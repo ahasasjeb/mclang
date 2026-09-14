@@ -1,5 +1,114 @@
-不要被向后兼容绑架，对于目前处于原型期的项目那是个坏习惯
-不要做非必要测试，每添加一个单元测试都要想真的有必要吗
-避免上帝类
-Minecraft数据包编程语言
-主动更新语言文档
+# mclang 项目说明与开发规范
+
+## 项目是什么
+
+mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言及其 Rust 编译器。编译器把
+`.mcl` 源文件编译成可直接放进世界 `datapacks` 目录的数据包，并在编译期报告词法、语法和语义错误。
+
+- 语言提供命名空间、全局计分变量、函数与参数、score 返回值、`let` 词法局部变量、`if`/`while`、
+  实体查询、物品定义、`give`、`self` 操作、`message`/`sound`、`schedule` 和 JSON 资源等结构化语法；
+  `run`/`execute` 是底层逃生口，`--deny-raw` 可以强制整个项目只用结构化语法。
+- 关键词中英文等价且可混用，两种写法必须生成逐字节相同的产物。
+- 目标版本固定为仓库内 `minecraft_client_26.3-rc-2/` 源码，数据包格式 `121.0`。
+- 依赖只有 `serde_json`，Rust edition 2024。
+- 命令行：
+  - `mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]`
+  - `mclang check <源文件.mcl|项目目录> [--deny-raw]`
+  - `mclang help` / `mclang version`
+- 默认输出到 `build/<项目名>`；`.mclang-manifest` 记录上次产物，重建只清理自己上次生成的文件。
+
+编译流水线：
+
+```text
+.mcl 源文件
+  → lexer 词法分析
+  → parser 递归下降解析（AST）
+  → lib.rs 多文件合并、命名空间一致性检查
+  → compiler/validate 只读语义检查（一次返回全部诊断）
+  → compiler/codegen 生成函数、辅助函数、pack.mcmeta、资源与函数标签
+  → lib.rs 写入输出目录
+```
+
+## 目录结构
+
+| 位置 | 职责 |
+| --- | --- |
+| `src/main.rs` | 命令行参数解析与入口 |
+| `src/lib.rs` | 项目级编排：发现/读取源文件、跨文件合并、写数据包 |
+| `src/lexer.rs` | 词法分析 |
+| `src/ast.rs` | AST 与源范围定义 |
+| `src/parser/` | 递归下降解析：`mod.rs`（游标导航与顶层分派）、`declarations`、`statements`、`conditions`、`expressions`、`keywords` |
+| `src/compiler/mod.rs` | `compile()` 入口与 `CompiledPack` |
+| `src/compiler/types.rs` | 校验与生成共享的内部类型 |
+| `src/compiler/constant.rs` | 编译期常量折叠 |
+| `src/compiler/validate/` | 只读语义检查：`rules`（名称/路径/标签等规则）、`items`、`statements`、`recursion` |
+| `src/compiler/codegen/` | 代码生成：`statements`（语句与辅助函数）、`expressions`、`names`（假玩家/objective）、`emit`（命令与 JSON 格式化） |
+| `docs/` | 语言与编译器文档 |
+| `examples/` | 端到端示例项目 |
+
+模块只向下依赖：`ast` 不认识其他模块；`validate` 只读 AST 并产出 `Diagnostic`；`codegen` 只处理已经
+通过检查的程序，不再报告用户错误（可以 `expect` 验证阶段已经保证的前提）。
+
+## 规范要求
+
+### 通用
+
+- 不要被向后兼容绑架，对于目前处于原型期的项目那是个坏习惯：可以随时调整语法、命名和内部 API，
+  不保留兼容层、废弃代码或迁移脚本。
+- 避免上帝类：
+  - 一个类型只承担一个职责，模块边界要与职责对应（校验、生成、命名、格式化各自独立）。
+  - 单个文件接近或超过 500 行时，先检查是否混合了多种职责；超过 800 行必须按职责拆分。
+  - 单个类型的方法超过约 30 个时，先按职责归类；如果归类后仍显臃肿，再拆分类型本身。
+  - 单个函数超过约 80 行时，拆成“分派函数 + 每个分支的小函数”。
+  - 状态型类型（如 `Compiler`、`Parser`）允许把 `impl` 分散到子模块，但状态字段只保留一处；
+    跨子模块调用的方法标 `pub(super)`，不要扩大可见性。
+- 人类可读优先：命名表意，注释解释“为什么”而不是复述代码。
+- 生成结果必须可复现：使用 `BTreeMap`/稳定哈希，不要在输出里引入随机顺序。
+
+### 测试
+
+- 不要做非必要测试，每添加一个单元测试都要想真的有必要吗。
+- 测试针对行为：断言生成的命令、JSON 和文件结构，不测私有实现细节。
+- 改动编译器后必须运行 `cargo fmt`、`cargo clippy --all-targets`、`cargo test`，保持零警告。
+- 语言或代码生成逻辑变化导致产物变化时，同步更新 `src/compiler/tests.rs` 中的断言。
+
+### 文档
+
+- 主动更新语言文档：语法、语义或运行时行为变化必须同步 `docs/language-reference.md`；编译器设计
+  变化同步 `docs/compiler-design.md`；面向用户的工作流变化同步 `docs/quickstart.md`。
+- 新增能力后在 `DEVELOPMENT_PLAN.md` 勾选对应条目，并在 `examples/` 提供或更新示例。
+- 不要主动创建 README.md。
+
+### 语言与目标版本
+
+- 一切以仓库内的 `minecraft_client_26.3-rc-2/` 源码和注册表为准，不要凭记忆猜资源类型、注册表
+  路径或命令签名；数据包格式保持 `121.0`。
+- 新增关键词必须同时提供中英文写法，并保证两种写法产物逐字节一致。
+- 代码标识符、内部符号和注释使用 ASCII/英文；用户消息和诊断使用中文。
+- 诊断信息要包含具体标识符、期望值和源位置。
+
+### 依赖与提交
+
+- 尽量不新增依赖；确需新依赖时先说明理由。
+- 只有用户明确要求时才 `git commit`、`git push`。
+
+## 常用命令
+
+```powershell
+cargo fmt
+cargo clippy --all-targets
+cargo test
+
+# 编译并检查示例
+cargo run -- build examples/portable_chest
+cargo run -- check examples/multi_counter --deny-raw
+cargo run -- build examples/give_reward.mcl -o build/give_reward --description "奖励示例"
+```
+
+## 文档索引
+
+- `docs/language-reference.md`：完整的语言语法与语义参考。
+- `docs/language-design.md`：语言设计取舍。
+- `docs/compiler-design.md`：编译流水线、代码生成约定和 26.3-rc-2 兼容依据。
+- `docs/quickstart.md`：从零构建第一个数据包。
+- `DEVELOPMENT_PLAN.md`：已完成能力与后续路线。

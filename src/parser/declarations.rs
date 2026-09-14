@@ -1,0 +1,526 @@
+//! 顶层声明：命名空间内的计分、实体查询、物品、存储、资源和函数。
+//!
+//! 无符号整数与资源路径的读取辅助函数也放在这里，供语句和条件子模块复用。
+
+use crate::ast::*;
+use crate::diagnostic::Diagnostic;
+use crate::lexer::TokenKind;
+
+use super::Parser;
+use super::keywords::{
+    boolean_word, entity_sort, item_property, item_stack_property, query_property, rarity_value,
+};
+
+impl Parser {
+    pub(super) fn score(&mut self) -> Result<ScoreDecl, Diagnostic> {
+        let start = self.expect_word("score")?.span;
+        let (name, _) = self.ident("计分变量名称")?;
+        self.expect(
+            TokenKind::Equal,
+            "计分变量需要初始值，例如 `score count = 0;`",
+        )?;
+        let sign = if self.take(&TokenKind::Minus).is_some() {
+            -1_i64
+        } else {
+            1
+        };
+        let token = self.advance().clone();
+        let TokenKind::Number(number) = token.kind else {
+            return Err(Diagnostic::new("初始值必须是整数常量", token.span));
+        };
+        let signed = number
+            .checked_mul(sign)
+            .ok_or_else(|| Diagnostic::new("整数超出 32 位范围", token.span))?;
+        let initial =
+            i32::try_from(signed).map_err(|_| Diagnostic::new("整数超出 32 位范围", token.span))?;
+        let end = self
+            .expect(TokenKind::Semicolon, "计分变量声明后需要 `;`")?
+            .span;
+        Ok(ScoreDecl {
+            name,
+            initial,
+            span: start.merge(end),
+        })
+    }
+
+    pub(super) fn query(&mut self) -> Result<EntityQueryDecl, Diagnostic> {
+        let start = self.expect_word("query")?.span;
+        let (name, _) = self.ident("查询名称")?;
+        self.expect(TokenKind::Equal, "查询名称后需要 `=`")?;
+        self.expect_word("entity")?;
+        self.expect(TokenKind::LeftParen, "entity 后需要 `(`")?;
+        let (entity_type, _) = self.string("entity 需要实体类型字符串")?;
+        self.expect(TokenKind::RightParen, "实体类型后需要 `)`")?;
+        self.expect(TokenKind::LeftBrace, "实体查询需要 `{`")?;
+
+        let mut tags = Vec::new();
+        let mut excluded_tags = Vec::new();
+        let mut limit = None;
+        let mut sort = None;
+        let mut within = None;
+        let mut item = None;
+        while !self.check(&TokenKind::RightBrace) {
+            if self.check(&TokenKind::Eof) {
+                return Err(Diagnostic::new("实体查询缺少 `}`", self.current().span));
+            }
+            let (property, property_span) = self.ident("查询属性")?;
+            let Some(property_kind) = query_property(&property) else {
+                return Err(Diagnostic::new(
+                    format!("未知实体查询属性 `{property}`"),
+                    property_span,
+                ));
+            };
+            match property_kind {
+                "tag" | "without_tag" => {
+                    self.expect(TokenKind::LeftParen, "查询属性后需要 `(`")?;
+                    let (value, _) = self.string("标签需要字符串")?;
+                    self.expect(TokenKind::RightParen, "标签后需要 `)`")?;
+                    self.expect(TokenKind::Semicolon, "查询属性后需要 `;`")?;
+                    if property_kind == "tag" {
+                        tags.push(value);
+                    } else {
+                        excluded_tags.push(value);
+                    }
+                }
+                "limit" => {
+                    if limit.is_some() {
+                        return Err(Diagnostic::new("查询只能声明一次 limit", property_span));
+                    }
+                    limit = Some(self.unsigned_call("limit")?);
+                }
+                "within" => {
+                    if within.is_some() {
+                        return Err(Diagnostic::new("查询只能声明一次 within", property_span));
+                    }
+                    within = Some(self.unsigned_call("within")?);
+                }
+                "sort" => {
+                    if sort.is_some() {
+                        return Err(Diagnostic::new("查询只能声明一次 sort", property_span));
+                    }
+                    self.expect(TokenKind::LeftParen, "sort 后需要 `(`")?;
+                    let (value, span) = self.ident("排序方式")?;
+                    sort = Some(match entity_sort(&value) {
+                        Some("nearest") => EntitySort::Nearest,
+                        Some("furthest") => EntitySort::Furthest,
+                        Some("random") => EntitySort::Random,
+                        Some("arbitrary") => EntitySort::Arbitrary,
+                        _ => {
+                            return Err(Diagnostic::new(
+                                "排序方式只能是 nearest/最近、furthest/最远、random/随机或 arbitrary/任意",
+                                span,
+                            ));
+                        }
+                    });
+                    self.expect(TokenKind::RightParen, "排序方式后需要 `)`")?;
+                    self.expect(TokenKind::Semicolon, "查询属性后需要 `;`")?;
+                }
+                "item" => {
+                    if item.is_some() {
+                        return Err(Diagnostic::new(
+                            "查询只能声明一个 item 过滤器",
+                            property_span,
+                        ));
+                    }
+                    item = Some(self.item_filter(property_span)?);
+                }
+                _ => unreachable!(),
+            }
+        }
+        let end = self.advance().span;
+        self.take(&TokenKind::Semicolon);
+        Ok(EntityQueryDecl {
+            name,
+            entity_type,
+            tags,
+            excluded_tags,
+            limit,
+            sort,
+            within,
+            item,
+            span: start.merge(end),
+        })
+    }
+
+    fn item_filter(&mut self, start: Span) -> Result<ItemFilter, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "item 后需要 `(`")?;
+        let (slot, _) = self.ident("物品槽名称")?;
+        let slot = if slot == "内容" {
+            "contents".to_owned()
+        } else {
+            slot
+        };
+        self.expect(TokenKind::RightParen, "物品槽后需要 `)`")?;
+        self.expect(TokenKind::LeftBrace, "item 过滤器需要 `{`")?;
+        let mut item_id = None;
+        let mut count = None;
+        let mut custom_name = None;
+        while !self.check(&TokenKind::RightBrace) {
+            if self.check(&TokenKind::Eof) {
+                return Err(Diagnostic::new("item 过滤器缺少 `}`", self.current().span));
+            }
+            let (property, span) = self.ident("item 属性")?;
+            self.expect(TokenKind::Equal, "item 属性后需要 `=`")?;
+            let Some(property_kind) = item_property(&property) else {
+                return Err(Diagnostic::new(
+                    format!("未知 item 属性 `{property}`"),
+                    span,
+                ));
+            };
+            match property_kind {
+                "id" => {
+                    if item_id.is_some() {
+                        return Err(Diagnostic::new("item.id 只能声明一次", span));
+                    }
+                    item_id = Some(self.string("item.id 需要物品类型字符串")?.0);
+                }
+                "count" => {
+                    if count.is_some() {
+                        return Err(Diagnostic::new("item.count 只能声明一次", span));
+                    }
+                    count = Some(self.unsigned("item.count")?);
+                }
+                "custom_name" => {
+                    if custom_name.is_some() {
+                        return Err(Diagnostic::new("item.custom_name 只能声明一次", span));
+                    }
+                    custom_name = Some(self.string("item.custom_name 需要文本字符串")?.0);
+                }
+                _ => unreachable!(),
+            }
+            self.expect(TokenKind::Semicolon, "item 属性后需要 `;`")?;
+        }
+        let end = self.advance().span;
+        let Some(item_id) = item_id else {
+            return Err(Diagnostic::new("item 过滤器必须声明 id", start.merge(end)));
+        };
+        Ok(ItemFilter {
+            slot,
+            item_id,
+            count,
+            custom_name,
+            span: start.merge(end),
+        })
+    }
+
+    pub(super) fn item_stack(&mut self) -> Result<ItemStackDecl, Diagnostic> {
+        let start = self.expect_word("item")?.span;
+        let (name, _) = self.ident("物品定义名称")?;
+        self.expect(TokenKind::Equal, "物品定义名称后需要 `=`")?;
+        self.expect_word("item_stack")?;
+        self.expect(TokenKind::LeftParen, "item_stack 后需要 `(`")?;
+        let (item_id, _) = self.string("item_stack 需要物品资源位置")?;
+        self.expect(TokenKind::RightParen, "物品资源位置后需要 `)`")?;
+        self.expect(TokenKind::LeftBrace, "物品定义需要 `{`")?;
+
+        let mut count = 1;
+        let mut has_count = false;
+        let mut custom_name = None;
+        let mut item_name = None;
+        let mut lore = Vec::new();
+        let mut enchantments = Vec::new();
+        let mut stored_enchantments = Vec::new();
+        let mut damage = None;
+        let mut max_damage = None;
+        let mut max_stack_size = None;
+        let mut rarity = None;
+        let mut item_model = None;
+        let mut dyed_color = None;
+        let mut enchantment_glint_override = None;
+        let mut unbreakable = false;
+        let mut has_unbreakable = false;
+        while !self.check(&TokenKind::RightBrace) {
+            if self.check(&TokenKind::Eof) {
+                return Err(Diagnostic::new("物品定义缺少 `}`", self.current().span));
+            }
+            let (property, span) = self.ident("物品定义属性")?;
+            let Some(property_kind) = item_stack_property(&property) else {
+                return Err(Diagnostic::new(
+                    format!("未知物品定义属性 `{property}`"),
+                    span,
+                ));
+            };
+            match property_kind {
+                "count" => {
+                    if has_count {
+                        return Err(Diagnostic::new("物品数量只能声明一次", span));
+                    }
+                    has_count = true;
+                    self.expect(TokenKind::Equal, "count 后需要 `=`")?;
+                    count = self.unsigned("物品数量")?;
+                    self.expect(TokenKind::Semicolon, "物品数量后需要 `;`")?;
+                }
+                "custom_name" => {
+                    if custom_name.is_some() {
+                        return Err(Diagnostic::new("物品自定义名称只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "custom_name 后需要 `=`")?;
+                    custom_name = Some(self.string("custom_name 需要文本字符串")?.0);
+                    self.expect(TokenKind::Semicolon, "物品自定义名称后需要 `;`")?;
+                }
+                "item_name" => {
+                    if item_name.is_some() {
+                        return Err(Diagnostic::new("物品名称只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "item_name 后需要 `=`")?;
+                    item_name = Some(self.string("item_name 需要文本字符串")?.0);
+                    self.expect(TokenKind::Semicolon, "物品名称后需要 `;`")?;
+                }
+                "rarity" => {
+                    if rarity.is_some() {
+                        return Err(Diagnostic::new("物品稀有度只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "rarity 后需要 `=`")?;
+                    let (value, value_span) = self.ident("稀有度名称")?;
+                    let Some(value) = rarity_value(&value) else {
+                        return Err(Diagnostic::new(
+                            "稀有度只能是 common、uncommon、rare 或 epic",
+                            value_span,
+                        ));
+                    };
+                    rarity = Some(value);
+                    self.expect(TokenKind::Semicolon, "稀有度后需要 `;`")?;
+                }
+                "item_model" => {
+                    if item_model.is_some() {
+                        return Err(Diagnostic::new("物品模型只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "item_model 后需要 `=`")?;
+                    item_model = Some(self.string("item_model 需要物品模型资源位置")?.0);
+                    self.expect(TokenKind::Semicolon, "物品模型后需要 `;`")?;
+                }
+                "lore" => {
+                    self.expect(TokenKind::LeftParen, "lore 后需要 `(`")?;
+                    lore.push(self.string("lore 需要文本字符串")?.0);
+                    self.expect(TokenKind::RightParen, "lore 文本后需要 `)`")?;
+                    self.expect(TokenKind::Semicolon, "lore 后需要 `;`")?;
+                }
+                "enchantment" | "stored_enchantment" => {
+                    self.expect(TokenKind::LeftParen, "enchantment 后需要 `(`")?;
+                    let (enchantment_id, enchantment_span) =
+                        self.string("enchantment 需要附魔资源位置")?;
+                    self.expect(TokenKind::Comma, "附魔资源位置后需要 `,`")?;
+                    let level = self.unsigned("附魔等级")?;
+                    self.expect(TokenKind::RightParen, "附魔等级后需要 `)`")?;
+                    self.expect(TokenKind::Semicolon, "enchantment 后需要 `;`")?;
+                    let enchantment = ItemEnchantment {
+                        enchantment_id,
+                        level,
+                        span: enchantment_span,
+                    };
+                    if property_kind == "enchantment" {
+                        enchantments.push(enchantment);
+                    } else {
+                        stored_enchantments.push(enchantment);
+                    }
+                }
+                "damage" => {
+                    if damage.is_some() {
+                        return Err(Diagnostic::new("物品损伤值只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "damage 后需要 `=`")?;
+                    damage = Some(self.unsigned("物品损伤值")?);
+                    self.expect(TokenKind::Semicolon, "物品损伤值后需要 `;`")?;
+                }
+                "max_damage" => {
+                    if max_damage.is_some() {
+                        return Err(Diagnostic::new("物品最大损伤值只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "max_damage 后需要 `=`")?;
+                    max_damage = Some(self.unsigned("物品最大损伤值")?);
+                    self.expect(TokenKind::Semicolon, "物品最大损伤值后需要 `;`")?;
+                }
+                "max_stack_size" => {
+                    if max_stack_size.is_some() {
+                        return Err(Diagnostic::new("物品最大堆叠数只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "max_stack_size 后需要 `=`")?;
+                    max_stack_size = Some(self.unsigned("物品最大堆叠数")?);
+                    self.expect(TokenKind::Semicolon, "物品最大堆叠数后需要 `;`")?;
+                }
+                "dyed_color" => {
+                    if dyed_color.is_some() {
+                        return Err(Diagnostic::new("物品染色只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "dyed_color 后需要 `=`")?;
+                    dyed_color = Some(self.unsigned("物品染色 RGB 值")?);
+                    self.expect(TokenKind::Semicolon, "物品染色后需要 `;`")?;
+                }
+                "enchantment_glint_override" => {
+                    if enchantment_glint_override.is_some() {
+                        return Err(Diagnostic::new("附魔光效覆盖只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "enchantment_glint_override 后需要 `=`")?;
+                    let (value, value_span) = self.ident("true 或 false")?;
+                    enchantment_glint_override = Some(match boolean_word(&value) {
+                        Some("true") => true,
+                        Some("false") => false,
+                        _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
+                    });
+                    self.expect(TokenKind::Semicolon, "附魔光效覆盖后需要 `;`")?;
+                }
+                "unbreakable" => {
+                    if has_unbreakable {
+                        return Err(Diagnostic::new("unbreakable 只能声明一次", span));
+                    }
+                    has_unbreakable = true;
+                    self.expect(TokenKind::Equal, "unbreakable 后需要 `=`")?;
+                    let (value, value_span) = self.ident("true 或 false")?;
+                    unbreakable = match boolean_word(&value) {
+                        Some("true") => true,
+                        Some("false") => false,
+                        _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
+                    };
+                    self.expect(TokenKind::Semicolon, "unbreakable 后需要 `;`")?;
+                }
+                _ => unreachable!(),
+            }
+        }
+        let end = self.advance().span;
+        self.take(&TokenKind::Semicolon);
+        Ok(ItemStackDecl {
+            name,
+            item_id,
+            count,
+            custom_name,
+            item_name,
+            lore,
+            enchantments,
+            stored_enchantments,
+            damage,
+            max_damage,
+            max_stack_size,
+            rarity,
+            item_model,
+            dyed_color,
+            enchantment_glint_override,
+            unbreakable,
+            span: start.merge(end),
+        })
+    }
+
+    pub(super) fn storage(&mut self) -> Result<StorageDecl, Diagnostic> {
+        let start = self.expect_word("storage")?.span;
+        let (name, _) = self.ident("存储名称")?;
+        self.expect(TokenKind::Equal, "存储名称后需要 `=`")?;
+        self.expect_word("items")?;
+        self.expect(TokenKind::LeftParen, "items 后需要 `(`")?;
+        let (storage_id, _) = self.string("items 需要存储资源位置")?;
+        self.expect(TokenKind::Comma, "存储资源位置后需要 `,`")?;
+        let (path, _) = self.string("items 需要 NBT 路径")?;
+        self.expect(TokenKind::RightParen, "存储声明缺少 `)`")?;
+        let end = self
+            .expect(TokenKind::Semicolon, "存储声明后需要 `;`")?
+            .span;
+        Ok(StorageDecl {
+            name,
+            storage_id,
+            path,
+            span: start.merge(end),
+        })
+    }
+
+    pub(super) fn resource(&mut self) -> Result<ResourceDecl, Diagnostic> {
+        let start = self.expect_word("resource")?.span;
+        let (kind, _) = self.resource_path("资源类型")?;
+        let kind = if kind == "谓词" {
+            "predicate".to_owned()
+        } else {
+            kind
+        };
+        let (name, _) = self.resource_path("资源名称")?;
+        self.expect(TokenKind::Equal, "资源名称后需要 `=`")?;
+        let (json, _) = self.string("资源内容需要 JSON 字符串")?;
+        let end = self
+            .expect(TokenKind::Semicolon, "资源声明后需要 `;`")?
+            .span;
+        Ok(ResourceDecl {
+            kind,
+            name,
+            json,
+            span: start.merge(end),
+        })
+    }
+
+    pub(super) fn resource_path(&mut self, expected: &str) -> Result<(String, Span), Diagnostic> {
+        let token = self.advance().clone();
+        match token.kind {
+            TokenKind::Ident(value) | TokenKind::String(value) => Ok((value, token.span)),
+            _ => Err(Diagnostic::new(
+                format!("这里需要{expected}标识符或字符串"),
+                token.span,
+            )),
+        }
+    }
+
+    pub(super) fn function(&mut self) -> Result<Function, Diagnostic> {
+        let mut attributes = Vec::new();
+        let start = self.current().span;
+        while self.take(&TokenKind::At).is_some() {
+            let (attribute, span) = self.ident("属性名称")?;
+            attributes.push(match attribute.as_str() {
+                "load" | "加载" => Attribute::Load,
+                "tick" | "每刻" => Attribute::Tick,
+                "entity" | "实体" => Attribute::Entity,
+                "player" | "玩家" => Attribute::Player,
+                _ => {
+                    return Err(Diagnostic::new(
+                        format!("未知函数属性 `@{attribute}`"),
+                        span,
+                    ));
+                }
+            });
+        }
+        self.expect_word("fn")?;
+        let (name, _) = self.ident("函数名称")?;
+        self.expect(TokenKind::LeftParen, "函数名称后需要 `(`")?;
+        let mut parameters = Vec::new();
+        if !self.check(&TokenKind::RightParen) {
+            loop {
+                let (name, span) = self.ident("参数名称")?;
+                parameters.push(Parameter { name, span });
+                if self.take(&TokenKind::Comma).is_none() {
+                    break;
+                }
+            }
+        }
+        self.expect(TokenKind::RightParen, "参数列表缺少 `)`")?;
+        let returns_score = if self.take(&TokenKind::Arrow).is_some() {
+            self.expect_word("score")?;
+            true
+        } else {
+            false
+        };
+        let (body, end) = self.block()?;
+        Ok(Function {
+            name,
+            parameters,
+            returns_score,
+            attributes,
+            body,
+            span: start.merge(end),
+        })
+    }
+
+    fn unsigned_call(&mut self, name: &str) -> Result<u32, Diagnostic> {
+        self.expect(TokenKind::LeftParen, &format!("{name} 后需要 `(`"))?;
+        let value = self.unsigned(name)?;
+        self.expect(TokenKind::RightParen, &format!("{name} 后需要 `)`"))?;
+        self.expect(TokenKind::Semicolon, "查询属性后需要 `;`")?;
+        Ok(value)
+    }
+
+    pub(super) fn unsigned(&mut self, name: &str) -> Result<u32, Diagnostic> {
+        self.unsigned_with_span(name).map(|(value, _)| value)
+    }
+
+    pub(super) fn unsigned_with_span(&mut self, name: &str) -> Result<(u32, Span), Diagnostic> {
+        let token = self.advance().clone();
+        let TokenKind::Number(value) = token.kind else {
+            return Err(Diagnostic::new(format!("{name} 需要非负整数"), token.span));
+        };
+        let value = u32::try_from(value)
+            .map_err(|_| Diagnostic::new(format!("{name} 超出范围"), token.span))?;
+        Ok((value, token.span))
+    }
+}
