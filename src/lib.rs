@@ -93,7 +93,8 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
                 else_body,
                 ..
             } => raw_count_in_block(then_body) + raw_count_in_block(else_body),
-            ast::StatementKind::SelfAction(_)
+            ast::StatementKind::Give { .. }
+            | ast::StatementKind::SelfAction(_)
             | ast::StatementKind::Message { .. }
             | ast::StatementKind::PlaySound { .. }
             | ast::StatementKind::Call { .. }

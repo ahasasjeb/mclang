@@ -3,9 +3,11 @@
 物品 welcome_gift = 物品堆("minecraft:diamond_pickaxe") {
     数量 = 1;
     自定义名称 = "开拓者之镐";
+    物品名称 = "钻石镐";
     描述("由 Mclang 类型化物品系统生成");
     附魔("minecraft:efficiency", 3);
     附魔("minecraft:unbreaking", 2);
+    稀有度 = 稀有;
     无法破坏 = 真;
 }
 
@@ -15,8 +17,9 @@
 
 @每刻
 函数 grant_once() {
+    // 结构化 give 语句：目标、物品、可选数量一步到位。
+    给予(new_players, welcome_gift);
     遍历(new_players) {
-        自身.给予物品(welcome_gift);
         自身.添加标签("give_reward_received");
         消息.自身("已收到欢迎礼物。", 绿色);
     }

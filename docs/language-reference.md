@@ -21,7 +21,8 @@
 | `call` | `调用` | `schedule` | `调度` |
 | `after` | `延后` | `append` | `追加` |
 | `replace` | `替换` | `each` | `遍历` |
-| `in_dimension` | `在维度` | `spawn` | `召唤` |
+| `give` | `给予` | `in_dimension` | `在维度` |
+| `spawn` | `召唤` |  |  |
 | `self` | `自身` | `message` | `消息` |
 | `sound` | `声音` | `run` | `原生命令` |
 | `execute` | `原生执行` |  |  |
@@ -37,9 +38,13 @@
 | `sort` | `排序` | `item` | `物品` |
 | `contents` | `内容` | `id` | `类型` |
 | `count` | `数量` | `custom_name` | `自定义名称` |
-| `lore` | `描述` | `enchantment` | `附魔` |
-| `stored_enchantment` | `存储附魔` | `damage` | `损伤` |
-| `unbreakable` | `无法破坏` | `give_item` | `给予物品` |
+| `item_name` | `物品名称` | `rarity` | `稀有度` |
+| `item_model` | `物品模型` | `max_stack_size` | `最大堆叠` |
+| `max_damage` | `最大损伤` | `dyed_color` | `染色` |
+| `enchantment_glint_override` | `附魔光效` | `lore` | `描述` |
+| `enchantment` | `附魔` | `stored_enchantment` | `存储附魔` |
+| `damage` | `损伤` | `unbreakable` | `无法破坏` |
+| `give_item` | `给予物品` |  |  |
 | `add_tag` | `添加标签` | `remove_tag` | `移除标签` |
 | `set_invulnerable` | `设置无敌` | `save_items` | `保存物品` |
 | `restore_items` | `恢复物品` | `remove_preserving_items` | `保存并移除` |
@@ -52,6 +57,7 @@
 | --- | --- | --- |
 | 消息目标 | `all` / `self` / `nearest` | `全部` / `自身` / `最近` |
 | 查询排序 | `nearest` / `furthest` / `random` / `arbitrary` | `最近` / `最远` / `随机` / `任意` |
+| 物品稀有度 | `common` / `uncommon` / `rare` / `epic` | `普通` / `罕见` / `稀有` / `史诗` |
 | 布尔值 | `true` / `false` | `真` / `假` |
 | 调度单位 | `t` / `s` / `d` | `刻` / `秒` / `天` |
 | 声音分类 | `master` / `music` / `record` / `weather` / `block` | `主音量` / `音乐` / `唱片` / `天气` / `方块` |
@@ -74,8 +80,8 @@
 函数 tick() {
     ticks += 1;
     如果 ticks >= 100 {
+        给予(players, reward);
         遍历(players) {
-            自身.给予物品(reward);
             声音.自身("minecraft:block.note_block.pling", 主音量);
             消息.自身("已经过五秒。", 金色);
         }
@@ -218,7 +224,7 @@ fn reward_current_player() {
 
 ## 类型化物品与给予
 
-物品先声明为可复用的类型化值，再给予玩家：
+物品先声明为可复用的类型化值，再给予玩家。`give` 语句直接对应原版 `give <目标> <物品> [<数量>]` 的形状：
 
 ```mcl
 item welcome_gift = item_stack("minecraft:emerald") {
@@ -233,17 +239,42 @@ item welcome_gift = item_stack("minecraft:emerald") {
 query players = entity("minecraft:player") {}
 
 fn grant() {
-    each(players) {
-        self.give_item(welcome_gift);
-    }
+    give(players, welcome_gift);       // 使用物品定义的 count
+    give(players, welcome_gift, 64);   // 本次给予 64 个
+}
+
+@player
+fn grant_self() {
+    self.give_item(welcome_gift);      // 当前玩家，使用物品定义的 count
+    self.give_item(welcome_gift, 5);   // 当前玩家，本次给予 5 个
 }
 ```
 
-`count` 默认为 1，范围为 1 到 100。这个上限来自 Minecraft 26.3 `GiveCommand` 的 100 个物品堆保护限制，并保证对最大堆叠数为 1 的物品也有效。`custom_name` 可选，`lore` 可以重复声明，最多 256 行。
+`give` 的目标必须是 `minecraft:player` 类型的查询；编译器为每个匹配玩家生成 `execute as <选择器> at @s run give @s ...`。`self.give_item` 是当前玩家上下文的简写，只能用于玩家查询建立的 `each` 块或 `@player` 函数。
 
-`enchantment(id, level)` 添加普通附魔，`stored_enchantment(id, level)` 添加附魔书使用的存储附魔；二者的等级范围均为 1 到 255，同一种附魔不能在同一类中重复。`damage` 是非负的物品损伤值，`unbreakable = true` 添加无法破坏组件。它们也可以使用中文形式 `附魔`、`存储附魔`、`损伤` 和 `无法破坏`。
+数量省略时使用物品定义的 `count`，显式数量总是覆盖它。与 26.3 `GiveCommand` 一致，数量上限是物品最大堆叠数乘以 100：未声明 `max_stack_size` 时物品的原型堆叠数至少为 1，因此保守上限为 100；声明 `max_stack_size = n` 后上限为 `n × 100`。
 
-编译器检查定义名称、物品与附魔资源位置、数量、等级、文本和引用，并生成 `/give` 所需的物品组件语法。`self.give_item` 只接受已声明物品，并且只能用于玩家查询建立的上下文或 `@player` 函数。
+物品定义的可选组件：
+
+| 写法 | 组件 | 说明 |
+| --- | --- | --- |
+| `custom_name = "..."` | `minecraft:custom_name` | 自定义名称，物品栏中显示为斜体 |
+| `item_name = "..."` | `minecraft:item_name` | 基础物品名称，不带斜体 |
+| `lore("...")` | `minecraft:lore` | 描述行，最多 256 行 |
+| `enchantment(id, level)` | `minecraft:enchantments` | 普通附魔，等级 1 到 255 |
+| `stored_enchantment(id, level)` | `minecraft:stored_enchantments` | 附魔书的存储附魔 |
+| `damage = n` | `minecraft:damage` | 当前损伤值，非负 |
+| `max_damage = n` | `minecraft:max_damage` | 最大损伤值，正整数 |
+| `max_stack_size = n` | `minecraft:max_stack_size` | 最大堆叠数，1 到 99 |
+| `rarity = 稀有度` | `minecraft:rarity` | `common`、`uncommon`、`rare` 或 `epic` |
+| `item_model = "..."` | `minecraft:item_model` | 物品模型资源位置 |
+| `dyed_color = n` | `minecraft:dyed_color` | 0 到 16777215 的 RGB 颜色 |
+| `enchantment_glint_override = 真/假` | `minecraft:enchantment_glint_override` | 强制显示或隐藏附魔光效 |
+| `unbreakable = 真` | `minecraft:unbreakable` | 无法破坏 |
+
+`damage` 是非负的物品损伤值。大于 1 的 `max_stack_size` 不能和 `max_damage` 同时声明，因为 26.3 的 `ItemStack.validateStrict` 拒绝既可堆叠又可损伤的物品。
+
+编译器检查定义名称、物品与附魔资源位置、数量、等级、文本和引用，并生成 `give` 所需的物品组件语法。所有属性都可以写成中文形式，例如 `物品名称`、`稀有度`、`最大堆叠`、`染色` 和 `附魔光效`。
 
 ## 类型化物品存储
 

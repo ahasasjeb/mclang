@@ -225,10 +225,17 @@ impl Parser {
         let mut count = 1;
         let mut has_count = false;
         let mut custom_name = None;
+        let mut item_name = None;
         let mut lore = Vec::new();
         let mut enchantments = Vec::new();
         let mut stored_enchantments = Vec::new();
         let mut damage = None;
+        let mut max_damage = None;
+        let mut max_stack_size = None;
+        let mut rarity = None;
+        let mut item_model = None;
+        let mut dyed_color = None;
+        let mut enchantment_glint_override = None;
         let mut unbreakable = false;
         let mut has_unbreakable = false;
         while !self.check(&TokenKind::RightBrace) {
@@ -259,6 +266,37 @@ impl Parser {
                     self.expect(TokenKind::Equal, "custom_name 后需要 `=`")?;
                     custom_name = Some(self.string("custom_name 需要文本字符串")?.0);
                     self.expect(TokenKind::Semicolon, "物品自定义名称后需要 `;`")?;
+                }
+                "item_name" => {
+                    if item_name.is_some() {
+                        return Err(Diagnostic::new("物品名称只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "item_name 后需要 `=`")?;
+                    item_name = Some(self.string("item_name 需要文本字符串")?.0);
+                    self.expect(TokenKind::Semicolon, "物品名称后需要 `;`")?;
+                }
+                "rarity" => {
+                    if rarity.is_some() {
+                        return Err(Diagnostic::new("物品稀有度只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "rarity 后需要 `=`")?;
+                    let (value, value_span) = self.ident("稀有度名称")?;
+                    let Some(value) = rarity_value(&value) else {
+                        return Err(Diagnostic::new(
+                            "稀有度只能是 common、uncommon、rare 或 epic",
+                            value_span,
+                        ));
+                    };
+                    rarity = Some(value);
+                    self.expect(TokenKind::Semicolon, "稀有度后需要 `;`")?;
+                }
+                "item_model" => {
+                    if item_model.is_some() {
+                        return Err(Diagnostic::new("物品模型只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "item_model 后需要 `=`")?;
+                    item_model = Some(self.string("item_model 需要物品模型资源位置")?.0);
+                    self.expect(TokenKind::Semicolon, "物品模型后需要 `;`")?;
                 }
                 "lore" => {
                     self.expect(TokenKind::LeftParen, "lore 后需要 `(`")?;
@@ -293,6 +331,43 @@ impl Parser {
                     damage = Some(self.unsigned("物品损伤值")?);
                     self.expect(TokenKind::Semicolon, "物品损伤值后需要 `;`")?;
                 }
+                "max_damage" => {
+                    if max_damage.is_some() {
+                        return Err(Diagnostic::new("物品最大损伤值只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "max_damage 后需要 `=`")?;
+                    max_damage = Some(self.unsigned("物品最大损伤值")?);
+                    self.expect(TokenKind::Semicolon, "物品最大损伤值后需要 `;`")?;
+                }
+                "max_stack_size" => {
+                    if max_stack_size.is_some() {
+                        return Err(Diagnostic::new("物品最大堆叠数只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "max_stack_size 后需要 `=`")?;
+                    max_stack_size = Some(self.unsigned("物品最大堆叠数")?);
+                    self.expect(TokenKind::Semicolon, "物品最大堆叠数后需要 `;`")?;
+                }
+                "dyed_color" => {
+                    if dyed_color.is_some() {
+                        return Err(Diagnostic::new("物品染色只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "dyed_color 后需要 `=`")?;
+                    dyed_color = Some(self.unsigned("物品染色 RGB 值")?);
+                    self.expect(TokenKind::Semicolon, "物品染色后需要 `;`")?;
+                }
+                "enchantment_glint_override" => {
+                    if enchantment_glint_override.is_some() {
+                        return Err(Diagnostic::new("附魔光效覆盖只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "enchantment_glint_override 后需要 `=`")?;
+                    let (value, value_span) = self.ident("true 或 false")?;
+                    enchantment_glint_override = Some(match boolean_word(&value) {
+                        Some("true") => true,
+                        Some("false") => false,
+                        _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
+                    });
+                    self.expect(TokenKind::Semicolon, "附魔光效覆盖后需要 `;`")?;
+                }
                 "unbreakable" => {
                     if has_unbreakable {
                         return Err(Diagnostic::new("unbreakable 只能声明一次", span));
@@ -317,10 +392,17 @@ impl Parser {
             item_id,
             count,
             custom_name,
+            item_name,
             lore,
             enchantments,
             stored_enchantments,
             damage,
+            max_damage,
+            max_stack_size,
+            rarity,
+            item_model,
+            dyed_color,
+            enchantment_glint_override,
             unbreakable,
             span: start.merge(end),
         })
@@ -356,11 +438,17 @@ impl Parser {
     }
 
     fn unsigned(&mut self, name: &str) -> Result<u32, Diagnostic> {
+        self.unsigned_with_span(name).map(|(value, _)| value)
+    }
+
+    fn unsigned_with_span(&mut self, name: &str) -> Result<(u32, Span), Diagnostic> {
         let token = self.advance().clone();
         let TokenKind::Number(value) = token.kind else {
             return Err(Diagnostic::new(format!("{name} 需要非负整数"), token.span));
         };
-        u32::try_from(value).map_err(|_| Diagnostic::new(format!("{name} 超出范围"), token.span))
+        let value = u32::try_from(value)
+            .map_err(|_| Diagnostic::new(format!("{name} 超出范围"), token.span))?;
+        Ok((value, token.span))
     }
 
     fn resource(&mut self) -> Result<ResourceDecl, Diagnostic> {
@@ -497,6 +585,8 @@ impl Parser {
             self.expect(TokenKind::RightParen, "查询名称后需要 `)`")?;
             let (body, _) = self.block()?;
             StatementKind::Each { query, body }
+        } else if self.take_word("give").is_some() {
+            self.give_statement()?
         } else if self.take_word("in_dimension").is_some() {
             self.expect(TokenKind::LeftParen, "in_dimension 后需要 `(`")?;
             let (dimension, _) = self.string("in_dimension 需要维度资源位置")?;
@@ -614,6 +704,30 @@ impl Parser {
         })
     }
 
+    fn give_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "give 后需要 `(`")?;
+        let (target, _) = self.ident("give 需要玩家查询名称")?;
+        self.expect(TokenKind::Comma, "查询名称后需要 `,`")?;
+        let (item, _) = self.ident("give 需要物品定义名称")?;
+        let (count, count_span) = self.optional_count("give 数量")?;
+        self.expect(TokenKind::RightParen, "give 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "give 调用后需要 `;`")?;
+        Ok(StatementKind::Give {
+            target,
+            item,
+            count,
+            count_span,
+        })
+    }
+
+    fn optional_count(&mut self, name: &str) -> Result<(Option<u32>, Option<Span>), Diagnostic> {
+        if self.take(&TokenKind::Comma).is_none() {
+            return Ok((None, None));
+        }
+        let (count, span) = self.unsigned_with_span(name)?;
+        Ok((Some(count), Some(span)))
+    }
+
     fn self_action(&mut self) -> Result<SelfAction, Diagnostic> {
         self.expect(TokenKind::Dot, "self 后需要 `.`")?;
         let (method, span) = self.ident("self 方法名称")?;
@@ -639,19 +753,22 @@ impl Parser {
                 };
                 SelfAction::SetInvulnerable(value)
             }
-            "save_items" | "restore_items" | "remove_preserving_items" | "give_item" => {
-                let expected = if method_kind == "give_item" {
-                    "物品定义名称"
-                } else {
-                    "物品存储名称"
-                };
-                let (reference, _) = self.ident(expected)?;
+            "save_items" | "restore_items" | "remove_preserving_items" => {
+                let (reference, _) = self.ident("物品存储名称")?;
                 match method_kind {
                     "save_items" => SelfAction::SaveItems(reference),
                     "restore_items" => SelfAction::RestoreItems(reference),
                     "remove_preserving_items" => SelfAction::RemovePreservingItems(reference),
-                    "give_item" => SelfAction::GiveItem(reference),
                     _ => unreachable!(),
+                }
+            }
+            "give_item" => {
+                let (item, _) = self.ident("物品定义名称")?;
+                let (count, count_span) = self.optional_count("给予物品数量")?;
+                SelfAction::GiveItem {
+                    item,
+                    count,
+                    count_span,
                 }
             }
             "clear_items" => SelfAction::ClearItems,
@@ -1117,6 +1234,7 @@ fn keyword_alias(english: &str) -> Option<&'static str> {
         "resource" => Some("资源"),
         "fn" => Some("函数"),
         "each" => Some("遍历"),
+        "give" => Some("给予"),
         "in_dimension" => Some("在维度"),
         "spawn" => Some("召唤"),
         "self" => Some("自身"),
@@ -1164,11 +1282,28 @@ fn item_stack_property(value: &str) -> Option<&'static str> {
     match value {
         "count" | "数量" => Some("count"),
         "custom_name" | "自定义名称" => Some("custom_name"),
+        "item_name" | "物品名称" => Some("item_name"),
         "lore" | "描述" => Some("lore"),
         "enchantment" | "附魔" => Some("enchantment"),
         "stored_enchantment" | "存储附魔" => Some("stored_enchantment"),
         "damage" | "损伤" => Some("damage"),
+        "max_damage" | "最大损伤" => Some("max_damage"),
+        "max_stack_size" | "最大堆叠" => Some("max_stack_size"),
+        "rarity" | "稀有度" => Some("rarity"),
+        "item_model" | "物品模型" => Some("item_model"),
+        "dyed_color" | "染色" => Some("dyed_color"),
+        "enchantment_glint_override" | "附魔光效" => Some("enchantment_glint_override"),
         "unbreakable" | "无法破坏" => Some("unbreakable"),
+        _ => None,
+    }
+}
+
+fn rarity_value(value: &str) -> Option<ItemRarity> {
+    match value {
+        "common" | "普通" => Some(ItemRarity::Common),
+        "uncommon" | "罕见" => Some(ItemRarity::Uncommon),
+        "rare" | "稀有" => Some(ItemRarity::Rare),
+        "epic" | "史诗" => Some(ItemRarity::Epic),
         _ => None,
     }
 }

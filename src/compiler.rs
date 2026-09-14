@@ -34,7 +34,7 @@ struct StatementSymbols<'a> {
     parameters: &'a HashSet<&'a str>,
     functions: &'a HashMap<&'a str, Signature>,
     queries: &'a HashMap<&'a str, &'a EntityQueryDecl>,
-    item_stacks: &'a HashSet<&'a str>,
+    item_stacks: &'a HashMap<&'a str, &'a ItemStackDecl>,
     storages: &'a HashSet<&'a str>,
     predicates: &'a HashSet<&'a str>,
 }
@@ -93,10 +93,10 @@ fn validate(program: &Program) -> Vec<Diagnostic> {
         validate_entity_query(query, &mut diagnostics);
     }
 
-    let mut item_stacks = HashSet::new();
+    let mut item_stacks = HashMap::new();
     for item in &program.item_stacks {
         validate_identifier("物品定义", &item.name, item.span, &mut diagnostics);
-        if !item_stacks.insert(item.name.as_str()) {
+        if item_stacks.insert(item.name.as_str(), item).is_some() {
             diagnostics.push(Diagnostic::new(
                 format!("重复声明物品定义 `{}`", item.name),
                 item.span,
@@ -363,6 +363,7 @@ fn collect_synchronous_calls<'a>(statements: &'a [Statement], calls: &mut HashSe
             }
             StatementKind::Return(Some(value)) => collect_expr_calls(value, calls),
             StatementKind::Run(_)
+            | StatementKind::Give { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
@@ -524,6 +525,35 @@ fn function_context(function: &Function) -> ExecutionContext {
     }
 }
 
+/// `GiveCommand` 允许的数量上限是物品最大堆叠数乘以 100。
+/// 未声明 `max_stack_size` 时物品原型的最小堆叠数是 1，因此保守上限为 100。
+fn max_give_count(item: &ItemStackDecl) -> u32 {
+    item.max_stack_size.unwrap_or(1).saturating_mul(100)
+}
+
+fn validate_give_count(
+    item: &ItemStackDecl,
+    count: Option<u32>,
+    statement_span: Span,
+    count_span: Option<Span>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(count) = count else {
+        return;
+    };
+    let limit = max_give_count(item);
+    if count == 0 || count > limit {
+        diagnostics.push(Diagnostic::new(
+            format!(
+                "给予数量必须是 1 到 {limit}（`{}` 的最大堆叠数为 {}）",
+                item.name,
+                item.max_stack_size.unwrap_or(1)
+            ),
+            count_span.unwrap_or(statement_span),
+        ));
+    }
+}
+
 fn validate_item_stack(item: &ItemStackDecl, diagnostics: &mut Vec<Diagnostic>) {
     if !valid_resource_location(&item.item_id) {
         diagnostics.push(Diagnostic::new(
@@ -531,9 +561,10 @@ fn validate_item_stack(item: &ItemStackDecl, diagnostics: &mut Vec<Diagnostic>) 
             item.span,
         ));
     }
-    if item.count == 0 || item.count > 100 {
+    let count_limit = max_give_count(item);
+    if item.count == 0 || item.count > count_limit {
         diagnostics.push(Diagnostic::new(
-            "物品定义的 count 必须是 1 到 100",
+            format!("物品定义的 count 必须是 1 到 {count_limit}"),
             item.span,
         ));
     }
@@ -543,6 +574,7 @@ fn validate_item_stack(item: &ItemStackDecl, diagnostics: &mut Vec<Diagnostic>) 
     if item
         .custom_name
         .iter()
+        .chain(&item.item_name)
         .chain(&item.lore)
         .any(|text| text.chars().any(char::is_control))
     {
@@ -556,6 +588,49 @@ fn validate_item_stack(item: &ItemStackDecl, diagnostics: &mut Vec<Diagnostic>) 
     if item.damage.is_some_and(|damage| damage > i32::MAX as u32) {
         diagnostics.push(Diagnostic::new(
             "物品定义的 damage 不能超过 2147483647",
+            item.span,
+        ));
+    }
+    if item
+        .max_damage
+        .is_some_and(|max_damage| max_damage == 0 || max_damage > i32::MAX as u32)
+    {
+        diagnostics.push(Diagnostic::new(
+            "物品定义的 max_damage 必须是 1 到 2147483647",
+            item.span,
+        ));
+    }
+    if item
+        .max_stack_size
+        .is_some_and(|max_stack_size| max_stack_size == 0 || max_stack_size > 99)
+    {
+        diagnostics.push(Diagnostic::new(
+            "物品定义的 max_stack_size 必须是 1 到 99",
+            item.span,
+        ));
+    }
+    if item.max_stack_size.is_some_and(|size| size > 1) && item.max_damage.is_some() {
+        diagnostics.push(Diagnostic::new(
+            "物品不能同时设置大于 1 的 max_stack_size 和 max_damage",
+            item.span,
+        ));
+    }
+    if item
+        .item_model
+        .as_deref()
+        .is_some_and(|model| !valid_resource_location(model))
+    {
+        diagnostics.push(Diagnostic::new(
+            format!(
+                "`{}` 不是有效的物品模型资源位置",
+                item.item_model.as_deref().unwrap_or_default()
+            ),
+            item.span,
+        ));
+    }
+    if item.dyed_color.is_some_and(|color| color > 0x00ff_ffff) {
+        diagnostics.push(Diagnostic::new(
+            "物品定义的 dyed_color 必须是 0 到 16777215 的 RGB 值",
             item.span,
         ));
     }
@@ -823,6 +898,7 @@ fn collect_local_declarations<'a>(
                 collect_local_declarations(body, scores, parameters, locals, diagnostics);
             }
             StatementKind::Run(_)
+            | StatementKind::Give { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
@@ -851,8 +927,41 @@ fn validate_statements<'a>(
     for statement in statements {
         match &statement.kind {
             StatementKind::Run(_) => {}
+            StatementKind::Give {
+                target,
+                item,
+                count,
+                count_span,
+            } => {
+                match queries.get(target.as_str()) {
+                    None => diagnostics.push(Diagnostic::new(
+                        format!("找不到实体查询 `{target}`"),
+                        statement.span,
+                    )),
+                    Some(query) if query.entity_type != "minecraft:player" => {
+                        diagnostics.push(Diagnostic::new(
+                            format!("give 目标查询 `{target}` 必须匹配 minecraft:player"),
+                            statement.span,
+                        ));
+                    }
+                    Some(_) => {}
+                }
+                match item_stacks.get(item.as_str()) {
+                    None => diagnostics.push(Diagnostic::new(
+                        format!("找不到物品定义 `{item}`"),
+                        statement.span,
+                    )),
+                    Some(declaration) => validate_give_count(
+                        declaration,
+                        *count,
+                        statement.span,
+                        *count_span,
+                        diagnostics,
+                    ),
+                }
+            }
             StatementKind::SelfAction(action) => {
-                let required_context = if matches!(action, SelfAction::GiveItem(_)) {
+                let required_context = if matches!(action, SelfAction::GiveItem { .. }) {
                     ExecutionContext::Player
                 } else {
                     ExecutionContext::Entity
@@ -884,14 +993,23 @@ fn validate_statements<'a>(
                             ));
                         }
                     }
-                    SelfAction::GiveItem(item) => {
-                        if !item_stacks.contains(item.as_str()) {
-                            diagnostics.push(Diagnostic::new(
-                                format!("找不到物品定义 `{item}`"),
-                                statement.span,
-                            ));
-                        }
-                    }
+                    SelfAction::GiveItem {
+                        item,
+                        count,
+                        count_span,
+                    } => match item_stacks.get(item.as_str()) {
+                        None => diagnostics.push(Diagnostic::new(
+                            format!("找不到物品定义 `{item}`"),
+                            statement.span,
+                        )),
+                        Some(declaration) => validate_give_count(
+                            declaration,
+                            *count,
+                            statement.span,
+                            *count_span,
+                            diagnostics,
+                        ),
+                    },
                     SelfAction::SetInvulnerable(_)
                     | SelfAction::ClearItems
                     | SelfAction::Remove
@@ -1492,6 +1610,31 @@ impl<'a> Compiler<'a> {
                         self.program.namespace
                     ));
                 }
+                StatementKind::Give {
+                    target,
+                    item,
+                    count,
+                    ..
+                } => {
+                    let query = self
+                        .program
+                        .queries
+                        .iter()
+                        .find(|candidate| candidate.name == *target)
+                        .expect("semantic validation guarantees the entity query exists");
+                    let item = self
+                        .program
+                        .item_stacks
+                        .iter()
+                        .find(|candidate| candidate.name == *item)
+                        .expect("semantic validation guarantees the item definition exists");
+                    commands.push(format!(
+                        "execute {} run give @s {} {}",
+                        entity_query_clause(query),
+                        item_stack_argument(item),
+                        count.unwrap_or(item.count)
+                    ));
+                }
                 StatementKind::SelfAction(action) => {
                     commands.extend(self.compile_self_action(action));
                 }
@@ -1610,17 +1753,17 @@ impl<'a> Compiler<'a> {
                     "kill @s".to_owned(),
                 ]
             }
-            SelfAction::GiveItem(name) => {
+            SelfAction::GiveItem { item, count, .. } => {
                 let item = self
                     .program
                     .item_stacks
                     .iter()
-                    .find(|candidate| candidate.name == *name)
+                    .find(|candidate| candidate.name == *item)
                     .expect("semantic validation guarantees the item definition exists");
                 vec![format!(
                     "give @s {} {}",
                     item_stack_argument(item),
-                    item.count
+                    count.unwrap_or(item.count)
                 )]
             }
             SelfAction::ClearItems => {
@@ -2120,6 +2263,7 @@ fn function_has_local(statements: &[Statement], name: &str) -> bool {
         | StatementKind::Spawn { body, .. }
         | StatementKind::While { body, .. } => function_has_local(body, name),
         StatementKind::Run(_)
+        | StatementKind::Give { .. }
         | StatementKind::SelfAction(_)
         | StatementKind::Message { .. }
         | StatementKind::PlaySound { .. }
@@ -2194,6 +2338,12 @@ fn item_stack_argument(item: &ItemStackDecl) -> String {
             snbt_string(custom_name)
         ));
     }
+    if let Some(item_name) = &item.item_name {
+        components.push(format!(
+            "minecraft:item_name={{text:{}}}",
+            snbt_string(item_name)
+        ));
+    }
     if !item.lore.is_empty() {
         let lines = item
             .lore
@@ -2215,6 +2365,27 @@ fn item_stack_argument(item: &ItemStackDecl) -> String {
     );
     if let Some(damage) = item.damage {
         components.push(format!("minecraft:damage={damage}"));
+    }
+    if let Some(max_damage) = item.max_damage {
+        components.push(format!("minecraft:max_damage={max_damage}"));
+    }
+    if let Some(max_stack_size) = item.max_stack_size {
+        components.push(format!("minecraft:max_stack_size={max_stack_size}"));
+    }
+    if let Some(rarity) = item.rarity {
+        components.push(format!("minecraft:rarity=\"{}\"", rarity.as_str()));
+    }
+    if let Some(item_model) = &item.item_model {
+        components.push(format!("minecraft:item_model={}", snbt_string(item_model)));
+    }
+    if let Some(dyed_color) = item.dyed_color {
+        components.push(format!("minecraft:dyed_color={dyed_color}"));
+    }
+    if let Some(glint) = item.enchantment_glint_override {
+        components.push(format!(
+            "minecraft:enchantment_glint_override={}",
+            if glint { "true" } else { "false" }
+        ));
     }
     if item.unbreakable {
         components.push("minecraft:unbreakable={}".to_owned());
@@ -2511,6 +2682,14 @@ mod tests {
                 damage = 4;
                 unbreakable = true;
             }
+            item flare = item_stack("minecraft:leather_chestplate") {
+                max_stack_size = 16;
+                item_name = "Flare";
+                rarity = rare;
+                item_model = "minecraft:leather_chestplate";
+                dyed_color = 16711680;
+                enchantment_glint_override = true;
+            }
             storage saved = items("demo:state", "saved_items");
             resource predicate coin = """{"condition":"minecraft:random_chance","chance":0.5}""";
             @load fn load() { message.all("loaded", green); }
@@ -2532,9 +2711,10 @@ mod tests {
                     self.consume();
                 }
                 each(players) {
-                    self.give_item(reward);
+                    self.give_item(reward, 2);
                     sound.self("minecraft:block.note_block.pling", master);
                 }
+                give(players, flare, 16);
             }
             fn plus_one(value) -> score {
                 let result = value + 1;
@@ -2569,6 +2749,14 @@ mod tests {
                 损伤 = 4;
                 无法破坏 = 真;
             }
+            物品 flare = 物品堆("minecraft:leather_chestplate") {
+                最大堆叠 = 16;
+                物品名称 = "Flare";
+                稀有度 = 稀有;
+                物品模型 = "minecraft:leather_chestplate";
+                染色 = 16711680;
+                附魔光效 = 真;
+            }
             存储 saved = 物品("demo:state", "saved_items");
             资源 谓词 coin = """{"condition":"minecraft:random_chance","chance":0.5}""";
             @加载 函数 load() { 消息.全部("loaded", 绿色); }
@@ -2590,9 +2778,10 @@ mod tests {
                     自身.消耗();
                 }
                 遍历(players) {
-                    自身.给予物品(reward);
+                    自身.给予物品(reward, 2);
                     声音.自身("minecraft:block.note_block.pling", 主音量);
                 }
+                给予(players, flare, 16);
             }
             函数 plus_one(value) -> 计分 {
                 令 result = value + 1;
@@ -2725,10 +2914,24 @@ mod tests {
                 damage = 4;
                 unbreakable = true;
             }
+            item flare = item_stack("minecraft:leather_chestplate") {
+                max_stack_size = 16;
+                item_name = "Signal Flare";
+                rarity = rare;
+                item_model = "minecraft:leather_chestplate";
+                dyed_color = 16711680;
+                enchantment_glint_override = true;
+            }
+            item blade = item_stack("minecraft:diamond_sword") {
+                max_damage = 100;
+            }
             query players = entity("minecraft:player") {}
             @player fn reward_player() { self.give_item(reward); }
             @tick fn tick() {
                 each(players) { reward_player(); }
+                give(players, flare, 1600);
+                give(players, blade);
+                give(players, reward, 4);
             }
             "#,
         );
@@ -2736,6 +2939,13 @@ mod tests {
         assert!(generated.contains(
             "give @s minecraft:diamond[minecraft:custom_name={text:\"Explorer's Gem\"},minecraft:lore=[{text:\"First line\"},{text:\"Second line\"}],minecraft:enchantments={\"minecraft:fortune\":2},minecraft:stored_enchantments={\"minecraft:mending\":1},minecraft:damage=4,minecraft:unbreakable={}] 3"
         ));
+        assert!(generated.contains(
+            "execute as @e[type=minecraft:player] at @s run give @s minecraft:leather_chestplate[minecraft:item_name={text:\"Signal Flare\"},minecraft:max_stack_size=16,minecraft:rarity=\"rare\",minecraft:item_model=\"minecraft:leather_chestplate\",minecraft:dyed_color=16711680,minecraft:enchantment_glint_override=true] 1600"
+        ));
+        assert!(
+            generated.contains("run give @s minecraft:diamond_sword[minecraft:max_damage=100] 1")
+        );
+        assert!(generated.contains("run give @s minecraft:diamond[") && generated.contains("] 4"));
 
         let invalid = parse(
             lex(
@@ -2747,10 +2957,22 @@ mod tests {
                     enchantment("Invalid Enchantment", 256);
                     damage = 2147483648;
                 }
+                item bounded = item_stack("minecraft:diamond") { max_stack_size = 16; }
+                item conflicting = item_stack("minecraft:diamond") {
+                    max_stack_size = 16;
+                    max_damage = 10;
+                }
+                query item_entities = entity("minecraft:item") {}
+                query players = entity("minecraft:player") {}
                 @player fn needs_player() {}
                 @entity fn wrong_entity() {
                     needs_player();
                     self.give_item(missing);
+                }
+                @tick fn wrong_give() {
+                    give(item_entities, bounded);
+                    give(players, bounded, 1601);
+                    give(players, bounded, 0);
                 }
                 fn wrong_call() { wrong_entity(); }
                 fn wrong_schedule() { schedule needs_player() after 1 t; }
@@ -2771,6 +2993,21 @@ mod tests {
                 .iter()
                 .any(|error| error.message.contains("count 必须是 1 到 100"))
         );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.message.contains("必须匹配 minecraft:player"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.message.contains("给予数量必须是 1 到 1600"))
+        );
+        assert!(errors.iter().any(|error| {
+            error
+                .message
+                .contains("不能同时设置大于 1 的 max_stack_size 和 max_damage")
+        }));
         assert!(
             errors
                 .iter()

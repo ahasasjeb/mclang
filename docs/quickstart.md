@@ -55,7 +55,7 @@ cargo run -- build examples/chinese_counter.mcl --deny-raw
 
 中文与英文关键词可以在同一项目、同一文件中混用；编译器会在解析时把它们规范化为同一套语义。
 
-`give_reward` 展示类型化物品定义、名称、Lore、附魔、无法破坏、玩家上下文和一次性给予：
+`give_reward` 展示类型化物品定义、名称、Lore、附魔、稀有度、无法破坏、结构化 `give` 语句和一次性给予：
 
 ```powershell
 cargo run -- check examples/give_reward.mcl --deny-raw

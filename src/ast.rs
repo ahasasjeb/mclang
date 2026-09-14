@@ -74,12 +74,38 @@ pub struct ItemStackDecl {
     pub item_id: String,
     pub count: u32,
     pub custom_name: Option<String>,
+    pub item_name: Option<String>,
     pub lore: Vec<String>,
     pub enchantments: Vec<ItemEnchantment>,
     pub stored_enchantments: Vec<ItemEnchantment>,
     pub damage: Option<u32>,
+    pub max_damage: Option<u32>,
+    pub max_stack_size: Option<u32>,
+    pub rarity: Option<ItemRarity>,
+    pub item_model: Option<String>,
+    pub dyed_color: Option<u32>,
+    pub enchantment_glint_override: Option<bool>,
     pub unbreakable: bool,
     pub span: Span,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ItemRarity {
+    Common,
+    Uncommon,
+    Rare,
+    Epic,
+}
+
+impl ItemRarity {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Common => "common",
+            Self::Uncommon => "uncommon",
+            Self::Rare => "rare",
+            Self::Epic => "epic",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -157,6 +183,12 @@ pub enum StatementKind {
         entity_type: String,
         body: Vec<Statement>,
     },
+    Give {
+        target: String,
+        item: String,
+        count: Option<u32>,
+        count_span: Option<Span>,
+    },
     SelfAction(SelfAction),
     Message {
         target: MessageTarget,
@@ -209,7 +241,11 @@ pub enum SelfAction {
     SaveItems(String),
     RestoreItems(String),
     RemovePreservingItems(String),
-    GiveItem(String),
+    GiveItem {
+        item: String,
+        count: Option<u32>,
+        count_span: Option<Span>,
+    },
     ClearItems,
     Remove,
     Consume,
