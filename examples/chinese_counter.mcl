@@ -1,0 +1,39 @@
+命名空间 chinese_counter;
+
+// 自定义名称继续使用稳定的 ASCII 标识符；语言关键词可以全部写成中文。
+计分 ticks = 0;
+计分 announcements = 0;
+
+查询 all_players = 实体("minecraft:player") {}
+
+物品 milestone_reward = 物品堆("minecraft:emerald") {
+    数量 = 1;
+    自定义名称 = "计时奖励";
+}
+
+@加载
+函数 load() {
+    消息.全部("中文关键词示例已加载", 绿色);
+}
+
+@每刻
+函数 tick() {
+    ticks += 1;
+    如果 ticks >= 100 {
+        调用 announce();
+        ticks = 0;
+    }
+}
+
+函数 announce() {
+    announcements += 1;
+    遍历(all_players) {
+        自身.给予物品(milestone_reward);
+        声音.自身("minecraft:block.note_block.pling", 主音量);
+        消息.自身("已经过五秒。", 金色);
+    }
+}
+
+函数 announce_later() {
+    调度 announce() 延后 5 秒 替换;
+}

@@ -1,0 +1,20 @@
+namespace multi_counter;
+
+fn announce(boundary) {
+    let overshoot = difference(ticks, boundary);
+    if overshoot >= 0 {
+        message.all("Counter reached its boundary", gold);
+    }
+}
+
+fn drain_pending() {
+    while pending > 0 {
+        message.all("processing one pending task");
+        pending -= 1;
+    }
+}
+
+// 调度调用发生在未来的游戏刻，不构成同步递归。
+fn heartbeat() {
+    schedule heartbeat() after 20 t replace;
+}

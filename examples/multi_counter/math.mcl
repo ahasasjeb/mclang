@@ -1,0 +1,5 @@
+namespace multi_counter;
+
+fn difference(left, right) -> score {
+    return left - right;
+}

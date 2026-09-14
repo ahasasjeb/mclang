@@ -1,0 +1,20 @@
+namespace multi_counter;
+
+score ticks = 0;
+score enabled = 1;
+score pending = 3;
+
+@load
+fn load() {
+    message.all("Multi-file counter loaded", green);
+}
+
+@tick
+fn tick() {
+    if enabled == 1 && ticks < 100 {
+        ticks += 1;
+    } else {
+        announce(100);
+        ticks = 0;
+    }
+}

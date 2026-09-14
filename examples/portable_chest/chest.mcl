@@ -1,0 +1,18 @@
+namespace portable_chest;
+
+// 查询声明由编译器检查并转换成实体选择器和物品组件谓词。
+query trigger_items = entity("minecraft:item") {
+    without_tag("portable_chest_processed");
+    item(contents) {
+        id = "minecraft:emerald";
+        count = 1;
+        custom_name = "A";
+    }
+}
+
+query chest_boxes = entity("minecraft:chest_minecart") {
+    tag("portable_chest_box");
+}
+
+// items 是类型化容器存储；编译器会在首次加载时自动初始化空列表。
+storage saved_items = items("portable_chest:state", "saved_items");

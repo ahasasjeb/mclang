@@ -1,0 +1,48 @@
+namespace portable_chest;
+
+// 0 表示矿车已收起，1 表示矿车已召唤。计分值会随世界保存。
+score active = 0;
+
+@load
+fn load() {
+    message.all("便携箱子已加载：丢出单个命名为 A 的绿宝石即可切换。", green);
+}
+
+@tick
+fn tick() {
+    each(trigger_items) {
+        // 先标记触发物。即使后续动作失败，也不会每刻重复处理。
+        self.add_tag("portable_chest_processed");
+
+        if active == 0 {
+            spawn("minecraft:chest_minecart") {
+                self.add_tag("portable_chest_box");
+                self.set_invulnerable(true);
+                self.restore_items(saved_items);
+            }
+            active = 1;
+            message.nearest(16, "便携箱子已放出。", green);
+        } else {
+            in_dimension("minecraft:overworld") {
+                each(chest_boxes) {
+                    self.remove_preserving_items(saved_items);
+                }
+            }
+            in_dimension("minecraft:the_nether") {
+                each(chest_boxes) {
+                    self.remove_preserving_items(saved_items);
+                }
+            }
+            in_dimension("minecraft:the_end") {
+                each(chest_boxes) {
+                    self.remove_preserving_items(saved_items);
+                }
+            }
+            active = 0;
+            message.nearest(16, "便携箱子已收起，物品已保存。", gold);
+        }
+
+        // 绿宝石是开关的消耗品。
+        self.consume();
+    }
+}

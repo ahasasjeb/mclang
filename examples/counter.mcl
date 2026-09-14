@@ -1,0 +1,33 @@
+namespace counter;
+
+// score 是跨函数共享的 32 位整数。重新加载数据包不会重置已有值。
+score ticks = 0;
+score announcements = 0;
+
+query all_players = entity("minecraft:player") { }
+
+@load
+fn load() {
+    message.all("Counter data pack loaded", green);
+}
+
+@tick
+fn tick() {
+    ticks += 1;
+    if ticks >= 100 {
+        announce();
+        ticks = 0;
+    }
+}
+
+fn announce() {
+    announcements += 1;
+    each(all_players) {
+        sound.self("minecraft:block.note_block.pling", master);
+        message.self("Five seconds passed.", gold);
+    }
+}
+
+fn announce_later() {
+    schedule announce() after 5 s replace;
+}

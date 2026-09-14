@@ -1,0 +1,16 @@
+namespace multi_counter;
+
+resource predicate coin_flip = """
+{
+  "condition": "minecraft:random_chance",
+  "chance": 0.5
+}
+""";
+
+fn random_message() {
+    if predicate(coin_flip) {
+        message.all("Heads");
+    } else {
+        message.all("Tails");
+    }
+}
