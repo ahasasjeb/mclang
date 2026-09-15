@@ -15,6 +15,7 @@ mod emit;
 mod expressions;
 mod names;
 mod statements;
+mod world;
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;

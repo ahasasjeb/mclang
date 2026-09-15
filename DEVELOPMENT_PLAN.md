@@ -24,7 +24,7 @@
 | 不可达 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 不建模 | 可由其他结构化语句等价表达，或对数据包无意义 |
 
-当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **6 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`），11 个有部分结构化入口；44 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
+当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **14 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`、`clone`、`fillbiome`、`forceload`、`time`、`weather`、`gamerule`、`worldborder`、`locate`），14 个有部分结构化入口；33 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
 
 ### 1.1 执行、函数与数据核心
 
@@ -84,17 +84,17 @@
 
 | 命令 | 原版形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `setblock` | `<pos> <block> [destroy\|keep\|replace\|strict]` | 缺失 | — |
-| `fill` | `<from> <to> <block> [mode\|replace filter\|keep]` | 缺失 | — |
-| `clone` | 同/跨维度 + masked/filtered/force/move/normal/strict | 缺失 | — |
-| `fillbiome` | `<from> <to> <biome> [replace filter]` | 缺失 | — |
-| `place` | feature/jigsaw/structure/template | 缺失 | — |
-| `forceload` | add/remove/query | 缺失 | — |
-| `time` | set/add/pause/resume/rate/query + `of <clock>` | 缺失 | 26.3 世界时钟模型 |
-| `weather` | clear/rain/thunder [duration] | 缺失 | — |
-| `gamerule` | `<rule> [value]`，每条规则生成短名与全名两个字面量 | 缺失 | — |
-| `worldborder` | add/set/center/damage amount/buffer/get/warning distance/time | 缺失 | — |
-| `locate` | structure/biome/poi | 缺失 | 只给反馈坐标，低优先 |
+| `setblock` | `<pos> <block> [destroy\|keep\|replace\|strict]` | 部分 | `set_block(pos, block_state[, 模式])`；缺方块实体 NBT（依赖 1.4） |
+| `fill` | `<from> <to> <block> [mode\|replace filter\|keep]` | 部分 | `fill(from, to, block_state[, 模式][, replace 过滤器])`；缺方块实体 NBT（依赖 1.4） |
+| `clone` | 同/跨维度 + masked/filtered/force/move/normal/strict | 完成 | `clone(起点, 终点, 目标[, 选项...])`，选项顺序无关、重复报错 |
+| `fillbiome` | `<from> <to> <biome> [replace filter]` | 完成 | `fill_biome(from, to, "生物群系"[, replace, "过滤器"])` |
+| `place` | feature/jigsaw/structure/template | 部分 | `place.feature/jigsaw/structure/template`；feature 的内联 JSON 未建模 |
+| `forceload` | add/remove/query | 完成 | `forceload.add/remove/remove_all/query`，绝对范围检查 256 区块上限 |
+| `time` | set/add/pause/resume/rate/query + `of <clock>` | 完成 | `time.set/add/pause/resume/rate(..., [时钟])`；`time.query([时钟])` 与 `time.query_gametime()` 是表达式；26.3 世界时钟模型 |
+| `weather` | clear/rain/thunder [duration] | 完成 | `weather.clear/rain/thunder([持续时间])` |
+| `gamerule` | `<rule> [value]`，每条规则生成短名与全名两个字面量 | 完成 | `gamerule.set(规则, 值)` 与表达式 `gamerule.query(规则)`；规则名、类型与范围来自 26.3 `GameRules` |
+| `worldborder` | add/set/center/damage amount/buffer/get/warning distance/time | 完成 | `worldborder.add/set/center/damage_amount/damage_buffer/warning_distance/warning_time`；`worldborder.get()` 是表达式 |
+| `locate` | structure/biome/poi | 完成 | `locate.structure/biome/poi("目标或 #标签")`；仅命令反馈 |
 
 ### 1.4 显示、声音与界面
 
@@ -183,6 +183,16 @@
 - [x] `stopwatch.create/restart/remove(id)` 与作为表达式的 `stopwatch.query(id[, 缩放])`。
 - [x] `examples/potion_lab.mcl`：严格模式示例，覆盖以上全部能力并通过 `--deny-raw`。
 
+世界与方块（本次批次）：
+
+- [x] 坐标类型：`pos(x, y, z)` 与 `column(x, z)`，支持绝对、`~` 相对与 `^` 局部坐标；`^` 不能与其他写法混用，绝对分量检查世界范围与列坐标 256 区块上限。
+- [x] `block_state("id") { 属性 = "值"; }`：属性字符集、重复声明与 `#` 标签谓词的使用位置都在编译期检查。
+- [x] `set_block`、`fill`、`fill_biome`、`clone`（含跨维度、filtered/masked、force/move、strict）、`place.feature/jigsaw/structure/template`、`forceload.*`。
+- [x] 世界时钟与天气：`time.set/add/pause/resume/rate`、`weather.*`，时间参数按原版 `TimeArgument` 换算。
+- [x] 游戏规则与边界：`gamerule.set`/`gamerule.query`（26.3 `GameRules` 表），`worldborder.*` 与表达式 `worldborder.get()`。
+- [x] 查询表达式：`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(规则)`、`worldborder.get()`。
+- [x] `examples/world_ops.mcl`：覆盖上述能力并通过 `--deny-raw`。
+
 ## 三、路线图
 
 实施约定：
@@ -224,18 +234,18 @@
 
 ### 第 3 阶段：世界与方块命令族
 
-- [ ] 3.1 方块状态值：`block_state("minecraft:oak_stairs") { facing = "east"; }` 与方块实体 `nbt { ... }`。
-- [ ] 3.2 `set_block(pos, block_state, mode)`，mode 为 `destroy`/`keep`/`replace`/`strict`。
-- [ ] 3.3 `fill(from, to, block_state [, mode] [, replace filter] [, keep])`。
-- [ ] 3.4 `clone(...)`：同维度与跨维度、`masked`/`filtered`、`force`/`move`/`normal`、`strict`。
-- [ ] 3.5 `fill_biome(from, to, biome [, replace filter])`。
-- [ ] 3.6 `place.feature/jigsaw/structure/template(...)`，含 rotation、mirror、integrity、seed、strict。
-- [ ] 3.7 `forceload.add/remove/remove_all/query`。
-- [ ] 3.8 `time.set/add/pause/resume/rate/query` 与 `time.of(clock)`（26.3 世界时钟）。
-- [ ] 3.9 `weather.clear/rain/thunder(duration)`。
-- [ ] 3.10 `gamerule(name, value)` 与 `gamerule(name) -> score`；规则名与值类型来自 1.1 快照。
-- [ ] 3.11 `worldborder.add/set/center/damage_amount/damage_buffer/get/warning_distance/warning_time`。
-- [ ] 3.12 `locate.structure/biome/poi`（低优先，仅日志反馈）。
+- [x] 3.1 方块状态值：`block_state("minecraft:oak_stairs") { facing = "east"; }`，属性值在编译期检查字符集并拒绝重复声明；`#` 标签谓词用于过滤器。方块实体 `nbt { ... }` 依赖 1.4，未实现。
+- [x] 3.2 `set_block(pos, block_state, mode)`，mode 为 `destroy`/`keep`/`replace`/`strict`。
+- [x] 3.3 `fill(from, to, block_state [, mode] [, replace filter] [, keep])`，模式含 `outline`/`hollow`/`destroy`/`strict`。
+- [x] 3.4 `clone(...)`：同维度与跨维度、`masked`/`filtered`、`force`/`move`/`normal`、`strict`；选项顺序无关，重复报错。
+- [x] 3.5 `fill_biome(from, to, biome [, replace filter])`；过滤器接受 `#` 生物群系标签。
+- [x] 3.6 `place.feature/jigsaw/structure/template(...)`，含 rotation、mirror、integrity、seed、strict；feature 的内联 JSON 未建模。
+- [x] 3.7 `forceload.add/remove/remove_all/query`，绝对范围检查 256 区块上限。
+- [x] 3.8 `time.set/add/pause/resume/rate` 与表达式 `time.query([clock])`、`time.query_gametime()`；时钟以可选参数写在方法调用末尾，生成 `time of <clock> ...`。
+- [x] 3.9 `weather.clear/rain/thunder(duration)`，持续时间按 `TimeArgument` 换算并拒绝不足 1 刻。
+- [x] 3.10 `gamerule.set(name, value)` 与表达式 `gamerule.query(name) -> score`；规则名与值类型对照 26.3 `GameRules` 的静态表（1.1 快照落地前的手工版本）。
+- [x] 3.11 `worldborder.add/set/center/damage_amount/damage_buffer/warning_distance/warning_time` 与表达式 `worldborder.get()`。
+- [x] 3.12 `locate.structure/biome/poi`（仅日志反馈，目标接受 `#` 标签）。
 
 ### 第 4 阶段：实体与玩家命令族
 
@@ -321,6 +331,7 @@
 ### 依赖关系与验收
 
 - 1.1 是全部注册表校验与补全数据的前提；1.2/1.4 是第 3、4、5 阶段的参数类型前提；1.3 支撑 2.7 与第 6 阶段；1.5 支撑 2.2、4.3、7.1–7.3。
+- 第 3 阶段已按上述形式落地：坐标与方块状态内联在语句参数中，资源位置只做语法检查；游戏规则使用对照 26.3 `GameRules` 的静态表。1.1 快照落地后应把方块、生物群系、结构、时钟与规则表升级为注册表校验；方块实体 NBT 与 `place.feature` 内联 JSON 等待 1.4。
 - 2.1/2.2 的 `execute` 与条件模型是第 3、4、5 阶段的世界/实体命令在非默认上下文中执行的前提。
 - 9.1/9.2 依赖 1.1 的版本元数据与注册表快照；函数标签部分已经落地，不依赖注册表数据；9.3–9.6 依赖 1.4 的结构化 NBT 与值类型；9.7/9.8 依赖输出层与 1.1 的版本数据。函数标签（9.2）是 2.10 的 `#tag` 调用前提。
 - 每个阶段的验收：编译器零警告；`examples/` 项目通过 `--deny-raw`；`src/compiler/tests.rs` 断言生成命令与资源文件；中英文关键词产物逐字节一致；文档与手册同步。

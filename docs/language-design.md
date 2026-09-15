@@ -24,6 +24,7 @@ Mclang 源码应表达 Minecraft 行为，而不是要求作者先会写 mcfunct
 - `@entity`：标记要求实体执行上下文的函数，不区分玩家与非玩家；只允许 `tag`、`kill` 这类对玩家同样成立的操作。
 - `@non_player`：标记要求非玩家实体执行上下文的函数；`data` 类 NBT 操作只在这里合法。
 - `@player`：标记要求玩家执行上下文的函数；玩家专用操作不会误用于普通实体。
+- 世界与方块：`pos`/`column` 坐标（绝对、`~`、`^`）、`block_state` 方块状态与标签谓词、`set_block`/`fill`/`fill_biome`/`clone`/`place.*`/`forceload`、`time`/`weather`/`gamerule`/`worldborder`/`locate`；`time.query`、`gamerule.query` 与 `worldborder.get` 是表达式。坐标范围、方块属性、游戏规则表与时间单位都在编译期检查。
 
 这些结构在 AST 中都有独立节点。后端才把它们转换为 26.3-rc-2 命令，因此以后目标版本改变时可以替换后端映射，而不要求项目源码到处修改字符串。
 

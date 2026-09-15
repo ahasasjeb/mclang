@@ -191,6 +191,70 @@ pub enum Attribute {
     NonPlayer,
 }
 
+/// 坐标分量：绝对数值、`~` 相对偏移或 `^` 局部偏移。
+///
+/// 文本已经规范化为 Minecraft 参数写法（`~1`、`^`、`-3.5`），代码生成直接转发。
+#[derive(Clone, Debug)]
+pub enum Coordinate {
+    Absolute(String),
+    Relative(String),
+    Local(String),
+}
+
+impl Coordinate {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::Absolute(text) | Self::Relative(text) | Self::Local(text) => text,
+        }
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self, Self::Local(_))
+    }
+
+    /// 绝对坐标的整数值；相对与局部坐标返回 `None`。
+    pub fn absolute_integer(&self) -> Option<i32> {
+        match self {
+            Self::Absolute(text) => text.parse().ok(),
+            Self::Relative(_) | Self::Local(_) => None,
+        }
+    }
+}
+
+/// 三段方块坐标（`setblock`、`fill` 等的 `<pos>`）。
+#[derive(Debug)]
+pub struct BlockPosition {
+    pub x: Coordinate,
+    pub y: Coordinate,
+    pub z: Coordinate,
+    pub span: Span,
+}
+
+/// 两段列坐标（`forceload` 的 `<column>`），不包含 Y 轴。
+#[derive(Debug)]
+pub struct ColumnPosition {
+    pub x: Coordinate,
+    pub z: Coordinate,
+    pub span: Span,
+}
+
+/// 方块状态字面量或方块谓词：`block_state("minecraft:oak_stairs") { facing = "east"; }`。
+///
+/// `#` 前缀的 id 是方块标签谓词，只能用在 `fill` 的过滤器与 `clone filtered` 里。
+#[derive(Debug)]
+pub struct BlockStateValue {
+    pub id: String,
+    pub properties: Vec<BlockProperty>,
+    pub span: Span,
+}
+
+#[derive(Debug)]
+pub struct BlockProperty {
+    pub name: String,
+    pub value: String,
+    pub span: Span,
+}
+
 #[derive(Debug)]
 pub struct Statement {
     pub kind: StatementKind,
@@ -244,6 +308,75 @@ pub enum StatementKind {
         item: Option<String>,
         max_count: Option<u32>,
     },
+    SetBlock {
+        pos: BlockPosition,
+        block: BlockStateValue,
+        mode: SetBlockMode,
+    },
+    Fill {
+        from: BlockPosition,
+        to: BlockPosition,
+        block: BlockStateValue,
+        mode: FillMode,
+        filter: Option<BlockStateValue>,
+    },
+    FillBiome {
+        from: BlockPosition,
+        to: BlockPosition,
+        biome: String,
+        filter: Option<String>,
+    },
+    Clone {
+        begin: BlockPosition,
+        end: BlockPosition,
+        destination: BlockPosition,
+        from_dimension: Option<String>,
+        to_dimension: Option<String>,
+        filter: CloneFilter,
+        mode: CloneMode,
+        strict: bool,
+    },
+    PlaceFeature {
+        feature: String,
+        pos: Option<BlockPosition>,
+    },
+    PlaceJigsaw {
+        pool: String,
+        target: String,
+        max_depth: u32,
+        pos: Option<BlockPosition>,
+    },
+    PlaceStructure {
+        structure: String,
+        pos: Option<BlockPosition>,
+    },
+    PlaceTemplate {
+        template: String,
+        pos: BlockPosition,
+        rotation: Option<TemplateRotation>,
+        mirror: Option<TemplateMirror>,
+        integrity: Option<String>,
+        seed: Option<i32>,
+        strict: bool,
+    },
+    ForceLoad(ForceLoadOperation),
+    TimeAction {
+        operation: TimeOperation,
+        clock: Option<String>,
+    },
+    Weather {
+        kind: WeatherKind,
+        duration: Option<String>,
+    },
+    GameRuleSet {
+        name: String,
+        value: GameRuleValue,
+    },
+    WorldBorder(WorldBorderOperation),
+    Locate {
+        kind: LocateKind,
+        target: String,
+    },
     SelfAction(SelfAction),
     Message {
         target: MessageTarget,
@@ -290,6 +423,204 @@ pub enum StatementKind {
         body: Vec<Statement>,
     },
     Return(ReturnKind),
+}
+
+/// `setblock` 的方块放置模式，对应原版可选字面量。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SetBlockMode {
+    Destroy,
+    Keep,
+    Replace,
+    Strict,
+}
+
+impl SetBlockMode {
+    pub fn as_str(self) -> Option<&'static str> {
+        match self {
+            Self::Destroy => Some("destroy"),
+            Self::Keep => Some("keep"),
+            Self::Strict => Some("strict"),
+            Self::Replace => None,
+        }
+    }
+}
+
+/// `fill` 的填充模式，对应原版可选字面量。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FillMode {
+    Replace,
+    Outline,
+    Hollow,
+    Destroy,
+    Strict,
+    Keep,
+}
+
+impl FillMode {
+    pub fn as_str(self) -> Option<&'static str> {
+        match self {
+            Self::Replace => None,
+            Self::Outline => Some("outline"),
+            Self::Hollow => Some("hollow"),
+            Self::Destroy => Some("destroy"),
+            Self::Strict => Some("strict"),
+            Self::Keep => Some("keep"),
+        }
+    }
+}
+
+/// `clone` 的方块过滤方式：全部、只复制非空气或按方块谓词过滤。
+#[derive(Debug)]
+pub enum CloneFilter {
+    Replace,
+    Masked,
+    Filtered(BlockStateValue),
+}
+
+/// `clone` 的复制模式。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CloneMode {
+    Normal,
+    Force,
+    Move,
+}
+
+impl CloneMode {
+    pub fn as_str(self) -> Option<&'static str> {
+        match self {
+            Self::Normal => None,
+            Self::Force => Some("force"),
+            Self::Move => Some("move"),
+        }
+    }
+}
+
+/// 26.3 `Rotation` 枚举的模板旋转值。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TemplateRotation {
+    None,
+    Clockwise90,
+    Clockwise180,
+    Counterclockwise90,
+}
+
+impl TemplateRotation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Clockwise90 => "clockwise_90",
+            Self::Clockwise180 => "180",
+            Self::Counterclockwise90 => "counterclockwise_90",
+        }
+    }
+}
+
+/// 26.3 `Mirror` 枚举的模板镜像值。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TemplateMirror {
+    None,
+    LeftRight,
+    FrontBack,
+}
+
+impl TemplateMirror {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::LeftRight => "left_right",
+            Self::FrontBack => "front_back",
+        }
+    }
+}
+
+/// `forceload` 的四种操作。
+#[derive(Debug)]
+pub enum ForceLoadOperation {
+    Add {
+        from: ColumnPosition,
+        to: Option<ColumnPosition>,
+    },
+    Remove {
+        from: ColumnPosition,
+        to: Option<ColumnPosition>,
+    },
+    RemoveAll,
+    Query {
+        pos: Option<ColumnPosition>,
+    },
+}
+
+/// `time` 的无返回值操作；查询在表达式中使用。
+#[derive(Debug)]
+pub enum TimeOperation {
+    Set(String),
+    Add(String),
+    Pause,
+    Resume,
+    Rate(String),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WeatherKind {
+    Clear,
+    Rain,
+    Thunder,
+}
+
+impl WeatherKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Clear => "clear",
+            Self::Rain => "rain",
+            Self::Thunder => "thunder",
+        }
+    }
+}
+
+/// `gamerule` 的取值：布尔规则或整数规则。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GameRuleValue {
+    Bool(bool),
+    Integer(i32),
+}
+
+/// `worldborder` 的无返回值操作；`get` 在表达式中使用。
+#[derive(Debug)]
+pub enum WorldBorderOperation {
+    Add {
+        distance: String,
+        time: Option<String>,
+    },
+    Set {
+        distance: String,
+        time: Option<String>,
+    },
+    Center {
+        x: String,
+        z: String,
+    },
+    DamageAmount(String),
+    DamageBuffer(String),
+    WarningDistance(u32),
+    WarningTime(String),
+}
+
+/// `locate` 的三类目标。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocateKind {
+    Structure,
+    Biome,
+    Poi,
+}
+
+impl LocateKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Structure => "structure",
+            Self::Biome => "biome",
+            Self::Poi => "poi",
+        }
+    }
 }
 
 /// `effect give` 的持续时间：整数秒或 `infinite`。
@@ -445,6 +776,18 @@ pub enum ExprKind {
         /// 原版 `scale` 参数，缺省为 1；保留规范化文本以避免双精度往返误差。
         scale: Option<String>,
     },
+    /// `time.query([时钟])`：默认或指定世界时钟的总游戏刻。
+    TimeQuery {
+        clock: Option<String>,
+    },
+    /// `time.query_gametime()`：世界的游戏时间。
+    GameTimeQuery,
+    /// `gamerule.query(规则)`：游戏规则的命令结果值。
+    GameRuleQuery {
+        name: String,
+    },
+    /// `worldborder.get()`：世界边界边长。
+    WorldBorderSize,
     Negate(Box<Expr>),
     Binary {
         left: Box<Expr>,

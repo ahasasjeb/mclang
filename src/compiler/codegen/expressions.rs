@@ -65,6 +65,22 @@ impl Compiler<'_> {
                 ));
                 Value::Score(result)
             }
+            ExprKind::TimeQuery { clock } => {
+                let command = match clock {
+                    Some(clock) => format!("time of {clock} query time"),
+                    None => "time query time".to_owned(),
+                };
+                self.capture_result(command, commands)
+            }
+            ExprKind::GameTimeQuery => {
+                self.capture_result("time query gametime".to_owned(), commands)
+            }
+            ExprKind::GameRuleQuery { name } => {
+                self.capture_result(format!("gamerule {name}"), commands)
+            }
+            ExprKind::WorldBorderSize => {
+                self.capture_result("worldborder get".to_owned(), commands)
+            }
             ExprKind::Negate(value) => {
                 let source_value = self.compile_expr(value, owner, commands);
                 let source = self.materialize(source_value, commands);
@@ -134,6 +150,18 @@ impl Compiler<'_> {
                 Value::Score(target)
             }
         }
+    }
+
+    /// 把一条查询命令的结果捕获到新的临时计分项。
+    ///
+    /// 命令失败时原版 `execute store result` 写入 0，因此不需要额外预置。
+    fn capture_result(&mut self, command: String, commands: &mut Vec<String>) -> Value {
+        let result = self.temporary();
+        commands.push(format!(
+            "execute store result score {result} {} run {command}",
+            self.objective
+        ));
+        Value::Score(result)
     }
 
     /// 把值落到具体计分项：常量需要额外生成一条 set 命令。

@@ -5,7 +5,7 @@ use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
 
 use super::Parser;
-use super::keywords::{word_matches, xp_kind};
+use super::keywords::{gamerule_method, time_method, word_matches, worldborder_method, xp_kind};
 
 impl Parser {
     pub(super) fn expression(&mut self) -> Result<Expr, Diagnostic> {
@@ -171,6 +171,50 @@ impl Parser {
                 span: start_span.merge(self.previous().span),
             });
         }
+        if word_matches(&receiver, "time") && time_method(&method) == Some("query") {
+            self.expect(TokenKind::LeftParen, "time.query 后需要 `(`")?;
+            let clock = if self.check(&TokenKind::RightParen) {
+                None
+            } else {
+                Some(self.string("time.query 需要世界时钟资源位置字符串")?.0)
+            };
+            self.expect(TokenKind::RightParen, "time.query 调用缺少 `)`")?;
+            return Ok(Expr {
+                kind: ExprKind::TimeQuery { clock },
+                span: start_span.merge(self.previous().span),
+            });
+        }
+        if word_matches(&receiver, "time") && time_method(&method) == Some("query_gametime") {
+            self.expect(TokenKind::LeftParen, "time.query_gametime 后需要 `(`")?;
+            self.expect(
+                TokenKind::RightParen,
+                "time.query_gametime 不接受参数，需要 `)`",
+            )?;
+            return Ok(Expr {
+                kind: ExprKind::GameTimeQuery,
+                span: start_span.merge(self.previous().span),
+            });
+        }
+        if word_matches(&receiver, "gamerule") && gamerule_method(&method) == Some("query") {
+            self.expect(TokenKind::LeftParen, "gamerule.query 后需要 `(`")?;
+            let (name, _) = self.string("gamerule.query 需要规则名称字符串")?;
+            self.expect(TokenKind::RightParen, "gamerule.query 调用缺少 `)`")?;
+            return Ok(Expr {
+                kind: ExprKind::GameRuleQuery { name },
+                span: start_span.merge(self.previous().span),
+            });
+        }
+        if word_matches(&receiver, "worldborder") && worldborder_method(&method) == Some("get") {
+            self.expect(TokenKind::LeftParen, "worldborder.get 后需要 `(`")?;
+            self.expect(
+                TokenKind::RightParen,
+                "worldborder.get 不接受参数，需要 `)`",
+            )?;
+            return Ok(Expr {
+                kind: ExprKind::WorldBorderSize,
+                span: start_span.merge(self.previous().span),
+            });
+        }
         if word_matches(&receiver, "stopwatch") && word_matches(&method, "query") {
             self.expect(TokenKind::LeftParen, "stopwatch.query 后需要 `(`")?;
             let (id, _) = self.string("stopwatch.query 需要秒表资源位置")?;
@@ -187,7 +231,7 @@ impl Parser {
         }
         Err(Diagnostic::new(
             format!(
-                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)` 和 `stopwatch.query(\"命名空间:id\"[, 缩放])`"
+                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`、`stopwatch.query(\"命名空间:id\"[, 缩放])`、`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(\"规则\")` 和 `worldborder.get()`"
             ),
             span,
         ))

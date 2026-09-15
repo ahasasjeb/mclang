@@ -26,6 +26,10 @@ pub(super) fn constant_value(expression: &Expr) -> Option<i32> {
         ExprKind::Score(_)
         | ExprKind::Call { .. }
         | ExprKind::XpQuery { .. }
-        | ExprKind::StopwatchQuery { .. } => None,
+        | ExprKind::StopwatchQuery { .. }
+        | ExprKind::TimeQuery { .. }
+        | ExprKind::GameTimeQuery
+        | ExprKind::GameRuleQuery { .. }
+        | ExprKind::WorldBorderSize => None,
     }
 }

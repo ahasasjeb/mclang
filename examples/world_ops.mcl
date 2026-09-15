@@ -1,0 +1,73 @@
+// 世界与方块命令示例：加载时搭建一座小广场，跨维度复制装饰，并配置
+// 区块加载、天气、时间与世界边界。全部使用结构化语句，没有 run/execute
+// 字符串，可以用 `mclang check examples/world_ops.mcl --deny-raw` 验证。
+namespace world_ops;
+
+score phase = 0;
+score border = 0;
+
+@load
+fn prepare() {
+    // 地基、台阶与玻璃顶。
+    fill(pos(0, 64, 0), pos(8, 64, 8), block_state("minecraft:stone_bricks"));
+    fill(pos(0, 65, 0), pos(8, 65, 8), block_state("minecraft:oak_planks"), replace, block_state("#minecraft:planks"));
+    set_block(pos(4, 65, 4), block_state("minecraft:oak_stairs") { facing = "south"; half = "bottom"; }, keep);
+    set_block(pos(4, 66, 4), block_state("minecraft:glass"), strict);
+
+    // 生物群系与跨维度复制：广场东侧从下界复制一栋木结构。
+    fill_biome(pos(0, 64, 0), pos(16, 64, 16), "minecraft:plains");
+    clone(pos(0, 64, 0), pos(8, 64, 8), pos(20, 64, 0), masked, force);
+    clone(pos(0, 64, 0), pos(8, 64, 8), pos(40, 64, 0), filtered, block_state("#minecraft:logs"), move, strict);
+    clone(pos(0, 64, 0), pos(8, 64, 8), pos(60, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
+
+    // 地物、结构与模板。
+    place.feature("minecraft:oak_tree", pos(0, 64, 20));
+    place.structure("minecraft:village_plains", pos(32, 64, 20));
+    place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
+    place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);
+
+    // 区块加载、天气与边界。
+    forceload.add(column(0, 0), column(31, 31));
+    weather.clear();
+    time.set(6000, t);
+    worldborder.set(1000, 5 s);
+    worldborder.warning_distance(10);
+    worldborder.warning_time(20 s);
+    gamerule.set("random_tick_speed", 5);
+    phase = 1;
+}
+
+// 每个游戏刻检查边界，并在入夜时把时间拨回清晨。
+@tick
+fn audit() {
+    border = worldborder.get();
+    if border < 1000 {
+        worldborder.add(10, 1 s);
+    }
+    if time.query() >= 13000 {
+        time.set(1000, t, "minecraft:overworld");
+    }
+}
+
+// 按需执行的维护操作：定位、规则查询、时间速率与伤害参数。
+fn landmarks() {
+    locate.biome("#minecraft:is_forest");
+    locate.structure("minecraft:village_plains");
+    locate.poi("minecraft:home");
+    if gamerule.query("keep_inventory") == 1 {
+        weather.thunder(1, d);
+    }
+    time.rate(1.5);
+    time.pause();
+    time.resume();
+    worldborder.damage_amount(0.5);
+    worldborder.damage_buffer(5);
+    worldborder.center(0, 0);
+}
+
+// 收起强制加载的区块。
+fn release() {
+    forceload.query();
+    forceload.remove(column(0, 0));
+    forceload.remove_all();
+}

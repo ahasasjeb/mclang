@@ -88,6 +88,20 @@ pub(super) fn collect_local_declarations<'a>(
             | StatementKind::XpChange { .. }
             | StatementKind::StopwatchAction { .. }
             | StatementKind::ClearInventory { .. }
+            | StatementKind::SetBlock { .. }
+            | StatementKind::Fill { .. }
+            | StatementKind::FillBiome { .. }
+            | StatementKind::Clone { .. }
+            | StatementKind::PlaceFeature { .. }
+            | StatementKind::PlaceJigsaw { .. }
+            | StatementKind::PlaceStructure { .. }
+            | StatementKind::PlaceTemplate { .. }
+            | StatementKind::ForceLoad(_)
+            | StatementKind::TimeAction { .. }
+            | StatementKind::Weather { .. }
+            | StatementKind::GameRuleSet { .. }
+            | StatementKind::WorldBorder(_)
+            | StatementKind::Locate { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
@@ -263,6 +277,22 @@ fn validate_statement<'a>(
         }
         StatementKind::Execute { body, .. } => {
             validate_execute(body, locals, ctx, diagnostics);
+        }
+        StatementKind::SetBlock { .. }
+        | StatementKind::Fill { .. }
+        | StatementKind::FillBiome { .. }
+        | StatementKind::Clone { .. }
+        | StatementKind::PlaceFeature { .. }
+        | StatementKind::PlaceJigsaw { .. }
+        | StatementKind::PlaceStructure { .. }
+        | StatementKind::PlaceTemplate { .. }
+        | StatementKind::ForceLoad(_)
+        | StatementKind::TimeAction { .. }
+        | StatementKind::Weather { .. }
+        | StatementKind::GameRuleSet { .. }
+        | StatementKind::WorldBorder(_)
+        | StatementKind::Locate { .. } => {
+            super::world::validate_world_statement(statement, diagnostics);
         }
     }
 }

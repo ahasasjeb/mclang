@@ -9,6 +9,8 @@ pub enum TokenKind {
     String(String),
     At,
     Hash,
+    Tilde,
+    Caret,
     LeftParen,
     RightParen,
     LeftBrace,
@@ -89,6 +91,8 @@ impl Lexer<'_> {
                 '"' => self.string(start),
                 '@' => self.single(TokenKind::At),
                 '#' => self.single(TokenKind::Hash),
+                '~' => self.single(TokenKind::Tilde),
+                '^' => self.single(TokenKind::Caret),
                 '(' => self.single(TokenKind::LeftParen),
                 ')' => self.single(TokenKind::RightParen),
                 '{' => self.single(TokenKind::LeftBrace),
@@ -384,5 +388,16 @@ mod tests {
         assert_eq!(tokens[5].kind, TokenKind::Hash);
         assert!(matches!(&tokens[6].kind, TokenKind::Ident(value) if value == "cleanup"));
         assert!(tokens.iter().any(|token| token.kind == TokenKind::Dot));
+    }
+
+    #[test]
+    fn lexes_coordinate_prefixes() {
+        let tokens = lex("pos(~1, ~-2.5, ^)", 0).unwrap();
+        assert_eq!(tokens[2].kind, TokenKind::Tilde);
+        assert!(matches!(tokens[3].kind, TokenKind::Number(1)));
+        assert_eq!(tokens[5].kind, TokenKind::Tilde);
+        assert_eq!(tokens[6].kind, TokenKind::Minus);
+        assert!(matches!(tokens[7].kind, TokenKind::Decimal(value) if value == 2.5));
+        assert_eq!(tokens[9].kind, TokenKind::Caret);
     }
 }

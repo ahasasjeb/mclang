@@ -136,6 +136,25 @@ pub(super) fn validate_expr(
         ExprKind::StopwatchQuery { id, .. } => {
             super::statements::validate_stopwatch_id(id, expression.span, diagnostics);
         }
+        ExprKind::TimeQuery { clock } => {
+            if let Some(clock) = clock
+                && !super::rules::valid_resource_location(clock)
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{clock}` 不是有效的世界时钟资源位置"),
+                    expression.span,
+                ));
+            }
+        }
+        ExprKind::GameTimeQuery | ExprKind::WorldBorderSize => {}
+        ExprKind::GameRuleQuery { name } => {
+            if !super::world::game_rule_exists(name) {
+                diagnostics.push(Diagnostic::new(
+                    format!("未知游戏规则 `{name}`；规则名来自 26.3 的 GameRules 注册表"),
+                    expression.span,
+                ));
+            }
+        }
         ExprKind::Negate(value) => validate_expr(value, locals, ctx, diagnostics),
         ExprKind::Binary {
             left,

@@ -129,6 +129,28 @@ impl Parser {
             self.clear_statement()?
         } else if self.take_word("stopwatch").is_some() {
             self.stopwatch_statement()?
+        } else if self.take_word("set_block").is_some() {
+            self.set_block_statement()?
+        } else if self.take_word("fill_biome").is_some() {
+            self.fill_biome_statement()?
+        } else if self.take_word("fill").is_some() {
+            self.fill_statement()?
+        } else if self.take_word("clone").is_some() {
+            self.clone_statement()?
+        } else if self.take_word("place").is_some() {
+            self.place_statement()?
+        } else if self.take_word("forceload").is_some() {
+            self.forceload_statement()?
+        } else if self.take_word("time").is_some() {
+            self.time_statement()?
+        } else if self.take_word("weather").is_some() {
+            self.weather_statement()?
+        } else if self.take_word("gamerule").is_some() {
+            self.gamerule_statement()?
+        } else if self.take_word("worldborder").is_some() {
+            self.worldborder_statement()?
+        } else if self.take_word("locate").is_some() {
+            self.locate_statement()?
         } else {
             let (name, _) = self.ident("语句")?;
             if self.check(&TokenKind::LeftParen) {
@@ -313,7 +335,7 @@ impl Parser {
         let target = self.call_target("被调度函数名称")?;
         self.empty_arguments()?;
         self.expect_word("after")?;
-        let delay = self.time_argument()?;
+        let delay = self.time_argument(1, "调度延迟")?;
         let mode = if self.take_word("append").is_some() {
             ScheduleMode::Append
         } else {
@@ -347,35 +369,49 @@ impl Parser {
         Ok(StatementKind::ScheduleClear { function })
     }
 
-    /// 读取 `<正数><单位>`，换算为游戏刻并生成规范化的延迟文本。
+    /// 读取 `[符号]<数值><单位>`，换算为游戏刻并生成规范化文本。
     ///
     /// 原版 `TimeArgument` 使用浮点数并按单位四舍五入，因此 `1.5 s` 与 `30 t`
-    /// 等价；这里沿用同一换算，并在编译期拒绝不足 1 刻或超出 32 位范围的延迟。
-    fn time_argument(&mut self) -> Result<String, Diagnostic> {
+    /// 等价；这里沿用同一换算，并在编译期按 `minimum` 拒绝过小或超出 32 位范围的
+    /// 时间。调度、天气持续时间和世界时钟命令共用本函数。
+    pub(super) fn time_argument(
+        &mut self,
+        minimum: i32,
+        label: &str,
+    ) -> Result<String, Diagnostic> {
+        let negative = self.negative_sign();
         let token = self.advance().clone();
         let (number, text) = match token.kind {
             TokenKind::Number(value) => {
-                if !(1..=i64::from(i32::MAX)).contains(&value) {
+                let signed = if negative { -value } else { value };
+                if !(i64::from(minimum)..=i64::from(i32::MAX)).contains(&signed) {
                     return Err(Diagnostic::new(
-                        "调度延迟必须是 1 到 2147483647 之间的整数",
+                        format!("{label}必须是 {minimum} 到 2147483647 之间的整数"),
                         token.span,
                     ));
                 }
-                (value as f64, value.to_string())
+                (signed as f64, signed.to_string())
             }
             TokenKind::Decimal(value) => {
-                if !value.is_finite() || value <= 0.0 {
-                    return Err(Diagnostic::new("调度延迟必须是大于 0 的小数", token.span));
+                let value = if negative { -value } else { value };
+                if !value.is_finite() {
+                    return Err(Diagnostic::new(
+                        format!("{label}必须是有限数字"),
+                        token.span,
+                    ));
                 }
                 (value, format!("{value}"))
             }
             _ => {
                 return Err(Diagnostic::new(
-                    "调度延迟需要正数，例如 `1 s` 或 `1.5 s`",
+                    format!("{label}需要数字，例如 `1 s` 或 `1.5 s`"),
                     token.span,
                 ));
             }
         };
+        // 括号调用里写作 `time.set(1000, t)`，schedule 里写作 `after 20 t`；
+        // 两种写法都接受一个可选逗号。
+        self.take(&TokenKind::Comma);
         let (unit, unit_span) = self.ident("时间单位 t、s 或 d")?;
         let Some(unit) = time_unit(&unit) else {
             return Err(Diagnostic::new("时间单位只能是 t、s 或 d", unit_span));
@@ -386,16 +422,17 @@ impl Parser {
             "d" => 24000.0,
             _ => unreachable!("time_unit 只返回 t、s、d"),
         };
+        // Java 的 Math.round 对负数同样向正无穷取半，`(x + 0.5).floor()` 与它一致。
         let ticks = (number * factor + 0.5).floor();
-        if ticks < 1.0 {
+        if ticks < f64::from(minimum) {
             return Err(Diagnostic::new(
-                "调度延迟至少为 1 游戏刻",
+                format!("{label}至少为 {minimum} 游戏刻"),
                 token.span.merge(unit_span),
             ));
         }
         if ticks > f64::from(i32::MAX) {
             return Err(Diagnostic::new(
-                "调度延迟超出 32 位游戏刻范围",
+                format!("{label}超出 32 位游戏刻范围"),
                 token.span.merge(unit_span),
             ));
         }

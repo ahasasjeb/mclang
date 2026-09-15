@@ -99,6 +99,20 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::XpChange { .. }
             | StatementKind::StopwatchAction { .. }
             | StatementKind::ClearInventory { .. }
+            | StatementKind::SetBlock { .. }
+            | StatementKind::Fill { .. }
+            | StatementKind::FillBiome { .. }
+            | StatementKind::Clone { .. }
+            | StatementKind::PlaceFeature { .. }
+            | StatementKind::PlaceJigsaw { .. }
+            | StatementKind::PlaceStructure { .. }
+            | StatementKind::PlaceTemplate { .. }
+            | StatementKind::ForceLoad(_)
+            | StatementKind::TimeAction { .. }
+            | StatementKind::Weather { .. }
+            | StatementKind::GameRuleSet { .. }
+            | StatementKind::WorldBorder(_)
+            | StatementKind::Locate { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
@@ -142,7 +156,11 @@ fn collect_expr_calls<'a>(expression: &'a Expr, calls: &mut HashSet<&'a str>) {
         ExprKind::Integer(_)
         | ExprKind::Score(_)
         | ExprKind::XpQuery { .. }
-        | ExprKind::StopwatchQuery { .. } => {}
+        | ExprKind::StopwatchQuery { .. }
+        | ExprKind::TimeQuery { .. }
+        | ExprKind::GameTimeQuery
+        | ExprKind::GameRuleQuery { .. }
+        | ExprKind::WorldBorderSize => {}
     }
 }
 

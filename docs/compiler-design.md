@@ -26,6 +26,8 @@
 
 `effect`、`xp`、`clear` 和 `stopwatch` 都以具名查询或资源位置为目标，生成 `execute as <选择器> at @s run <命令>` 或原生命令。等级为 0 且不隐藏粒子时 `effect give` 省略可选参数；需要隐藏粒子时补上等级占位。`xp.query` 只能出现在表达式里，编译器要求它的查询带 `limit(1)`（原版只接受单个玩家），生成 `execute ... store result score ... run xp query @s <类型>`，并先把临时计分项置零，避免选择器没有匹配玩家时读到旧值。`stopwatch.query` 生成 `execute store result score ... run stopwatch query <id> [<缩放>]`，保留缩放参数的规范化文本以避免双精度往返误差；命令失败时原版 `store result` 会写入 0，因此不需要预置。`schedule` 的延迟在解析期按原版 `TimeArgument` 的浮点规则换算为游戏刻，拒绝不足 1 刻或超出 32 位范围的延迟，`schedule.clear` 只接受函数。
 
+世界与方块命令把位置与方块状态抽成共享的具名参数：`pos(x, y, z)` 的三段分量保持在 AST 的 `Coordinate` 里（绝对、`~` 相对、`^` 局部），解析期拒绝 `^` 与另外两种写法混用；语义阶段检查绝对分量的世界范围（水平 -30000000 到 29999999，垂直 -2032 到 2031）与列坐标的区块数量上限。`block_state("id") { 属性 = "值"; }` 保存资源位置与属性表，`#` 前缀在目标位置是错误、在 `fill` 过滤器与 `clone filtered` 里是方块标签谓词。`set_block`、`fill`、`fill_biome`、`clone`、`place.*`、`forceload`、`time`、`weather`、`gamerule`、`worldborder` 与 `locate` 的代码生成只拼接这些已经验证过的文本，`replace` 等默认值省略以匹配手写命令的最短形状。`gamerule` 的规则名与布尔/整数类型、整数范围来自 26.3 的 `GameRules` 注册表引导代码，编译期一次校验；`time.query`、`time.query_gametime`、`gamerule.query` 与 `worldborder.get` 是表达式，生成 `execute store result score ... run <命令>`。
+
 `resource` 声明中的原始文本先由 `serde_json` 解析，语义阶段检查资源类型、资源路径和项目内重复项。代码生成阶段重新序列化为稳定缩进的 JSON，并按照注册表目录写入用户命名空间。
 
 ## 编辑器接口

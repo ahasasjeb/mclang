@@ -10,6 +10,7 @@ use super::Compiler;
 use super::Value;
 use super::emit::{compile_message, entity_query_clause};
 use super::names::parameter_holder;
+use super::world;
 
 impl Compiler<'_> {
     /// 下降一个语句块。辅助函数命名计数器按所属函数（`owner`）独立编号。
@@ -80,6 +81,100 @@ impl Compiler<'_> {
                 item,
                 max_count,
             } => self.compile_clear_inventory(target, item.as_deref(), *max_count, commands),
+            StatementKind::SetBlock { pos, block, mode } => {
+                commands.push(world::set_block_command(pos, block, *mode));
+            }
+            StatementKind::Fill {
+                from,
+                to,
+                block,
+                mode,
+                filter,
+            } => commands.push(world::fill_command(from, to, block, *mode, filter.as_ref())),
+            StatementKind::FillBiome {
+                from,
+                to,
+                biome,
+                filter,
+            } => commands.push(world::fill_biome_command(
+                from,
+                to,
+                biome,
+                filter.as_deref(),
+            )),
+            StatementKind::Clone {
+                begin,
+                end,
+                destination,
+                from_dimension,
+                to_dimension,
+                filter,
+                mode,
+                strict,
+            } => commands.push(world::clone_command(&world::CloneOptions {
+                begin,
+                end,
+                destination,
+                from_dimension: from_dimension.as_deref(),
+                to_dimension: to_dimension.as_deref(),
+                filter,
+                mode: *mode,
+                strict: *strict,
+            })),
+            StatementKind::PlaceFeature { feature, pos } => {
+                commands.push(world::place_feature_command(feature, pos.as_ref()));
+            }
+            StatementKind::PlaceJigsaw {
+                pool,
+                target,
+                max_depth,
+                pos,
+            } => commands.push(world::place_jigsaw_command(
+                pool,
+                target,
+                *max_depth,
+                pos.as_ref(),
+            )),
+            StatementKind::PlaceStructure { structure, pos } => {
+                commands.push(world::place_structure_command(structure, pos.as_ref()));
+            }
+            StatementKind::PlaceTemplate {
+                template,
+                pos,
+                rotation,
+                mirror,
+                integrity,
+                seed,
+                strict,
+            } => commands.push(world::place_template_command(
+                &world::PlaceTemplateOptions {
+                    template,
+                    pos,
+                    rotation: *rotation,
+                    mirror: *mirror,
+                    integrity: integrity.as_deref(),
+                    seed: *seed,
+                    strict: *strict,
+                },
+            )),
+            StatementKind::ForceLoad(operation) => {
+                commands.push(world::forceload_command(operation));
+            }
+            StatementKind::TimeAction { operation, clock } => {
+                commands.push(world::time_command(operation, clock.as_deref()));
+            }
+            StatementKind::Weather { kind, duration } => {
+                commands.push(world::weather_command(*kind, duration.as_deref()));
+            }
+            StatementKind::GameRuleSet { name, value } => {
+                commands.push(world::gamerule_command(name, *value));
+            }
+            StatementKind::WorldBorder(operation) => {
+                commands.push(world::worldborder_command(operation));
+            }
+            StatementKind::Locate { kind, target } => {
+                commands.push(world::locate_command(kind.as_str(), target));
+            }
             StatementKind::SelfAction(action) => commands.extend(self.compile_self_action(action)),
             StatementKind::Message {
                 target,

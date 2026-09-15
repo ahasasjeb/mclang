@@ -417,22 +417,27 @@ impl Parser {
             .map_err(|_| Diagnostic::new(format!("{name} 超出 32 位范围"), token.span))
     }
 
-    /// 读取可带负号的整数或小数并返回规范文本，供原版双精度参数使用。
+    /// 读取可带符号的整数或小数并返回规范文本，供原版双精度参数使用。
     ///
     /// 直接保留源文本可以避免把 64 位整数未经检查地转成 `f64`，输出也更贴近手写命令。
     pub(super) fn signed_number_text(&mut self, name: &str) -> Result<String, Diagnostic> {
-        let minus = self.take(&TokenKind::Minus);
+        let negative = self.negative_sign();
         let token = self.advance().clone();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
             TokenKind::Decimal(value) => format!("{value}"),
             _ => return Err(Diagnostic::new(format!("{name} 需要数字"), token.span)),
         };
-        Ok(if minus.is_some() {
-            format!("-{text}")
-        } else {
-            text
-        })
+        Ok(if negative { format!("-{text}") } else { text })
+    }
+
+    /// 读取可选的正负号；原版参数接受 `+5`，这里把正号规范化为无符号。
+    pub(super) fn negative_sign(&mut self) -> bool {
+        if self.take(&TokenKind::Minus).is_some() {
+            return true;
+        }
+        self.take(&TokenKind::Plus);
+        false
     }
 
     pub(super) fn unsigned_with_span(&mut self, name: &str) -> Result<(u32, Span), Diagnostic> {

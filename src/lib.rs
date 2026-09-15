@@ -106,6 +106,20 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::XpChange { .. }
             | ast::StatementKind::StopwatchAction { .. }
             | ast::StatementKind::ClearInventory { .. }
+            | ast::StatementKind::SetBlock { .. }
+            | ast::StatementKind::Fill { .. }
+            | ast::StatementKind::FillBiome { .. }
+            | ast::StatementKind::Clone { .. }
+            | ast::StatementKind::PlaceFeature { .. }
+            | ast::StatementKind::PlaceJigsaw { .. }
+            | ast::StatementKind::PlaceStructure { .. }
+            | ast::StatementKind::PlaceTemplate { .. }
+            | ast::StatementKind::ForceLoad(_)
+            | ast::StatementKind::TimeAction { .. }
+            | ast::StatementKind::Weather { .. }
+            | ast::StatementKind::GameRuleSet { .. }
+            | ast::StatementKind::WorldBorder(_)
+            | ast::StatementKind::Locate { .. }
             | ast::StatementKind::SelfAction(_)
             | ast::StatementKind::Message { .. }
             | ast::StatementKind::PlaySound { .. }

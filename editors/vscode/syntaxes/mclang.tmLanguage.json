@@ -121,15 +121,15 @@
     "keywords": {
       "patterns": [
         {
-          "match": "\\b(namespace|命名空间|score|计分|query|查询|item_stack|物品堆|item_list|物品列表|item|物品|storage|存储|resource|资源|predicate|谓词|fn_tag|函数标签|fn|函数|let|令)\\b",
+          "match": "\\b(namespace|命名空间|score|计分|query|查询|item_stack|物品堆|item_list|物品列表|item|物品|storage|存储|resource|资源|predicate|谓词|fn_tag|函数标签|fn|函数|let|令|pos|坐标|column|列坐标|block_state|方块状态)\\b",
           "name": "storage.type.mclang"
         },
         {
-          "match": "\\b(if|如果|else|否则|while|当|each|遍历|call|调用|schedule|调度|after|延后|append|追加|replace|替换|return|返回|fail|失败|run|原生命令)\\b",
+          "match": "\\b(if|如果|else|否则|while|当|each|遍历|call|调用|schedule|调度|after|延后|append|追加|replace|替换|return|返回|fail|失败|run|原生命令|set_block|设置方块|fill|填充|fill_biome|填充生物群系|clone|复制|place|放置)\\b",
           "name": "keyword.control.mclang"
         },
         {
-          "match": "\\b(entity|实体|self|自身|message|消息|sound|声音|effect|效果|xp|经验|clear|清除|stopwatch|秒表|spawn|召唤|give|给予|origin|投掷者|in_dimension|在维度|contents|内容|execute|原生执行)\\b",
+          "match": "\\b(entity|实体|self|自身|message|消息|sound|声音|effect|效果|xp|经验|clear|清除|stopwatch|秒表|spawn|召唤|give|给予|origin|投掷者|in_dimension|在维度|contents|内容|execute|原生执行|forceload|强制加载|time|时间|weather|天气|gamerule|游戏规则|worldborder|世界边界|locate|定位)\\b",
           "name": "support.function.mclang"
         }
       ]
@@ -184,7 +184,7 @@
     "operators": {
       "patterns": [
         {
-          "match": "(==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|->|[=<>+\\-*/%!])",
+          "match": "(==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|->|[=<>+\\-*/%!~^])",
           "name": "keyword.operator.mclang"
         }
       ]

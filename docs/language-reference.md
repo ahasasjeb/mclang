@@ -29,6 +29,13 @@
 | `origin` | `投掷者` | `self` | `自身` |
 | `message` | `消息` | `sound` | `声音` |
 | `run` | `原生命令` | `execute` | `原生执行` |
+| `set_block` | `设置方块` | `fill` | `填充` |
+| `fill_biome` | `填充生物群系` | `clone` | `复制` |
+| `place` | `放置` | `forceload` | `强制加载` |
+| `time` | `时间` | `weather` | `天气` |
+| `gamerule` | `游戏规则` | `worldborder` | `世界边界` |
+| `locate` | `定位` | `pos` | `坐标` |
+| `column` | `列坐标` | `block_state` | `方块状态` |
 
 函数属性为 `@load`/`@加载`、`@tick`/`@每刻`、`@entity`/`@实体`、`@non_player`/`@非玩家`
 和 `@player`/`@玩家`。返回类型 `-> score` 也可以写成 `-> 计分`。
@@ -68,6 +75,8 @@
 | 声音分类 | `hostile` / `neutral` / `player` / `ambient` / `voice` / `ui` | `敌对` / `中立` / `玩家` / `环境` / `语音` / `界面` |
 
 方法名也可以写中文：`效果.给予`、`效果.给予无限`、`效果.清除`、`经验.增加`、`经验.设置`、`经验.查询`、`秒表.创建`、`秒表.查询`、`秒表.重启`、`秒表.移除`，以及函数标签里的 `值` 和 `替换`。
+
+世界命令的方法名同样有中文写法：`放置.地物`/`拼图`/`结构`/`模板`、`强制加载.添加`/`移除`/`全部移除`/`查询`、`时间.设置`/`增加`/`暂停`/`恢复`/`速率`/`查询`/`查询游戏时间`、`天气.晴朗`/`下雨`/`雷暴`、`游戏规则.设置`/`查询`、`世界边界.增加`/`设置`/`中心`/`伤害量`/`伤害缓冲`/`获取`/`警告距离`/`警告时间`、`定位.结构`/`生物群系`/`兴趣点`。
 
 文本颜色支持 `black`/`黑色`、`dark_blue`/`深蓝色`、`dark_green`/`深绿色`、`dark_aqua`/`深青色`、`dark_red`/`深红色`、`dark_purple`/`深紫色`、`gold`/`金色`、`gray`/`灰色`、`dark_gray`/`深灰色`、`blue`/`蓝色`、`green`/`绿色`、`aqua`/`青色`、`red`/`红色`、`light_purple`/`亮紫色`、`yellow`/`黄色` 和 `white`/`白色`。
 
@@ -395,6 +404,21 @@ sound.self("minecraft:block.note_block.pling", master);
 | `clear(q[, 物品][, 数量])` | `... clear @s [<物品>] [<数量>]` | 目标必须是玩家查询 |
 | `stopwatch.create/restart/remove("id")` | `stopwatch create/restart/remove <id>` | id 是完整资源位置 |
 | `stopwatch.query("id"[, 缩放])` | `execute store result score ... run stopwatch query <id> [<缩放>]` | 表达式；失败写入 0 |
+| `set_block(pos, 方块[, 模式])` | `setblock <坐标> <方块>[ destroy\|keep\|strict]` | `replace` 为默认，省略 |
+| `fill(起点, 终点, 方块[, 模式][, replace 过滤器])` | `fill <起点> <终点> <方块>[ 模式][ replace <过滤器>]` | 模式 replace/outline/hollow/destroy/strict/keep |
+| `fill_biome(起点, 终点, "生物群系"[, replace, "过滤器"])` | `fillbiome <起点> <终点> <生物群系>[ replace <过滤>]` | 过滤器可带 `#` 标签 |
+| `clone(起点, 终点, 目标[, 选项...])` | `clone [from <维度>] <起点> <终点> <目标> [to <维度>][ masked\|filtered <谓词>][ force\|move][ strict]` | 选项顺序无关 |
+| `place.feature/structure/jigsaw/template` | `place feature/structure/jigsaw/template ...` | 旋转、镜像、完整度、种子、strict |
+| `forceload.add/remove/query(column)[, column]` | `forceload add/remove/query <列>[ <列>]` | 一次最多 256 个区块 |
+| `forceload.remove_all()` | `forceload remove all` | |
+| `time.set/add/pause/resume/rate(..., [时钟])` | `time [of <时钟>] set/add/pause/resume/rate ...` | 编译期换算时间单位 |
+| `time.query([时钟])`、`time.query_gametime()` | `execute store result score ... run time [of <时钟>] query time/gametime` | 表达式 |
+| `weather.clear/rain/thunder([时间])` | `weather clear/rain/thunder [<时间>]` | |
+| `gamerule.set("规则", 值)` | `gamerule <规则> <值>` | 规则表来自 26.3 `GameRules` |
+| `gamerule.query("规则")` | `execute store result score ... run gamerule <规则>` | 表达式 |
+| `worldborder.add/set(...)`、`center`、`damage_amount`、`damage_buffer`、`warning_distance`、`warning_time` | `worldborder add/set/center/damage amount/damage buffer/warning distance/warning time ...` | 距离与中心检查范围 |
+| `worldborder.get()` | `execute store result score ... run worldborder get` | 表达式 |
+| `locate.structure/biome/poi("目标")` | `locate structure/biome/poi <目标>` | 只产生反馈，可带 `#` 标签 |
 | `predicate(p)` | `execute if predicate <ns>:p` | 可与 `!`、`&&`、`\|\|` 组合 |
 | `schedule f() after n t [append]` | `schedule function <ns>:f <n>t [append]` | 单位 `t`、`s`、`d`，支持小数 |
 | `schedule #标签() after n t` | `schedule function #<ns>:标签 <n>t` | |
@@ -569,6 +593,90 @@ fn main() {
 ```
 
 秒表 id 是完整的资源位置，保存在世界的 `stopwatches` 存档数据里：`/reload` 不会清空它，因此 `stopwatch.create` 只在第一次加载时成功。`stopwatch.query` 只能作为表达式使用，返回 `(int)(已过秒数 × 缩放)`；缩放是可选的双精度参数，省略时为 1，`1000` 得到毫秒。查询不存在的秒表时命令失败，表达式得到 0（原版 `store result` 在失败时写入 0）。`restart` 和 `remove` 对不存在的秒表会在运行时记录错误，但不会中断后续命令。
+
+## 世界与方块
+
+`pos(x, y, z)` 描述方块坐标：绝对分量是整数，`~` 是相对偏移，`^` 是局部偏移，`^` 不能与 `~` 或绝对坐标混用；`column(x, z)` 是 `forceload` 使用的两段列坐标（不支持 `^`）。绝对坐标在编译期检查世界范围（水平 -30000000 到 29999999，垂直 -2032 到 2031）。
+
+`block_state("minecraft:oak_stairs") { facing = "east"; }` 描述方块状态；属性值写成字符串，输出时去掉引号。`#` 前缀的 `block_state("#minecraft:planks")` 是方块标签谓词，只能出现在 `fill` 的替换过滤器与 `clone filtered` 里。
+
+```mcl
+fn build() {
+    set_block(pos(0, 64, 0), block_state("minecraft:stone"));
+    set_block(pos(~, ~1, ~), block_state("minecraft:oak_stairs") { facing = "east"; }, keep);
+    fill(pos(0, 64, 1), pos(4, 64, 5), block_state("minecraft:glass"), outline);
+    fill(pos(0, 64, 1), pos(4, 64, 5), block_state("minecraft:oak_planks"), replace, block_state("#minecraft:planks"));
+    fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains");
+    fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains", replace, "#minecraft:is_forest");
+}
+```
+
+`set_block` 的模式是 `replace`（默认）、`destroy`、`keep` 或 `strict`；`fill` 的模式还接受 `outline`、`hollow`。`clone` 的选项按任意顺序写在目标位置之后：`replace`/`masked`/`filtered(方块谓词)`、`normal`/`force`/`move`、`strict`、`from_dimension("维度")`、`to_dimension("维度")`，每个选项最多一次：
+
+```mcl
+clone(pos(0, 64, 0), pos(8, 64, 8), pos(20, 64, 0), masked, force);
+clone(pos(0, 64, 0), pos(8, 64, 8), pos(40, 64, 0), filtered, block_state("#minecraft:logs"), move, strict);
+clone(pos(0, 64, 0), pos(8, 64, 8), pos(60, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
+```
+
+放置命令对应原版子命令：`place.feature("地物"[, pos])`、`place.structure("结构"[, pos])`、`place.jigsaw("模板池", "目标", 最大深度[, pos])`、`place.template("模板", pos[, 旋转][, 镜像][, 完整度][, 种子][, strict])`。旋转是 `none`、`clockwise_90`、`180`、`counterclockwise_90`，镜像是 `none`、`left_right`、`front_back`，完整度必须在 0.0 到 1.0 之间。
+
+```mcl
+place.feature("minecraft:oak_tree", pos(0, 64, 20));
+place.structure("minecraft:village_plains");
+place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
+place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);
+
+forceload.add(column(0, 0), column(31, 31));   // 两端都写时是矩形范围
+forceload.query(column(0, 0));
+forceload.remove(column(0, 0));
+forceload.remove_all();
+```
+
+时间参数写成 `数值, 单位`，单位沿用 `t`、`s`、`d`；编译器按原版 `TimeArgument` 换算成游戏刻并检查范围，输出保留原始写法。`time` 的时钟是可选参数：
+
+```mcl
+time.set(1000, t);
+time.add(1, d, "minecraft:the_end");   // 可选的世界时钟
+time.pause();
+time.resume();
+time.rate(1.5);
+weather.rain(30, s);
+weather.clear();
+
+let ticks = time.query();              // 默认时钟的总游戏刻
+let end = time.query("minecraft:the_end");
+let game = time.query_gametime();
+```
+
+`gamerule` 的规则名与取值类型来自 26.3 的 `GameRules` 注册表，写 `keep_inventory` 或 `minecraft:keep_inventory` 都可以；查询是表达式：
+
+```mcl
+gamerule.set("keep_inventory", true);
+gamerule.set("random_tick_speed", 5);
+if gamerule.query("keep_inventory") == 1 {
+    message.all("keep inventory is on", green);
+}
+```
+
+`worldborder` 的距离与中心在编译期检查原版范围；`get` 是表达式。`locate` 只产生命令反馈：
+
+```mcl
+worldborder.set(1000, 5 s);
+worldborder.add(-100, 30 s);
+worldborder.center(0, 0);
+worldborder.damage_amount(0.5);
+worldborder.damage_buffer(5);
+worldborder.warning_distance(10);
+worldborder.warning_time(20 s);
+let size = worldborder.get();
+
+locate.structure("minecraft:village_plains");
+locate.biome("#minecraft:is_forest");
+locate.poi("minecraft:home");
+```
+
+方块实体 NBT 尚未建模：`block_state` 只描述方块属性，`setblock`/`fill` 的 `{...}` NBT 后缀需要时暂用 `run`。`place.feature` 的原版内联地物 JSON 同样未建模。
 
 ## 函数标签
 

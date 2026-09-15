@@ -5,7 +5,10 @@
 //! 声音分类等）按领域保持独立函数，规范形式统一为英文；中文别名只在解析边界
 //! 出现，进入 AST 后所有阶段只处理英文规范值。
 
-use crate::ast::{Attribute, ItemRarity, XpKind};
+use crate::ast::{
+    Attribute, CloneMode, FillMode, ItemRarity, LocateKind, SetBlockMode, TemplateMirror,
+    TemplateRotation, WeatherKind, XpKind,
+};
 
 /// 语言关键词的规范英文写法与中文别名。
 pub(crate) struct Keyword {
@@ -166,6 +169,62 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
     Keyword {
         english: "contents",
         chinese: "内容",
+    },
+    Keyword {
+        english: "set_block",
+        chinese: "设置方块",
+    },
+    Keyword {
+        english: "fill",
+        chinese: "填充",
+    },
+    Keyword {
+        english: "fill_biome",
+        chinese: "填充生物群系",
+    },
+    Keyword {
+        english: "clone",
+        chinese: "复制",
+    },
+    Keyword {
+        english: "place",
+        chinese: "放置",
+    },
+    Keyword {
+        english: "forceload",
+        chinese: "强制加载",
+    },
+    Keyword {
+        english: "time",
+        chinese: "时间",
+    },
+    Keyword {
+        english: "weather",
+        chinese: "天气",
+    },
+    Keyword {
+        english: "gamerule",
+        chinese: "游戏规则",
+    },
+    Keyword {
+        english: "worldborder",
+        chinese: "世界边界",
+    },
+    Keyword {
+        english: "locate",
+        chinese: "定位",
+    },
+    Keyword {
+        english: "pos",
+        chinese: "坐标",
+    },
+    Keyword {
+        english: "column",
+        chinese: "列坐标",
+    },
+    Keyword {
+        english: "block_state",
+        chinese: "方块状态",
     },
 ];
 
@@ -425,6 +484,158 @@ pub(super) fn sound_source(value: &str) -> Option<&'static str> {
         "ambient" | "环境" => Some("ambient"),
         "voice" | "语音" => Some("voice"),
         "ui" | "界面" => Some("ui"),
+        _ => None,
+    }
+}
+
+/// `setblock` 的放置模式。
+pub(super) fn set_block_mode(value: &str) -> Option<SetBlockMode> {
+    match value {
+        "destroy" | "摧毁" => Some(SetBlockMode::Destroy),
+        "keep" | "保留" => Some(SetBlockMode::Keep),
+        "replace" | "替换" => Some(SetBlockMode::Replace),
+        "strict" | "严格" => Some(SetBlockMode::Strict),
+        _ => None,
+    }
+}
+
+/// `fill` 的填充模式。
+pub(super) fn fill_mode(value: &str) -> Option<FillMode> {
+    match value {
+        "replace" | "替换" => Some(FillMode::Replace),
+        "outline" | "轮廓" => Some(FillMode::Outline),
+        "hollow" | "空心" => Some(FillMode::Hollow),
+        "destroy" | "摧毁" => Some(FillMode::Destroy),
+        "strict" | "严格" => Some(FillMode::Strict),
+        "keep" | "保留" => Some(FillMode::Keep),
+        _ => None,
+    }
+}
+
+/// `clone` 的过滤方式；`filtered` 还需要紧跟一个方块谓词参数。
+pub(super) fn clone_filter(value: &str) -> Option<&'static str> {
+    match value {
+        "replace" | "替换" => Some("replace"),
+        "masked" | "遮罩" => Some("masked"),
+        "filtered" | "过滤" => Some("filtered"),
+        _ => None,
+    }
+}
+
+/// `clone` 的复制模式。
+pub(super) fn clone_mode(value: &str) -> Option<CloneMode> {
+    match value {
+        "normal" | "普通" => Some(CloneMode::Normal),
+        "force" | "强制" => Some(CloneMode::Force),
+        "move" | "移动" => Some(CloneMode::Move),
+        _ => None,
+    }
+}
+
+/// `place.template` 的旋转值；`180` 既是数字字面量也是原版枚举名。
+pub(super) fn template_rotation(value: &str) -> Option<TemplateRotation> {
+    match value {
+        "none" | "无" => Some(TemplateRotation::None),
+        "clockwise_90" | "顺时针90" => Some(TemplateRotation::Clockwise90),
+        "180" => Some(TemplateRotation::Clockwise180),
+        "counterclockwise_90" | "逆时针90" => Some(TemplateRotation::Counterclockwise90),
+        _ => None,
+    }
+}
+
+/// `place.template` 的镜像值。
+pub(super) fn template_mirror(value: &str) -> Option<TemplateMirror> {
+    match value {
+        "none" | "无" => Some(TemplateMirror::None),
+        "left_right" | "左右" => Some(TemplateMirror::LeftRight),
+        "front_back" | "前后" => Some(TemplateMirror::FrontBack),
+        _ => None,
+    }
+}
+
+/// `clone` 的跨维度选项。
+pub(super) fn clone_dimension(value: &str) -> Option<&'static str> {
+    match value {
+        "from_dimension" | "起始维度" => Some("from"),
+        "to_dimension" | "目标维度" => Some("to"),
+        _ => None,
+    }
+}
+
+/// `strict` 标志：应用在 `set_block`、`fill`、`clone`、`place.template` 上。
+pub(super) fn strict_word(value: &str) -> bool {
+    matches!(value, "strict" | "严格")
+}
+
+pub(super) fn place_method(value: &str) -> Option<&'static str> {
+    match value {
+        "feature" | "地物" => Some("feature"),
+        "jigsaw" | "拼图" => Some("jigsaw"),
+        "structure" | "结构" => Some("structure"),
+        "template" | "模板" => Some("template"),
+        _ => None,
+    }
+}
+
+pub(super) fn forceload_method(value: &str) -> Option<&'static str> {
+    match value {
+        "add" | "添加" => Some("add"),
+        "remove" | "移除" => Some("remove"),
+        "remove_all" | "全部移除" => Some("remove_all"),
+        "query" | "查询" => Some("query"),
+        _ => None,
+    }
+}
+
+pub(super) fn time_method(value: &str) -> Option<&'static str> {
+    match value {
+        "set" | "设置" => Some("set"),
+        "add" | "增加" => Some("add"),
+        "pause" | "暂停" => Some("pause"),
+        "resume" | "恢复" => Some("resume"),
+        "rate" | "速率" => Some("rate"),
+        "query" | "查询" => Some("query"),
+        "query_gametime" | "查询游戏时间" => Some("query_gametime"),
+        _ => None,
+    }
+}
+
+pub(super) fn weather_kind(value: &str) -> Option<WeatherKind> {
+    match value {
+        "clear" | "晴朗" => Some(WeatherKind::Clear),
+        "rain" | "下雨" => Some(WeatherKind::Rain),
+        "thunder" | "雷暴" => Some(WeatherKind::Thunder),
+        _ => None,
+    }
+}
+
+pub(super) fn gamerule_method(value: &str) -> Option<&'static str> {
+    match value {
+        "set" | "设置" => Some("set"),
+        "query" | "查询" => Some("query"),
+        _ => None,
+    }
+}
+
+pub(super) fn worldborder_method(value: &str) -> Option<&'static str> {
+    match value {
+        "add" | "增加" => Some("add"),
+        "set" | "设置" => Some("set"),
+        "center" | "中心" => Some("center"),
+        "damage_amount" | "伤害量" => Some("damage_amount"),
+        "damage_buffer" | "伤害缓冲" => Some("damage_buffer"),
+        "get" | "获取" => Some("get"),
+        "warning_distance" | "警告距离" => Some("warning_distance"),
+        "warning_time" | "警告时间" => Some("warning_time"),
+        _ => None,
+    }
+}
+
+pub(super) fn locate_kind(value: &str) -> Option<LocateKind> {
+    match value {
+        "structure" | "结构" => Some(LocateKind::Structure),
+        "biome" | "生物群系" => Some(LocateKind::Biome),
+        "poi" | "兴趣点" => Some(LocateKind::Poi),
         _ => None,
     }
 }

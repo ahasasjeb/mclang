@@ -9,6 +9,7 @@ mod recursion;
 mod rules;
 mod statements;
 mod tags;
+mod world;
 
 use std::collections::{HashMap, HashSet};
 

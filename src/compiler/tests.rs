@@ -122,7 +122,7 @@ fn validates_and_emits_json_resources() {
 #[test]
 fn lowers_predicate_conditions_and_typed_sounds() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             resource predicate coin = """{"condition":"minecraft:random_chance","chance":0.5}""";
             query players = entity("minecraft:player") {}
@@ -133,7 +133,7 @@ fn lowers_predicate_conditions_and_typed_sounds() {
                     }
                 }
             }
-            "#,
+            "##,
     );
     let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
     assert!(generated.contains("execute if predicate demo:coin run scoreboard players set"));
@@ -141,13 +141,13 @@ fn lowers_predicate_conditions_and_typed_sounds() {
 
     let invalid = parse(
         lex(
-            r#"
+            r##"
                 namespace demo;
                 fn broken() {
                     if predicate(missing) {}
                     sound.self("Invalid Sound", invalid_category);
                 }
-                "#,
+                "##,
             0,
         )
         .unwrap(),
@@ -179,7 +179,7 @@ fn lowers_predicate_conditions_and_typed_sounds() {
 #[test]
 fn chinese_and_english_keywords_compile_identically() {
     let english = compile_text(
-        r#"
+        r##"
             namespace demo;
             score active = 0;
             query triggers = entity("minecraft:item") {
@@ -245,10 +245,10 @@ fn chinese_and_english_keywords_compile_identically() {
             }
             fn later() { schedule later() after 1 s append; }
             fn drain() { while active > 0 { active -= 1; } }
-            "#,
+            "##,
     );
     let chinese = compile_text(
-        r#"
+        r##"
             命名空间 demo;
             计分 active = 0;
             查询 triggers = 实体("minecraft:item") {
@@ -314,7 +314,7 @@ fn chinese_and_english_keywords_compile_identically() {
             }
             函数 later() { 调度 later() 延后 1 秒 追加; }
             函数 drain() { 当 active > 0 { active -= 1; } }
-            "#,
+            "##,
     );
 
     assert_eq!(english.files, chinese.files);
@@ -432,7 +432,7 @@ fn lowers_self_item_give_through_empty_slot_source() {
 #[test]
 fn lowers_typed_minecraft_queries_storage_and_actions() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             score active = 0;
             query triggers = entity("minecraft:item") {
@@ -455,7 +455,7 @@ fn lowers_typed_minecraft_queries_storage_and_actions() {
                     message.nearest(16, "Ready", green);
                 }
             }
-            "#,
+            "##,
     );
     let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
     assert!(generated.contains(
@@ -478,7 +478,7 @@ fn lowers_typed_minecraft_queries_storage_and_actions() {
 #[test]
 fn lowers_typed_item_giving_and_checks_player_context() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             item reward = item_stack("minecraft:diamond") {
                 count = 3;
@@ -509,7 +509,7 @@ fn lowers_typed_item_giving_and_checks_player_context() {
                 give(players, blade);
                 give(players, reward, 4);
             }
-            "#,
+            "##,
     );
     let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
     assert!(generated.contains(
@@ -523,7 +523,7 @@ fn lowers_typed_item_giving_and_checks_player_context() {
 
     let invalid = parse(
         lex(
-            r#"
+            r##"
                 namespace demo;
                 item broken = item_stack("Invalid Item") {
                     count = 101;
@@ -552,7 +552,7 @@ fn lowers_typed_item_giving_and_checks_player_context() {
                 fn wrong_self_item() { give(players, self.item, 3); }
                 fn wrong_call() { wrong_entity(); }
                 fn wrong_schedule() { schedule needs_player() after 1 t; }
-                "#,
+                "##,
             0,
         )
         .unwrap(),
@@ -638,7 +638,7 @@ fn lowers_typed_item_giving_and_checks_player_context() {
 
 #[test]
 fn checks_entity_context_and_typed_references() {
-    let source = r#"
+    let source = r##"
             namespace demo;
             @entity fn entity_only() { self.remove(); }
             @tick fn tick() {
@@ -646,7 +646,7 @@ fn checks_entity_context_and_typed_references() {
                 each(missing_query) { self.save_items(missing_storage); }
                 message.all("bad color", orange);
             }
-        "#;
+        "##;
     let program = parse(lex(source, 0).unwrap()).unwrap();
     let errors = compile(&program, "test").unwrap_err();
     assert!(
@@ -675,7 +675,7 @@ fn checks_entity_context_and_typed_references() {
 fn rejects_player_nbt_mutations_and_accepts_non_player_contexts() {
     let invalid = parse(
         lex(
-            r#"
+            r##"
                 namespace demo;
                 query players = entity("minecraft:player") {}
                 storage saved = item_list("demo:state", "saved_items");
@@ -689,7 +689,7 @@ fn rejects_player_nbt_mutations_and_accepts_non_player_contexts() {
                 @tick fn tick() {
                     each(players) { self.remove_preserving_items(saved); }
                 }
-                "#,
+                "##,
             0,
         )
         .unwrap(),
@@ -704,7 +704,7 @@ fn rejects_player_nbt_mutations_and_accepts_non_player_contexts() {
     );
 
     let valid = compile_text(
-        r#"
+        r##"
             namespace demo;
             query mobs = entity("minecraft:zombie") {}
             storage saved = item_list("demo:state", "saved_items");
@@ -716,7 +716,7 @@ fn rejects_player_nbt_mutations_and_accepts_non_player_contexts() {
                 spawn("minecraft:armor_stand") { mob_init(); }
                 each(mobs) { mob_init(); self.add_tag("ready"); }
             }
-            "#,
+            "##,
     );
     let generated = valid.files.values().cloned().collect::<Vec<_>>().join("\n");
     assert!(generated.contains("data merge entity @s {Invulnerable:1b}"));
@@ -727,12 +727,12 @@ fn rejects_player_nbt_mutations_and_accepts_non_player_contexts() {
 
     let wrong_caller = parse(
         lex(
-            r#"
+            r##"
                 namespace demo;
                 @non_player fn mob_only() {}
                 @entity fn any_entity() { mob_only(); }
                 fn no_context() { mob_only(); }
-                "#,
+                "##,
             0,
         )
         .unwrap(),
@@ -751,13 +751,13 @@ fn rejects_player_nbt_mutations_and_accepts_non_player_contexts() {
 fn rejects_non_summonable_entity_types() {
     let program = parse(
         lex(
-            r#"
+            r##"
                 namespace demo;
                 fn bad() {
                     spawn("minecraft:player") { self.add_tag("x"); }
                     spawn("minecraft:fishing_bobber") { self.add_tag("x"); }
                 }
-                "#,
+                "##,
             0,
         )
         .unwrap(),
@@ -775,11 +775,11 @@ fn rejects_non_summonable_entity_types() {
 #[test]
 fn lowers_return_fail_and_run() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             fn fail_now() { return fail; }
             fn gametime() -> score { return run "time query gametime"; }
-            "#,
+            "##,
     );
     let fail_now = &pack.files[&PathBuf::from("data/demo/function/fail_now.mcfunction")];
     assert!(fail_now.contains("return fail"));
@@ -794,7 +794,7 @@ fn lowers_return_fail_and_run() {
 #[test]
 fn lowers_schedule_clear_and_fractional_delays() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             fn cleanup() {}
             fn main() {
@@ -803,7 +803,7 @@ fn lowers_schedule_clear_and_fractional_delays() {
                 schedule cleanup() after 30 t replace;
                 schedule.clear(cleanup);
             }
-            "#,
+            "##,
     );
     let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
     assert!(main.contains("schedule function demo:cleanup 1.5s append"));
@@ -823,7 +823,7 @@ fn lowers_schedule_clear_and_fractional_delays() {
 #[test]
 fn emits_function_tags_and_tag_calls() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             fn a() {}
             fn b() {}
@@ -835,7 +835,7 @@ fn emits_function_tags_and_tag_calls() {
                 replace = true;
             }
             fn_tag nested { value(b); }
-            "#,
+            "##,
     );
     let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
     assert!(main.contains("function #demo:cleanup"));
@@ -857,7 +857,7 @@ fn emits_function_tags_and_tag_calls() {
 #[test]
 fn lowers_effect_xp_and_clear_commands() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             score total = 0;
             query players = entity("minecraft:player") { limit(1); }
@@ -880,7 +880,7 @@ fn lowers_effect_xp_and_clear_commands() {
                 clear(players, "minecraft:diamond");
                 clear(players, "minecraft:diamond", 5);
             }
-            "#,
+            "##,
     );
     let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
     assert!(
@@ -906,7 +906,7 @@ fn lowers_effect_xp_and_clear_commands() {
 fn rejects_invalid_effects_xp_clear_and_tags() {
     let program = parse(
         lex(
-            r#"
+            r##"
             namespace demo;
             query players = entity("minecraft:player") {}
             query mobs = entity("minecraft:zombie") {}
@@ -939,7 +939,7 @@ fn rejects_invalid_effects_xp_clear_and_tags() {
                 schedule.clear(missing_function);
                 schedule missing_function() after 1 t;
             }
-            "#,
+            "##,
             0,
         )
         .unwrap(),
@@ -989,7 +989,7 @@ fn rejects_invalid_effects_xp_clear_and_tags() {
 
     let tag_context = parse(
         lex(
-            r#"
+            r##"
             namespace demo;
             query players = entity("minecraft:player") {}
             @player fn needs_player() {}
@@ -998,7 +998,7 @@ fn rejects_invalid_effects_xp_clear_and_tags() {
                 call #needs_context();
                 schedule #needs_context() after 1 t;
             }
-            "#,
+            "##,
             0,
         )
         .unwrap(),
@@ -1018,12 +1018,12 @@ fn rejects_invalid_effects_xp_clear_and_tags() {
 
     let tag_parameters = parse(
         lex(
-            r#"
+            r##"
             namespace demo;
             fn add(amount) {}
             fn_tag with_args { value(add); }
             fn main() { call #with_args(); }
-            "#,
+            "##,
             0,
         )
         .unwrap(),
@@ -1040,7 +1040,7 @@ fn rejects_invalid_effects_xp_clear_and_tags() {
 #[test]
 fn lowers_stopwatch_commands() {
     let pack = compile_text(
-        r#"
+        r##"
             namespace demo;
             score elapsed = 0;
             fn main() {
@@ -1054,7 +1054,7 @@ fn lowers_stopwatch_commands() {
                     message.all("wrapped", yellow);
                 }
             }
-            "#,
+            "##,
     );
     let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
     assert!(main.contains("stopwatch create demo:timer\n"), "{main}");
@@ -1071,11 +1071,11 @@ fn lowers_stopwatch_commands() {
 fn rejects_invalid_stopwatch_usage() {
     let program = parse(
         lex(
-            r#"
+            r##"
             namespace demo;
             fn bad_create() { stopwatch.create("Bad Id"); }
             fn bad_query() -> score { return stopwatch.query("also bad"); }
-            "#,
+            "##,
             0,
         )
         .unwrap(),
@@ -1116,9 +1116,383 @@ fn rejects_invalid_stopwatch_usage() {
 }
 
 #[test]
+fn lowers_block_and_fill_commands() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            fn build() {
+                set_block(pos(0, 64, 0), block_state("minecraft:stone"));
+                set_block(pos(~, ~1, ~), block_state("minecraft:oak_stairs") { facing = "east"; half = "bottom"; }, keep);
+                set_block(pos(1, 2, 3), block_state("minecraft:glass"), strict);
+                set_block(pos(1, 2, 3), block_state("minecraft:stone"), destroy);
+                fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:glass"));
+                fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:glass"), hollow);
+                fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:oak_planks"), replace, block_state("#minecraft:planks"));
+                fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:glass"), keep);
+                clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0));
+                clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), masked, force, strict);
+                clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), filtered, block_state("#minecraft:logs"), move);
+                clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
+            }
+            "##,
+    );
+    let build = &pack.files[&PathBuf::from("data/demo/function/build.mcfunction")];
+    let expected = "\
+setblock 0 64 0 minecraft:stone
+setblock ~ ~1 ~ minecraft:oak_stairs[facing=east,half=bottom] keep
+setblock 1 2 3 minecraft:glass strict
+setblock 1 2 3 minecraft:stone destroy
+fill 0 64 0 4 64 4 minecraft:glass
+fill 0 64 0 4 64 4 minecraft:glass hollow
+fill 0 64 0 4 64 4 minecraft:oak_planks replace #minecraft:planks
+fill 0 64 0 4 64 4 minecraft:glass keep
+clone 0 64 0 4 64 4 10 64 0
+clone 0 64 0 4 64 4 10 64 0 masked force strict
+clone 0 64 0 4 64 4 10 64 0 filtered #minecraft:logs move
+clone from minecraft:the_nether 0 64 0 4 64 4 10 64 0 to minecraft:overworld\n";
+    assert!(build.ends_with(expected), "{build}");
+}
+
+#[test]
+fn lowers_biome_place_forceload_and_queries() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            score size = 0;
+            fn world() {
+                fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains");
+                fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains", replace, "#minecraft:is_forest");
+                place.feature("minecraft:oak_tree", pos(0, 64, 0));
+                place.structure("minecraft:village_plains");
+                place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(48, 64, 48));
+                place.template("demo:house", pos(64, 64, 64), clockwise_90, none, 0.5, 42, strict);
+                place.template("demo:house", pos(64, 64, 64));
+                forceload.add(column(0, 0), column(15, 15));
+                forceload.remove(column(~, ~));
+                forceload.remove_all();
+                forceload.query(column(1, 2));
+                forceload.query();
+                locate.structure("minecraft:village_plains");
+                locate.biome("#minecraft:is_forest");
+                locate.poi("minecraft:home");
+                size = worldborder.get();
+            }
+            "##,
+    );
+    let world = &pack.files[&PathBuf::from("data/demo/function/world.mcfunction")];
+    let expected = "\
+fillbiome 0 0 0 15 0 15 minecraft:plains
+fillbiome 0 0 0 15 0 15 minecraft:plains replace #minecraft:is_forest
+place feature minecraft:oak_tree 0 64 0
+place structure minecraft:village_plains
+place jigsaw minecraft:village/plains/houses minecraft:bottom 4 48 64 48
+place template demo:house 64 64 64 clockwise_90 none 0.5 42 strict
+place template demo:house 64 64 64
+forceload add 0 0 15 15
+forceload remove ~ ~
+forceload remove all
+forceload query 1 2
+forceload query
+locate structure minecraft:village_plains
+locate biome #minecraft:is_forest
+locate poi minecraft:home
+execute store result score #t0";
+    assert!(world.contains(expected), "{world}");
+    assert!(world.contains("run worldborder get"));
+}
+
+#[test]
+fn lowers_time_weather_gamerule_and_worldborder() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            fn main() {
+                time.set(1000, t);
+                time.add(1, d, "minecraft:the_end");
+                time.pause();
+                time.resume();
+                time.rate(2.5);
+                weather.rain(30, s);
+                weather.thunder();
+                weather.clear();
+                gamerule.set("keep_inventory", true);
+                gamerule.set("minecraft:random_tick_speed", 5);
+                worldborder.add(-100, 30 s);
+                worldborder.set(1000);
+                worldborder.center(~, 0.5);
+                worldborder.damage_amount(0.5);
+                worldborder.damage_buffer(5);
+                worldborder.warning_distance(10);
+                worldborder.warning_time(20 s);
+            }
+            "##,
+    );
+    let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
+    let expected = "\
+time set 1000t
+time of minecraft:the_end add 1d
+time pause
+time resume
+time rate 2.5
+weather rain 30s
+weather thunder
+weather clear
+gamerule keep_inventory true
+gamerule minecraft:random_tick_speed 5
+worldborder add -100 30s
+worldborder set 1000
+worldborder center ~ 0.5
+worldborder damage amount 0.5
+worldborder damage buffer 5
+worldborder warning distance 10
+worldborder warning time 20s\n";
+    assert!(main.ends_with(expected), "{main}");
+}
+
+#[test]
+fn lowers_world_queries_as_expressions() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            score ticks = 0;
+            fn main() {
+                ticks = time.query();
+                ticks = time.query("minecraft:the_end");
+                ticks = time.query_gametime();
+                ticks = gamerule.query("keep_inventory");
+                ticks = worldborder.get();
+            }
+            "##,
+    );
+    let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
+    assert_eq!(main.matches("execute store result score").count(), 5);
+    assert!(main.contains("run time query time"));
+    assert!(main.contains("run time of minecraft:the_end query time"));
+    assert!(main.contains("run time query gametime"));
+    assert!(main.contains("run gamerule keep_inventory"));
+    assert!(main.contains("run worldborder get"));
+}
+
+#[test]
+fn rejects_invalid_world_commands() {
+    let program = parse(
+        lex(
+            r##"
+            namespace demo;
+            score ticks = 0;
+            fn bad() {
+                set_block(pos(40000000, 64, 0), block_state("minecraft:stone"));
+                set_block(pos(0, 5000, 0), block_state("minecraft:stone"));
+                fill(pos(0, 64, 0), pos(1, 64, 1), block_state("#minecraft:logs"));
+                fill_biome(pos(0, 0, 0), pos(1, 0, 1), "plains");
+                clone(pos(0, 64, 0), pos(1, 64, 1), pos(2, 64, 2), filtered, block_state("#minecraft:logs") { facing = "east"; });
+                clone(pos(0, 64, 0), pos(1, 64, 1), pos(2, 64, 2), from_dimension("the_nether"));
+                place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 0);
+                place.template("demo:house", pos(0, 64, 0), clockwise_90, none, 1.5);
+                gamerule.set("do_daylight_cycle", true);
+                gamerule.set("keep_inventory", 1);
+                gamerule.set("random_tick_speed", -1);
+                worldborder.set(0.5);
+                worldborder.center(30000000, 0);
+                worldborder.damage_amount(-1);
+                locate.structure("village");
+                forceload.add(column(0, 0), column(4096, 0));
+                time.rate(0);
+                set_block(pos(0, 64, 0), block_state("minecraft:oak_stairs") { facing = "north west"; });
+                ticks = time.query("Bad Id");
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    // 解析阶段就会拒绝混用坐标与非法过滤器，这里只保留语义诊断。
+    assert_eq!(errors.len(), 19, "{errors:#?}");
+    for expected in [
+        "超出世界范围",
+        "需要具体的方块资源位置",
+        "不是有效的生物群系资源位置",
+        "方块标签不能声明方块属性",
+        "不是有效的维度资源位置",
+        "最大深度必须是 1 到 20",
+        "完整度必须是 0.0 到 1.0",
+        "未知游戏规则",
+        "需要 true 或 false",
+        "值必须在 0 到 2147483647 之间",
+        "边长必须在 1 到 59999968 之间",
+        "坐标绝对值不能超过 29999984",
+        "伤害参数必须是非负数字",
+        "不是有效的定位目标资源位置",
+        "最多影响 256 个区块",
+        "速率必须在 0.00001 到 1000 之间",
+        "含有不允许的字符",
+        "不是有效的世界时钟资源位置",
+    ] {
+        assert!(
+            errors.iter().any(|error| error.message.contains(expected)),
+            "缺少诊断：{expected}\n{errors:#?}"
+        );
+    }
+}
+
+#[test]
+fn rejects_malformed_world_syntax() {
+    let mixed = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(~, ~, ^), block_state(\"minecraft:stone\")); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(mixed.unwrap_err()[0].message.contains("不能混用"));
+
+    let local_column =
+        parse(lex("namespace demo; fn f() { forceload.add(column(^, ^)); }", 0).unwrap());
+    assert!(local_column.unwrap_err()[0].message.contains("不支持 `^`"));
+
+    let bad_filter = parse(
+        lex(
+            r##"namespace demo; fn f() { fill(pos(0, 64, 0), pos(1, 64, 1), block_state("minecraft:stone"), hollow, block_state("#minecraft:logs")); }"##,
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        bad_filter.unwrap_err()[0]
+            .message
+            .contains("替换过滤器只与 replace 模式")
+    );
+
+    let missing_pos = parse(
+        lex(
+            "namespace demo; fn f() { set_block(column(0, 0), block_state(\"minecraft:stone\")); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(missing_pos.unwrap_err()[0].message.contains("需要 `pos"));
+    let query_as_statement = parse(lex("namespace demo; fn f() { time.query(); }", 0).unwrap());
+    assert!(
+        query_as_statement.unwrap_err()[0]
+            .message
+            .contains("只能出现在表达式里")
+    );
+
+    let decimal = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0.5, 64, 0), block_state(\"minecraft:stone\")); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(decimal.unwrap_err()[0].message.contains("绝对坐标需要整数"));
+}
+
+#[test]
+fn world_commands_are_keyword_symmetric() {
+    let english = compile_text(
+        r##"
+            namespace demo;
+            score ticks = 0;
+            fn build() {
+                set_block(pos(0, 64, 0), block_state("minecraft:stone"));
+                set_block(pos(~, ~1, ~), block_state("minecraft:oak_stairs") { facing = "east"; }, keep);
+                fill(pos(0, 64, 1), pos(4, 64, 5), block_state("minecraft:glass"), outline);
+                fill(pos(0, 64, 1), pos(4, 64, 5), block_state("minecraft:oak_planks"), replace, block_state("#minecraft:planks"));
+                fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains", replace, "#minecraft:is_forest");
+                clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), filtered, block_state("#minecraft:logs"), move, strict);
+                clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"), masked, force);
+                place.feature("minecraft:oak_tree", pos(0, 64, 0));
+                place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(48, 64, 48));
+                place.structure("minecraft:village_plains");
+                place.template("demo:house", pos(64, 64, 64), counterclockwise_90, front_back, 0.5, 42, strict);
+                forceload.add(column(0, 0), column(15, 15));
+                forceload.remove(column(0, 0));
+                forceload.remove_all();
+                forceload.query(column(1, 2));
+                forceload.query();
+                time.set(1000, t);
+                time.add(1, d, "minecraft:the_end");
+                time.pause();
+                time.resume();
+                time.rate(2.5);
+                weather.rain(30, s);
+                weather.thunder();
+                weather.clear();
+                gamerule.set("keep_inventory", true);
+                worldborder.add(-100, 30 s);
+                worldborder.set(1000);
+                worldborder.center(~, 0.5);
+                worldborder.damage_amount(0.5);
+                worldborder.damage_buffer(5);
+                worldborder.warning_distance(10);
+                worldborder.warning_time(20 s);
+                locate.structure("minecraft:village_plains");
+                locate.biome("#minecraft:is_forest");
+                locate.poi("minecraft:home");
+                ticks = time.query();
+                ticks = time.query_gametime();
+                ticks = gamerule.query("keep_inventory");
+                ticks = worldborder.get();
+            }
+            "##,
+    );
+    let chinese = compile_text(
+        r##"
+            命名空间 demo;
+            计分 ticks = 0;
+            函数 build() {
+                设置方块(坐标(0, 64, 0), 方块状态("minecraft:stone"));
+                设置方块(坐标(~, ~1, ~), 方块状态("minecraft:oak_stairs") { facing = "east"; }, 保留);
+                填充(坐标(0, 64, 1), 坐标(4, 64, 5), 方块状态("minecraft:glass"), 轮廓);
+                填充(坐标(0, 64, 1), 坐标(4, 64, 5), 方块状态("minecraft:oak_planks"), 替换, 方块状态("#minecraft:planks"));
+                填充生物群系(坐标(0, 0, 0), 坐标(15, 0, 15), "minecraft:plains", 替换, "#minecraft:is_forest");
+                复制(坐标(0, 64, 0), 坐标(4, 64, 4), 坐标(10, 64, 0), 过滤, 方块状态("#minecraft:logs"), 移动, 严格);
+                复制(坐标(0, 64, 0), 坐标(4, 64, 4), 坐标(10, 64, 0), 起始维度("minecraft:the_nether"), 目标维度("minecraft:overworld"), 遮罩, 强制);
+                放置.地物("minecraft:oak_tree", 坐标(0, 64, 0));
+                放置.拼图("minecraft:village/plains/houses", "minecraft:bottom", 4, 坐标(48, 64, 48));
+                放置.结构("minecraft:village_plains");
+                放置.模板("demo:house", 坐标(64, 64, 64), 逆时针90, 前后, 0.5, 42, 严格);
+                强制加载.添加(列坐标(0, 0), 列坐标(15, 15));
+                强制加载.移除(列坐标(0, 0));
+                强制加载.全部移除();
+                强制加载.查询(列坐标(1, 2));
+                强制加载.查询();
+                时间.设置(1000, 刻);
+                时间.增加(1, 天, "minecraft:the_end");
+                时间.暂停();
+                时间.恢复();
+                时间.速率(2.5);
+                天气.下雨(30, 秒);
+                天气.雷暴();
+                天气.晴朗();
+                游戏规则.设置("keep_inventory", 真);
+                世界边界.增加(-100, 30 秒);
+                世界边界.设置(1000);
+                世界边界.中心(~, 0.5);
+                世界边界.伤害量(0.5);
+                世界边界.伤害缓冲(5);
+                世界边界.警告距离(10);
+                世界边界.警告时间(20 秒);
+                定位.结构("minecraft:village_plains");
+                定位.生物群系("#minecraft:is_forest");
+                定位.兴趣点("minecraft:home");
+                ticks = 时间.查询();
+                ticks = 时间.查询游戏时间();
+                ticks = 游戏规则.查询("keep_inventory");
+                ticks = 世界边界.获取();
+            }
+            "##,
+    );
+    assert_eq!(english.files, chinese.files);
+}
+
+#[test]
 fn new_commands_are_keyword_symmetric() {
     let english = compile_text(
-        r#"
+        r##"
             namespace demo;
             query players = entity("minecraft:player") { limit(1); }
             query mobs = entity("minecraft:zombie") {}
@@ -1141,10 +1515,10 @@ fn new_commands_are_keyword_symmetric() {
             }
             fn_tag cleanup { value(a); value(#nested); replace = true; }
             fn_tag nested { value(b); }
-            "#,
+            "##,
     );
     let chinese = compile_text(
-        r#"
+        r##"
             命名空间 demo;
             查询 players = 实体("minecraft:player") { 上限(1); }
             查询 mobs = 实体("minecraft:zombie") {}
@@ -1167,7 +1541,7 @@ fn new_commands_are_keyword_symmetric() {
             }
             函数标签 cleanup { 值(a); 值(#nested); 替换 = 真; }
             函数标签 nested { 值(b); }
-            "#,
+            "##,
     );
     assert_eq!(english.files, chinese.files);
 }

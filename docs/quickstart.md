@@ -69,6 +69,13 @@ cargo run -- check examples/potion_lab.mcl --deny-raw
 cargo run -- build examples/potion_lab.mcl --deny-raw
 ```
 
+`world_ops` 展示世界与方块命令：`set_block`、`fill`、`clone`、`fill_biome`、`place.*`、`forceload`、`time`、`weather`、`gamerule`、`worldborder` 与 `locate`，坐标和方块状态都是结构化参数：
+
+```powershell
+cargo run -- check examples/world_ops.mcl --deny-raw
+cargo run -- build examples/world_ops.mcl --deny-raw
+```
+
 `--deny-raw` 会递归拒绝任何 `run` 或字符串形式的 `execute`，适合要求全部使用 Mclang 标准层的新项目。它也可以用于 `check`。
 
 构建会维护输出目录中的 `.mclang-manifest`。再次构建时只删除上一次由 Mclang 生成的文件，目录中的其他文件保持原样。

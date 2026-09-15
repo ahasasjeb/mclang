@@ -73,6 +73,62 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "原生命令子句逃生口：在额外执行上下文中运行语句。",
     ),
     ("contents", "物品查询的槽位名：容器内容。"),
+    (
+        "set_block",
+        "放置单个方块：`set_block(pos, block_state[, 模式])`。",
+    ),
+    (
+        "fill",
+        "填充长方体区域：`fill(起点, 终点, block_state[, 模式][, replace 过滤器])`。",
+    ),
+    (
+        "fill_biome",
+        "填充生物群系区域：`fill_biome(起点, 终点, \"生物群系\"[, replace, \"过滤器\"])`。",
+    ),
+    (
+        "clone",
+        "复制区域：`clone(起点, 终点, 目标位置[, 选项...])`，支持跨维度与 filtered/masked。",
+    ),
+    (
+        "place",
+        "放置地物、拼图、结构或模板：`place.feature/jigsaw/structure/template(...)`。",
+    ),
+    (
+        "forceload",
+        "强制加载区块：`forceload.add/remove/remove_all/query(...)`。",
+    ),
+    (
+        "time",
+        "世界时钟：`time.set/add/pause/resume/rate(...)`，`time.query()` 与 `time.query_gametime()` 是表达式。",
+    ),
+    (
+        "weather",
+        "天气：`weather.clear/rain/thunder([持续时间])`。",
+    ),
+    (
+        "gamerule",
+        "游戏规则：`gamerule.set(\"规则\", 值)`，`gamerule.query(\"规则\")` 是表达式。",
+    ),
+    (
+        "worldborder",
+        "世界边界：`worldborder.add/set/center/damage_amount/damage_buffer/warning_distance/warning_time(...)`，`worldborder.get()` 是表达式。",
+    ),
+    (
+        "locate",
+        "定位结构、生物群系或兴趣点：`locate.structure/biome/poi(...)`。",
+    ),
+    (
+        "pos",
+        "方块坐标构造器：`pos(x, y, z)`，支持 `~` 相对与 `^` 局部坐标。",
+    ),
+    (
+        "column",
+        "列坐标构造器：`column(x, z)`，供 forceload 使用。",
+    ),
+    (
+        "block_state",
+        "方块状态构造器：`block_state(\"命名空间:方块\") { 属性 = \"值\"; }`。",
+    ),
 ];
 
 /// 函数属性的说明，与 `ATTRIBUTES` 逐项对应。
