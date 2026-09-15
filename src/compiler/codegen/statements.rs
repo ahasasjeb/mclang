@@ -67,6 +67,14 @@ impl Compiler<'_> {
                 operation,
                 amount,
             } => self.compile_xp_change(target, *kind, *operation, *amount, commands),
+            StatementKind::StopwatchAction { operation, id } => {
+                let operation = match operation {
+                    StopwatchOperation::Create => "create",
+                    StopwatchOperation::Restart => "restart",
+                    StopwatchOperation::Remove => "remove",
+                };
+                commands.push(format!("stopwatch {operation} {id}"));
+            }
             StatementKind::ClearInventory {
                 target,
                 item,

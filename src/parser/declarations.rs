@@ -393,7 +393,7 @@ impl Parser {
         self.unsigned_with_span(name).map(|(value, _)| value)
     }
 
-    /// 读取可带负号的 32 位整数；供 `xp add` 这类允许减少的命令使用。
+    /// 读取可带负号的整数；供 `xp add` 这类允许减少的命令使用。
     pub(super) fn signed(&mut self, name: &str) -> Result<i32, Diagnostic> {
         let minus = self.take(&TokenKind::Minus);
         let token = self.advance().clone();
@@ -409,6 +409,24 @@ impl Parser {
         };
         i32::try_from(signed)
             .map_err(|_| Diagnostic::new(format!("{name} 超出 32 位范围"), token.span))
+    }
+
+    /// 读取可带负号的整数或小数并返回规范文本，供原版双精度参数使用。
+    ///
+    /// 直接保留源文本可以避免把 64 位整数未经检查地转成 `f64`，输出也更贴近手写命令。
+    pub(super) fn signed_number_text(&mut self, name: &str) -> Result<String, Diagnostic> {
+        let minus = self.take(&TokenKind::Minus);
+        let token = self.advance().clone();
+        let text = match token.kind {
+            TokenKind::Number(value) => value.to_string(),
+            TokenKind::Decimal(value) => format!("{value}"),
+            _ => return Err(Diagnostic::new(format!("{name} 需要数字"), token.span)),
+        };
+        Ok(if minus.is_some() {
+            format!("-{text}")
+        } else {
+            text
+        })
     }
 
     pub(super) fn unsigned_with_span(&mut self, name: &str) -> Result<(u32, Span), Diagnostic> {

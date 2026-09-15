@@ -152,6 +152,10 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "清除",
     },
     Keyword {
+        english: "stopwatch",
+        chinese: "秒表",
+    },
+    Keyword {
         english: "run",
         chinese: "原生命令",
     },
@@ -355,6 +359,16 @@ pub(super) fn xp_kind(value: &str) -> Option<XpKind> {
     match value {
         "points" | "点数" => Some(XpKind::Points),
         "levels" | "等级" => Some(XpKind::Levels),
+        _ => None,
+    }
+}
+
+pub(super) fn stopwatch_method(value: &str) -> Option<&'static str> {
+    match value {
+        "create" | "创建" => Some("create"),
+        "query" | "查询" => Some("query"),
+        "restart" | "重启" => Some("restart"),
+        "remove" | "移除" => Some("remove"),
         _ => None,
     }
 }

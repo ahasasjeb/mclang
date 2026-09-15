@@ -228,6 +228,10 @@ pub enum StatementKind {
         operation: XpOperation,
         amount: i32,
     },
+    StopwatchAction {
+        operation: StopwatchOperation,
+        id: String,
+    },
     ClearInventory {
         target: String,
         item: Option<String>,
@@ -291,6 +295,14 @@ pub enum EffectDuration {
 pub enum XpOperation {
     Add,
     Set,
+}
+
+/// 26.3 `stopwatch` 的三种无返回值操作。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StopwatchOperation {
+    Create,
+    Restart,
+    Remove,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -419,6 +431,11 @@ pub enum ExprKind {
     XpQuery {
         target: String,
         kind: XpKind,
+    },
+    StopwatchQuery {
+        id: String,
+        /// 原版 `scale` 参数，缺省为 1；保留规范化文本以避免双精度往返误差。
+        scale: Option<String>,
     },
     Negate(Box<Expr>),
     Binary {

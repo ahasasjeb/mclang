@@ -28,7 +28,7 @@ fn tick() {
 
 ## 特性
 
-- **结构化标准层**：`query`、`item_stack`、`item_list`、`give`、`each`、`spawn`、`in_dimension`、`self.*`、`message.*`、`sound.self`、`effect.*`、`xp.*`、`clear`、`fn_tag`、`predicate`、`schedule`、`return fail`/`return run`、`score` 返回值等都是独立的 AST 节点，而不是命令字符串。
+- **结构化标准层**：`query`、`item_stack`、`item_list`、`give`、`each`、`spawn`、`in_dimension`、`self.*`、`message.*`、`sound.self`、`effect.*`、`xp.*`、`clear`、`stopwatch.*`、`fn_tag`、`predicate`、`schedule`、`return fail`/`return run`、`score` 返回值等都是独立的 AST 节点，而不是命令字符串。
 - **编译期检查**：命名、资源位置、标签、范围、枚举、执行上下文、返回值、调用图递归、JSON 资源都在写出数据包之前报错，并一次返回全部诊断。
 - **精确的执行上下文**：区分“无 / 任意实体 / 非玩家实体 / 玩家”，`data` 类 NBT 操作只允许非玩家实体，玩家数据不会被错误修改。
 - **中英文双关键词**：任意结构都有英文和中文写法，可以在同一文件里混用，两种写法生成逐字节相同的产物。
@@ -108,6 +108,8 @@ mclang help | version
 | `xp.add/set(q, points\|levels, n)` | `execute as <选择器> at @s run xp add/set @s n <类型>` |
 | `xp.query(q, levels)` | `store result score … run xp query @s levels`（查询需要 `limit(1)`） |
 | `clear(q[, "…"][, n])` | `execute as <选择器> at @s run clear @s …` |
+| `stopwatch.create/restart/remove("id")` | `stopwatch create/restart/remove <id>` |
+| `stopwatch.query("id"[, 缩放])` | `execute store result score … run stopwatch query <id> …` |
 | `call #标签()` / `schedule #标签() after 2 s` | `function #<命名空间>:标签` / `schedule function #…` |
 | `fn_tag 名称 { value(函数); }` | `data/<命名空间>/tags/function/<名称>.json` |
 | `return fail` / `return run "…"` | `return fail` / `return run …` |

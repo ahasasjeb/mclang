@@ -86,6 +86,7 @@ pub(super) fn collect_local_declarations<'a>(
             | StatementKind::EffectGive { .. }
             | StatementKind::EffectClear { .. }
             | StatementKind::XpChange { .. }
+            | StatementKind::StopwatchAction { .. }
             | StatementKind::ClearInventory { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
@@ -173,6 +174,9 @@ fn validate_statement<'a>(
             ctx,
             diagnostics,
         ),
+        StatementKind::StopwatchAction { id, .. } => {
+            validate_stopwatch_id(id, statement.span, diagnostics);
+        }
         StatementKind::ClearInventory {
             target,
             item,
@@ -472,6 +476,16 @@ fn validate_clear_inventory(
         && max_count > i32::MAX as u32
     {
         diagnostics.push(Diagnostic::new("clear 最大数量不能超过 2147483647", span));
+    }
+}
+
+/// 秒表 id 的公共校验，供语句与表达式共用。
+pub(super) fn validate_stopwatch_id(id: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
+    if !valid_resource_location(id) {
+        diagnostics.push(Diagnostic::new(
+            format!("`{id}` 不是有效的秒表资源位置"),
+            span,
+        ));
     }
 }
 

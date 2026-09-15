@@ -97,6 +97,7 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::EffectGive { .. }
             | StatementKind::EffectClear { .. }
             | StatementKind::XpChange { .. }
+            | StatementKind::StopwatchAction { .. }
             | StatementKind::ClearInventory { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
@@ -138,7 +139,10 @@ fn collect_expr_calls<'a>(expression: &'a Expr, calls: &mut HashSet<&'a str>) {
             collect_expr_calls(left, calls);
             collect_expr_calls(right, calls);
         }
-        ExprKind::Integer(_) | ExprKind::Score(_) | ExprKind::XpQuery { .. } => {}
+        ExprKind::Integer(_)
+        | ExprKind::Score(_)
+        | ExprKind::XpQuery { .. }
+        | ExprKind::StopwatchQuery { .. } => {}
     }
 }
 

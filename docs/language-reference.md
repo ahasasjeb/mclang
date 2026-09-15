@@ -18,7 +18,7 @@
 | `contents` | `内容` | `fn` | `函数` |
 | `fn_tag` | `函数标签` | `fail` | `失败` |
 | `effect` | `效果` | `xp` | `经验` |
-| `clear` | `清除` | | |
+| `clear` | `清除` | `stopwatch` | `秒表` |
 | `let` | `令` | `return` | `返回` |
 | `if` | `如果` | `else` | `否则` |
 | `while` | `当` | `each` | `遍历` |
@@ -67,7 +67,7 @@
 | 声音分类 | `master` / `music` / `record` / `weather` / `block` | `主音量` / `音乐` / `唱片` / `天气` / `方块` |
 | 声音分类 | `hostile` / `neutral` / `player` / `ambient` / `voice` / `ui` | `敌对` / `中立` / `玩家` / `环境` / `语音` / `界面` |
 
-方法名也可以写中文：`效果.给予`、`效果.给予无限`、`效果.清除`、`经验.增加`、`经验.设置`、`经验.查询`，以及函数标签里的 `值` 和 `替换`。
+方法名也可以写中文：`效果.给予`、`效果.给予无限`、`效果.清除`、`经验.增加`、`经验.设置`、`经验.查询`、`秒表.创建`、`秒表.查询`、`秒表.重启`、`秒表.移除`，以及函数标签里的 `值` 和 `替换`。
 
 文本颜色支持 `black`/`黑色`、`dark_blue`/`深蓝色`、`dark_green`/`深绿色`、`dark_aqua`/`深青色`、`dark_red`/`深红色`、`dark_purple`/`深紫色`、`gold`/`金色`、`gray`/`灰色`、`dark_gray`/`深灰色`、`blue`/`蓝色`、`green`/`绿色`、`aqua`/`青色`、`red`/`红色`、`light_purple`/`亮紫色`、`yellow`/`黄色` 和 `white`/`白色`。
 
@@ -393,6 +393,8 @@ sound.self("minecraft:block.note_block.pling", master);
 | `xp.add/set(q, points\|levels, 数量)` | `... xp add/set @s <数量> <类型>` | 目标必须是玩家查询 |
 | `xp.query(q, points\|levels)` | `... store result score #tN ... run xp query @s <类型>` | 表达式；查询需要 `limit(1)` |
 | `clear(q[, 物品][, 数量])` | `... clear @s [<物品>] [<数量>]` | 目标必须是玩家查询 |
+| `stopwatch.create/restart/remove("id")` | `stopwatch create/restart/remove <id>` | id 是完整资源位置 |
+| `stopwatch.query("id"[, 缩放])` | `execute store result score ... run stopwatch query <id> [<缩放>]` | 表达式；失败写入 0 |
 | `predicate(p)` | `execute if predicate <ns>:p` | 可与 `!`、`&&`、`\|\|` 组合 |
 | `schedule f() after n t [append]` | `schedule function <ns>:f <n>t [append]` | 单位 `t`、`s`、`d`，支持小数 |
 | `schedule #标签() after n t` | `schedule function #<ns>:标签 <n>t` | |
@@ -553,6 +555,20 @@ clear(player, "minecraft:diamond", 5);  // 最多清除 5 个
 ```
 
 目标必须是玩家查询，物品是资源位置，数量最大为 2147483647。
+
+## 秒表
+
+```mcl
+fn main() {
+    stopwatch.create("demo:timer");            // 创建，重复创建会失败
+    stopwatch.restart("demo:timer");           // 重新计时
+    let seconds = stopwatch.query("demo:timer");
+    let millis = stopwatch.query("demo:timer", 1000);
+    stopwatch.remove("demo:timer");
+}
+```
+
+秒表 id 是完整的资源位置，保存在世界的 `stopwatches` 存档数据里：`/reload` 不会清空它，因此 `stopwatch.create` 只在第一次加载时成功。`stopwatch.query` 只能作为表达式使用，返回 `(int)(已过秒数 × 缩放)`；缩放是可选的双精度参数，省略时为 1，`1000` 得到毫秒。查询不存在的秒表时命令失败，表达式得到 0（原版 `store result` 在失败时写入 0）。`restart` 和 `remove` 对不存在的秒表会在运行时记录错误，但不会中断后续命令。
 
 ## 函数标签
 

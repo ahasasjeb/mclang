@@ -62,7 +62,7 @@ cargo run -- check examples/give_reward.mcl --deny-raw
 cargo run -- build examples/give_reward.mcl --deny-raw
 ```
 
-`potion_lab` 展示效果、经验、清空物品、函数标签和带小数的调度，同样完全不含底层命令字符串：
+`potion_lab` 展示效果、经验、清空物品、秒表、函数标签和带小数的调度，同样完全不含底层命令字符串：
 
 ```powershell
 cargo run -- check examples/potion_lab.mcl --deny-raw

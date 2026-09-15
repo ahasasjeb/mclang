@@ -53,6 +53,18 @@ impl Compiler<'_> {
                 ));
                 Value::Score(result)
             }
+            ExprKind::StopwatchQuery { id, scale } => {
+                let result = self.temporary();
+                let scale = scale
+                    .as_ref()
+                    .map(|scale| format!(" {scale}"))
+                    .unwrap_or_default();
+                commands.push(format!(
+                    "execute store result score {result} {} run stopwatch query {id}{scale}",
+                    self.objective
+                ));
+                Value::Score(result)
+            }
             ExprKind::Negate(value) => {
                 let source_value = self.compile_expr(value, owner, commands);
                 let source = self.materialize(source_value, commands);

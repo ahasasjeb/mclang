@@ -1038,6 +1038,84 @@ fn rejects_invalid_effects_xp_clear_and_tags() {
 }
 
 #[test]
+fn lowers_stopwatch_commands() {
+    let pack = compile_text(
+        r#"
+            namespace demo;
+            score elapsed = 0;
+            fn main() {
+                stopwatch.create("demo:timer");
+                stopwatch.restart("demo:timer");
+                stopwatch.remove("demo:timer");
+                elapsed = stopwatch.query("demo:timer");
+                elapsed = stopwatch.query("demo:timer", 1000);
+                elapsed = stopwatch.query("demo:timer", 0.5);
+                if stopwatch.query("demo:timer", -2) >= 0 {
+                    message.all("wrapped", yellow);
+                }
+            }
+            "#,
+    );
+    let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
+    assert!(main.contains("stopwatch create demo:timer\n"), "{main}");
+    assert!(main.contains("stopwatch restart demo:timer\n"));
+    assert!(main.contains("stopwatch remove demo:timer\n"));
+    assert!(main.contains("run stopwatch query demo:timer\n"));
+    assert!(main.contains("run stopwatch query demo:timer 1000\n"));
+    assert!(main.contains("run stopwatch query demo:timer 0.5\n"));
+    assert!(main.contains("run stopwatch query demo:timer -2\n"));
+    assert_eq!(main.matches("run stopwatch query demo:timer").count(), 4);
+}
+
+#[test]
+fn rejects_invalid_stopwatch_usage() {
+    let program = parse(
+        lex(
+            r#"
+            namespace demo;
+            fn bad_create() { stopwatch.create("Bad Id"); }
+            fn bad_query() -> score { return stopwatch.query("also bad"); }
+            "#,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    assert_eq!(errors.len(), 2, "{errors:#?}");
+    assert!(
+        errors
+            .iter()
+            .all(|error| error.message.contains("不是有效的秒表资源位置"))
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("`Bad Id`"))
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("`also bad`"))
+    );
+
+    let statement_query =
+        parse(lex("namespace demo; fn f() { stopwatch.query(\"demo:t\"); }", 0).unwrap());
+    assert!(
+        statement_query.unwrap_err()[0]
+            .message
+            .contains("只能出现在表达式里")
+    );
+
+    let unknown = parse(lex("namespace demo; fn f() { stopwatch.list(\"demo:t\"); }", 0).unwrap());
+    assert!(
+        unknown.unwrap_err()[0]
+            .message
+            .contains("未知 stopwatch 方法")
+    );
+}
+
+#[test]
 fn new_commands_are_keyword_symmetric() {
     let english = compile_text(
         r#"
@@ -1055,6 +1133,10 @@ fn new_commands_are_keyword_symmetric() {
                 xp.set(players, levels, 2);
                 let level = xp.query(players, levels);
                 clear(players, "minecraft:diamond", 3);
+                stopwatch.create("demo:timer");
+                stopwatch.restart("demo:timer");
+                let elapsed = stopwatch.query("demo:timer", 0.5);
+                stopwatch.remove("demo:timer");
                 return fail;
             }
             fn_tag cleanup { value(a); value(#nested); replace = true; }
@@ -1077,6 +1159,10 @@ fn new_commands_are_keyword_symmetric() {
                 经验.设置(players, 等级, 2);
                 令 level = 经验.查询(players, 等级);
                 清除(players, "minecraft:diamond", 3);
+                秒表.创建("demo:timer");
+                秒表.重启("demo:timer");
+                令 elapsed = 秒表.查询("demo:timer", 0.5);
+                秒表.移除("demo:timer");
                 返回 失败;
             }
             函数标签 cleanup { 值(a); 值(#nested); 替换 = 真; }

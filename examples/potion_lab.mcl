@@ -1,8 +1,9 @@
-// 药水实验室：演示效果、经验、清空物品、函数标签与带小数的调度。
+// 药水实验室：演示效果、经验、清空物品、秒表、函数标签与带小数的调度。
 namespace lab;
 
 score charges = 3;
 score announced = 0;
+score watch_ready = 0;
 
 query player = entity("minecraft:player") { limit(1); }
 query nearby = entity("minecraft:player") { within(16); }
@@ -10,6 +11,20 @@ query nearby = entity("minecraft:player") { within(16); }
 @load
 fn load() {
     message.all("药水实验室已加载", green);
+    call ensure_timer();
+}
+
+// 秒表保存在世界数据里，`/reload` 不会清空，重复 create 会失败；
+// 用计分标志保证只在第一次加载时创建。
+fn ensure_timer() {
+    if watch_ready == 0 {
+        watch_ready = 1;
+        call create_timer();
+    }
+}
+
+fn create_timer() {
+    stopwatch.create("lab:batch");
 }
 
 fn prepare() {
@@ -53,6 +68,7 @@ fn_tag announcement {
 fn queue() {
     schedule #batch() after 2.5 s append;
     schedule cleanup() after 5 s;
+    stopwatch.restart("lab:batch");
 }
 
 fn cancel_pending() {
@@ -68,6 +84,9 @@ fn wrap_up() {
     if announced == 0 {
         announced = 1;
         message.all("充能耗尽", red);
+        if stopwatch.query("lab:batch", 1000) >= 10000 {
+            message.all("本轮超过十秒", gold);
+        }
         call cancel_pending();
         call abort();
     }

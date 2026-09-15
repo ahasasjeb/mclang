@@ -153,29 +153,43 @@ impl Parser {
     fn named_expression(&mut self, receiver: String, start_span: Span) -> Result<Expr, Diagnostic> {
         self.expect(TokenKind::Dot, "名称后需要 `.`")?;
         let (method, method_span) = self.ident("名称方法")?;
-        if !word_matches(&receiver, "xp") || !word_matches(&method, "query") {
-            return Err(Diagnostic::new(
-                format!(
-                    "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`"
-                ),
-                start_span.merge(method_span),
-            ));
+        let span = start_span.merge(method_span);
+        if word_matches(&receiver, "xp") && word_matches(&method, "query") {
+            self.expect(TokenKind::LeftParen, "xp.query 后需要 `(`")?;
+            let (target, _) = self.ident("xp.query 目标查询名称")?;
+            self.expect(TokenKind::Comma, "xp.query 目标后需要 `,`")?;
+            let (kind, kind_span) = self.ident("xp 类型 points 或 levels")?;
+            let Some(kind) = xp_kind(&kind) else {
+                return Err(Diagnostic::new(
+                    "xp 类型只能是 points/点数 或 levels/等级",
+                    kind_span,
+                ));
+            };
+            self.expect(TokenKind::RightParen, "xp.query 调用缺少 `)`")?;
+            return Ok(Expr {
+                kind: ExprKind::XpQuery { target, kind },
+                span: start_span.merge(self.previous().span),
+            });
         }
-        self.expect(TokenKind::LeftParen, "xp.query 后需要 `(`")?;
-        let (target, _) = self.ident("xp.query 目标查询名称")?;
-        self.expect(TokenKind::Comma, "xp.query 目标后需要 `,`")?;
-        let (kind, kind_span) = self.ident("xp 类型 points 或 levels")?;
-        let Some(kind) = xp_kind(&kind) else {
-            return Err(Diagnostic::new(
-                "xp 类型只能是 points/点数 或 levels/等级",
-                kind_span,
-            ));
-        };
-        self.expect(TokenKind::RightParen, "xp.query 调用缺少 `)`")?;
-        let span = start_span.merge(self.previous().span);
-        Ok(Expr {
-            kind: ExprKind::XpQuery { target, kind },
+        if word_matches(&receiver, "stopwatch") && word_matches(&method, "query") {
+            self.expect(TokenKind::LeftParen, "stopwatch.query 后需要 `(`")?;
+            let (id, _) = self.string("stopwatch.query 需要秒表资源位置")?;
+            let scale = if self.take(&TokenKind::Comma).is_some() {
+                Some(self.signed_number_text("秒表缩放比例")?)
+            } else {
+                None
+            };
+            self.expect(TokenKind::RightParen, "stopwatch.query 调用缺少 `)`")?;
+            return Ok(Expr {
+                kind: ExprKind::StopwatchQuery { id, scale },
+                span: start_span.merge(self.previous().span),
+            });
+        }
+        Err(Diagnostic::new(
+            format!(
+                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)` 和 `stopwatch.query(\"命名空间:id\"[, 缩放])`"
+            ),
             span,
-        })
+        ))
     }
 }

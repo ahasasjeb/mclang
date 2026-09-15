@@ -24,7 +24,7 @@
 | 不可达 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 不建模 | 可由其他结构化语句等价表达，或对数据包无意义 |
 
-当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **5 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`），11 个有部分结构化入口；45 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
+当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **6 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`），11 个有部分结构化入口；44 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
 
 ### 1.1 执行、函数与数据核心
 
@@ -43,7 +43,7 @@
 | `reload` | — | 缺失 | — |
 | `datapack` | enable/disable/list；create（不可达，需 OWNER） | 缺失 | — |
 | `compute` | default/block/entity × float/integer provider | 缺失 | — |
-| `stopwatch` | create/query/restart/remove | 缺失 | — |
+| `stopwatch` | create/query/restart/remove | 完成 | `stopwatch.create/restart/remove(id)`；`query` 作为表达式并支持可选缩放，失败写入 0 |
 | `random` | value/roll/reset | 缺失 | — |
 | `test` | gametest 系列 | 不建模 | 测试框架，不属于数据包标准层 |
 | `fetchprofile` | name/id/entity | 不建模 | 只输出可点击引用，无返回值 |
@@ -180,6 +180,7 @@
 - [x] `effect.give`/`effect.give_infinite`/`effect.clear`，秒数与等级范围检查。
 - [x] `xp.add`/`xp.set` 与作为表达式的 `xp.query`（要求 `limit(1)` 玩家查询）。
 - [x] `clear(玩家查询[, 物品][, 数量])`。
+- [x] `stopwatch.create/restart/remove(id)` 与作为表达式的 `stopwatch.query(id[, 缩放])`。
 - [x] `examples/potion_lab.mcl`：严格模式示例，覆盖以上全部能力并通过 `--deny-raw`。
 
 ## 三、路线图
@@ -279,7 +280,7 @@
 ### 第 7 阶段：服务器数据与工具
 
 - [ ] 7.1 `random`：`random(1, 6)` 结果表达式、`random.roll`、`random.reset`（sequence 参数受等级限制）。
-- [ ] 7.2 `stopwatch.create/query/restart/remove`，query 提供结果表达式。
+- [x] 7.2 `stopwatch.create/query/restart/remove`，query 提供结果表达式。
 - [ ] 7.3 `compute`：default/block/entity 上下文 + float/integer provider。
 - [ ] 7.4 `reload()`、`datapack.enable/disable/list`。
 - [ ] 7.5 `list`、`seed`、`version`、`help`：只读反馈，明确不建模或提供只写日志的语句。

@@ -100,6 +100,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::EffectGive { .. }
             | ast::StatementKind::EffectClear { .. }
             | ast::StatementKind::XpChange { .. }
+            | ast::StatementKind::StopwatchAction { .. }
             | ast::StatementKind::ClearInventory { .. }
             | ast::StatementKind::SelfAction(_)
             | ast::StatementKind::Message { .. }

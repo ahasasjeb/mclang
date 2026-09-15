@@ -23,6 +23,9 @@ pub(super) fn constant_value(expression: &Expr) -> Option<i32> {
                 BinaryOp::Modulo => left.checked_rem(right),
             }
         }
-        ExprKind::Score(_) | ExprKind::Call { .. } | ExprKind::XpQuery { .. } => None,
+        ExprKind::Score(_)
+        | ExprKind::Call { .. }
+        | ExprKind::XpQuery { .. }
+        | ExprKind::StopwatchQuery { .. } => None,
     }
 }

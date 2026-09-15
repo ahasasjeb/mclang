@@ -78,6 +78,7 @@ pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut 
             | StatementKind::EffectGive { .. }
             | StatementKind::EffectClear { .. }
             | StatementKind::XpChange { .. }
+            | StatementKind::StopwatchAction { .. }
             | StatementKind::ClearInventory { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }

@@ -133,6 +133,9 @@ pub(super) fn validate_expr(
                 ));
             }
         }
+        ExprKind::StopwatchQuery { id, .. } => {
+            super::statements::validate_stopwatch_id(id, expression.span, diagnostics);
+        }
         ExprKind::Negate(value) => validate_expr(value, locals, ctx, diagnostics),
         ExprKind::Binary {
             left,

@@ -6,8 +6,8 @@ use crate::lexer::TokenKind;
 
 use super::Parser;
 use super::keywords::{
-    boolean_word, effect_method, message_target, self_method, sound_source, text_color, time_unit,
-    word_matches, xp_kind, xp_method,
+    boolean_word, effect_method, message_target, self_method, sound_source, stopwatch_method,
+    text_color, time_unit, word_matches, xp_kind, xp_method,
 };
 
 impl Parser {
@@ -123,6 +123,8 @@ impl Parser {
             self.xp_statement()?
         } else if self.take_word("clear").is_some() {
             self.clear_statement()?
+        } else if self.take_word("stopwatch").is_some() {
+            self.stopwatch_statement()?
         } else {
             let (name, _) = self.ident("语句")?;
             if self.check(&TokenKind::LeftParen) {
@@ -529,6 +531,38 @@ impl Parser {
             target,
             item,
             max_count,
+        })
+    }
+
+    /// `stopwatch.create/restart/remove("命名空间:id")`。
+    ///
+    /// `stopwatch.query` 有返回值，只能在表达式里使用，语句形式会给出引导性诊断。
+    fn stopwatch_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::Dot, "stopwatch 后需要 `.`")?;
+        let (method, method_span) = self.ident("stopwatch 方法")?;
+        let Some(method) = stopwatch_method(&method) else {
+            return Err(Diagnostic::new(
+                format!("未知 stopwatch 方法 `{method}`"),
+                method_span,
+            ));
+        };
+        if method == "query" {
+            return Err(Diagnostic::new(
+                "stopwatch.query 只能出现在表达式里，例如 `let seconds = stopwatch.query(\"demo:timer\");`",
+                method_span,
+            ));
+        }
+        self.expect(TokenKind::LeftParen, "stopwatch 方法后需要 `(`")?;
+        let (id, _) = self.string("stopwatch 需要秒表资源位置")?;
+        self.expect(TokenKind::RightParen, "stopwatch 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "stopwatch 调用后需要 `;`")?;
+        Ok(StatementKind::StopwatchAction {
+            operation: match method {
+                "create" => StopwatchOperation::Create,
+                "restart" => StopwatchOperation::Restart,
+                _ => StopwatchOperation::Remove,
+            },
+            id,
         })
     }
 
