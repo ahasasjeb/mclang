@@ -11,7 +11,7 @@ fn load() {
 @tick
 fn tick() {
     each(trigger_items) {
-        // 先标记触发物。即使后续动作失败，也不会每刻重复处理。
+        // 先标记触发物，避免同一个掉落物每刻重复切换。
         self.add_tag("portable_chest_processed");
 
         if active == 0 {
@@ -42,7 +42,8 @@ fn tick() {
             message.nearest(16, "便携箱子已收起，物品已保存。", gold);
         }
 
-        // 绿宝石是开关的消耗品。
-        self.consume();
+        // 触发用的绿宝石原样交还投掷者：同一个实体传送到投掷者并立即可被拾取。
+        // 投掷者不存在或背包已满时，实体保持原样留在世界，不会丢失。
+        self.return_to_owner();
     }
 }

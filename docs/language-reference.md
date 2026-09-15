@@ -49,7 +49,7 @@
 | `set_invulnerable` | `设置无敌` | `save_items` | `保存物品` |
 | `restore_items` | `恢复物品` | `remove_preserving_items` | `保存并移除` |
 | `clear_items` | `清空物品` | `remove` | `移除` |
-| `consume` | `消耗` |  |  |
+| `consume` | `消耗` | `return_to_owner` | `返还投掷者` |
 
 目标和枚举值：
 
@@ -202,7 +202,9 @@ in_dimension("minecraft:the_nether") {
 }
 ```
 
-可用实体方法包括 `add_tag`、`remove_tag`、`set_invulnerable`、`save_items`、`restore_items`、`remove_preserving_items`、`clear_items`、`remove` 和 `consume`。这些方法只能用于 `each`、`spawn` 或 `@entity` 函数建立的实体上下文。
+可用实体方法包括 `add_tag`、`remove_tag`、`set_invulnerable`、`save_items`、`restore_items`、`remove_preserving_items`、`clear_items`、`remove`、`consume` 和 `return_to_owner`。这些方法只能用于 `each`、`spawn` 或 `@entity` 函数建立的实体上下文。
+
+`return_to_owner` 用于掉落物实体：它读取实体的 `Thrower`，把同一个实体传送到投掷者并把 `PickupDelay` 置零，由原版拾取逻辑把完整物品堆放回背包。物品的名称、附魔、Lore 等组件原样保留；没有投掷者（例如命令直接生成的掉落物）或投掷者背包已满时，实体保持原样留在世界。掉落物与投掷者应当处于同一维度。
 
 ```mcl
 @entity

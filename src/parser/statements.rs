@@ -220,6 +220,7 @@ impl Parser {
             "clear_items" => SelfAction::ClearItems,
             "remove" => SelfAction::Remove,
             "consume" => SelfAction::Consume,
+            "return_to_owner" => SelfAction::ReturnToOwner,
             _ => unreachable!(),
         };
         self.expect(TokenKind::RightParen, "self 方法缺少 `)`")?;

@@ -12,6 +12,8 @@
 
 语义阶段使用 `无上下文 < 实体 < 玩家` 的上下文层级。`each` 根据查询的实体类型建立实体或玩家上下文，`spawn` 建立普通实体上下文；`@entity` 和 `@player` 把最低上下文要求加入函数签名。`self.give_item`、`message.self` 和 `sound.self` 要求玩家，其余 `self` 操作要求实体；`give` 语句自带目标查询，不要求当前上下文。上下文函数不能被调度。`storage ... = items(...)` 还会向合成 load 函数加入幂等的空列表初始化。
 
+`self.return_to_owner` 面向掉落物：生成临时标签、`execute on origin at @s run tp` 和 `data merge entity … {PickupDelay:0}`，借助 ItemEntity 的 `Thrower`（`TraceableEntity.getOwner`）把实体交还投掷者，再由原版拾取逻辑放入背包，因此物品组件原样保留；投掷者不存在或背包已满时实体留在世界。临时标签由该命名空间的 objective 名派生，同一命令序列内独占，不会与其它掉落物互相干扰。
+
 算术值存储在同一个内部 scoreboard objective。用户变量使用 `#v_<name>` 假玩家，表达式临时值使用 `#t<number>`，函数参数和局部变量使用函数名与变量名的稳定哈希假玩家，避免与真实玩家冲突。调用前先从左到右计算全部实参，再复制到被调用函数的参数计分项。语义检查器单独维护词法块作用域，保证局部变量在生成阶段已经完成名称解析。objective 名由命名空间的稳定 FNV-1a 哈希生成，格式为 16 字符的 `mcl_<12 hex>`，满足 Minecraft 的 objective 长度限制。
 
 结构化代码块通过辅助函数实现。例如 `if` 先计算两侧表达式，把比较结果冻结到临时计分项，再用两条 `execute if score ... matches` 分派 then 和 else 辅助函数。`execute` 块也调用辅助函数，从而自然继承 Minecraft 命令源上下文。

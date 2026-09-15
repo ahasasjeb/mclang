@@ -274,6 +274,21 @@ impl Compiler<'_> {
             SelfAction::ClearItems => {
                 vec!["data modify entity @s Items set value []".to_owned()]
             }
+            // 把掉落物交还投掷者：`execute on origin` 读取 ItemEntity 的 Thrower
+            // （TraceableEntity.getOwner）。临时标签在本函数内独占，命令按顺序
+            // 执行，不会与其它掉落物的处理重叠；实体由原版拾取逻辑收进背包，
+            // 投掷者不存在或背包已满时实体保持原样。
+            SelfAction::ReturnToOwner => {
+                let tag = format!("{}_returning", self.objective);
+                vec![
+                    format!("tag @s add {tag}"),
+                    format!("execute on origin at @s run tp @e[tag={tag},limit=1] ~ ~ ~"),
+                    format!(
+                        "execute on origin at @s run data merge entity @e[tag={tag},limit=1] {{PickupDelay:0}}"
+                    ),
+                    format!("tag @s remove {tag}"),
+                ]
+            }
             SelfAction::Remove | SelfAction::Consume => vec!["kill @s".to_owned()],
         }
     }

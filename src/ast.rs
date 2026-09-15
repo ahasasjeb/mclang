@@ -249,6 +249,7 @@ pub enum SelfAction {
     ClearItems,
     Remove,
     Consume,
+    ReturnToOwner,
 }
 
 #[derive(Debug)]

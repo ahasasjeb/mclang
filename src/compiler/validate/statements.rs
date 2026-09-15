@@ -271,7 +271,8 @@ fn validate_self_action(
         SelfAction::SetInvulnerable(_)
         | SelfAction::ClearItems
         | SelfAction::Remove
-        | SelfAction::Consume => {}
+        | SelfAction::Consume
+        | SelfAction::ReturnToOwner => {}
     }
 }
 

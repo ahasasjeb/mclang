@@ -117,6 +117,7 @@ pub(super) fn self_method(value: &str) -> Option<&'static str> {
         "clear_items" | "清空物品" => Some("clear_items"),
         "remove" | "移除" => Some("remove"),
         "consume" | "消耗" => Some("consume"),
+        "return_to_owner" | "返还投掷者" => Some("return_to_owner"),
         _ => None,
     }
 }

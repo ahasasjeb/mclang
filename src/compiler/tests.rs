@@ -217,6 +217,7 @@ fn chinese_and_english_keywords_compile_identically() {
                             self.remove_preserving_items(saved);
                         }
                     }
+                    self.return_to_owner();
                     self.consume();
                 }
                 each(players) {
@@ -284,6 +285,7 @@ fn chinese_and_english_keywords_compile_identically() {
                             自身.保存并移除(saved);
                         }
                     }
+                    自身.返还投掷者();
                     自身.消耗();
                 }
                 遍历(players) {
@@ -358,6 +360,23 @@ fn captures_score_function_results_in_expressions() {
             .iter()
             .any(|error| error.message.contains("只能直接出现在函数代码块"))
     );
+}
+
+#[test]
+fn lowers_return_to_owner_for_dropped_items() {
+    let pack = compile_text(
+        "namespace demo; query drops = entity(\"minecraft:item\") {} fn collect() { each(drops) { self.return_to_owner(); } }",
+    );
+    let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
+    assert!(generated.contains("tag @s add mcl_"));
+    assert!(
+        generated.contains("execute on origin at @s run tp @e[tag=mcl_"),
+        "missing teleport to origin:\n{generated}"
+    );
+    assert!(generated.contains("_returning,limit=1] ~ ~ ~"));
+    assert!(generated.contains("data merge entity @e[tag=mcl_"));
+    assert!(generated.contains("_returning,limit=1] {PickupDelay:0}"));
+    assert!(generated.contains("tag @s remove mcl_"));
 }
 
 #[test]

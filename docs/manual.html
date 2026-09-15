@@ -1,0 +1,3021 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mclang 语言手册 — 面向 Minecraft 26.3 的数据包编程语言</title>
+<meta name="description" content="Mclang 0.5.0 完整语言手册：语法、语义、执行上下文、编译产物、静态检查与示例走读。">
+<style>
+/* ---------- 主题变量 ---------- */
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-2: #fbfcfd;
+  --text: #1b1f24;
+  --muted: #5a6472;
+  --line: #e2e6ea;
+  --line-strong: #c9d0d8;
+  --accent: #256b4b;
+  --accent-2: #1d5d8c;
+  --accent-weak: #e8f3ec;
+  --code-bg: #f3f5f8;
+  --code-line: #e6e9ee;
+  --kw: #a626a4;
+  --str: #1a7f37;
+  --num: #b05a00;
+  --com: #7a8494;
+  --lit: #1d5d8c;
+  --var: #9a3d00;
+  --warn: #8a5100;
+  --warn-bg: #fff6e5;
+  --danger: #b42318;
+  --danger-bg: #fdecea;
+  --tip: #14557d;
+  --tip-bg: #e9f4fb;
+  --ok: #256b4b;
+  --ok-bg: #e8f3ec;
+  --shadow: 0 1px 2px rgba(20, 30, 40, .06), 0 8px 24px rgba(20, 30, 40, .06);
+  --mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --sans: "Segoe UI", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+}
+html[data-theme="dark"] {
+  --bg: #12151a;
+  --panel: #1a1e25;
+  --panel-2: #171b21;
+  --text: #e6e9ee;
+  --muted: #9aa5b3;
+  --line: #2a303a;
+  --line-strong: #3a424e;
+  --accent: #6cc79a;
+  --accent-2: #7ab8e8;
+  --accent-weak: #1d2b24;
+  --code-bg: #161a20;
+  --code-line: #262c35;
+  --kw: #d98cd8;
+  --str: #88c98a;
+  --num: #e0a36a;
+  --com: #8b95a4;
+  --lit: #7ab8e8;
+  --var: #e8b06c;
+  --warn: #e0b070;
+  --warn-bg: #2a2317;
+  --danger: #f08a80;
+  --danger-bg: #2c1c1b;
+  --tip: #8cc4e8;
+  --tip-bg: #16242f;
+  --ok: #6cc79a;
+  --ok-bg: #17251e;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+}
+
+/* ---------- 基础 ---------- */
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.75 var(--sans);
+  -webkit-text-size-adjust: 100%;
+}
+a { color: var(--accent-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+p { margin: .7em 0; }
+ul, ol { padding-left: 1.4em; margin: .7em 0; }
+li { margin: .3em 0; }
+strong { font-weight: 650; }
+code {
+  font-family: var(--mono);
+  font-size: .9em;
+  background: var(--code-bg);
+  border: 1px solid var(--code-line);
+  border-radius: 4px;
+  padding: .08em .35em;
+}
+kbd {
+  font-family: var(--mono);
+  font-size: .82em;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: .1em .4em;
+}
+hr { border: 0; border-top: 1px solid var(--line); margin: 2.2em 0; }
+
+/* ---------- 布局 ---------- */
+header.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 18px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+header.topbar .brand {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: .2px;
+  color: var(--text);
+  white-space: nowrap;
+}
+header.topbar .brand small { color: var(--muted); font-weight: 500; margin-left: 8px; font-size: 12.5px; }
+header.topbar .spacer { flex: 1; }
+header.topbar button {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+header.topbar button:hover { border-color: var(--accent); color: var(--accent); }
+
+.layout { display: grid; grid-template-columns: 278px minmax(0, 1fr); gap: 28px; max-width: 1420px; margin: 0 auto; padding: 0 22px; }
+nav.toc {
+  position: sticky;
+  top: 56px;
+  align-self: start;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: 20px 6px 40px 0;
+  font-size: 14px;
+  border-right: 1px solid var(--line);
+}
+nav.toc .group { margin: 0 0 14px; }
+nav.toc .group-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  padding: 0 10px;
+  margin-bottom: 4px;
+}
+nav.toc a {
+  display: block;
+  color: var(--text);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+}
+nav.toc a:hover { background: var(--panel); text-decoration: none; }
+nav.toc a.active { background: var(--accent-weak); color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+nav.toc a.sub { padding-left: 24px; font-size: 13.3px; color: var(--muted); }
+nav.toc a.sub.active { color: var(--accent); }
+
+main { min-width: 0; padding: 28px 0 90px; }
+
+/* ---------- 正文排版 ---------- */
+main h1 { font-size: 34px; line-height: 1.25; margin: .2em 0 .3em; letter-spacing: -.5px; }
+main h2 {
+  font-size: 25px;
+  margin: 2.4em 0 .7em;
+  padding-bottom: .35em;
+  border-bottom: 2px solid var(--line);
+  letter-spacing: -.3px;
+}
+main h3 { font-size: 19.5px; margin: 1.9em 0 .5em; }
+main h4 { font-size: 16.5px; margin: 1.5em 0 .4em; }
+.lede { font-size: 17.5px; color: var(--muted); max-width: 74ch; }
+.anchor {
+  opacity: 0;
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: .75em;
+  transition: opacity .15s;
+}
+h2:hover .anchor, h3:hover .anchor { opacity: 1; }
+.section { scroll-margin-top: 76px; }
+
+/* ---------- 提示框 ---------- */
+.callout { border-left: 4px solid; border-radius: 0 8px 8px 0; padding: 10px 16px; margin: 1.1em 0; }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+.callout .tag { font-weight: 700; font-size: 13px; letter-spacing: .04em; }
+.callout.note { border-color: var(--accent-2); background: var(--tip-bg); }
+.callout.note .tag { color: var(--tip); }
+.callout.tip { border-color: var(--ok); background: var(--ok-bg); }
+.callout.tip .tag { color: var(--ok); }
+.callout.warn { border-color: var(--warn); background: var(--warn-bg); }
+.callout.warn .tag { color: var(--warn); }
+.callout.danger { border-color: var(--danger); background: var(--danger-bg); }
+.callout.danger .tag { color: var(--danger); }
+.callout.quote { border-color: var(--line-strong); background: var(--panel-2); }
+
+/* ---------- 表格 ---------- */
+.table-wrap { overflow-x: auto; margin: 1.1em 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 8px 13px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--panel-2); font-weight: 650; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td code, th code { white-space: nowrap; }
+table.compact td, table.compact th { padding: 6px 10px; }
+
+/* ---------- 代码块 ---------- */
+.code { margin: 1.1em 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--code-bg); box-shadow: var(--shadow); }
+.code-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px; color: var(--muted);
+}
+.code-bar .code-title { font-family: var(--mono); }
+.code-bar .badge {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line-strong); color: var(--muted);
+}
+.code-bar .spacer { flex: 1; }
+.code-bar button {
+  font: inherit; font-size: 12px; color: var(--muted);
+  background: transparent; border: 1px solid var(--line-strong); border-radius: 5px;
+  padding: 2px 9px; cursor: pointer;
+}
+.code-bar button:hover { color: var(--accent); border-color: var(--accent); }
+pre { margin: 0; padding: 14px 16px; overflow-x: auto; }
+pre code {
+  display: block;
+  background: transparent; border: 0; padding: 0;
+  font-size: 13.4px; line-height: 1.62;
+  color: var(--text);
+  white-space: pre;
+}
+.tok-kw { color: var(--kw); font-weight: 600; }
+.tok-str { color: var(--str); }
+.tok-num { color: var(--num); }
+.tok-com { color: var(--com); font-style: italic; }
+.tok-lit { color: var(--lit); }
+.tok-var { color: var(--var); }
+.tok-attr { color: var(--kw); font-weight: 600; }
+
+/* ---------- 标签页 ---------- */
+.tabs { margin: 1.1em 0; }
+.tabs .tab-btns { display: flex; gap: 6px; margin-bottom: -1px; padding-left: 4px; flex-wrap: wrap; }
+.tabs .tab-btns button {
+  font: inherit; font-size: 13.5px; color: var(--muted);
+  background: var(--panel-2); border: 1px solid var(--line); border-bottom-color: var(--line);
+  border-radius: 8px 8px 0 0; padding: 5px 14px; cursor: pointer; position: relative; top: 1px;
+}
+.tabs .tab-btns button.active { background: var(--panel); color: var(--text); font-weight: 650; border-bottom-color: var(--panel); }
+.tabs .tab-panel { display: none; }
+.tabs .tab-panel.active { display: block; }
+.tabs .tab-panel > .code { margin-top: 0; }
+
+/* ---------- 列表卡片 ---------- */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin: 1.2em 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.card h4 { margin: 0 0 6px; font-size: 15.5px; }
+.card p { margin: .3em 0; font-size: 14.3px; color: var(--muted); }
+.card code { font-size: 12.8px; }
+
+/* ---------- 流程图 ---------- */
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 1.1em 0; font-size: 13.6px; }
+.flow .step { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 11px; white-space: nowrap; }
+.flow .arrow { color: var(--muted); }
+.flow .step.hl { border-color: var(--accent); background: var(--accent-weak); }
+
+/* ---------- 问答折叠 ---------- */
+details.faq {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin: .6em 0;
+}
+details.faq summary { cursor: pointer; font-weight: 650; }
+details.faq summary::marker { color: var(--accent); }
+details.faq[open] { border-color: var(--accent); }
+details.faq p { margin: .6em 0 .2em; }
+details.faq ul { margin: .5em 0 .3em; }
+
+/* ---------- 色块 ---------- */
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line-strong); vertical-align: -1px; margin-right: 5px; }
+
+/* ---------- 关键词过滤 ---------- */
+.filter-bar { display: flex; gap: 10px; align-items: center; margin: 1em 0 .4em; flex-wrap: wrap; }
+.filter-bar input {
+  font: inherit; font-size: 14px; padding: 6px 12px; min-width: 240px;
+  border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); color: var(--text);
+}
+.filter-bar input:focus { outline: 2px solid var(--accent-weak); border-color: var(--accent); }
+.filter-bar .hint { font-size: 13px; color: var(--muted); }
+tr.filtered-out { display: none; }
+
+/* ---------- 页脚与回到顶部 ---------- */
+footer { border-top: 1px solid var(--line); padding: 22px 0 40px; color: var(--muted); font-size: 13.5px; }
+footer .wrap { max-width: 1420px; margin: 0 auto; padding: 0 22px; }
+#to-top {
+  position: fixed; right: 22px; bottom: 22px; z-index: 40;
+  display: none; font: inherit; font-size: 13px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line-strong); border-radius: 50%;
+  width: 42px; height: 42px; cursor: pointer; box-shadow: var(--shadow);
+}
+#to-top.show { display: block; }
+#nav-toggle { display: none; }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 1000px) {
+  .layout { display: block; padding: 0 16px; }
+  nav.toc {
+    position: fixed; z-index: 50; top: 56px; left: 0; bottom: 0; width: 290px;
+    background: var(--panel); height: auto; padding: 16px 12px 40px; border-right: 1px solid var(--line);
+    transform: translateX(-102%); transition: transform .2s ease;
+  }
+  nav.toc.open { transform: none; box-shadow: var(--shadow); }
+  #nav-toggle { display: inline-block; }
+  main h1 { font-size: 28px; }
+  main h2 { font-size: 22px; }
+}
+@media (max-width: 620px) {
+  header.topbar { padding: 0 10px; gap: 6px; }
+  header.topbar .brand { font-size: 14.5px; }
+  header.topbar .brand small { display: none; }
+  header.topbar button { padding: 4px 8px; font-size: 12.5px; }
+}
+@media print {
+  header.topbar, nav.toc, #to-top, .code-bar button { display: none !important; }
+  .layout { display: block; }
+  body { background: #fff; }
+  .code { break-inside: avoid; box-shadow: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <button id="nav-toggle" type="button" aria-label="切换目录">目录</button>
+  <div class="brand">Mclang 语言手册 <small>v0.5.0 · Minecraft Java 26.3-rc-2</small></div>
+  <div class="spacer"></div>
+  <button id="lang-toggle" type="button" title="切换代码示例的关键词语言">English keywords</button>
+  <button id="theme-toggle" type="button" title="切换深浅色">深色</button>
+</header>
+
+<div class="layout">
+<nav class="toc" id="toc" aria-label="目录">
+  <div class="group">
+    <div class="group-title">开始</div>
+    <a href="#intro">认识 Mclang</a>
+    <a href="#quickstart">快速上手</a>
+    <a href="#basics">语言基础</a>
+  </div>
+  <div class="group">
+    <div class="group-title">顶层声明</div>
+    <a href="#decl">声明总览</a>
+    <a href="#decl-namespace" class="sub">命名空间</a>
+    <a href="#decl-score" class="sub" data-zh="计分变量">计分变量 score</a>
+    <a href="#decl-query" class="sub" data-zh="实体查询">实体查询 query</a>
+    <a href="#decl-item" class="sub" data-zh="物品定义">物品定义 item</a>
+    <a href="#decl-storage" class="sub" data-zh="物品存储">物品存储 storage</a>
+    <a href="#decl-resource" class="sub" data-zh="JSON 资源">JSON 资源 resource</a>
+    <a href="#decl-fn" class="sub">函数与属性</a>
+  </div>
+  <div class="group">
+    <div class="group-title">语句</div>
+    <a href="#stmt">语句总览</a>
+    <a href="#stmt-assign" class="sub">表达式与赋值</a>
+    <a href="#stmt-let" class="sub" data-zh="局部变量 令">局部变量 let</a>
+    <a href="#stmt-if" class="sub" data-zh="条件分支 如果">条件分支 if</a>
+    <a href="#stmt-while" class="sub" data-zh="循环 当">循环 while</a>
+    <a href="#stmt-call" class="sub">调用与返回值</a>
+    <a href="#stmt-each" class="sub" data-zh="遍历实体 遍历">遍历实体 each</a>
+    <a href="#stmt-spawn" class="sub" data-zh="生成实体 召唤">生成实体 spawn</a>
+    <a href="#stmt-dimension" class="sub" data-zh="维度上下文 在维度">维度上下文 in_dimension</a>
+    <a href="#stmt-self" class="sub" data-zh="实体操作 自身">实体操作 self</a>
+    <a href="#stmt-message" class="sub" data-zh="消息">消息 message</a>
+    <a href="#stmt-sound" class="sub" data-zh="声音">声音 sound</a>
+    <a href="#stmt-give" class="sub" data-zh="给予">给予 give</a>
+    <a href="#stmt-schedule" class="sub" data-zh="调度">调度 schedule</a>
+    <a href="#stmt-raw" class="sub" data-zh="底层接口 原生命令 / 原生执行">底层接口 run / execute</a>
+  </div>
+  <div class="group">
+    <div class="group-title">深入</div>
+    <a href="#context">执行上下文</a>
+    <a href="#output">编译产物与 ABI</a>
+    <a href="#checks">静态检查与诊断</a>
+  </div>
+  <div class="group">
+    <div class="group-title">参考</div>
+    <a href="#examples">示例走读</a>
+    <a href="#faq">常见问题</a>
+    <a href="#design">设计理念</a>
+    <a href="#appendix">附录</a>
+  </div>
+</nav>
+
+<main>
+
+<section class="section" id="intro">
+  <h1>Mclang：写给人类的 Minecraft 数据包语言</h1>
+  <p class="lede">Mclang 是一门把 <code>.mcl</code> 源码编译成 Minecraft Java Edition 数据包的小语言。它让你用命名、类型和结构化语法描述实体查询、物品、消息、调度与控制流，把选择器、<code>execute</code> 上下文、NBT 路径和文本组件 JSON 交给编译器生成。</p>
+
+  <div class="grid">
+    <div class="card">
+      <h4>结构化的 Minecraft 类型</h4>
+      <p>实体查询、物品堆、物品存储、维度、粒子以外的常用操作都有专门的语法节点，而不是命令字符串。</p>
+    </div>
+    <div class="card">
+      <h4>错误在编译期出现</h4>
+      <p>未知变量、错误参数个数、数量越界、无效资源位置、执行上下文不匹配都会在写数据包之前报告，并带文件、行列与源码标记。</p>
+    </div>
+    <div class="card">
+      <h4>中英文关键词等价</h4>
+      <p>每个语言结构都有中文写法，可以在同一文件内自由混用；两种写法生成逐字节相同的产物。</p>
+    </div>
+    <div class="card">
+      <h4>可复现的产物</h4>
+      <p>输出顺序稳定、不依赖随机数；<code>.mclang-manifest</code> 记录上次生成的文件，重建只清理自己的旧产物。</p>
+    </div>
+  </div>
+
+  <h3>它解决什么问题</h3>
+  <p>手写 <code>.mcfunction</code> 时，一个很简单的“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、<code>execute as</code>/<code>at</code> 上下文、函数标签、<code>tellraw</code> 的 JSON、<code>give</code> 的物品组件语法和 <code>pack.mcmeta</code> 的版本号。Mclang 让源码只描述<strong>意图</strong>：</p>
+
+  <pre><code class="mcl" data-title="意图表达" data-kind="mcl">@tick
+fn tick() {
+    ticks += 1;
+    if ticks >= 100 {
+        调用 announce();
+        ticks = 0;
+    }
+}</code></pre>
+
+  <p>编译后展开为一条条合法的 <code>.mcfunction</code> 命令，例如上面的 <code>if</code> 会生成预计算比较结果、再用两条 <code>execute if score ... matches 1 run function</code> 分派分支的辅助函数。</p>
+
+  <h3>编译流水线</h3>
+  <div class="flow">
+    <span class="step">.mcl 源文件</span><span class="arrow">→</span>
+    <span class="step">词法分析</span><span class="arrow">→</span>
+    <span class="step">递归下降解析</span><span class="arrow">→</span>
+    <span class="step">多文件合并</span><span class="arrow">→</span>
+    <span class="step hl">语义检查（一次报告全部诊断）</span><span class="arrow">→</span>
+    <span class="step">代码生成</span><span class="arrow">→</span>
+    <span class="step">数据包目录</span>
+  </div>
+
+  <h3>目标与边界</h3>
+  <ul>
+    <li><strong>目标版本固定</strong>：Minecraft Java Edition <strong>26.3-rc-2</strong>，数据包格式 <strong>121.0</strong>。资源位置、注册表目录与命令签名都以仓库内随附的客户端源码为准。</li>
+    <li><strong>编译器用 Rust 实现，运行时不需要 Java</strong>：编译一次，把生成的目录放进世界的 <code>datapacks/</code> 即可。</li>
+    <li><strong>不支持热更新语言语义</strong>：目前是原型期语言，语法与内部 API 可以随版本调整，不保留兼容层。</li>
+    <li><strong>不是命令包装器</strong>：<code>run</code> 与字符串形式的 <code>execute</code> 只是底层逃生口（类似内联汇编），常规项目应使用结构化语法，并用 <code>--deny-raw</code> 强制这一点。</li>
+  </ul>
+
+  <div class="callout note">
+    <p><span class="tag">本手册约定</span></p>
+    <p>语法模板中的 <code>&lt;名称&gt;</code> 表示占位符；代码块右上角可以一键复制。所有示例的<strong>完整程序</strong>都经过仓库内编译器实际编译验证；标注“片段”的代码只用于说明语法形状，不能单独编译。</p>
+    <p>顶栏的 <strong>“中文关键词 / English keywords”</strong> 按钮会把页面上的 Mclang 代码块、侧边目录、章节标题和正文行内关键词一起在两种写法之间切换。切换只替换关键词、属性、方法和枚举值，注释与字符串原样保留；生成的 <code>.mcfunction</code>、命令行、目录树和附录的双语对照表不参与切换。</p>
+  </div>
+</section>
+
+<section class="section" id="quickstart">
+  <h2>快速上手 <a class="anchor" href="#quickstart">#</a></h2>
+
+  <h3>1. 构建编译器</h3>
+  <p>需要 Rust 工具链（edition 2024；项目只依赖 <code>serde_json</code>）。</p>
+  <pre><code class="pwsh" data-title="构建" data-kind="pwsh">cargo build --release</code></pre>
+  <p>可执行文件位于 <code>target/release/mclang.exe</code>。开发时也可以直接用 <code>cargo run -- &lt;参数&gt;</code>。</p>
+
+  <h3>2. 命令行</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>命令</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>mclang build &lt;源文件.mcl|项目目录&gt; [-o &lt;输出目录&gt;] [--description &lt;文本&gt;] [--deny-raw]</code></td><td>编译并写入数据包目录；默认输出到 <code>build/&lt;源文件名或目录名&gt;</code></td></tr>
+        <tr><td><code>mclang check &lt;源文件.mcl|项目目录&gt; [--deny-raw]</code></td><td>只做静态检查，不写任何文件；通过后打印资源统计</td></tr>
+        <tr><td><code>mclang help</code></td><td>打印用法；<code>-h</code>、<code>--help</code> 等价</td></tr>
+        <tr><td><code>mclang version</code></td><td>打印版本号；<code>-V</code>、<code>--version</code> 等价</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>-o</code> 与 <code>--output</code> 等价。<code>--deny-raw</code> 会递归统计项目里的 <code>run</code> 和字符串 <code>execute</code> 语句，只要多于零条就让命令失败，适合要求全部使用标准层的新项目。</p>
+
+  <h3>3. 第一个数据包</h3>
+  <p>把下面这个文件保存为 <code>counter.mcl</code>（它也是仓库 <code>examples/counter.mcl</code> 的内容）：</p>
+
+  <pre><code class="mcl" data-title="counter.mcl" data-check="full">namespace counter;
+
+// score 是跨函数共享的 32 位整数。重新加载数据包不会重置已有值。
+score ticks = 0;
+score announcements = 0;
+
+query all_players = entity("minecraft:player") { }
+
+@load
+fn load() {
+    message.all("Counter data pack loaded", green);
+}
+
+@tick
+fn tick() {
+    ticks += 1;
+    if ticks >= 100 {
+        announce();
+        ticks = 0;
+    }
+}
+
+fn announce() {
+    announcements += 1;
+    each(all_players) {
+        sound.self("minecraft:block.note_block.pling", master);
+        message.self("Five seconds passed.", gold);
+    }
+}
+
+fn announce_later() {
+    schedule announce() after 5 s replace;
+}</code></pre>
+
+  <p>先做静态检查：</p>
+  <pre><code class="pwsh" data-title="check" data-kind="pwsh">cargo run -- check examples/counter.mcl</code></pre>
+  <p>输出：</p>
+  <pre><code class="text" data-title="输出" data-kind="text">检查通过：4 个函数，2 个计分变量，1 个实体查询，0 个物品定义，0 个物品存储，0 个 JSON 资源，0 条底层语句</code></pre>
+
+  <p>再构建数据包：</p>
+  <pre><code class="pwsh" data-title="build" data-kind="pwsh">cargo run -- build examples/counter.mcl</code></pre>
+  <pre><code class="text" data-title="输出" data-kind="text">已生成 10 个文件：build\counter</code></pre>
+
+  <h3>4. 产物长什么样</h3>
+  <pre><code class="text" data-title="build/counter" data-kind="text">build/counter/
+├── pack.mcmeta                          # 数据包描述与格式 [121, 0]
+├── .mclang-manifest                     # Mclang 的产物清单
+└── data/
+    ├── counter/
+    │   └── function/
+    │       ├── load.mcfunction          # 源码中的 @load 函数
+    │       ├── tick.mcfunction          # 源码中的 @tick 函数
+    │       ├── announce.mcfunction
+    │       ├── announce_later.mcfunction
+    │       └── __mcl/
+    │           ├── load.mcfunction      # 合成的初始化函数
+    │           ├── tick/0.mcfunction    # if 分支的辅助函数
+    │           └── announce/0.mcfunction# each 循环体的辅助函数
+    └── minecraft/
+        └── tags/function/
+            ├── load.json                # 指向 counter:__mcl/load
+            └── tick.json                # 指向 counter:tick</code></pre>
+
+  <p>其中 <code>tick.mcfunction</code> 的内容是：</p>
+  <pre><code class="mcf" data-title="data/counter/function/tick.mcfunction" data-kind="mcfunction"># Generated by mclang.
+scoreboard players add #v_ticks mcl_6c7416517c63 1
+scoreboard players set #t0 mcl_6c7416517c63 100
+scoreboard players set #t1 mcl_6c7416517c63 0
+execute if score #v_ticks mcl_6c7416517c63 >= #t0 mcl_6c7416517c63 run scoreboard players set #t1 mcl_6c7416517c63 1
+execute if score #t1 mcl_6c7416517c63 matches 1 run function counter:__mcl/tick/0</code></pre>
+
+  <div class="callout tip">
+    <p><span class="tag">提示</span> 生成的命令不必逐行读懂，但知道“用户变量是 <code>#v_&lt;名字&gt;</code>、每个命名空间只有一个 objective、条件先算成 0/1 标志再分派”后，排查问题会容易很多。细节见 <a href="#output">编译产物与 ABI</a>。</p>
+  </div>
+
+  <h3>5. 放进世界并运行</h3>
+  <ol>
+    <li>把 <code>build/counter</code> 整个目录复制到存档的 <code>&lt;世界目录&gt;/datapacks/counter</code>。也可以直接构建到目标位置：
+      <pre><code class="pwsh" data-title="直接输出到世界" data-kind="pwsh">cargo run -- build examples/counter.mcl -o "C:/path/to/world/datapacks/counter" --description "My counter pack"</code></pre>
+    </li>
+    <li>进入世界后执行 <code>/reload</code>。Minecraft 会读取 <code>load</code> 标签，调用 <code>counter:__mcl/load</code>：创建 objective、只在计分项不存在时写入初始值，然后依次调用所有 <code>@load</code> 函数。</li>
+    <li><code>tick</code> 标签每个游戏刻调用一次 <code>counter:tick</code>，五秒后消息和声音就会出现在所有玩家处。</li>
+  </ol>
+  <p>再次执行 <code>/reload</code> 不会重置 <code>ticks</code> 的值：初始化语句是“若该计分项还不存在才写入”，这是有意的设计——数据包重载不应清空玩家的运行状态。</p>
+
+  <h3>6. 项目目录与严格模式</h3>
+  <p>把多个 <code>.mcl</code> 文件放在同一目录（可嵌套子目录），编译器会递归读取，跳过隐藏目录、<code>target</code> 和 <code>build</code>。目录里每个文件必须声明<strong>相同的命名空间</strong>，声明和引用在整个项目内可见：</p>
+  <pre><code class="pwsh" data-title="目录输入" data-kind="pwsh">cargo run -- check examples/multi_counter
+cargo run -- build examples/multi_counter</code></pre>
+  <pre><code class="pwsh" data-title="严格模式" data-kind="pwsh">cargo run -- check examples/portable_chest --deny-raw
+cargo run -- build examples/portable_chest --deny-raw</code></pre>
+  <p><code>portable_chest</code> 是一个完全不含底层命令字符串的实际项目，展示类型化实体查询、物品组件匹配、跨维度执行和容器持久化。</p>
+
+  <h3>7. 重建与清理规则</h3>
+  <p>每次构建都会在输出目录写一个 <code>.mclang-manifest</code>，内容是本次生成的全部相对路径。下次构建先用它删除上一次的产物，再写新文件：</p>
+  <ul>
+    <li>只删除清单里列出的普通相对路径，清单损坏、包含绝对路径或 <code>..</code> 时构建直接失败，避免越界删除。</li>
+    <li>目录中的其他文件（比如你自己放的资源或文档）保持原样。</li>
+    <li>输出顺序由 <code>BTreeMap</code> 保证稳定，同样的源码总是生成同样的文件集合。</li>
+  </ul>
+</section>
+
+<section class="section" id="basics">
+  <h2>语言基础 <a class="anchor" href="#basics">#</a></h2>
+
+  <h3>源文件与项目</h3>
+  <ul>
+    <li>输入可以是单个 <code>.mcl</code> 文件，也可以是一个目录。目录会递归读取所有 <code>.mcl</code> 文件，跳过名字以 <code>.</code> 开头的目录、<code>target</code> 和 <code>build</code>，并按路径排序后合并。</li>
+    <li>每个源文件的第一条声明必须是命名空间；<strong>同一项目内所有文件的命名空间必须一致</strong>，否则报告错误并指出冲突文件的位置。</li>
+    <li>声明顺序不影响引用：函数、计分变量、查询、物品定义、存储和资源在整个项目中可见，跨文件互相引用没有问题。</li>
+    <li>源文件按 UTF-8 读取。中文既可以出现在关键词、字符串和注释里，也可以出现在资源路径之外的所有文本位置。</li>
+  </ul>
+
+  <h3>注释</h3>
+  <p><code>//</code> 开始单行注释，直到行尾。注释不参与编译，也不影响产物。</p>
+  <pre><code class="mcl" data-title="注释" data-kind="mcl">// 整行注释
+score ticks = 0; // 行尾注释</code></pre>
+
+  <h3>标识符与保留字</h3>
+  <p>函数名、计分变量名、查询名、物品定义名、存储名和参数名共用一套命名规则：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>规则</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>字符集</td><td>只能包含小写 ASCII 字母 <code>a-z</code>、数字 <code>0-9</code> 和下划线 <code>_</code></td></tr>
+        <tr><td>首字符</td><td>必须是字母或下划线，不能是数字</td></tr>
+        <tr><td>长度</td><td>不超过 32 个字节</td></tr>
+        <tr><td>大小写</td><td>区分大小写；大写字母不合法，标识符必须是纯小写</td></tr>
+        <tr><td>保留字</td><td>不能与语言关键词重名，见下表</td></tr>
+        <tr><td>额外限制</td><td>函数名和命名空间不能使用 Windows 保留设备名（<code>con</code>、<code>prn</code>、<code>aux</code>、<code>nul</code>、<code>com1</code>–<code>com9</code>、<code>lpt1</code>–<code>lpt9</code>，不区分大小写），避免生成无法在 Windows 上创建的文件</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>不能用作标识符的保留字：<code>namespace</code>、<code>score</code>、<code>query</code>、<code>entity</code>、<code>items</code>、<code>item</code>、<code>item_stack</code>、<code>storage</code>、<code>resource</code>、<code>fn</code>、<code>let</code>、<code>run</code>、<code>call</code>、<code>schedule</code>、<code>after</code>、<code>append</code>、<code>replace</code>、<code>if</code>、<code>else</code>、<code>while</code>、<code>execute</code>、<code>each</code>、<code>in_dimension</code>、<code>spawn</code>、<code>self</code>、<code>message</code>、<code>sound</code>、<code>predicate</code>、<code>player</code>、<code>return</code>、<code>true</code>、<code>false</code>。</p>
+  <div class="callout note">
+    <p><span class="tag">注意</span> 资源位置（比如 <code>minecraft:emerald</code>、<code>demo:state</code>）遵循 Minecraft 自己的规则，可以使用命名空间前缀和路径段，不受上面的标识符规则限制。命名空间前缀和路径段的合法字符见<a href="#checks">静态检查</a>。</p>
+  </div>
+
+  <h3>字符串</h3>
+  <p>普通字符串用双引号，支持五种转义：<code>\"</code>、<code>\\</code>、<code>\n</code>、<code>\r</code>、<code>\t</code>。其他转义会报错；字符串内不允许出现实际换行（需要多行文本时使用原始字符串）。</p>
+  <p>跨行原始字符串以三个双引号开始和结束，内容<strong>不处理任何转义</strong>，原样保留。它主要用来在源码里嵌入可读的 JSON：</p>
+  <pre><code class="mcl" data-title="原始字符串" data-check="full">namespace demo;
+
+resource predicate coin_flip = """
+{
+  "condition": "minecraft:random_chance",
+  "chance": 0.5
+}
+""";</code></pre>
+  <p>命令字符串里如果需要引号，使用 <code>\"</code> 转义；<code>run</code> 与 <code>execute</code> 的字符串都只允许一行，具体限制见<a href="#stmt-raw">底层接口</a>。</p>
+
+  <h3>中英文双关键词</h3>
+  <p>所有语言结构、属性、方法和枚举值都提供中文写法，解析器在构造 AST 时把它们规范化为同一内部表示，因此：</p>
+  <ul>
+    <li>两种写法可以在同一项目、同一文件、同一条语句里混用；</li>
+    <li>两种写法生成<strong>逐字节相同</strong>的产物；</li>
+    <li>函数名、变量名、查询名、存储名、命名空间和 Minecraft 资源位置始终是稳定的 ASCII/Minecraft 标识符，不会被翻译。</li>
+  </ul>
+  <p>同一个 <code>@tick</code> 函数的两种写法：</p>
+  <div class="tabs">
+    <div class="tab-btns">
+      <button type="button" data-tab="en" class="active">English</button>
+      <button type="button" data-tab="zh">中文</button>
+    </div>
+    <div class="tab-panel active" data-panel="en">
+      <pre><code class="mcl" data-title="片段：英文写法" data-kind="mcl">@tick
+fn tick() {
+    ticks += 1;
+    if ticks >= 100 {
+        call announce();
+        ticks = 0;
+    }
+}</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="zh">
+      <pre><code class="mcl" data-title="片段：中文写法" data-kind="mcl">@每刻
+函数 tick() {
+    ticks += 1;
+    如果 ticks >= 100 {
+        调用 announce();
+        ticks = 0;
+    }
+}</code></pre>
+    </div>
+  </div>
+  <p>上例中的 <code>ticks</code>、<code>announce</code> 是用户标识符，两种写法保持原样；只有关键词被替换。完整的中英文关键词对照表见<a href="#appendix">附录</a>。</p>
+
+  <h3>运算符一览</h3>
+  <div class="table-wrap">
+    <table class="compact">
+      <thead><tr><th>类别</th><th>记号</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>赋值</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td><td>写入计分值；复合赋值带算术运算</td></tr>
+        <tr><td>比较</td><td><code>==</code> <code>!=</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>只能出现在条件里，两侧都是算术表达式</td></tr>
+        <tr><td>布尔</td><td><code>!</code> <code>&amp;&amp;</code> <code>||</code></td><td>组合条件与 predicate；优先级 <code>!</code> &gt; <code>&amp;&amp;</code> &gt; <code>||</code></td></tr>
+        <tr><td>算术</td><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td>乘除模优先于加减；一元负号优先级最高</td></tr>
+        <tr><td>标点</td><td><code>@ ( ) { } ; , . -&gt;</code></td><td>属性前缀、分组、块、语句结束、参数分隔、成员访问、返回类型箭头</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>语句以分号结束；代码块用花括号；函数返回类型写作 <code>-&gt; score</code>（中文 <code>-&gt; 计分</code>）。</p>
+</section>
+
+<section class="section" id="decl">
+  <h2>顶层声明 <a class="anchor" href="#decl">#</a></h2>
+  <p>一个源文件由“命名空间 + 任意数量的顶层声明”组成。声明之间没有顺序要求，可以交错出现；只有命名空间必须写在最前面。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>声明</th><th>语法形状</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><a href="#decl-namespace">命名空间</a></td><td><code>namespace demo;</code></td><td>包名；决定函数路径、objective 与资源输出位置</td></tr>
+        <tr><td><a href="#decl-score">计分变量</a></td><td><code>score ticks = 0;</code></td><td>跨函数共享的 32 位整数</td></tr>
+        <tr><td><a href="#decl-query">实体查询</a></td><td><code>query q = entity("minecraft:item") { ... }</code></td><td>可复用的实体集合与物品条件</td></tr>
+        <tr><td><a href="#decl-item">物品定义</a></td><td><code>item gift = item_stack("minecraft:emerald") { ... }</code></td><td>可复用的物品堆与组件</td></tr>
+        <tr><td><a href="#decl-storage">物品存储</a></td><td><code>storage s = items("demo:state", "saved_items");</code></td><td>持久保存完整槽位列表的容器</td></tr>
+        <tr><td><a href="#decl-resource">JSON 资源</a></td><td><code>resource predicate p = """{...}""";</code></td><td>带校验的 JSON 数据包资源</td></tr>
+        <tr><td><a href="#decl-fn">函数</a></td><td><code>@tick fn tick() { ... }</code></td><td>可调用、可返回 score 的代码块</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="decl-namespace">命名空间 <a class="anchor" href="#decl-namespace">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">namespace &lt;名称&gt;;      // 中文：命名空间 &lt;名称&gt;;</code></pre>
+  <p>命名空间必须出现在文件最前面，并且只能由小写 ASCII 字母、数字和下划线组成、不能以数字开头、不能超过 32 字节、不能是 Windows 保留设备名。它同时决定：</p>
+  <ul>
+    <li>函数在数据包中的路径：<code>data/&lt;命名空间&gt;/function/*.mcfunction</code>；</li>
+    <li>objective 名：<code>mcl_</code> 加上命名空间的稳定 FNV-1a 哈希（12 位十六进制），避免不同数据包互相覆盖计分板；</li>
+    <li>JSON 资源的输出位置：<code>data/&lt;命名空间&gt;/&lt;资源类型&gt;/&lt;资源名&gt;.json</code>。</li>
+  </ul>
+  <div class="callout note">
+    <p><span class="tag">为什么是哈希</span> 两个不同名字空间在 Minecraft 里可能对应同样的合法 objective 名。用稳定哈希可以让名字空间保持人类可读，同时保证 objective 名不会冲突、生成结果可复现。</p>
+  </div>
+
+  <h3 id="decl-score">计分变量 <code data-zh="">score</code> <a class="anchor" href="#decl-score">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">score &lt;名称&gt; = &lt;整数&gt;;   // 中文：计分 &lt;名称&gt; = &lt;整数&gt;;</code></pre>
+  <ul>
+    <li>类型是有符号 32 位整数（−2147483648 到 2147483647）。初始值前的负号计入数值，超出范围会在解析时报错。</li>
+    <li>计分变量是跨函数、跨刻共享的全局状态，可以出现在任何表达式和赋值左侧。</li>
+    <li>初始值只在“该计分项尚不存在”时写入，因此 <code>/reload</code> 不会清空运行状态；想让 <code>/reload</code> 重置状态需要显式赋值。</li>
+    <li>生成时每个全局变量对应一个 <code>#v_&lt;名字&gt;</code> 假玩家，运行在同一个 objective 下。</li>
+  </ul>
+  <pre><code class="mcl" data-title="示例" data-check="full">namespace demo;
+
+score counter = 0;
+score offset = -10;
+
+fn reset() {
+    counter = 0;
+    offset = -10;
+}</code></pre>
+
+  <h3 id="decl-query">实体查询 <code data-zh="">query</code> <a class="anchor" href="#decl-query">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">query &lt;名称&gt; = entity("&lt;实体类型&gt;") {
+    tag("&lt;标签&gt;");            // 中文：标签("...")
+    without_tag("&lt;标签&gt;");    // 中文：排除标签("...")
+    limit(&lt;数量&gt;);            // 中文：上限(1)
+    within(&lt;距离&gt;);           // 中文：范围(16)
+    sort(nearest);             // 中文：排序(最近)
+    item(contents) {           // 中文：物品(内容)
+        id = "minecraft:emerald";
+        count = 1;
+        custom_name = "A";
+    }
+}</code></pre>
+  <div class="table-wrap">
+    <table data-no-translate>
+      <thead><tr><th>属性</th><th>中文</th><th>参数</th><th>可重复</th><th>约束</th></tr></thead>
+      <tbody>
+        <tr><td><code>tag("x")</code></td><td><code>标签</code></td><td>实体标签</td><td>可以，多个</td><td>非空、不超过 1024 字节，只含 ASCII 字母数字与 <code>_ - .</code></td></tr>
+        <tr><td><code>without_tag("x")</code></td><td><code>排除标签</code></td><td>实体标签</td><td>可以，多个</td><td>同上；与 <code>tag</code> 合并去重</td></tr>
+        <tr><td><code>limit(n)</code></td><td><code>上限</code></td><td>正整数</td><td>只能一次</td><td>1 到 2147483647</td></tr>
+        <tr><td><code>within(n)</code></td><td><code>范围</code></td><td>正整数</td><td>只能一次</td><td>1 到 30000000（生成 <code>distance=..n</code>）</td></tr>
+        <tr><td><code>sort(v)</code></td><td><code>排序</code></td><td><code>nearest</code> / <code>furthest</code> / <code>random</code> / <code>arbitrary</code></td><td>只能一次</td><td>中文：<code>最近</code> / <code>最远</code> / <code>随机</code> / <code>任意</code></td></tr>
+        <tr><td><code>item(槽)</code></td><td><code>物品</code></td><td>槽位名</td><td>只能一次</td><td>26.3 首版只支持 <code>contents</code> / <code>内容</code> 槽</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>item</code> 子块描述一个物品组件条件，必须声明 <code>id</code>：</p>
+  <div class="table-wrap">
+    <table class="compact" data-no-translate>
+      <thead><tr><th>属性</th><th>中文</th><th>约束</th></tr></thead>
+      <tbody>
+        <tr><td><code>id = "..."</code></td><td><code>类型</code></td><td>必填；合法的物品资源位置</td></tr>
+        <tr><td><code>count = n</code></td><td><code>数量</code></td><td>可选；1 到 99</td></tr>
+        <tr><td><code>custom_name = "..."</code></td><td><code>自定义名称</code></td><td>可选；要求物品的自定义名称组件值精确匹配给定文本；不能包含控制字符</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>查询本身不产生命令，只在 <code>each</code>、<code>give</code> 中展开为选择器。例如：</p>
+  <pre><code class="mcl" data-title="查询示例" data-check="full">namespace demo;
+
+query emerald_drops = entity("minecraft:item") {
+    without_tag("handled");
+    limit(1);
+    within(16);
+    sort(nearest);
+    item(contents) {
+        id = "minecraft:emerald";
+        count = 1;
+        custom_name = "A";
+    }
+}
+
+@tick
+fn tick() {
+    each(emerald_drops) {
+        run "say found the named emerald";
+    }
+}</code></pre>
+  <p>上面的查询会生成选择器 <code>@e[type=minecraft:item,tag=!handled,sort=nearest,limit=1,distance=..16]</code>，并追加物品组件检查：</p>
+  <pre><code class="mcf" data-title="生成片段" data-kind="mcfunction">execute as @e[type=minecraft:item,tag=!handled,sort=nearest,limit=1,distance=..16] at @s if items entity @s contents minecraft:emerald[minecraft:custom_name={text:"A"},minecraft:count=1] run function demo:__mcl/tick/0</code></pre>
+  <div class="callout warn">
+    <p><span class="tag">注意</span> 实体类型为 <code>minecraft:player</code> 的查询在 <code>each</code> 和 <code>give</code> 中会建立<strong>玩家上下文</strong>；其他类型只建立普通实体上下文。这是后面所有 <code>self.*</code> 限制的来源，详见<a href="#context">执行上下文</a>。</p>
+  </div>
+</section>
+
+<section class="section" id="decl-item-wrap">
+  <h3 id="decl-item">物品定义 <code data-zh="">item</code> <a class="anchor" href="#decl-item">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">item &lt;名称&gt; = item_stack("&lt;物品资源位置&gt;") {   // 中文：物品 &lt;名称&gt; = 物品堆("...")
+    count = 1;                    // 数量
+    custom_name = "显示名称";      // 自定义名称
+    item_name = "基础名称";        // 物品名称
+    lore("第一行");                // 描述，可重复，最多 256 行
+    enchantment("minecraft:fortune", 2);        // 附魔，可重复
+    stored_enchantment("minecraft:mending", 1); // 存储附魔，可重复
+    damage = 4;                   // 损伤
+    max_damage = 100;             // 最大损伤
+    max_stack_size = 16;          // 最大堆叠
+    rarity = rare;                // 稀有度
+    item_model = "minecraft:leather_chestplate";// 物品模型
+    dyed_color = 0xff0000;        // 染色；源码里十进制，0 到 16777215
+    enchantment_glint_override = true;          // 附魔光效
+    unbreakable = true;                         // 无法破坏
+}</code></pre>
+  <p>物品定义把可复用的物品堆（类型 + 组件）变成一个名字，供 <code>give</code> 和 <code>self.give_item</code> 引用。解析器把中英文属性规范化为同一字段，生成时再写成 26.3 的物品组件参数。</p>
+  <div class="table-wrap">
+    <table data-no-translate>
+      <thead><tr><th>属性</th><th>中文</th><th>生成的组件</th><th>约束</th></tr></thead>
+      <tbody>
+        <tr><td><code>count = n</code></td><td><code>数量</code></td><td>（不生成组件）</td><td>1 到 100（未声明 <code>max_stack_size</code> 时；声明后为 <code>n × 100</code>）；作为 <code>give</code> 省略数量时的默认值</td></tr>
+        <tr><td><code>custom_name = "..."</code></td><td><code>自定义名称</code></td><td><code>minecraft:custom_name</code></td><td>纯文本；物品栏中显示为斜体；不能含控制字符</td></tr>
+        <tr><td><code>item_name = "..."</code></td><td><code>物品名称</code></td><td><code>minecraft:item_name</code></td><td>纯文本，不带斜体；不能含控制字符</td></tr>
+        <tr><td><code>lore("...")</code></td><td><code>描述</code></td><td><code>minecraft:lore</code></td><td>可重复，最多 256 行；不能含控制字符</td></tr>
+        <tr><td><code>enchantment(id, level)</code></td><td><code>附魔</code></td><td><code>minecraft:enchantments</code></td><td>合法附魔资源位置；等级 1 到 255；同一个附魔不能重复声明</td></tr>
+        <tr><td><code>stored_enchantment(id, level)</code></td><td><code>存储附魔</code></td><td><code>minecraft:stored_enchantments</code></td><td>同上，用于附魔书</td></tr>
+        <tr><td><code>damage = n</code></td><td><code>损伤</code></td><td><code>minecraft:damage</code></td><td>0 到 2147483647</td></tr>
+        <tr><td><code>max_damage = n</code></td><td><code>最大损伤</code></td><td><code>minecraft:max_damage</code></td><td>1 到 2147483647</td></tr>
+        <tr><td><code>max_stack_size = n</code></td><td><code>最大堆叠</code></td><td><code>minecraft:max_stack_size</code></td><td>1 到 99</td></tr>
+        <tr><td><code>rarity = v</code></td><td><code>稀有度</code></td><td><code>minecraft:rarity</code></td><td><code>common</code>/<code>uncommon</code>/<code>rare</code>/<code>epic</code> 或中文</td></tr>
+        <tr><td><code>item_model = "..."</code></td><td><code>物品模型</code></td><td><code>minecraft:item_model</code></td><td>合法的资源位置</td></tr>
+        <tr><td><code>dyed_color = n</code></td><td><code>染色</code></td><td><code>minecraft:dyed_color</code></td><td>0 到 16777215 的 RGB 值</td></tr>
+        <tr><td><code>enchantment_glint_override = b</code></td><td><code>附魔光效</code></td><td><code>minecraft:enchantment_glint_override</code></td><td><code>true</code>/<code>false</code> 或 <code>真</code>/<code>假</code></td></tr>
+        <tr><td><code>unbreakable = b</code></td><td><code>无法破坏</code></td><td><code>minecraft:unbreakable</code></td><td><code>true</code>/<code>false</code> 或 <code>真</code>/<code>假</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn">
+    <p><span class="tag">两条容易踩的约束</span></p>
+    <ul>
+      <li>大于 1 的 <code>max_stack_size</code> 不能与 <code>max_damage</code> 同时声明：26.3 的 <code>ItemStack.validateStrict</code> 拒绝既可堆叠又可损伤的物品。</li>
+      <li><code>count</code> 的合法上限取决于 <code>max_stack_size</code>：没有声明时按最小堆叠数 1 计算，上限是 100；声明 <code>max_stack_size = n</code> 后上限是 <code>n × 100</code>。这是 <code>GiveCommand</code> 自己的检查规则。</li>
+    </ul>
+  </div>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace gifts;
+
+item welcome_gift = item_stack("minecraft:emerald") {
+    count = 3;
+    custom_name = "Welcome Gift";
+    lore("First lore line");
+    lore("Second lore line");
+    enchantment("minecraft:fortune", 2);
+    unbreakable = true;
+}
+
+query players = entity("minecraft:player") { }
+
+fn grant() {
+    give(players, welcome_gift);       // 使用物品定义的 count = 3
+    give(players, welcome_gift, 64);   // 本次给予 64 个
+}
+
+@player
+fn grant_self() {
+    self.give_item(welcome_gift);      // 当前玩家，使用定义中的 count
+    self.give_item(welcome_gift, 5);   // 当前玩家，本次给予 5 个
+}</code></pre>
+  <p>生成的核心命令形如（组件在方括号内，顺序固定）：</p>
+  <pre><code class="mcf" data-title="生成片段" data-kind="mcfunction">execute as @e[type=minecraft:player] at @s run give @s minecraft:emerald[minecraft:custom_name={text:"Welcome Gift"},minecraft:lore=[{text:"First lore line"},{text:"Second lore line"}],minecraft:enchantments={"minecraft:fortune":2},minecraft:unbreakable={}] 3</code></pre>
+
+  <h3 id="decl-storage">物品存储 <code data-zh="">storage</code> <a class="anchor" href="#decl-storage">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">storage &lt;名称&gt; = items("&lt;存储资源位置&gt;", "&lt;NBT 路径&gt;");
+// 中文：存储 &lt;名称&gt; = 物品("&lt;存储资源位置&gt;", "&lt;NBT 路径&gt;");</code></pre>
+  <p>声明一个持久保存完整 <code>Items</code> 槽位列表的位置。存储资源位置是普通的 <code>命名空间:路径</code>；NBT 路径由点分隔的段组成，每段只能包含 ASCII 字母数字和下划线。</p>
+  <ul>
+    <li>编译器在合成 load 函数里加入幂等初始化：<code>execute unless data storage &lt;位置&gt; &lt;路径&gt; run data modify storage &lt;位置&gt; &lt;路径&gt; set value []</code>。路径已存在时不覆盖，所以 <code>/reload</code> 不会清空收藏。</li>
+    <li>在实体上下文中用 <a href="#stmt-self"><code>self.save_items</code></a> 保存、<code>self.restore_items</code> 恢复、<code>self.remove_preserving_items</code> 安全收起容器。</li>
+    <li><code>remove_preserving_items</code> 固定生成三步：保存完整槽位列表 → 把实体的 <code>Items</code> 置空 → 删除实体。它把“先保存再删除”的不变量固化在语言里，避免容器里的东西掉一地。</li>
+  </ul>
+  <pre><code class="mcl" data-title="示例" data-check="full">namespace stash;
+
+query boxes = entity("minecraft:chest_minecart") {
+    tag("stash_box");
+}
+
+storage saved_items = items("stash:state", "saved_items");
+
+@tick
+fn tick() {
+    each(boxes) {
+        self.remove_preserving_items(saved_items);
+    }
+}
+
+fn restore_into_box() {
+    spawn("minecraft:chest_minecart") {
+        self.add_tag("stash_box");
+        self.restore_items(saved_items);
+    }
+}</code></pre>
+
+  <h3 id="decl-resource">JSON 资源 <code data-zh="">resource</code> <a class="anchor" href="#decl-resource">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">resource &lt;类型&gt; &lt;名称&gt; = &lt;JSON 字符串&gt;;
+// 中文：资源 &lt;类型&gt; &lt;名称&gt; = &lt;JSON 字符串&gt;;</code></pre>
+  <ul>
+    <li>类型和名称都可以写成标识符或字符串。名称需要子目录时使用字符串，例如 <code>resource advancement "story/custom" = """...""";</code>。</li>
+    <li>类型必须是 26.3 支持的资源目录，完整列表见<a href="#appendix-kinds">附录</a>；<code>worldgen/*</code> 一律使用字符串形式。</li>
+    <li>解析器提供一个中文别名：<code>资源 谓词 &lt;名称&gt; = ...</code> 等价于 <code>resource predicate ...</code>；其他类型保持英文目录名。</li>
+    <li>内容用 <code>serde_json</code> 在编译期解析，语法错误会报告 JSON 的行列；通过后重新格式化为稳定缩进的 JSON 写出。</li>
+    <li>输出路径为 <code>data/&lt;命名空间&gt;/&lt;类型&gt;/&lt;名称&gt;.json</code>；同一类型同一名称重复声明会报错。</li>
+    <li>当前命名空间中声明的 <code>predicate</code> 可以直接在条件里用 <code>predicate(&lt;名称&gt;)</code>（中文 <code>谓词(&lt;名称&gt;)</code>）引用，并参与 <code>!</code>、<code>&amp;&amp;</code>、<code>||</code> 组合。</li>
+    <li>JSON 字段的 Minecraft codec 语义仍由游戏加载时验证：编译器保证语法合法、路径合法、类型受支持，但不校验每个字段的含义。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace resourcedemo;
+
+resource predicate coin_flip = """
+{
+  "condition": "minecraft:random_chance",
+  "chance": 0.5
+}
+""";
+
+resource advancement "story/root" = """
+{
+  "criteria": {
+    "tick": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}
+""";
+
+fn decide() {
+    if predicate(coin_flip) {
+        run "say heads";
+    } else {
+        run "say tails";
+    }
+}</code></pre>
+
+  <h3 id="decl-fn">函数与属性 <a class="anchor" href="#decl-fn">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">@属性
+fn &lt;名称&gt;(&lt;参数列表&gt;) -&gt; score {   // -&gt; score 可省略；中文 -&gt; 计分
+    ...
+    return &lt;表达式&gt;;
+}</code></pre>
+  <div class="table-wrap">
+    <table data-no-translate>
+      <thead><tr><th>属性</th><th>中文</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>@load</code></td><td><code>@加载</code></td><td>数据包加载或 <code>/reload</code> 后调用。可以标记多个函数，按源码顺序调用</td></tr>
+        <tr><td><code>@tick</code></td><td><code>@每刻</code></td><td>每个游戏刻调用一次。可以标记多个函数</td></tr>
+        <tr><td><code>@entity</code></td><td><code>@实体</code></td><td>函数要求普通实体执行上下文，<code>self.*</code> 可以安全使用</td></tr>
+        <tr><td><code>@player</code></td><td><code>@玩家</code></td><td>函数要求玩家执行上下文，可以使用玩家专用操作</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h4>参数</h4>
+  <ul>
+    <li>参数是函数私有的 32 位计分值，可以参与表达式和赋值。调用时实参从左到右求值，再复制到被调用函数的私有槽位。</li>
+    <li>参数名不能与全局计分变量重名，函数内也不能重复声明同名参数。</li>
+    <li>入口函数（<code>@load</code>/<code>@tick</code>）不能带参数；需要参数的函数不能直接 <code>schedule</code>，请调度一个无参数包装函数。</li>
+    <li>参数化函数应由 Mclang 代码调用：直接从 Minecraft 执行它会沿用上次调用留下的参数值。</li>
+  </ul>
+  <h4>返回值</h4>
+  <ul>
+    <li>函数默认没有返回值，用 <code>return;</code> 提前结束。追加 <code>-&gt; score</code> 后，函数必须以 <code>return &lt;表达式&gt;;</code> 结束，调用可以出现在任意计分表达式中。</li>
+    <li>返回 score 的函数里每个 <code>return</code> 都必须带表达式；无返回值函数只能用 <code>return;</code>。</li>
+    <li><code>return</code> 只能<strong>直接位于函数最外层代码块</strong>，不能放进 <code>if</code>、<code>while</code>、<code>each</code>、<code>spawn</code>、<code>in_dimension</code> 或 <code>execute</code> 块：Minecraft 的 <code>return</code> 只会退出当前 <code>.mcfunction</code>，而这些块会生成辅助函数，放进去会改变控制流含义。需要条件结果时，先赋给局部变量，在函数末尾返回。</li>
+  </ul>
+  <div class="tabs">
+    <div class="tab-btns">
+      <button type="button" data-tab="ok" class="active">正确写法</button>
+      <button type="button" data-tab="bad">错误写法（会报错）</button>
+    </div>
+    <div class="tab-panel active" data-panel="ok">
+      <pre><code class="mcl" data-title="early.mcl" data-check="full">namespace early;
+
+score total = 0;
+
+fn clamp_low(value) -> score {
+    let result = value;
+    if result < 0 {
+        result = 0;
+    }
+    return result;
+}
+
+fn main() {
+    total = clamp_low(total - 5);
+}</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="bad">
+      <pre><code class="mcl" data-title="片段：编译错误" data-kind="mcl">fn wrong(value) -> score {
+    if value < 0 {
+        return 0;   // 错误：return 不能放在 if 块里
+    }
+    return value;
+}
+
+fn also_wrong() {
+    return 1;       // 错误：没有 -&gt; score 的函数只能 return;
+}</code></pre>
+      <p>编译器会给出“return 只能直接出现在函数代码块中，不能放在 if、while、each、spawn、in_dimension 或 execute 块内”和“无返回值函数只能使用 <code>return;</code>”。</p>
+    </div>
+  </div>
+  <h4>函数契约</h4>
+  <ul>
+    <li>同一个函数上不能重复使用相同属性；<code>@entity</code> 与 <code>@player</code> 互斥；<code>@entity</code>/<code>@player</code> 不能与 <code>@load</code>/<code>@tick</code> 组合。</li>
+    <li><code>@load</code>/<code>@tick</code> 不能声明参数，也不能返回值。</li>
+    <li>需要执行上下文的函数、带参数的函数都不能被 <code>schedule</code>：原版调度不会保留执行实体，也不会携带参数。</li>
+    <li>同步调用图里不允许任何直接或间接递归：递归会覆盖仍在使用的参数与表达式临时值。需要跨刻重复执行时用 <code>schedule</code>。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace mathpack;
+
+score total = 0;
+
+@load
+fn load() {
+    total = 0;
+}
+
+fn double(value) -> score {
+    return value * 2;
+}
+
+fn add(left, right) -> score {
+    let sum = left + right;
+    return sum;
+}
+
+fn main() {
+    total = add(double(10), 1);
+}</code></pre>
+</section>
+
+<section class="section" id="stmt">
+  <h2>语句参考 <a class="anchor" href="#stmt">#</a></h2>
+  <p>语句只能出现在函数体里（函数体可以嵌套结构块）。下表是全部语句，后面的小节逐条给出语法、语义和产物：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>语句</th><th>形状</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><a href="#stmt-assign">赋值</a></td><td><code>target += expr;</code></td><td>写入全局变量、参数或局部变量</td></tr>
+        <tr><td><a href="#stmt-let">局部变量</a></td><td><code>let x = expr;</code></td><td>声明函数内的词法作用域变量</td></tr>
+        <tr><td><a href="#stmt-if">条件分支</a></td><td><code>if cond { } else { }</code></td><td>按一次求值的条件选择分支</td></tr>
+        <tr><td><a href="#stmt-while">循环</a></td><td><code>while cond { }</code></td><td>条件为真时重复执行循环体</td></tr>
+        <tr><td><a href="#stmt-call">调用</a></td><td><code>name(args);</code></td><td>调用函数；返回值可用于表达式</td></tr>
+        <tr><td><a href="#stmt-call">返回</a></td><td><code>return expr;</code></td><td>结束函数并（可选）返回值</td></tr>
+        <tr><td><a href="#stmt-each">遍历实体</a></td><td><code>each(query) { }</code></td><td>逐实体建立执行上下文</td></tr>
+        <tr><td><a href="#stmt-spawn">生成实体</a></td><td><code>spawn("type") { }</code></td><td>生成实体并在新实体的上下文中初始化</td></tr>
+        <tr><td><a href="#stmt-dimension">维度上下文</a></td><td><code>in_dimension("...") { }</code></td><td>切换维度执行代码块</td></tr>
+        <tr><td><a href="#stmt-self">实体操作</a></td><td><code>self.add_tag("x");</code></td><td>标签、无敌、物品、移除等实体操作</td></tr>
+        <tr><td><a href="#stmt-message">消息</a></td><td><code>message.all("...");</code></td><td>生成合法的文本组件与玩家选择器</td></tr>
+        <tr><td><a href="#stmt-sound">声音</a></td><td><code>sound.self("...", master);</code></td><td>向当前玩家播放声音</td></tr>
+        <tr><td><a href="#stmt-give">给予</a></td><td><code>give(players, item, 64);</code></td><td>给玩家查询中的每个匹配玩家发物品</td></tr>
+        <tr><td><a href="#stmt-schedule">调度</a></td><td><code>schedule f() after 5 s;</code></td><td>在未来游戏刻调用函数</td></tr>
+        <tr><td><a href="#stmt-raw">底层接口</a></td><td><code>run "command";</code></td><td>逃生口；可用 <code>--deny-raw</code> 禁用</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="stmt-assign">表达式与赋值 <a class="anchor" href="#stmt-assign">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">target = expr;   target += expr;   target -= expr;
+target *= expr;  target /= expr;   target %= expr;</code></pre>
+  <p>表达式由以下元素组成，优先级从低到高：</p>
+  <ol>
+    <li><code>+</code>、<code>-</code>（左结合）</li>
+    <li><code>*</code>、<code>/</code>、<code>%</code>（左结合）</li>
+    <li>一元负号 <code>-</code></li>
+    <li>整数常量、计分变量名、函数调用（返回 score）、括号分组</li>
+  </ol>
+  <p>计分值全部是有符号 32 位整数，运算沿用 Minecraft 计分板的语义与溢出行为：</p>
+  <div class="table-wrap">
+    <table class="compact">
+      <thead><tr><th>运算</th><th>Minecraft 26.3 行为</th></tr></thead>
+      <tbody>
+        <tr><td><code>/=</code></td><td><code>Mth.floorDiv</code>：向下取整（<code>-7 / 2</code> 得 <code>-4</code>）</td></tr>
+        <tr><td><code>%=</code></td><td><code>Mth.positiveModulo</code>：结果始终非负（<code>-7 % 3</code> 得 <code>2</code>）</td></tr>
+        <tr><td>除零 / 模零</td><td>运行时整条命令失败。编译器只拒绝<strong>编译期能确定为 0</strong> 的除数，运行时出现的 0 仍然会失败</td></tr>
+        <tr><td><code>+=</code> 等</td><td>32 位有符号加法，溢出回绕</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>纯常量表达式会在编译期折叠（使用带检查的算术；折叠失败则不再当作常量）。含变量或调用的表达式生成计分板命令，临时结果存放在 <code>#t&lt;编号&gt;</code> 槽位里。</p>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace arithmetic;
+
+score counter = 0;
+score scale = 3;
+
+fn update() {
+    counter = 10;
+    counter += 1;
+    counter -= 2;
+    counter *= scale;
+    counter /= 4;
+    counter %= 20;
+    counter = (counter + 3) * 2;
+}</code></pre>
+  <p>静态除零检查的两种形式：</p>
+  <pre><code class="mcl" data-title="片段：编译错误" data-kind="mcl">counter /= 0;              // 错误：不能除以零
+counter /= scale - scale;  // 错误：右侧常量折叠为 0</code></pre>
+  <div class="callout note">
+    <p><span class="tag">生成提示</span> <code>counter += 1;</code> 会生成更短的 <code>scoreboard players add … 1</code>；<code>counter = 5;</code> 直接生成 <code>set</code>；只有运行时的混合表达式才使用 <code>scoreboard players operation</code>。</p>
+  </div>
+
+  <h3 id="stmt-let">局部变量 <code data-zh="令">let</code> <a class="anchor" href="#stmt-let">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">let &lt;名称&gt; = &lt;表达式&gt;;   // 中文：令 &lt;名称&gt; = &lt;表达式&gt;;</code></pre>
+  <ul>
+    <li>局部变量是函数私有的 32 位计分值，初始值可以引用全局变量、参数和此前声明的局部变量。</li>
+    <li>采用词法块作用域：离开声明它的代码块后不可见，也不能在声明前使用。</li>
+    <li>同一函数内不允许重名局部变量（即使位于不同分支），也不允许局部变量或参数与全局计分变量同名——这是为了让生成的私有槽位和诊断信息保持清晰。</li>
+    <li>名称是解析时确定的：函数内有同名局部变量时，这个名字解析为局部变量；否则解析为参数或全局变量。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace scopes;
+
+score total = 0;
+
+fn update(amount) {
+    let adjusted = amount * 2;
+    total += adjusted;
+
+    if adjusted > 10 {
+        let excess = adjusted - 10;
+        total += excess;
+    }
+}</code></pre>
+
+  <h3 id="stmt-if">条件分支 <code data-zh="如果">if</code> <a class="anchor" href="#stmt-if">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">if &lt;条件&gt; { ... } else { ... }
+// 中文：如果 &lt;条件&gt; { ... } 否则 { ... }</code></pre>
+  <p>条件由三种形式组合而成：</p>
+  <ul>
+    <li><strong>比较</strong>：<code>left == right</code>、<code>!=</code>、<code>&lt;</code>、<code>&lt;=</code>、<code>&gt;</code>、<code>&gt;=</code>，两侧都是任意算术表达式（可以包含函数调用）。</li>
+    <li><strong>predicate</strong>：<code>predicate(名字)</code>（中文 <code>谓词(名字)</code>），引用当前命名空间声明的 predicate 资源。</li>
+    <li><strong>组合</strong>：<code>!</code>、<code>&amp;&amp;</code>、<code>||</code> 和括号，优先级 <code>!</code> &gt; <code>&amp;&amp;</code> &gt; <code>||</code>。</li>
+  </ul>
+  <p>条件在进入分支<strong>之前求值一次</strong>，结果冻结为 0/1 标志，再由两条 <code>execute if score &lt;标志&gt; matches 1/0</code> 分派 then / else 辅助函数。因此 then 分支修改参与比较的变量不会错误触发 else。组合条件按从左到右的确定顺序求值。</p>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace branching;
+
+score enabled = 1;
+score ticks = 0;
+score override = 0;
+
+fn check() {
+    if enabled == 1 &amp;&amp; ticks &lt; 100 || override == 1 {
+        run "say active";
+    } else {
+        run "say waiting";
+    }
+
+    if enabled == 1 &amp;&amp; !(ticks &lt; 100 || override == 1) {
+        run "say paused";
+    }
+}</code></pre>
+  <p>没有 <code>else if</code> 语法：在 <code>else</code> 块里继续写 <code>if</code> 即可。条件表达式只读取计分值，没有副作用。</p>
+
+  <h3 id="stmt-while">循环 <code data-zh="当">while</code> <a class="anchor" href="#stmt-while">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">while &lt;条件&gt; { ... }   // 中文：当 &lt;条件&gt; { ... }</code></pre>
+  <ul>
+    <li>每次迭代都重新计算条件，语法与 <code>if</code> 完全一致。</li>
+    <li>循环由两个辅助函数实现：条件函数求值后调用循环体函数，循环体末尾再调用条件函数。运行时上限由世界的 <code>maxCommandChainLength</code> 决定，所以循环体必须推进退出条件。</li>
+    <li>没有 <code>break</code> / <code>continue</code>；需要提前结束时改写条件或使用 <code>if</code> 包裹循环体。</li>
+    <li>同步函数递归会被编译器拒绝，循环不受此限制（它不是递归，而是同一调用链中的重复调用）。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace looping;
+
+score pending = 3;
+
+fn drain() {
+    while pending &gt; 0 {
+        pending -= 1;
+        run "say processed one task";
+    }
+}</code></pre>
+
+  <h3 id="stmt-call">调用与返回值 <a class="anchor" href="#stmt-call">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">&lt;函数名&gt;(&lt;实参列表&gt;);          // 直接调用
+call &lt;函数名&gt;(&lt;实参列表&gt;);     // 中文：调用
+return;                        // 结束无返回值函数
+return &lt;表达式&gt;;                // 结束 -&gt; score 函数并给出结果</code></pre>
+  <ul>
+    <li>实参是从左到右求值的计分表达式，数量必须与参数列表一致；求值完成后复制到被调用函数的私有参数槽位，然后 <code>function &lt;命名空间&gt;:&lt;名字&gt;</code>。</li>
+    <li>无返回值函数只能作为语句调用；<code>-&gt; score</code> 函数的调用可以出现在任意表达式和实参中，生成 <code>execute store result score &lt;临时槽&gt; … run function …</code> 捕获结果。</li>
+    <li>调用会检查执行上下文：<code>@player</code> 函数只能从玩家上下文调用，<code>@entity</code> 函数可以从实体或玩家上下文调用。</li>
+    <li>同步调用图不允许任何直接或间接递归；<code>schedule</code> 产生的调用不属于同步调用图，因此“每刻调用自己一次”这种模式是允许的。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace callpack;
+
+score total = 0;
+
+fn double(value) -&gt; score {
+    return value * 2;
+}
+
+fn add(left, right) -&gt; score {
+    let sum = left + right;
+    return sum;
+}
+
+fn main() {
+    total = add(double(10), 1);
+}</code></pre>
+  <p><code>total = add(double(10), 1);</code> 会生成（<code>callpack</code> 命名空间、真实哈希）：</p>
+  <pre><code class="mcf" data-title="data/callpack/function/main.mcfunction" data-kind="mcfunction"># Generated by mclang.
+scoreboard players set #p_60f821f0cd37 mcl_8b21f4c52ab4 10
+execute store result score #t3 mcl_8b21f4c52ab4 run function callpack:double
+scoreboard players operation #p_dd391b6cfb87 mcl_8b21f4c52ab4 = #t3 mcl_8b21f4c52ab4
+scoreboard players set #p_ea8f54f0aab8 mcl_8b21f4c52ab4 1
+execute store result score #t4 mcl_8b21f4c52ab4 run function callpack:add
+scoreboard players operation #v_total mcl_8b21f4c52ab4 = #t4 mcl_8b21f4c52ab4</code></pre>
+  <p>被调用函数的参数槽位由“函数名:参数名”的稳定哈希决定，<code>double.mcfunction</code> 里的 <code>value</code> 就是 <code>#p_60f821f0cd37</code>：</p>
+  <pre><code class="mcf" data-title="data/callpack/function/double.mcfunction" data-kind="mcfunction"># Generated by mclang.
+scoreboard players operation #t0 mcl_8b21f4c52ab4 = #p_60f821f0cd37 mcl_8b21f4c52ab4
+scoreboard players set #t1 mcl_8b21f4c52ab4 2
+scoreboard players operation #t0 mcl_8b21f4c52ab4 *= #t1 mcl_8b21f4c52ab4
+return run scoreboard players get #t0 mcl_8b21f4c52ab4</code></pre>
+  <div class="callout note">
+    <p><span class="tag">返回值 ABI</span> 常量返回值编译为 <code>return &lt;整数&gt;</code>；计分值编译为 <code>return run scoreboard players get &lt;槽位&gt; &lt;objective&gt;</code>。调用方用 <code>execute store result score</code> 接住原版 <code>return</code> 的整数值。</p>
+  </div>
+</section>
+
+<section class="section" id="stmt-entity-wrap">
+  <h3 id="stmt-each">遍历实体 <code data-zh="遍历">each</code> <a class="anchor" href="#stmt-each">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">each(&lt;查询名&gt;) { ... }   // 中文：遍历(&lt;查询名&gt;) { ... }</code></pre>
+  <ul>
+    <li>为查询匹配的每个实体建立执行上下文：块内的 <code>self</code> 指向该实体，位置是实体所在位置（生成 <code>execute as @e[...] at @s run function ...</code>）。</li>
+    <li>查询类型是 <code>minecraft:player</code> 时建立<strong>玩家上下文</strong>，否则建立普通实体上下文。</li>
+    <li>块体是单独的辅助函数；实体逐个在各自上下文中执行。块内修改的全局计分值对所有实体持续生效。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace entitydemo;
+
+score checked = 0;
+
+query players = entity("minecraft:player") { }
+
+@tick
+fn tick() {
+    each(players) {
+        self.add_tag("seen");
+        checked += 1;
+        message.self("hello", green);
+    }
+}</code></pre>
+
+  <h3 id="stmt-spawn">生成实体 <code data-zh="召唤">spawn</code> <a class="anchor" href="#stmt-spawn">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">spawn("&lt;实体类型&gt;") { ... }   // 中文：召唤("&lt;实体类型&gt;") { ... }</code></pre>
+  <p>在当前执行位置生成实体，块内的 <code>self</code> 指向新生成的实体，建立普通实体上下文。生成 <code>execute summon &lt;类型&gt; run function &lt;辅助函数&gt;</code>——原版 <code>execute summon</code> 会把执行者切换到新实体，因此块内的通用操作天然作用于新实体。</p>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace spawning;
+
+query boxes = entity("minecraft:chest_minecart") {
+    tag("portable_box");
+}
+
+@tick
+fn tick() {
+    spawn("minecraft:chest_minecart") {
+        self.add_tag("portable_box");
+        self.set_invulnerable(true);
+    }
+}</code></pre>
+
+  <h3 id="stmt-dimension">维度上下文 <code data-zh="在维度">in_dimension</code> <a class="anchor" href="#stmt-dimension">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">in_dimension("&lt;维度资源位置&gt;") { ... }   // 中文：在维度("...") { ... }</code></pre>
+  <p>在指定维度中执行块，生成 <code>execute in &lt;维度&gt; run function ...</code>。它保留当前的实体/玩家上下文（与 <code>execute in</code> 一致），因此“跨维度遍历实体”只需要一条查询加上三个维度块。</p>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace dims;
+
+query boxes = entity("minecraft:chest_minecart") {
+    tag("dims_box");
+}
+
+fn clear_all() {
+    in_dimension("minecraft:overworld") {
+        each(boxes) {
+            self.remove();
+        }
+    }
+    in_dimension("minecraft:the_nether") {
+        each(boxes) {
+            self.remove();
+        }
+    }
+    in_dimension("minecraft:the_end") {
+        each(boxes) {
+            self.remove();
+        }
+    }
+}</code></pre>
+
+  <h3 id="stmt-self">实体操作 <code data-zh="自身">self</code> <a class="anchor" href="#stmt-self">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">self.&lt;方法&gt;(&lt;参数&gt;);   // 中文：自身.&lt;方法&gt;(&lt;参数&gt;);</code></pre>
+  <div class="table-wrap">
+    <table data-no-translate>
+      <thead><tr><th>方法</th><th>中文</th><th>需要</th><th>生成命令</th></tr></thead>
+      <tbody>
+        <tr><td><code>add_tag("x")</code></td><td><code>添加标签</code></td><td>实体</td><td><code>tag @s add x</code></td></tr>
+        <tr><td><code>remove_tag("x")</code></td><td><code>移除标签</code></td><td>实体</td><td><code>tag @s remove x</code></td></tr>
+        <tr><td><code>set_invulnerable(true|false)</code></td><td><code>设置无敌</code></td><td>实体</td><td><code>data merge entity @s {Invulnerable:1b}</code> 或 <code>0b</code></td></tr>
+        <tr><td><code>save_items(存储)</code></td><td><code>保存物品</code></td><td>实体</td><td><code>data modify storage &lt;位置&gt; &lt;路径&gt; set from entity @s Items</code></td></tr>
+        <tr><td><code>restore_items(存储)</code></td><td><code>恢复物品</code></td><td>实体</td><td><code>data modify entity @s Items set from storage &lt;位置&gt; &lt;路径&gt;</code></td></tr>
+        <tr><td><code>remove_preserving_items(存储)</code></td><td><code>保存并移除</code></td><td>实体</td><td>保存 → <code>data modify entity @s Items set value []</code> → <code>kill @s</code></td></tr>
+        <tr><td><code>clear_items()</code></td><td><code>清空物品</code></td><td>实体</td><td><code>data modify entity @s Items set value []</code></td></tr>
+        <tr><td><code>remove()</code></td><td><code>移除</code></td><td>实体</td><td><code>kill @s</code></td></tr>
+        <tr><td><code>consume()</code></td><td><code>消耗</code></td><td>实体</td><td><code>kill @s</code>（语义上表示“消耗掉触发物”）</td></tr>
+        <tr><td><code>return_to_owner()</code></td><td><code>返还投掷者</code></td><td>实体</td><td>通过 <code>execute on origin</code> 找到掉落物的 <code>Thrower</code>，把同一个实体传送到投掷者并置 <code>PickupDelay:0</code>，由原版拾取逻辑收进背包；没有投掷者或背包已满时实体保持原样</td></tr>
+        <tr><td><code>give_item(物品[, 数量])</code></td><td><code>给予物品</code></td><td><strong>玩家</strong></td><td><code>give @s &lt;物品&gt; &lt;数量&gt;</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>除 <code>give_item</code> 外的 <code>self</code> 方法都要求实体上下文（<code>each</code>、<code>spawn</code> 或 <code>@entity</code> 函数）；<code>give_item</code> 要求玩家上下文（玩家查询的 <code>each</code>、<code>spawn</code> 除外）。需要的上下文可以在嵌套里获得，编译器按最内层块判断。</p>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace selfdemo;
+
+query boxes = entity("minecraft:chest_minecart") {
+    tag("self_box");
+}
+
+storage saved = items("selfdemo:state", "saved_items");
+
+@tick
+fn tick() {
+    each(boxes) {
+        self.add_tag("checked");
+        self.remove_tag("checked");
+        self.set_invulnerable(true);
+        self.save_items(saved);
+        self.restore_items(saved);
+        self.clear_items();
+        self.remove_preserving_items(saved);
+    }
+}</code></pre>
+
+  <h3 id="stmt-message">消息 <code data-zh="">message</code> <a class="anchor" href="#stmt-message">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">message.all("&lt;文本&gt;"[, &lt;颜色&gt;]);            // 全部玩家；中文 消息.全部
+message.self("&lt;文本&gt;"[, &lt;颜色&gt;]);           // 当前玩家，需要玩家上下文；中文 消息.自身
+message.nearest(&lt;距离&gt;, "&lt;文本&gt;"[, &lt;颜色&gt;]); // 最近的单个玩家；中文 消息.最近</code></pre>
+  <div class="table-wrap">
+    <table class="compact" data-no-translate>
+      <thead><tr><th>目标</th><th>生成的选择器</th><th>需要上下文</th></tr></thead>
+      <tbody>
+        <tr><td><code>all</code> / <code>全部</code></td><td><code>@a</code></td><td>无</td></tr>
+        <tr><td><code>self</code> / <code>自身</code></td><td><code>@s</code></td><td>玩家</td></tr>
+        <tr><td><code>nearest</code> / <code>最近</code></td><td><code>@a[sort=nearest,limit=1,distance=..n]</code>，<code>n</code> 为 1 到 30000000</td><td>无</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>编译器负责 JSON 转义并生成合法文本组件，例如 <code>message.all("Five seconds passed.", gold)</code> 生成 <code>tellraw @a {"text":"Five seconds passed.","color":"gold"}</code>。颜色只能是 16 个命名颜色之一（中英文均可，见<a href="#appendix-colors">附录</a>）；写其他名字会报“不是有效的文本颜色”。</p>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace messaging;
+
+query players = entity("minecraft:player") { }
+
+fn greet() {
+    message.all("Data pack loaded", green);
+    message.nearest(16, "Container stored", gold);
+    each(players) {
+        message.self("Only you see this", yellow);
+    }
+}</code></pre>
+
+  <h3 id="stmt-sound">声音 <code data-zh="">sound</code> <a class="anchor" href="#stmt-sound">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">sound.self("&lt;声音资源位置&gt;", &lt;分类&gt;);   // 中文：声音.自身("...", 主音量);</code></pre>
+  <p>在当前玩家位置向该玩家播放声音，需要玩家上下文。生成 <code>playsound &lt;声音&gt; &lt;分类&gt; @s ~ ~ ~ 1 1</code>。声音资源位置和分类都会在编译期检查；分类列表见<a href="#appendix-sounds">附录</a>。目前只支持 <code>self</code> 目标。</p>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace sounding;
+
+query players = entity("minecraft:player") { }
+
+fn ping() {
+    each(players) {
+        sound.self("minecraft:block.note_block.pling", master);
+    }
+}</code></pre>
+
+  <h3 id="stmt-give">给予 <code data-zh="">give</code> <a class="anchor" href="#stmt-give">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">give(&lt;玩家查询&gt;, &lt;物品定义&gt;[, &lt;数量&gt;]);   // 中文：给予(...)</code></pre>
+  <ul>
+    <li>目标必须是 <code>minecraft:player</code> 类型的查询，否则报“give 目标查询必须匹配 minecraft:player”。</li>
+    <li>数量省略时使用物品定义的 <code>count</code>；显式数量覆盖它，合法范围是 1 到 <code>max_stack_size × 100</code>（未声明 <code>max_stack_size</code> 时为 100）。数量 0 或越界都会编译失败。</li>
+    <li>生成 <code>execute as &lt;选择器&gt; at @s run give @s &lt;物品&gt; &lt;数量&gt;</code>，即给每个匹配玩家各发一份。语句本身不要求当前执行上下文。</li>
+    <li>在玩家上下文中，<code>self.give_item(物品[, 数量])</code> 是“给当前玩家”的简写，生成不带目标包装的 <code>give @s ...</code>。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace giving;
+
+item reward = item_stack("minecraft:diamond") {
+    count = 2;
+}
+
+query players = entity("minecraft:player") { }
+
+@load
+fn load() {
+    give(players, reward);
+    give(players, reward, 8);
+}</code></pre>
+
+  <h3 id="stmt-schedule">调度 <code data-zh="">schedule</code> <a class="anchor" href="#stmt-schedule">#</a></h3>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">schedule &lt;函数名&gt;() after &lt;数量&gt; &lt;单位&gt; [append|replace];
+// 中文：调度 &lt;函数名&gt;() 延后 &lt;数量&gt; &lt;单位&gt; [追加|替换];</code></pre>
+  <div class="table-wrap">
+    <table class="compact" data-no-translate>
+      <thead><tr><th>单位</th><th>中文</th><th>模式</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>t</code></td><td><code>刻</code></td><td rowspan="3"><code>replace</code>（默认）或 <code>append</code>；中文 <code>替换</code> / <code>追加</code></td><td>游戏刻</td></tr>
+        <tr><td><code>s</code></td><td><code>秒</code></td><td>20 游戏刻</td></tr>
+        <tr><td><code>d</code></td><td><code>天</code></td><td>24000 游戏刻</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li>延迟必须是 1 到 2147483647 的整数；默认 <code>replace</code>，<code>append</code> 保留同一函数已有的调度。</li>
+    <li>被调度函数必须无参数，且不能需要执行上下文（<code>@entity</code>/<code>@player</code> 或依赖上下文的内联代码都不行）：原版调度不会保留执行实体，也不会携带参数。</li>
+    <li>需要给带参数的函数定时调用时，写一个无参数包装函数：
+      <pre><code class="mcl" data-title="包装模式" data-check="full">namespace wrapper;
+
+score total = 0;
+
+fn cleanup_with(amount) {
+    total -= amount;
+}
+
+fn cleanup_wrapper() {
+    cleanup_with(10);
+}
+
+fn start() {
+    schedule cleanup_wrapper() after 1 s append;
+}</code></pre>
+    </li>
+  </ul>
+
+  <h3 id="stmt-raw">底层接口 <code data-zh="原生命令">run</code> / <code data-zh="原生执行">execute</code> <a class="anchor" href="#stmt-raw">#</a></h3>
+  <p>Mclang 把未建模的能力留给两个逃生口，定位类似内联汇编。常规项目应优先使用结构化语法；<code>--deny-raw</code> 可以让项目强制拒绝它们。</p>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">run "&lt;完整命令&gt;";                    // 中文：原生命令 "&lt;完整命令&gt;";
+execute "&lt;execute 子句&gt;" { ... }       // 中文：原生执行 "&lt;子句&gt;" { ... }</code></pre>
+  <h4><code>run</code></h4>
+  <ul>
+    <li>字符串内容原样成为一行 <code>.mcfunction</code> 命令，不做实体、资源位置、NBT 或参数的静态检查。</li>
+    <li>命令不要写开头的 <code>/</code>；不能为空、不能包含实际换行（<code>\n</code> 转义也会在生成的文件中变成换行，所以也只允许单行命令）。</li>
+    <li>支持 <code>\"</code>、<code>\\</code>、<code>\n</code>、<code>\r</code>、<code>\t</code> 转义。</li>
+  </ul>
+  <h4><code>execute</code></h4>
+  <ul>
+    <li>字符串只写 <code>execute</code> 和 <code>run</code> 之间的子句，例如 <code>"as @a at @s"</code>；不能为空、不能以 <code>execute </code> 开头、不能以 <code> run</code> 结尾。</li>
+    <li>代码块编译为私有辅助函数并继承原版 <code>execute</code> 建立的执行者、位置、维度和朝向上下文；块内可以继续嵌套 <code>if</code>、<code>execute</code> 和其他语句（不能用 <code>return</code>）。</li>
+  </ul>
+  <pre><code class="mcl" data-title="完整示例" data-check="full">namespace rawdemo;
+
+@load
+fn load() {
+    run "say hello from raw";
+    execute "as @a at @s" {
+        run "particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3";
+    }
+}</code></pre>
+  <p>生成的 <code>load.mcfunction</code> 与辅助函数：</p>
+  <pre><code class="mcf" data-title="生成结果" data-kind="mcfunction"># data/rawdemo/function/load.mcfunction
+# Generated by mclang.
+say hello from raw
+execute as @a at @s run function rawdemo:__mcl/load/0
+
+# data/rawdemo/function/__mcl/load/0.mcfunction
+# Generated by mclang.
+particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3</code></pre>
+  <div class="callout warn">
+    <p><span class="tag"><code>--deny-raw</code> 的计数规则</span> 每条 <code>run</code> 计 1 条；每个字符串 <code>execute</code> 块本身计 1 条，再加上嵌套内容里的每一条。上面的例子共 3 条，所以严格模式会失败并提示“项目包含 3 条底层 run/execute 语句”。</p>
+    <p><code>check --deny-raw</code> 的失败信息是“严格模式检查失败：…”；<code>build --deny-raw</code> 是“严格模式拒绝构建：…”。</p>
+  </div>
+</section>
+
+<section class="section" id="context">
+  <h2>执行上下文 <a class="anchor" href="#context">#</a></h2>
+  <p>Mclang 用三级上下文描述“这段代码在谁身上执行”：<strong>无上下文 &lt; 实体 &lt; 玩家</strong>。编译器在编译期跟踪当前上下文，拒绝把玩家专用操作用在普通实体上，也拒绝在无实体时使用 <code>self</code>。</p>
+
+  <div class="flow">
+    <span class="step">无上下文<br><small>@load / @tick / 普通函数</small></span><span class="arrow">→</span>
+    <span class="step">实体上下文<br><small>each(非玩家查询) / spawn / @entity</small></span><span class="arrow">→</span>
+    <span class="step">玩家上下文<br><small>each(玩家查询) / @player</small></span>
+  </div>
+
+  <h3>上下文如何建立与传递</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>位置</th><th>块内上下文</th></tr></thead>
+      <tbody>
+        <tr><td><code>@load</code> / <code>@tick</code> / 未标注函数</td><td>无上下文</td></tr>
+        <tr><td><code>@entity</code> 函数</td><td>实体</td></tr>
+        <tr><td><code>@player</code> 函数</td><td>玩家</td></tr>
+        <tr><td><code>each(玩家查询)</code></td><td>玩家</td></tr>
+        <tr><td><code>each(其他查询)</code></td><td>实体</td></tr>
+        <tr><td><code>spawn("...")</code></td><td>实体（新生成的实体）</td></tr>
+        <tr><td><code>in_dimension("...")</code></td><td>保持外层上下文</td></tr>
+        <tr><td><code>execute "..."</code></td><td>保持外层上下文（原版 <code>execute</code> 可能改变执行者，但编译器以声明的上下文为准）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>上下文要求</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>操作</th><th>最低上下文</th></tr></thead>
+      <tbody>
+        <tr><td>普通 <code>self.*</code>（标签、无敌、物品保存/恢复/清空、<code>remove</code>、<code>consume</code>）</td><td>实体</td></tr>
+        <tr><td><code>self.give_item</code>、<code>message.self</code>、<code>sound.self</code></td><td>玩家</td></tr>
+        <tr><td><code>give(...)</code>、<code>message.all</code>、<code>message.nearest</code>、<code>schedule</code>、<code>run</code></td><td>无</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>函数调用同样检查：调用要求“当前上下文 ≥ 函数要求的上下文”。玩家上下文可以调用 <code>@player</code> 或 <code>@entity</code> 函数；普通实体上下文只能调用 <code>@entity</code> 函数。</p>
+
+  <h3>常见错误与解决</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>错误信息包含</th><th>原因</th><th>解决</th></tr></thead>
+      <tbody>
+        <tr><td>“self 方法需要实体执行上下文”</td><td>在 <code>@tick</code> 等无上下文函数里直接用了 <code>self</code></td><td>放进 <code>each</code>/<code>spawn</code> 块，或给函数加 <code>@entity</code></td></tr>
+        <tr><td>“self.give_item 需要玩家执行上下文”</td><td>实体上下文或普通查询的 <code>each</code> 里给物品</td><td>用玩家查询的 <code>each</code>，或加 <code>@player</code>，或改用 <code>give(players, item)</code></td></tr>
+        <tr><td>“@player 函数 <code>f</code> 需要玩家执行上下文”</td><td>从实体或无上下文处调用了 <code>@player</code> 函数</td><td>外层先进入玩家查询的 <code>each</code>，或改用 <code>@entity</code>/普通函数</td></tr>
+        <tr><td>“不能调度需要执行上下文的函数”</td><td><code>schedule</code> 一个 <code>@entity</code>/<code>@player</code> 函数</td><td>改为调度无上下文包装函数，让包装函数进入上下文</td></tr>
+        <tr><td>“@entity 和 @player 不能与 @load 或 @tick 用在同一个函数上”</td><td>入口函数被同时标注上下文属性</td><td>拆成两个函数</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout tip">
+    <p><span class="tag">判断口诀</span> “谁身上执行”决定 <code>self</code>；“给谁”由查询决定。绝大多数上下文错误都能靠“把语句放进正确的 <code>each</code> 块”解决。</p>
+  </div>
+</section>
+
+<section class="section" id="output">
+  <h2>编译产物与 ABI <a class="anchor" href="#output">#</a></h2>
+  <p>这一节解释“编译后到底生成了什么”。理解这些约定能让你在读生成的 <code>.mcfunction</code>、排查与其它数据包的冲突时心里有数。</p>
+
+  <h3>目录结构</h3>
+  <pre><code class="text" data-title="数据包布局" data-kind="text">&lt;输出目录&gt;/
+├── pack.mcmeta                                   # min_format / max_format = [121, 0]
+├── .mclang-manifest                              # 产物清单
+└── data/
+    ├── &lt;命名空间&gt;/
+    │   ├── function/
+    │   │   ├── &lt;用户函数&gt;.mcfunction
+    │   │   └── __mcl/
+    │   │       ├── load.mcfunction               # 合成的初始化 + @load 派发
+    │   │       └── &lt;函数名&gt;/&lt;编号&gt;.mcfunction       # 结构块的辅助函数
+    │   └── &lt;资源类型&gt;/&lt;资源名&gt;.json                # resource 声明
+    └── minecraft/tags/function/
+        ├── load.json                              # 指向 &lt;命名空间&gt;:__mcl/load
+        └── tick.json                              # 指向全部 @tick 函数（没有 @tick 时不生成）</code></pre>
+
+  <h3>计分板 ABI</h3>
+  <p>每个命名空间只有一个 objective，名字是 <code>mcl_</code> 加命名空间的稳定 FNV-1a 哈希（12 位十六进制）。所有数值都存放在它的假玩家槽位里：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>槽位</th><th>含义</th><th>命名方式</th></tr></thead>
+      <tbody>
+        <tr><td><code>#v_&lt;名字&gt;</code></td><td>全局计分变量</td><td>人类可读，直接使用变量名</td></tr>
+        <tr><td><code>#p_&lt;12 位十六进制&gt;</code></td><td>函数参数</td><td><code>函数名:参数名</code> 的哈希</td></tr>
+        <tr><td><code>#l_&lt;12 位十六进制&gt;</code></td><td>词法局部变量</td><td><code>函数名:局部名</code> 的哈希</td></tr>
+        <tr><td><code>#t&lt;编号&gt;</code></td><td>表达式临时值</td><td>按编译顺序递增</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>以 <code>#</code> 开头的名字在 Minecraft 里不会与真实玩家冲突。哈希保证“同样的函数名 + 参数名”跨平台、跨次编译得到同样的槽位。</p>
+
+  <h3>初始化与入口标签</h3>
+  <p><code>__mcl/load</code> 的内容按固定顺序生成：</p>
+  <ol>
+    <li><code>scoreboard objectives add &lt;objective&gt; dummy</code></li>
+    <li>对每个 <code>score</code> 声明：<code>execute unless score &lt;槽&gt; &lt;objective&gt; = &lt;槽&gt; &lt;objective&gt; run scoreboard players set &lt;槽&gt; &lt;objective&gt; &lt;初始值&gt;</code>（只在计分项不存在时写初始值）</li>
+    <li>对每个 <code>storage</code> 声明：<code>execute unless data storage &lt;位置&gt; &lt;路径&gt; run data modify storage &lt;位置&gt; &lt;路径&gt; set value []</code></li>
+    <li>按源码顺序调用所有 <code>@load</code> 函数</li>
+  </ol>
+  <p><code>load.json</code> 只包含 <code>&lt;命名空间&gt;:__mcl/load</code>；<code>tick.json</code> 包含全部 <code>@tick</code> 函数，顺序与源码一致。每个 <code>.mcfunction</code> 以 <code># Generated by mclang.</code> 开头（空函数只有这一行）。</p>
+
+  <h3>结构块如何展开</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>源码结构</th><th>生成方式</th></tr></thead>
+      <tbody>
+        <tr><td><code>if</code> / <code>while</code> 条件</td><td>求值到 0/1 标志槽位，再用 <code>execute if score … matches 1</code> 分派</td></tr>
+        <tr><td><code>if</code> 的 then / else</td><td>各一个辅助函数；else 为空时不生成</td></tr>
+        <tr><td><code>while</code></td><td>条件辅助函数与循环体辅助函数互相调用；运行时受 <code>maxCommandChainLength</code> 限制</td></tr>
+        <tr><td><code>each</code></td><td><code>execute as &lt;选择器&gt; at @s run function &lt;辅助函数&gt;</code></td></tr>
+        <tr><td><code>spawn</code></td><td><code>execute summon &lt;类型&gt; run function &lt;辅助函数&gt;</code></td></tr>
+        <tr><td><code>in_dimension</code></td><td><code>execute in &lt;维度&gt; run function &lt;辅助函数&gt;</code></td></tr>
+        <tr><td><code>execute "子句"</code></td><td><code>execute &lt;子句&gt; run function &lt;辅助函数&gt;</code></td></tr>
+        <tr><td>函数调用</td><td>先绑定实参，再 <code>function &lt;命名空间&gt;:&lt;名字&gt;</code>；表达式调用用 <code>execute store result score</code></td></tr>
+        <tr><td><code>return</code></td><td>常量直接 <code>return &lt;整数&gt;</code>；计分值 <code>return run scoreboard players get …</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn">
+    <p><span class="tag">为什么禁止同步递归</span> 表达式临时值 <code>#t&lt;编号&gt;</code> 是每个命名空间全局复用的。如果函数 A 在表达式求值途中同步调用回自己，外层尚未使用的临时值会被内层覆盖，结果不可预测。因此编译器拒绝同步调用图里的任何环；<code>schedule</code> 不算同步调用。<code>while</code> 循环不涉及重入，所以不受影响。</p>
+  </div>
+
+  <h3>可复现性</h3>
+  <ul>
+    <li>所有集合使用 <code>BTreeMap</code> 或稳定哈希，不引入随机顺序；同样的源码总是生成同样的文件与内容。</li>
+    <li>函数、辅助函数、objective、参数与局部变量名都由输入唯一决定，跨平台一致。</li>
+    <li><code>pack.mcmeta</code> 的描述来自 <code>--description</code>，默认 <code>Generated by mclang</code>。</li>
+    <li>资源 JSON 通过 <code>serde_json</code> 重新格式化为两空格缩进，字段顺序保留源码中的顺序。</li>
+  </ul>
+</section>
+
+<section class="section" id="checks">
+  <h2>静态检查与诊断 <a class="anchor" href="#checks">#</a></h2>
+  <p>编译分四个检查阶段，顺序是词法 → 语法 → 语义 → （通过后）代码生成。任何一步失败都不会写出数据包：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>阶段</th><th>检查内容</th><th>报告方式</th></tr></thead>
+      <tbody>
+        <tr><td>词法</td><td>无法识别的字符、未闭合字符串、非法转义、整数过大</td><td>一次报告该文件全部词法错误</td></tr>
+        <tr><td>语法</td><td>缺失的 <code>;</code>、<code>{ }</code>、<code>( )</code>、错误的语句形状</td><td>每个文件报告第一个语法错误</td></tr>
+        <tr><td>语义</td><td>命名、引用、范围、上下文、返回值、递归、JSON 等全部规则</td><td><strong>一次返回全部诊断</strong>，方便一次修完</td></tr>
+        <tr><td>严格模式</td><td><code>--deny-raw</code> 统计 <code>run</code> / 字符串 <code>execute</code>；<code>build</code> 在语义检查之前统计，<code>check</code> 在语义检查之后统计</td><td>只要有零条以上底层语句就失败，绝不写出数据包</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>任何文件出现词法或语法错误时，语义阶段不会运行（因为无法构造完整的 AST）。项目内命名空间不一致也在合并阶段报告，并指向冲突文件。</p>
+
+  <h3>诊断格式</h3>
+  <p>每条诊断包含中文信息、文件路径、行列、源码行和标记范围。下面是真实输出：</p>
+  <pre><code class="text" data-title="诊断示例" data-kind="text">错误：找不到计分变量 `missing`
+ --> broken.mcl:7:16
+  |
+  7 |     counter += missing;
+  |                ^^^^^^^</code></pre>
+  <p>命令行里错误打印到标准错误，进程返回退出码 1；<code>check</code> 成功时打印资源统计，<code>build</code> 成功时打印生成的文件数量与输出目录。</p>
+
+  <h3>检查清单</h3>
+  <p>语义阶段覆盖的规则，按类别列出（括号内是典型错误信息）：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>类别</th><th>检查</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>命名与声明</td>
+          <td>标识符字符集/长度/保留字；函数与命名空间的 Windows 设备名；重复声明计分变量、查询、物品、存储、函数、资源；重复参数、重复属性；参数与全局变量同名；局部变量重名、与参数或全局变量冲突；项目命名空间一致</td>
+        </tr>
+        <tr>
+          <td>资源位置与标签</td>
+          <td>实体类型、物品、附魔、物品模型、维度、声音、存储位置、资源名称、predicate 名称的合法性；实体标签格式与重复使用；NBT 路径格式</td>
+        </tr>
+        <tr>
+          <td>数值范围</td>
+          <td>计分初始值与整数字面量；查询 <code>limit</code>/<code>within</code>；<code>item.count</code>；物品 <code>count</code>/<code>damage</code>/<code>max_damage</code>/<code>max_stack_size</code>/<code>dyed_color</code>/<code>lore</code> 行数；附魔等级；<code>give</code> 数量；消息距离；调度延迟；控制字符</td>
+        </tr>
+        <tr>
+          <td>引用与调用</td>
+          <td>找不到变量/函数/查询/物品/存储/predicate；实参个数；无返回值函数出现在表达式；返回值约定（<code>return</code> 位置、必须有返回值、必须以 <code>return</code> 结束）</td>
+        </tr>
+        <tr>
+          <td>上下文与调度</td>
+          <td><code>self.*</code>、<code>message.self</code>、<code>sound.self</code> 的上下文；跨函数调用的上下文；不能调度带参数或需要上下文的函数；入口函数限制</td>
+        </tr>
+        <tr>
+          <td>值语义</td>
+          <td>静态除零（除数可折叠为 0）；<code>max_stack_size &gt; 1</code> 与 <code>max_damage</code> 互斥；同一附魔不能重复声明</td>
+        </tr>
+        <tr>
+          <td>控制流与递归</td>
+          <td>同步调用图中的直接/间接递归环；<code>return</code> 不能位于结构块中</td>
+        </tr>
+        <tr>
+          <td>JSON 资源</td>
+          <td>类型受支持、资源路径合法、重复声明、JSON 语法（带行列）、<code>worldgen/*</code> 路径</td>
+        </tr>
+        <tr>
+          <td>底层接口</td>
+          <td><code>run</code> 非空、不能以 <code>/</code> 开头、单行；<code>execute</code> 子句非空、单行、不能带 <code>execute</code> 前缀或 <code>run</code> 后缀；<code>--deny-raw</code> 计数</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>两条容易误认为“能过”的规则</h3>
+  <ul>
+    <li><strong>资源位置的字符集很窄</strong>：命名空间前缀和路径段只允许小写字母、数字、下划线、连字符和点；路径段不能是空串、<code>.</code> 或 <code>..</code>，也不能是 Windows 设备名。像 <code>"MyPack:item"</code> 或 <code>"minecraft:my item"</code> 都会被拒绝。</li>
+    <li><strong>实体标签不是自由文本</strong>：不能包含空格、冒号、<code>*</code> 或中文；要匹配“所有带某标签的实体”请用查询，不要写 <code>tag("*")</code>。</li>
+  </ul>
+  <p>所有数值范围和枚举值的速查表在<a href="#appendix-ranges">附录</a>。</p>
+</section>
+
+<section class="section" id="examples">
+  <h2>示例走读 <a class="anchor" href="#examples">#</a></h2>
+  <p>仓库 <code>examples/</code> 里的每个项目都可以直接编译。除了下面逐段说明的内容，建议按需运行：</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>示例</th><th>形式</th><th>展示的能力</th></tr></thead>
+      <tbody>
+        <tr><td><code>examples/counter.mcl</code></td><td>单文件</td><td>计分变量、<code>@load</code>/<code>@tick</code>、条件、实体查询、声音、消息、调度</td></tr>
+        <tr><td><code>examples/chinese_counter.mcl</code></td><td>单文件</td><td>中文关键词、<code>give_item</code>、与英文版逐字节一致的产物</td></tr>
+        <tr><td><code>examples/give_reward.mcl</code></td><td>单文件</td><td>类型化物品、名称、Lore、附魔、稀有度、无法破坏、结构化 <code>give</code>、一次性给予</td></tr>
+        <tr><td><code>examples/multi_counter/</code></td><td>四文件项目</td><td>跨文件引用、函数参数与 score 返回值、<code>while</code>、predicate 条件、<code>schedule</code></td></tr>
+        <tr><td><code>examples/portable_chest/</code></td><td>两文件项目</td><td>零底层字符串的完整项目：物品组件匹配、跨维度、容器持久化、原子收起</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>计数器：中英文逐字节一致</h3>
+  <p>两个文件表达完全相同的行为，区别只有关键词。<code>chinese_counter</code> 特意保留了 ASCII 的查询名、变量名和资源位置——只有语言关键词被翻译。</p>
+  <div class="tabs">
+    <div class="tab-btns">
+      <button type="button" data-tab="en" class="active">English</button>
+      <button type="button" data-tab="zh">中文</button>
+    </div>
+    <div class="tab-panel active" data-panel="en">
+      <pre><code class="mcl" data-title="examples/counter.mcl" data-check="full">namespace counter;
+
+// score 是跨函数共享的 32 位整数。重新加载数据包不会重置已有值。
+score ticks = 0;
+score announcements = 0;
+
+query all_players = entity("minecraft:player") { }
+
+@load
+fn load() {
+    message.all("Counter data pack loaded", green);
+}
+
+@tick
+fn tick() {
+    ticks += 1;
+    if ticks >= 100 {
+        announce();
+        ticks = 0;
+    }
+}
+
+fn announce() {
+    announcements += 1;
+    each(all_players) {
+        sound.self("minecraft:block.note_block.pling", master);
+        message.self("Five seconds passed.", gold);
+    }
+}
+
+fn announce_later() {
+    schedule announce() after 5 s replace;
+}</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="zh">
+      <pre><code class="mcl" data-title="examples/chinese_counter.mcl" data-check="full">命名空间 chinese_counter;
+
+// 自定义名称继续使用稳定的 ASCII 标识符；语言关键词可以全部写成中文。
+计分 ticks = 0;
+计分 announcements = 0;
+
+查询 all_players = 实体("minecraft:player") {}
+
+物品 milestone_reward = 物品堆("minecraft:emerald") {
+    数量 = 1;
+    自定义名称 = "计时奖励";
+}
+
+@加载
+函数 load() {
+    消息.全部("中文关键词示例已加载", 绿色);
+}
+
+@每刻
+函数 tick() {
+    ticks += 1;
+    如果 ticks >= 100 {
+        调用 announce();
+        ticks = 0;
+    }
+}
+
+函数 announce() {
+    announcements += 1;
+    遍历(all_players) {
+        自身.给予物品(milestone_reward);
+        声音.自身("minecraft:block.note_block.pling", 主音量);
+        消息.自身("已经过五秒。", 金色);
+    }
+}
+
+函数 announce_later() {
+    调度 announce() 延后 5 秒 替换;
+}</code></pre>
+    </div>
+  </div>
+
+  <h3>综合示例：把大部分能力放进一个文件</h3>
+  <p>下面的程序把查询、物品、存储、资源、控制流、上下文和调度放在一起，可以先用 <code>mclang check</code> 验证，再构建到世界里观察行为：</p>
+  <pre><code class="mcl" data-title="tour.mcl" data-check="full">namespace tour;
+
+score ticks = 0;
+score enabled = 1;
+score stored = 0;
+
+query players = entity("minecraft:player") {
+    without_tag("tour_welcomed");
+}
+
+query drops = entity("minecraft:item") {
+    limit(1);
+    within(16);
+    sort(nearest);
+    item(contents) {
+        id = "minecraft:emerald";
+        count = 1;
+        custom_name = "A";
+    }
+}
+
+item welcome_gift = item_stack("minecraft:emerald") {
+    count = 3;
+    custom_name = "Welcome Gift";
+    lore("Generated by Mclang");
+    enchantment("minecraft:fortune", 2);
+    unbreakable = true;
+}
+
+storage saved = items("tour:state", "saved_items");
+
+resource predicate coin_flip = """
+{
+  "condition": "minecraft:random_chance",
+  "chance": 0.5
+}
+""";
+
+@load
+fn load() {
+    message.all("Tour pack loaded", green);
+}
+
+@tick
+fn tick() {
+    ticks += 1;
+    if enabled == 1 &amp;&amp; ticks &gt;= 100 {
+        grant_gifts();
+        collect_drops();
+        ticks = 0;
+    }
+}
+
+fn grant_gifts() {
+    give(players, welcome_gift);
+    each(players) {
+        self.add_tag("tour_welcomed");
+        self.give_item(welcome_gift, 1);
+        message.self("Five seconds passed.", gold);
+        sound.self("minecraft:block.note_block.pling", master);
+    }
+}
+
+fn collect_drops() {
+    each(drops) {
+        self.add_tag("tour_handled");
+        if predicate(coin_flip) {
+            spawn("minecraft:chest_minecart") {
+                self.add_tag("tour_box");
+                self.set_invulnerable(true);
+                self.restore_items(saved);
+            }
+        } else {
+            in_dimension("minecraft:overworld") {
+                self.remove_preserving_items(saved);
+            }
+        }
+        self.consume();
+    }
+}
+
+fn difference(left, right) -&gt; score {
+    let result = left - right;
+    return result;
+}
+
+fn countdown() {
+    while ticks &gt; 0 {
+        ticks = difference(ticks, 1);
+        stored += 1;
+    }
+}
+
+fn later() {
+    schedule later() after 5 s append;
+}</code></pre>
+  <p>逐块看：</p>
+  <ul>
+    <li><code>players</code> 用 <code>without_tag</code> 只匹配还没欢迎过的玩家，配合 <code>@tick</code> 里的 100 刻计时实现“每人只欢迎一次”。</li>
+    <li><code>drops</code> 是带物品组件条件的掉落物查询：只匹配单个（<code>limit(1)</code>）、16 格内、最近优先、命名为 <code>A</code> 的绿宝石。</li>
+    <li><code>collect_drops</code> 用 <code>predicate</code> 做五五开：正面时召唤箱子矿车并恢复保存的物品，反面时尝试安全收起主世界中的矿车，最后消耗触发物。</li>
+    <li><code>difference</code> 展示 <code>-&gt; score</code> 返回值参与 <code>while</code> 循环体的赋值；<code>later</code> 展示“跨刻重复执行用 <code>schedule</code>”的写法。</li>
+  </ul>
+</section>
+
+<section class="section" id="examples-multifile">
+  <h3>多文件项目：<code>examples/multi_counter</code></h3>
+  <pre><code class="text" data-title="目录结构" data-kind="text">examples/multi_counter/
+├── main.mcl        # 计分变量与入口函数
+├── math.mcl        # 返回 score 的工具函数
+├── tasks.mcl       # 参数、while、schedule
+└── resources.mcl   # predicate 资源与条件</code></pre>
+  <div class="tabs">
+    <div class="tab-btns">
+      <button type="button" data-tab="main" class="active">main.mcl</button>
+      <button type="button" data-tab="math">math.mcl</button>
+      <button type="button" data-tab="tasks">tasks.mcl</button>
+      <button type="button" data-tab="res">resources.mcl</button>
+    </div>
+    <div class="tab-panel active" data-panel="main">
+      <pre><code class="mcl" data-title="main.mcl" data-kind="mcl">namespace multi_counter;
+
+score ticks = 0;
+score enabled = 1;
+score pending = 3;
+
+@load
+fn load() {
+    message.all("Multi-file counter loaded", green);
+}
+
+@tick
+fn tick() {
+    if enabled == 1 &amp;&amp; ticks &lt; 100 {
+        ticks += 1;
+    } else {
+        announce(100);
+        ticks = 0;
+    }
+}</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="math">
+      <pre><code class="mcl" data-title="math.mcl" data-kind="mcl">namespace multi_counter;
+
+fn difference(left, right) -&gt; score {
+    return left - right;
+}</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="tasks">
+      <pre><code class="mcl" data-title="tasks.mcl" data-kind="mcl">namespace multi_counter;
+
+fn announce(boundary) {
+    let overshoot = difference(ticks, boundary);
+    if overshoot &gt;= 0 {
+        message.all("Counter reached its boundary", gold);
+    }
+}
+
+fn drain_pending() {
+    while pending &gt; 0 {
+        message.all("processing one pending task");
+        pending -= 1;
+    }
+}
+
+// 调度调用发生在未来的游戏刻，不构成同步递归。
+fn heartbeat() {
+    schedule heartbeat() after 20 t replace;
+}</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="res">
+      <pre><code class="mcl" data-title="resources.mcl" data-kind="mcl">namespace multi_counter;
+
+resource predicate coin_flip = """
+{
+  "condition": "minecraft:random_chance",
+  "chance": 0.5
+}
+""";
+
+fn random_message() {
+    if predicate(coin_flip) {
+        message.all("Heads");
+    } else {
+        message.all("Tails");
+    }
+}</code></pre>
+    </div>
+  </div>
+  <p>注意 <code>main.mcl</code> 调用 <code>announce(100)</code>，而 <code>announce</code> 与 <code>difference</code> 定义在别的文件里：合并后整项目共享符号表，跨文件引用不需要导入语句。参数 <code>boundary</code> 是函数私有计分值，调用前由 <code>tick</code> 绑定为 100。</p>
+  <p><code>while</code> 循环编译成互相调用的两个辅助函数，例如 <code>drain_pending</code>：</p>
+  <pre><code class="mcf" data-title="__mcl/drain_pending/0.mcfunction（条件）" data-kind="mcfunction">scoreboard players set #t10 mcl_3eb302f4b259 0
+scoreboard players set #t11 mcl_3eb302f4b259 0
+execute if score #v_pending mcl_3eb302f4b259 &gt; #t10 mcl_3eb302f4b259 run scoreboard players set #t11 mcl_3eb302f4b259 1
+execute if score #t11 mcl_3eb302f4b259 matches 1 run function multi_counter:__mcl/drain_pending/1</code></pre>
+  <pre><code class="mcf" data-title="__mcl/drain_pending/1.mcfunction（循环体）" data-kind="mcfunction">tellraw @a {"text":"processing one pending task"}
+scoreboard players remove #v_pending mcl_3eb302f4b259 1
+function multi_counter:__mcl/drain_pending/0</code></pre>
+  <p>每次迭代由 <code>function</code> 命令重新调用条件函数，直到条件为假。命令链长度上限由世界设置提供，所以循环体必须能推进退出条件。</p>
+</section>
+
+<section class="section" id="examples-give">
+  <h3>类型化物品：<code>examples/give_reward.mcl</code></h3>
+  <p>同一程序的两种关键词写法。它展示一次性奖励的完整流程：不给已收到的玩家重复发放、把目标限制在“没有标签的玩家”查询上、给出带名称/ Lore /附魔/稀有度的物品。</p>
+  <div class="tabs">
+    <div class="tab-btns">
+      <button type="button" data-tab="zh" class="active">中文</button>
+      <button type="button" data-tab="en">English</button>
+    </div>
+    <div class="tab-panel active" data-panel="zh">
+      <pre><code class="mcl" data-title="examples/give_reward.mcl" data-check="full">命名空间 give_reward;
+
+物品 welcome_gift = 物品堆("minecraft:diamond_pickaxe") {
+    数量 = 1;
+    自定义名称 = "开拓者之镐";
+    物品名称 = "钻石镐";
+    描述("由 Mclang 类型化物品系统生成");
+    附魔("minecraft:efficiency", 3);
+    附魔("minecraft:unbreaking", 2);
+    稀有度 = 稀有;
+    无法破坏 = 真;
+}
+
+查询 new_players = 实体("minecraft:player") {
+    排除标签("give_reward_received");
+}
+
+@每刻
+函数 grant_once() {
+    // 结构化 give 语句：目标、物品、可选数量一步到位。
+    给予(new_players, welcome_gift);
+    遍历(new_players) {
+        自身.添加标签("give_reward_received");
+        消息.自身("已收到欢迎礼物。", 绿色);
+    }
+}</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="en">
+      <pre><code class="mcl" data-title="give_reward.mcl（英文关键词）" data-check="full">namespace give_reward;
+
+item welcome_gift = item_stack("minecraft:diamond_pickaxe") {
+    count = 1;
+    custom_name = "开拓者之镐";
+    item_name = "钻石镐";
+    lore("由 Mclang 类型化物品系统生成");
+    enchantment("minecraft:efficiency", 3);
+    enchantment("minecraft:unbreaking", 2);
+    rarity = rare;
+    unbreakable = true;
+}
+
+query new_players = entity("minecraft:player") {
+    without_tag("give_reward_received");
+}
+
+@tick
+fn grant_once() {
+    give(new_players, welcome_gift);
+    each(new_players) {
+        self.add_tag("give_reward_received");
+        message.self("已收到欢迎礼物。", green);
+    }
+}</code></pre>
+    </div>
+  </div>
+  <p>生成的 <code>grant_once.mcfunction</code> 只有两条命令——一条发物品，一条进入“打标签 + 提示”的辅助函数：</p>
+  <pre><code class="mcf" data-title="data/give_reward/function/grant_once.mcfunction" data-kind="mcfunction"># Generated by mclang.
+execute as @e[type=minecraft:player,tag=!give_reward_received] at @s run give @s minecraft:diamond_pickaxe[minecraft:custom_name={text:"开拓者之镐"},minecraft:item_name={text:"钻石镐"},minecraft:lore=[{text:"由 Mclang 类型化物品系统生成"}],minecraft:enchantments={"minecraft:efficiency":3,"minecraft:unbreaking":2},minecraft:rarity="rare",minecraft:unbreakable={}] 1
+execute as @e[type=minecraft:player,tag=!give_reward_received] at @s run function give_reward:__mcl/grant_once/0</code></pre>
+  <div class="callout tip">
+    <p><span class="tag">为什么第一条命令里没有 “if items”</span> <code>give</code> 的目标查询只带实体条件；物品组件条件只出现在 <code>each</code> 展开的查询里（本例的目标查询没有 <code>item</code> 子块）。如果给玩家查询加了 <code>item(contents)</code> 过滤，选择器同样会追加 <code>if items entity @s contents …</code>。</p>
+  </div>
+</section>
+
+<section class="section" id="examples-chest">
+  <h3>旗舰项目：<code>examples/portable_chest</code></h3>
+  <p>一个完全不含底层命令字符串的实际项目。丢出单个命名为 <code>A</code> 的绿宝石，它会在落点召唤一辆不可被普通伤害破坏的箱子矿车，绿宝石由 <code>return_to_owner</code> 原样交还投掷者、立即回到背包；再次丢出，矿车被安全收起（物品完整保存）；第三次触发会重新放出矿车并恢复槽位。</p>
+  <pre><code class="text" data-title="目录结构" data-kind="text">examples/portable_chest/
+├── PROJECT.md      # 项目说明与手工验收清单
+├── chest.mcl       # 实体查询与物品存储声明
+└── main.mcl        # 状态、入口函数与开关逻辑</code></pre>
+  <div class="tabs">
+    <div class="tab-btns">
+      <button type="button" data-tab="chest" class="active">chest.mcl</button>
+      <button type="button" data-tab="main">main.mcl</button>
+    </div>
+    <div class="tab-panel active" data-panel="chest">
+      <pre><code class="mcl" data-title="chest.mcl" data-kind="mcl">namespace portable_chest;
+
+// 查询声明由编译器检查并转换成实体选择器和物品组件谓词。
+query trigger_items = entity("minecraft:item") {
+    without_tag("portable_chest_processed");
+    item(contents) {
+        id = "minecraft:emerald";
+        count = 1;
+        custom_name = "A";
+    }
+}
+
+query chest_boxes = entity("minecraft:chest_minecart") {
+    tag("portable_chest_box");
+}
+
+// items 是类型化容器存储；编译器会在首次加载时自动初始化空列表。
+storage saved_items = items("portable_chest:state", "saved_items");</code></pre>
+    </div>
+    <div class="tab-panel" data-panel="main">
+      <pre><code class="mcl" data-title="main.mcl" data-kind="mcl">namespace portable_chest;
+
+// 0 表示矿车已收起，1 表示矿车已召唤。计分值会随世界保存。
+score active = 0;
+
+@load
+fn load() {
+    message.all("便携箱子已加载：丢出单个命名为 A 的绿宝石即可切换。", green);
+}
+
+@tick
+fn tick() {
+    each(trigger_items) {
+        // 先标记触发物，避免同一个掉落物每刻重复切换。
+        self.add_tag("portable_chest_processed");
+
+        if active == 0 {
+            spawn("minecraft:chest_minecart") {
+                self.add_tag("portable_chest_box");
+                self.set_invulnerable(true);
+                self.restore_items(saved_items);
+            }
+            active = 1;
+            message.nearest(16, "便携箱子已放出。", green);
+        } else {
+            in_dimension("minecraft:overworld") {
+                each(chest_boxes) {
+                    self.remove_preserving_items(saved_items);
+                }
+            }
+            in_dimension("minecraft:the_nether") {
+                each(chest_boxes) {
+                    self.remove_preserving_items(saved_items);
+                }
+            }
+            in_dimension("minecraft:the_end") {
+                each(chest_boxes) {
+                    self.remove_preserving_items(saved_items);
+                }
+            }
+            active = 0;
+            message.nearest(16, "便携箱子已收起，物品已保存。", gold);
+        }
+
+        // 触发用的绿宝石原样交还投掷者：同一个实体传送到投掷者并立即可被拾取。
+        // 投掷者不存在或背包已满时，实体保持原样留在世界，不会丢失。
+        self.return_to_owner();
+    }
+}</code></pre>
+    </div>
+  </div>
+  <p><code>self.remove_preserving_items(saved_items)</code> 一行展开为固定三步，保证收起时物品留在存储里而不是掉在地上：</p>
+  <pre><code class="mcf" data-title="data/portable_chest/function/__mcl/tick/5.mcfunction" data-kind="mcfunction"># Generated by mclang.
+data modify storage portable_chest:state saved_items set from entity @s Items
+data modify entity @s Items set value []
+kill @s</code></pre>
+  <p>这个项目通过严格模式检查，说明标准层已经覆盖了它的全部需求：</p>
+  <pre><code class="pwsh" data-title="验证" data-kind="pwsh">cargo run -- check examples/portable_chest --deny-raw
+cargo run -- build examples/portable_chest --deny-raw</code></pre>
+
+  <h3>自己验证本手册的示例</h3>
+  <p>本手册中标注为“完整示例”的代码块都经过 <code>mclang check</code> 验证。你可以用同样方式验证仓库示例：</p>
+  <pre><code class="pwsh" data-title="批量检查" data-kind="pwsh">cargo run -- check examples/counter.mcl --deny-raw
+cargo run -- check examples/chinese_counter.mcl --deny-raw
+cargo run -- check examples/give_reward.mcl --deny-raw
+cargo run -- check examples/multi_counter --deny-raw
+cargo run -- check examples/portable_chest --deny-raw</code></pre>
+</section>
+
+<section class="section" id="faq">
+  <h2>常见问题 <a class="anchor" href="#faq">#</a></h2>
+
+  <details class="faq">
+    <summary>编译成功了，但进游戏后没有任何效果，从哪里查起？</summary>
+    <ol>
+      <li><code>/datapack list</code> 确认数据包已启用；如果显示为 disabled，用 <code>/datapack enable</code> 或检查输出目录是否在存档的 <code>datapacks/</code> 下。</li>
+      <li>执行 <code>/reload</code>。如果 load 入口报错，游戏控制台会给出具体的函数名与命令。</li>
+      <li>确认 <code>pack.mcmeta</code> 的 <code>min_format</code>/<code>max_format</code> 是 <code>[121, 0]</code>，目标客户端是 26.3-rc-2。</li>
+      <li>检查 <code>load.json</code> / <code>tick.json</code> 里的函数引用是否与命名空间一致。</li>
+    </ol>
+  </details>
+
+  <details class="faq">
+    <summary>为什么 <code>/reload</code> 之后计分变量没有回到初始值？</summary>
+    <p>这是有意设计：初始化命令是 <code>execute unless score … run …</code>，只在计分项不存在时写入，这样重载数据包不会清空运行状态。需要重置就显式赋值（例如在 <code>@load</code> 函数里写 <code>ticks = 0;</code>），但这同样会在每次重载时执行。</p>
+  </details>
+
+  <details class="faq">
+    <summary>为什么带参数的函数被原版 <code>/function</code> 调用时，参数值是上一次的？</summary>
+    <p>参数保存在函数私有的固定计分项里，调用方负责写值。从 Minecraft 直接调用一个参数化函数不会重新绑定参数，所以会沿用上次留下的值。正确做法是：只在 Mclang 代码里调用它，或为它写一个无参数包装函数供原版/调度使用。</p>
+  </details>
+
+  <details class="faq">
+    <summary>为什么 <code>schedule</code> 提示“不能调度需要 N 个参数的函数”或“不能调度需要执行上下文的函数”？</summary>
+    <p>原版 <code data-no-translate>/schedule</code> 在未来的游戏刻执行函数，不保留当前执行实体，也不携带参数。请调度一个无参数、不需要上下文的包装函数，把参数和上下文逻辑写在包装函数内部。详见<a href="#stmt-schedule">调度</a>。</p>
+  </details>
+
+  <details class="faq">
+    <summary><code>while</code> 循环会一直卡住吗？</summary>
+    <p>不会无限执行，但会消耗命令链预算。循环由函数互相调用实现，运行时会受世界设置 <code>maxCommandChainLength</code> 限制；一旦达到上限，游戏会停止执行剩余命令并记录错误。请确保循环体推进退出条件，跨刻的重复执行用 <code>schedule</code>。</p>
+  </details>
+
+  <details class="faq">
+    <summary>什么时候可以用 <code>self</code>？为什么总报“需要实体执行上下文”？</summary>
+    <p><code>self</code> 需要实体上下文，只有四种位置能提供：非玩家查询的 <code>each</code> 块、<code>spawn</code> 块、<code>@entity</code> 函数、<code>@player</code> 函数。玩家专用的 <code>self.give_item</code>、<code>message.self</code>、<code>sound.self</code> 还要求玩家上下文。把语句移进正确的块即可。</p>
+  </details>
+
+  <details class="faq">
+    <summary>为什么 <code>return</code> 不能写在 <code>if</code> 里？</summary>
+    <p>Minecraft 的 <code>return</code> 只退出当前 <code>.mcfunction</code>。Mclang 的 <code>if</code>、<code>while</code>、<code>each</code> 等结构会生成辅助函数，把 <code>return</code> 放进去只会结束辅助函数，含义与作者预期不符。需要条件结果时先给局部变量赋值，在函数最外层末尾 <code>return</code>。</p>
+  </details>
+
+  <details class="faq">
+    <summary>可以用中文命名变量或函数吗？</summary>
+    <p>不可以。标识符必须是纯小写 ASCII 字母、数字和下划线；中文只用于关键词、字符串、注释和资源路径之外的文本。查询名、物品名等同样遵循 ASCII 规则，因为生成的选择器与函数路径需要稳定。</p>
+  </details>
+
+  <details class="faq">
+    <summary>中英文关键词可以混用吗？产物会不同吗？</summary>
+    <p>可以任意混用，包括同一文件同一条语句。解析器立即把中文别名规范化为同一内部值，因此两种写法生成逐字节相同的产物；仓库测试里有一份 300 行的中英文对照程序断言 <code>files</code> 完全相等。</p>
+  </details>
+
+  <details class="faq">
+    <summary>静态检查通过了，游戏加载却报资源 JSON 错误，为什么？</summary>
+    <p>编译器只做三件事：确认类型受支持、路径合法、JSON 语法正确并按注册表目录写出。JSON 字段的 Minecraft codec 语义（必填字段、枚举值、类型）由游戏加载时验证。请对照目标版本的资源 schema 检查字段。</p>
+  </details>
+
+  <details class="faq">
+    <summary>什么时候该用 <code>run</code>？</summary>
+    <p>只在标准层确实没有覆盖目标能力时使用，并且把它当作“内联汇编”：字符串内容不受任何静态检查。建议先在新项目里打开 <code>--deny-raw</code>，遇到缺口时记录它，再考虑给语言加类型化语法。仓库现状：<code>portable_chest</code> 与所有单文件示例都通过了 <code>--deny-raw</code>。</p>
+  </details>
+
+  <details class="faq">
+    <summary>objective 名可以自定义吗？</summary>
+    <p>不可以。每个命名空间对应一个由稳定哈希生成的 <code>mcl_&lt;12 位十六进制&gt;</code> objective。这样做既避免不同数据包互相覆盖计分板，也保证生成结果可复现。如果两个数据包想共享状态，需要显式约定同一个命名空间之外的机制（例如命令存储或标签）。</p>
+  </details>
+
+  <details class="faq">
+    <summary>为什么 <code>give</code> 的数量上限是 100 或 <code>堆叠数 × 100</code>？</summary>
+    <p>这是 26.3 <code>GiveCommand</code> 自己的规则：<code>MAX_ALLOWED_ITEMSTACKS = 100</code>，数量不能超过物品最大堆叠数乘以 100。编译器在编译期借用同一规则，把错误提前暴露。未声明 <code>max_stack_size</code> 时物品原型的最小堆叠数是 1，所以保守上限是 100。</p>
+  </details>
+
+  <details class="faq">
+    <summary>能不能一个项目里放多个命名空间？</summary>
+    <p>不能。项目内所有 <code>.mcl</code> 文件必须声明相同的命名空间；不同数据包请分别构建到不同输出目录。合并时会检查一致性并指出冲突文件与位置。</p>
+  </details>
+
+  <details class="faq">
+    <summary>如何升级到未来的 Minecraft 版本？</summary>
+    <p>当前编译器把目标版本固定在 26.3-rc-2（数据包格式 121.0），没有版本选择参数。目标版本细节集中在代码生成与校验数据里，不散落在用户源码中。</p>
+  </details>
+</section>
+
+<section class="section" id="design">
+  <h2>设计理念 <a class="anchor" href="#design">#</a></h2>
+
+  <h3>标准层准入准则</h3>
+  <div class="callout quote">
+    <p>一个功能是否进入语言标准层，判断标准是：<strong>作者能否用有名称、有结构、可补全且可静态检查的语法描述意图。只能原样复制字符串的功能不算完成。</strong></p>
+  </div>
+  <p>因此 Mclang 的源码表达 Minecraft 行为，而不是要求作者先会写 <code>mcfunction</code> 再把命令塞进字符串。编译器负责实体选择器、<code>execute</code> 上下文、NBT 路径、文本组件 JSON、计分板 ABI、函数标签和目标版本目录。</p>
+
+  <h3>底层接口的定位</h3>
+  <p><code>run</code> 和字符串形式的 <code>execute</code> 定位等同于外部函数接口或内联汇编：保留是为了不让语言挡住真实需求，但它们不属于常规应用代码。<code>--deny-raw</code> 把这条边界变成可执行的策略，而不是文档里的口头约定。</p>
+
+  <h3>0.5 已实现</h3>
+  <ul>
+    <li>单文件与多文件项目；递归发现 <code>.mcl</code>；跨文件符号可见；命名空间一致性检查。</li>
+    <li>命名空间、计分变量、函数与参数、<code>-&gt; score</code> 返回值、词法作用域 <code>let</code>。</li>
+    <li>结构化实体查询（类型、标签、排除标签、上限、范围、排序、物品组件条件）。</li>
+    <li>类型化物品定义（数量、名称、Lore、普通/存储附魔、损伤、最大损伤、最大堆叠、稀有度、模型、染色、光效覆盖、无法破坏）与结构化 <code>give</code>。</li>
+    <li>物品存储、实体操作、消息、声音、维度上下文、<code>spawn</code>、<code>each</code>、predicate 条件。</li>
+    <li><code>if</code>/<code>else</code>、<code>while</code>、条件组合、调度、静态除零检查与同步递归拒绝。</li>
+    <li>JSON 资源声明、原始多行字符串、严格模式。</li>
+    <li>中英文双关键词，保证产物逐字节一致。</li>
+    <li>带文件、行列与源码标记的诊断；一次返回全部语义诊断。</li>
+    <li>可复现产物、<code>.mclang-manifest</code> 安全清理。</li>
+  </ul>
+
+  <h3>当前明确的限制</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>限制</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>单一目标版本</td><td>固定 26.3-rc-2 / 数据包 121.0，没有版本参数</td></tr>
+        <tr><td>数值类型只有计分板</td><td>所有值都是 32 位计分值；没有浮点、字符串、列表、实体引用等一等类型</td></tr>
+        <tr><td>没有模块系统</td><td>项目内所有声明全局可见，没有 import / 私有模块</td></tr>
+        <tr><td>没有 <code>for</code>、<code>break</code>、<code>continue</code></td><td>循环只有 <code>while</code>，提前结束需要改写条件</td></tr>
+        <tr><td>禁止同步递归</td><td>表达式临时值全局复用；跨刻重复用 <code>schedule</code></td></tr>
+        <tr><td>参数化/上下文函数不能直接调度</td><td>需要无参数包装函数</td></tr>
+        <tr><td>物品查询只支持 <code>contents</code> 槽</td><td>26.3 首版类型化物品查询的已知边界</td></tr>
+        <tr><td>消息与声音目标有限</td><td><code>message</code> 只有 all/self/nearest；<code>sound</code> 只有 self</td></tr>
+        <tr><td>资源 JSON 不做 schema 校验</td><td>字段语义由游戏加载时验证</td></tr>
+        <tr><td><code>run</code> 不受检查</td><td>字符串原样输出，错误只能在游戏里发现</td></tr>
+        <tr><td>没有语言服务器/编辑器集成</td><td>目前只有命令行与文档</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="appendix" data-no-translate>
+  <h2>附录 <a class="anchor" href="#appendix">#</a></h2>
+  <p>本附录汇总所有可用的名字与范围。中英文写法完全等价，可以在同一项目、同一文件、同一条语句中混用。</p>
+
+  <h3 id="appendix-keywords">关键词、属性、方法与枚举总表</h3>
+  <div class="filter-bar">
+    <input id="keyword-filter" type="search" placeholder="过滤：输入英文、中文或用途，例如 give、标签、调度">
+    <span class="hint" id="keyword-count"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="keyword-table" class="compact">
+      <thead><tr><th>English</th><th>中文</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><code>namespace</code></td><td><code>命名空间</code></td><td>顶层声明</td></tr>
+        <tr><td><code>score</code></td><td><code>计分</code></td><td>顶层声明：全局计分变量</td></tr>
+        <tr><td><code>query</code></td><td><code>查询</code></td><td>顶层声明：实体查询</td></tr>
+        <tr><td><code>entity</code></td><td><code>实体</code></td><td>查询构造器</td></tr>
+        <tr><td><code>storage</code></td><td><code>存储</code></td><td>顶层声明：物品存储</td></tr>
+        <tr><td><code>items</code></td><td><code>物品</code></td><td>存储构造器（<code>items("位置", "路径")</code>）</td></tr>
+        <tr><td><code>item</code></td><td><code>物品</code></td><td>顶层声明：物品定义；查询属性：物品过滤</td></tr>
+        <tr><td><code>item_stack</code></td><td><code>物品堆</code></td><td>物品构造器</td></tr>
+        <tr><td><code>resource</code></td><td><code>资源</code></td><td>顶层声明：JSON 资源</td></tr>
+        <tr><td><code>fn</code></td><td><code>函数</code></td><td>顶层声明：函数</td></tr>
+        <tr><td><code>@load</code></td><td><code>@加载</code></td><td>函数属性：加载/reload</td></tr>
+        <tr><td><code>@tick</code></td><td><code>@每刻</code></td><td>函数属性：每游戏刻</td></tr>
+        <tr><td><code>@entity</code></td><td><code>@实体</code></td><td>函数属性：要求实体上下文</td></tr>
+        <tr><td><code>@player</code></td><td><code>@玩家</code></td><td>函数属性：要求玩家上下文</td></tr>
+        <tr><td><code>let</code></td><td><code>令</code></td><td>语句：局部变量</td></tr>
+        <tr><td><code>return</code></td><td><code>返回</code></td><td>语句：函数返回</td></tr>
+        <tr><td><code>if</code></td><td><code>如果</code></td><td>语句：条件分支</td></tr>
+        <tr><td><code>else</code></td><td><code>否则</code></td><td>语句：条件分支</td></tr>
+        <tr><td><code>while</code></td><td><code>当</code></td><td>语句：循环</td></tr>
+        <tr><td><code>each</code></td><td><code>遍历</code></td><td>语句：遍历查询结果</td></tr>
+        <tr><td><code>call</code></td><td><code>调用</code></td><td>语句：显式函数调用</td></tr>
+        <tr><td><code>schedule</code></td><td><code>调度</code></td><td>语句：延迟调用</td></tr>
+        <tr><td><code>after</code></td><td><code>延后</code></td><td>调度语句</td></tr>
+        <tr><td><code>append</code></td><td><code>追加</code></td><td>调度模式</td></tr>
+        <tr><td><code>replace</code></td><td><code>替换</code></td><td>调度模式（默认）</td></tr>
+        <tr><td><code>give</code></td><td><code>给予</code></td><td>语句：结构化给予</td></tr>
+        <tr><td><code>spawn</code></td><td><code>召唤</code></td><td>语句：生成实体</td></tr>
+        <tr><td><code>in_dimension</code></td><td><code>在维度</code></td><td>语句：维度上下文</td></tr>
+        <tr><td><code>self</code></td><td><code>自身</code></td><td>实体操作前缀；消息目标 self</td></tr>
+        <tr><td><code>message</code></td><td><code>消息</code></td><td>语句前缀：消息</td></tr>
+        <tr><td><code>sound</code></td><td><code>声音</code></td><td>语句前缀：声音</td></tr>
+        <tr><td><code>run</code></td><td><code>原生命令</code></td><td>底层接口：单条命令</td></tr>
+        <tr><td><code>execute</code></td><td><code>原生执行</code></td><td>底层接口：execute 子句块</td></tr>
+        <tr><td><code>predicate</code></td><td><code>谓词</code></td><td>布尔条件；也是 <code>resource</code> 的谓词类型别名</td></tr>
+        <tr><td><code>tag("x")</code></td><td><code>标签("x")</code></td><td>查询属性：必须带标签</td></tr>
+        <tr><td><code>without_tag("x")</code></td><td><code>排除标签("x")</code></td><td>查询属性：排除标签</td></tr>
+        <tr><td><code>limit(n)</code></td><td><code>上限(n)</code></td><td>查询属性</td></tr>
+        <tr><td><code>within(n)</code></td><td><code>范围(n)</code></td><td>查询属性</td></tr>
+        <tr><td><code>sort(v)</code></td><td><code>排序(v)</code></td><td>查询属性</td></tr>
+        <tr><td><code>contents</code></td><td><code>内容</code></td><td>查询物品槽名</td></tr>
+        <tr><td><code>id</code></td><td><code>类型</code></td><td>物品过滤属性</td></tr>
+        <tr><td><code>count</code></td><td><code>数量</code></td><td>物品过滤/物品定义属性</td></tr>
+        <tr><td><code>custom_name</code></td><td><code>自定义名称</code></td><td>物品过滤/物品定义属性</td></tr>
+        <tr><td><code>item_name</code></td><td><code>物品名称</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>lore("...")</code></td><td><code>描述("...")</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>enchantment(id, n)</code></td><td><code>附魔(id, n)</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>stored_enchantment(id, n)</code></td><td><code>存储附魔(id, n)</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>damage</code></td><td><code>损伤</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>max_damage</code></td><td><code>最大损伤</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>max_stack_size</code></td><td><code>最大堆叠</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>rarity</code></td><td><code>稀有度</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>item_model</code></td><td><code>物品模型</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>dyed_color</code></td><td><code>染色</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>enchantment_glint_override</code></td><td><code>附魔光效</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>unbreakable</code></td><td><code>无法破坏</code></td><td>物品定义属性</td></tr>
+        <tr><td><code>add_tag("x")</code></td><td><code>添加标签("x")</code></td><td>self 方法</td></tr>
+        <tr><td><code>remove_tag("x")</code></td><td><code>移除标签("x")</code></td><td>self 方法</td></tr>
+        <tr><td><code>set_invulnerable(b)</code></td><td><code>设置无敌(b)</code></td><td>self 方法</td></tr>
+        <tr><td><code>save_items(s)</code></td><td><code>保存物品(s)</code></td><td>self 方法</td></tr>
+        <tr><td><code>restore_items(s)</code></td><td><code>恢复物品(s)</code></td><td>self 方法</td></tr>
+        <tr><td><code>remove_preserving_items(s)</code></td><td><code>保存并移除(s)</code></td><td>self 方法</td></tr>
+        <tr><td><code>give_item(i[, n])</code></td><td><code>给予物品(i[, n])</code></td><td>self 方法（玩家上下文）</td></tr>
+        <tr><td><code>clear_items()</code></td><td><code>清空物品()</code></td><td>self 方法</td></tr>
+        <tr><td><code>remove()</code></td><td><code>移除()</code></td><td>self 方法</td></tr>
+        <tr><td><code>consume()</code></td><td><code>消耗()</code></td><td>self 方法</td></tr>
+        <tr><td><code>return_to_owner()</code></td><td><code>返还投掷者()</code></td><td>self 方法（掉落物）</td></tr>
+        <tr><td><code>all</code></td><td><code>全部</code></td><td>消息目标</td></tr>
+        <tr><td><code>nearest(n, ...)</code></td><td><code>最近(n, ...)</code></td><td>消息目标</td></tr>
+        <tr><td><code>true</code> / <code>false</code></td><td><code>真</code> / <code>假</code></td><td>布尔值</td></tr>
+        <tr><td><code>nearest</code> / <code>furthest</code></td><td><code>最近</code> / <code>最远</code></td><td>查询排序</td></tr>
+        <tr><td><code>random</code> / <code>arbitrary</code></td><td><code>随机</code> / <code>任意</code></td><td>查询排序</td></tr>
+        <tr><td><code>common</code> / <code>uncommon</code></td><td><code>普通</code> / <code>罕见</code></td><td>物品稀有度</td></tr>
+        <tr><td><code>rare</code> / <code>epic</code></td><td><code>稀有</code> / <code>史诗</code></td><td>物品稀有度</td></tr>
+        <tr><td><code>t</code> / <code>s</code> / <code>d</code></td><td><code>刻</code> / <code>秒</code> / <code>天</code></td><td>调度单位</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="appendix-colors">文本颜色（16 个）</h3>
+  <div class="table-wrap">
+    <table class="compact">
+      <thead><tr><th>English</th><th>中文</th><th>色值</th><th>English</th><th>中文</th><th>色值</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>black</code></td><td><code>黑色</code></td><td><span class="swatch" style="background:#000000"></span><code>#000000</code></td>
+          <td><code>dark_blue</code></td><td><code>深蓝色</code></td><td><span class="swatch" style="background:#0000AA"></span><code>#0000AA</code></td>
+        </tr>
+        <tr>
+          <td><code>dark_green</code></td><td><code>深绿色</code></td><td><span class="swatch" style="background:#00AA00"></span><code>#00AA00</code></td>
+          <td><code>dark_aqua</code></td><td><code>深青色</code></td><td><span class="swatch" style="background:#00AAAA"></span><code>#00AAAA</code></td>
+        </tr>
+        <tr>
+          <td><code>dark_red</code></td><td><code>深红色</code></td><td><span class="swatch" style="background:#AA0000"></span><code>#AA0000</code></td>
+          <td><code>dark_purple</code></td><td><code>深紫色</code></td><td><span class="swatch" style="background:#AA00AA"></span><code>#AA00AA</code></td>
+        </tr>
+        <tr>
+          <td><code>gold</code></td><td><code>金色</code></td><td><span class="swatch" style="background:#FFAA00"></span><code>#FFAA00</code></td>
+          <td><code>gray</code></td><td><code>灰色</code></td><td><span class="swatch" style="background:#AAAAAA"></span><code>#AAAAAA</code></td>
+        </tr>
+        <tr>
+          <td><code>dark_gray</code></td><td><code>深灰色</code></td><td><span class="swatch" style="background:#555555"></span><code>#555555</code></td>
+          <td><code>blue</code></td><td><code>蓝色</code></td><td><span class="swatch" style="background:#5555FF"></span><code>#5555FF</code></td>
+        </tr>
+        <tr>
+          <td><code>green</code></td><td><code>绿色</code></td><td><span class="swatch" style="background:#55FF55"></span><code>#55FF55</code></td>
+          <td><code>aqua</code></td><td><code>青色</code></td><td><span class="swatch" style="background:#55FFFF"></span><code>#55FFFF</code></td>
+        </tr>
+        <tr>
+          <td><code>red</code></td><td><code>红色</code></td><td><span class="swatch" style="background:#FF5555"></span><code>#FF5555</code></td>
+          <td><code>light_purple</code></td><td><code>亮紫色</code></td><td><span class="swatch" style="background:#FF55FF"></span><code>#FF55FF</code></td>
+        </tr>
+        <tr>
+          <td><code>yellow</code></td><td><code>黄色</code></td><td><span class="swatch" style="background:#FFFF55"></span><code>#FFFF55</code></td>
+          <td><code>white</code></td><td><code>白色</code></td><td><span class="swatch" style="background:#FFFFFF"></span><code>#FFFFFF</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>这些名字来自 26.3 的文本颜色枚举；消息颜色使用颜色名而不是十六进制值。</p>
+
+  <h3 id="appendix-sounds">声音分类（11 个）</h3>
+  <div class="table-wrap">
+    <table class="compact">
+      <thead><tr><th>English</th><th>中文</th><th>English</th><th>中文</th></tr></thead>
+      <tbody>
+        <tr><td><code>master</code></td><td><code>主音量</code></td><td><code>hostile</code></td><td><code>敌对</code></td></tr>
+        <tr><td><code>music</code></td><td><code>音乐</code></td><td><code>neutral</code></td><td><code>中立</code></td></tr>
+        <tr><td><code>record</code></td><td><code>唱片</code></td><td><code>player</code></td><td><code>玩家</code></td></tr>
+        <tr><td><code>weather</code></td><td><code>天气</code></td><td><code>ambient</code></td><td><code>环境</code></td></tr>
+        <tr><td><code>block</code></td><td><code>方块</code></td><td><code>voice</code></td><td><code>语音</code></td></tr>
+        <tr><td><code>ui</code></td><td><code>界面</code></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="appendix-kinds">JSON 资源类型</h3>
+  <p>以下类型可以写成标识符或字符串；名称需要子目录时用字符串。<code>worldgen/*</code> 必须以字符串形式给出具体子类型。</p>
+  <div class="table-wrap">
+    <table class="compact">
+      <tbody>
+        <tr>
+          <td><code>advancement</code></td><td><code>loot_table</code></td><td><code>predicate</code></td><td><code>recipe</code></td>
+        </tr>
+        <tr>
+          <td><code>item_modifier</code></td><td><code>enchantment</code></td><td><code>enchantment_provider</code></td><td><code>dialog</code></td>
+        </tr>
+        <tr>
+          <td><code>damage_type</code></td><td><code>dimension_type</code></td><td><code>chat_type</code></td><td><code>trim_material</code></td>
+        </tr>
+        <tr>
+          <td><code>trim_pattern</code></td><td><code>instrument</code></td><td><code>jukebox_song</code></td><td><code>painting_variant</code></td>
+        </tr>
+        <tr>
+          <td><code>banner_pattern</code></td><td><code>decorated_pot_pattern</code></td><td><code>cat_variant</code></td><td><code>cat_sound_variant</code></td>
+        </tr>
+        <tr>
+          <td><code>chicken_variant</code></td><td><code>chicken_sound_variant</code></td><td><code>cow_variant</code></td><td><code>cow_sound_variant</code></td>
+        </tr>
+        <tr>
+          <td><code>frog_variant</code></td><td><code>pig_variant</code></td><td><code>pig_sound_variant</code></td><td><code>wolf_variant</code></td>
+        </tr>
+        <tr>
+          <td><code>wolf_sound_variant</code></td><td><code>zombie_nautilus_variant</code></td><td><code>block_transformer</code></td><td><code>sulfur_cube_archetype</code></td>
+        </tr>
+        <tr>
+          <td><code>context_float_provider</code></td><td><code>context_int_provider</code></td><td><code>test_environment</code></td><td><code>test_instance</code></td>
+        </tr>
+        <tr>
+          <td><code>timeline</code></td><td><code>trade_set</code></td><td><code>trial_spawner</code></td><td><code>villager_trade</code></td>
+        </tr>
+        <tr>
+          <td><code>world_clock</code></td><td><code>worldgen/*</code></td><td></td><td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="appendix-ranges">数值范围与约束速查</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>项目</th><th>合法范围</th></tr></thead>
+      <tbody>
+        <tr><td>计分值、整数字面量、计分初始值</td><td>−2147483648 到 2147483647（有符号 32 位）</td></tr>
+        <tr><td>标识符（函数/变量/查询/物品/存储/参数/局部）</td><td>小写 ASCII 字母、数字、下划线；首字符非数字；不超过 32 字节；非保留字</td></tr>
+        <tr><td>实体标签</td><td>非空、不超过 1024 字节，仅 ASCII 字母数字与 <code>_ - .</code></td></tr>
+        <tr><td>存储 NBT 路径</td><td>点分隔的段，每段仅 ASCII 字母数字与下划线</td></tr>
+        <tr><td>查询 <code>limit</code></td><td>1 到 2147483647</td></tr>
+        <tr><td>查询 <code>within</code>、<code>message.nearest</code> 距离</td><td>1 到 30000000</td></tr>
+        <tr><td>查询物品过滤 <code>count</code></td><td>1 到 99</td></tr>
+        <tr><td>物品 <code>count</code>、<code>give</code> 数量</td><td>1 到 <code>max_stack_size × 100</code>；未声明最大堆叠时按 1 计算，即 1 到 100</td></tr>
+        <tr><td><code>lore</code> 行数</td><td>不超过 256 行；名称与 Lore 不能含控制字符</td></tr>
+        <tr><td>附魔等级</td><td>1 到 255；同一附魔不能重复声明</td></tr>
+        <tr><td>物品 <code>damage</code></td><td>0 到 2147483647</td></tr>
+        <tr><td>物品 <code>max_damage</code></td><td>1 到 2147483647；与大于 1 的 <code>max_stack_size</code> 互斥</td></tr>
+        <tr><td>物品 <code>max_stack_size</code></td><td>1 到 99</td></tr>
+        <tr><td>物品 <code>dyed_color</code></td><td>0 到 16777215</td></tr>
+        <tr><td>调度延迟</td><td>1 到 2147483647；单位为 <code>t</code>/<code>s</code>/<code>d</code></td></tr>
+        <tr><td>布尔值</td><td><code>true</code>/<code>false</code> 或 <code>真</code>/<code>假</code></td></tr>
+        <tr><td>文本颜色、声音分类、排序、稀有度</td><td>只能取本附录列出的命名值</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="appendix-versions">目标版本兼容依据</h3>
+  <ul>
+    <li>随附客户端源码 <code>minecraft_client_26.3-rc-2/version.json</code> 声明数据包版本 major 121、minor 0；生成的 <code>pack.mcmeta</code> 使用 <code>[121, 0]</code> 作为 <code>min_format</code> 与 <code>max_format</code>。</li>
+    <li>该版本通过注册表 <code>minecraft:function</code> 加载函数；函数目录为 <code>data/&lt;命名空间&gt;/function</code>，标签目录为 <code>data/&lt;命名空间&gt;/tags/function</code>。</li>
+    <li>计分板除法使用 <code>Mth.floorDiv</code>（向下取整），取模使用 <code>Mth.positiveModulo</code>（结果非负）；除数为 0 时整条命令失败。</li>
+    <li><code>GiveCommand.MAX_ALLOWED_ITEMSTACKS = 100</code>，数量上限为最大堆叠数乘以 100。</li>
+    <li>物品数量查询与设置（例如物品过滤的 <code>count</code>）在 26.3 命令树中限制为 1 到 99。</li>
+    <li>实体生成使用原版 <code>execute summon</code>，返回使用 <code>return</code> 与 <code>execute store result</code>。</li>
+  </ul>
+</section>
+
+
+<footer>
+  <div class="wrap">
+    <p>本手册针对 <strong>mclang 0.5.0</strong>（Rust edition 2024），目标 Minecraft Java Edition <strong>26.3-rc-2</strong>，数据包格式 <strong>121.0</strong>。内容依据仓库源码与 <code>docs/</code> 手工核对；权威定义始终以编译器源码和随附的 Minecraft 客户端源码为准。</p>
+    <p>相关文件：<code>docs/language-reference.md</code>（语言参考）、<code>docs/compiler-design.md</code>（编译器设计）、<code>docs/language-design.md</code>（设计方向）、<code>docs/quickstart.md</code>（快速上手）。</p>
+  </div>
+</footer>
+</main>
+</div>
+
+<button id="to-top" type="button" title="回到顶部">↑</button>
+
+<script>
+(function () {
+  "use strict";
+
+  var $$ = function (selector, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(selector));
+  };
+
+  /* ---------- 深色 / 浅色主题 ---------- */
+  var themeButton = document.getElementById("theme-toggle");
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    themeButton.textContent = theme === "dark" ? "浅色" : "深色";
+  }
+  var savedTheme = null;
+  try { savedTheme = localStorage.getItem("mclang-manual-theme"); } catch (error) { savedTheme = null; }
+  if (!savedTheme) {
+    savedTheme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  applyTheme(savedTheme);
+  themeButton.addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+    try { localStorage.setItem("mclang-manual-theme", next); } catch (error) { /* 忽略隐私模式 */ }
+  });
+
+  /* ---------- 移动端目录 ---------- */
+  var toc = document.getElementById("toc");
+  document.getElementById("nav-toggle").addEventListener("click", function () {
+    toc.classList.toggle("open");
+  });
+  toc.addEventListener("click", function (event) {
+    if (event.target.tagName === "A") { toc.classList.remove("open"); }
+  });
+
+  /* ---------- 代码高亮 ---------- */
+  var KEYWORDS = [
+    "namespace", "score", "query", "entity", "storage", "items", "item", "item_stack",
+    "resource", "fn", "each", "give", "in_dimension", "spawn", "self", "message", "sound",
+    "run", "call", "schedule", "after", "append", "replace", "if", "else", "while",
+    "execute", "return", "let", "predicate", "predicate",
+    "命名空间", "计分", "查询", "实体", "存储", "物品", "物品堆", "资源", "函数", "遍历",
+    "给予", "在维度", "召唤", "自身", "消息", "声音", "原生命令", "调用", "调度", "延后",
+    "追加", "替换", "如果", "否则", "当", "原生执行", "返回", "令", "谓词",
+    "tag", "标签", "without_tag", "排除标签", "limit", "上限", "within", "范围", "sort", "排序",
+    "id", "类型", "count", "数量", "custom_name", "自定义名称", "item_name", "物品名称",
+    "lore", "描述", "enchantment", "附魔", "stored_enchantment", "存储附魔", "damage", "损伤",
+    "max_damage", "最大损伤", "max_stack_size", "最大堆叠", "rarity", "稀有度",
+    "item_model", "物品模型", "dyed_color", "染色", "enchantment_glint_override", "附魔光效",
+    "unbreakable", "无法破坏", "add_tag", "添加标签", "remove_tag", "移除标签",
+    "set_invulnerable", "设置无敌", "save_items", "保存物品", "restore_items", "恢复物品",
+    "remove_preserving_items", "保存并移除", "give_item", "给予物品", "clear_items", "清空物品",
+    "remove", "移除", "consume", "消耗", "return_to_owner", "返还投掷者",
+    "contents", "内容", "all", "全部", "nearest", "最近"
+  ];
+  var LITERALS = [
+    "true", "false", "真", "假", "nearest", "furthest", "random", "arbitrary",
+    "最近", "最远", "随机", "任意", "common", "uncommon", "rare", "epic",
+    "普通", "罕见", "稀有", "史诗", "t", "s", "d", "刻", "秒", "天",
+    "black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold",
+    "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white",
+    "黑色", "深蓝色", "深绿色", "深青色", "深红色", "深紫色", "金色", "灰色", "深灰色",
+    "蓝色", "绿色", "青色", "红色", "亮紫色", "黄色", "白色",
+    "master", "music", "record", "weather", "block", "hostile", "neutral", "player",
+    "ambient", "voice", "ui", "主音量", "音乐", "唱片", "天气", "方块", "敌对", "中立",
+    "玩家", "环境", "语音", "界面"
+  ];
+  var keywordSet = Object.create(null);
+  KEYWORDS.forEach(function (word) { keywordSet[word] = true; });
+  var literalSet = Object.create(null);
+  LITERALS.forEach(function (word) { literalSet[word] = true; });
+
+  var TOKEN = /("""[\s\S]*?"""|"(?:\\.|[^"\\])*"|\/\/[^\n]*|@[\u4e00-\u9fffA-Za-z_][\u4e00-\u9fffA-Za-z0-9_]*|#[A-Za-z0-9_]+|\d+|[\u4e00-\u9fffA-Za-z_][\u4e00-\u9fffA-Za-z0-9_]*|[\s\S])/g;
+
+  /* ---------- 代码块的中英文关键词切换 ----------
+     翻译按词法单元进行：字符串、注释与标识符整体保留，只替换关键词、
+     属性、方法、属性和枚举值。这样不会误伤注释里的英文与字符串里的 JSON。 */
+  var EN_TO_ZH = {
+    namespace: "命名空间", score: "计分", query: "查询", entity: "实体",
+    storage: "存储", items: "物品", item: "物品", item_stack: "物品堆",
+    resource: "资源", fn: "函数", each: "遍历", give: "给予",
+    in_dimension: "在维度", spawn: "召唤", self: "自身", message: "消息",
+    sound: "声音", run: "原生命令", execute: "原生执行", call: "调用",
+    schedule: "调度", after: "延后", append: "追加", replace: "替换",
+    if: "如果", else: "否则", while: "当", return: "返回", let: "令",
+    predicate: "谓词",
+    tag: "标签", without_tag: "排除标签", limit: "上限", within: "范围",
+    sort: "排序", id: "类型", count: "数量", custom_name: "自定义名称",
+    contents: "内容", item_name: "物品名称", lore: "描述",
+    enchantment: "附魔", stored_enchantment: "存储附魔", damage: "损伤",
+    max_damage: "最大损伤", max_stack_size: "最大堆叠", rarity: "稀有度",
+    item_model: "物品模型", dyed_color: "染色",
+    enchantment_glint_override: "附魔光效", unbreakable: "无法破坏",
+    add_tag: "添加标签", remove_tag: "移除标签", set_invulnerable: "设置无敌",
+    save_items: "保存物品", restore_items: "恢复物品",
+    remove_preserving_items: "保存并移除", give_item: "给予物品",
+    clear_items: "清空物品", remove: "移除", consume: "消耗",
+    return_to_owner: "返还投掷者",
+    all: "全部", nearest: "最近", furthest: "最远", random: "随机",
+    arbitrary: "任意", true: "真", false: "假",
+    common: "普通", uncommon: "罕见", rare: "稀有", epic: "史诗",
+    black: "黑色", dark_blue: "深蓝色", dark_green: "深绿色", dark_aqua: "深青色",
+    dark_red: "深红色", dark_purple: "深紫色", gold: "金色", gray: "灰色",
+    dark_gray: "深灰色", blue: "蓝色", green: "绿色", aqua: "青色",
+    red: "红色", light_purple: "亮紫色", yellow: "黄色", white: "白色",
+    master: "主音量", music: "音乐", record: "唱片", weather: "天气",
+    block: "方块", hostile: "敌对", neutral: "中立", player: "玩家",
+    ambient: "环境", voice: "语音", ui: "界面"
+  };
+  var ZH_TO_EN = {};
+  Object.keys(EN_TO_ZH).forEach(function (english) {
+    var chinese = EN_TO_ZH[english];
+    if (chinese === "物品") { return; } // item 与 items 共用中文名，单独按上下文还原
+    ZH_TO_EN[chinese] = english;
+  });
+  var ATTR_EN_TO_ZH = { load: "加载", tick: "每刻", entity: "实体", player: "玩家" };
+  var ATTR_ZH_TO_EN = { "加载": "load", "每刻": "tick", "实体": "entity", "玩家": "player" };
+  var UNIT_EN_TO_ZH = { t: "刻", s: "秒", d: "天" };
+  var UNIT_ZH_TO_EN = { "刻": "t", "秒": "s", "天": "d" };
+
+  var language = "zh";
+  try {
+    var savedLanguage = localStorage.getItem("mclang-manual-lang");
+    if (savedLanguage === "zh" || savedLanguage === "en") { language = savedLanguage; }
+  } catch (error) { /* 忽略隐私模式 */ }
+
+  function isWhitespaceToken(token) {
+    return /^\s+$/.test(token);
+  }
+
+  function tokenizeCode(code) {
+    var tokens = [];
+    var match;
+    TOKEN.lastIndex = 0;
+    while ((match = TOKEN.exec(code)) !== null) { tokens.push(match[0]); }
+    return tokens;
+  }
+
+  /* 取相对 index 的下一个非空白记号；step 为 ±1。 */
+  function significantToken(tokens, index, step) {
+    for (var i = index; i >= 0 && i < tokens.length; i += step) {
+      if (!isWhitespaceToken(tokens[i])) { return tokens[i]; }
+    }
+    return null;
+  }
+
+  /* 已经写成中文关键词的代码块在“英文模式”下需要反向翻译。 */
+  function detectBaseLanguage(code) {
+    var tokens = tokenizeCode(code);
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      if (isWhitespaceToken(token)) { continue; }
+      var first = token.charAt(0);
+      if (token.slice(0, 3) === '"""' || first === '"' || token.slice(0, 2) === "//") { continue; }
+      if (first === "@") {
+        if (ATTR_ZH_TO_EN[token.slice(1)]) { return "zh"; }
+        continue;
+      }
+      if (first === "#") { continue; }
+      if (ZH_TO_EN[token] || token === "物品") { return "zh"; }
+    }
+    return "en";
+  }
+
+  function translateToken(tokens, index, toChinese) {
+    var token = tokens[index];
+    var first = token.charAt(0);
+    if (isWhitespaceToken(token)) { return token; }
+    if (token.slice(0, 3) === '"""' || first === '"' || token.slice(0, 2) === "//") { return token; }
+    if (first === "#") { return token; }
+    if (first === "@") {
+      var attribute = token.slice(1);
+      var attributeMap = toChinese ? ATTR_EN_TO_ZH : ATTR_ZH_TO_EN;
+      return attributeMap[attribute] ? "@" + attributeMap[attribute] : token;
+    }
+    if (first >= "0" && first <= "9") { return token; }
+    if (toChinese) {
+      // t / s / d 只有在数字后面才是时间单位，避免误伤名为 t 的标识符。
+      if (UNIT_EN_TO_ZH[token]) {
+        var before = significantToken(tokens, index - 1, -1);
+        return before && /^[0-9]+$/.test(before) ? UNIT_EN_TO_ZH[token] : token;
+      }
+      return EN_TO_ZH[token] || token;
+    }
+    if (UNIT_ZH_TO_EN[token]) { return UNIT_ZH_TO_EN[token]; }
+    if (token === "物品") {
+      // 物品(contents) 是 item 过滤槽；物品("资源", "路径") 是 items 存储。
+      var next = significantToken(tokens, index + 1, 1);
+      if (next === "(") {
+        var inside = significantToken(tokens, index + 2, 1);
+        return inside && inside.charAt(0) === '"' ? "items" : "item";
+      }
+      return "item";
+    }
+    return ZH_TO_EN[token] || token;
+  }
+
+  function translateCode(code, toChinese) {
+    var tokens = tokenizeCode(code);
+    var output = "";
+    for (var i = 0; i < tokens.length; i++) {
+      output += translateToken(tokens, i, toChinese);
+    }
+    return output;
+  }
+
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function highlight(code) {
+    var output = "";
+    var match;
+    TOKEN.lastIndex = 0;
+    while ((match = TOKEN.exec(code)) !== null) {
+      var token = match[0];
+      var first = token.charAt(0);
+      var cls = "";
+      if (token.slice(0, 3) === '"""' || first === '"') { cls = "tok-str"; }
+      else if (token.slice(0, 2) === "//") { cls = "tok-com"; }
+      else if (first === "@") { cls = "tok-attr"; }
+      else if (first === "#") { cls = "tok-var"; }
+      else if (first >= "0" && first <= "9") { cls = "tok-num"; }
+      else if (keywordSet[token]) { cls = "tok-kw"; }
+      else if (literalSet[token]) { cls = "tok-lit"; }
+      var escaped = escapeHtml(token);
+      output += cls ? '<span class="' + cls + '">' + escaped + "</span>" : escaped;
+    }
+    return output;
+  }
+
+  /* 只有 Mclang 源码与语法模板参与关键词切换；生成的命令、目录树和命令行保持原样。 */
+  function isTranslatableCode(code) {
+    var kind = code.getAttribute("data-kind") || "mcl";
+    return kind === "mcl" || kind === "syntax";
+  }
+
+  /* 命令行与目录树不做 Mclang 词法高亮，避免把 run、# 之类误标成语言记号。 */
+  function isHighlightedCode(code) {
+    var kind = code.getAttribute("data-kind") || "mcl";
+    return kind === "mcl" || kind === "syntax" || kind === "mcfunction" || kind === "mcf";
+  }
+
+  function renderCode(code) {
+    var text = code.__base;
+    if (code.__translatable && code.__baseLang !== language) {
+      text = translateCode(code.__base, language === "zh");
+    }
+    code.innerHTML = code.__highlighted ? highlight(text) : escapeHtml(text);
+  }
+
+  /* 行内 code 只有在“全部由关键词、属性或枚举组成”时才参与切换，
+     避免把生成命令（例如 execute if score … matches 1）翻译坏。 */
+  function isTranslatableInline(text) {
+    var tokens = tokenizeCode(text);
+    var translatable = 0;
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      if (isWhitespaceToken(token)) { continue; }
+      var first = token.charAt(0);
+      if (token.slice(0, 3) === '"""' || first === '"' || token.slice(0, 2) === "//") { return false; }
+      if (first === "@") {
+        var name = token.slice(1);
+        if (!ATTR_EN_TO_ZH[name] && !ATTR_ZH_TO_EN[name]) { return false; }
+        translatable += 1;
+        continue;
+      }
+      if (first === "#") { return false; }
+      if (EN_TO_ZH[token] || ZH_TO_EN[token] || token === "物品") { translatable += 1; continue; }
+      if (/^[0-9]+$/.test(token)) { continue; }
+      if (/^[\p{L}_]/u.test(token)) { return false; }
+      // 其余标点或符号放行
+    }
+    return translatable > 0;
+  }
+
+  function setupInlineKeywords() {
+    $$("code").forEach(function (code) {
+      if (code.closest("pre") || code.closest("[data-no-translate]") || code.hasAttribute("data-zh")) { return; }
+      var base = code.textContent;
+      if (isTranslatableInline(base)) { code.__inlineBase = base; }
+    });
+  }
+
+  /* 侧边目录与章节标题用 data-zh 标注另一种写法；空值表示中文模式下隐藏该关键词。 */
+  function setupBilingual() {
+    $$("[data-zh]").forEach(function (element) {
+      if (element.__enText === undefined) { element.__enText = element.textContent; }
+    });
+  }
+
+  function applyBilingual() {
+    $$("[data-zh]").forEach(function (element) {
+      var zh = element.getAttribute("data-zh");
+      if (language === "zh" && zh === "") {
+        element.style.display = "none";
+      } else {
+        element.style.display = "";
+        element.textContent = language === "zh" ? zh : element.__enText;
+      }
+    });
+    $$("code").forEach(function (code) {
+      if (code.__inlineBase === undefined) { return; }
+      code.textContent = language === "zh" ? translateCode(code.__inlineBase, true) : code.__inlineBase;
+    });
+  }
+
+  function applyLanguage() {
+    $$("pre > code").forEach(function (code) {
+      if (code.__base !== undefined) { renderCode(code); }
+    });
+    applyBilingual();
+    var button = document.getElementById("lang-toggle");
+    if (button) {
+      button.textContent = language === "zh" ? "English keywords" : "中文关键词";
+    }
+    document.documentElement.setAttribute("data-lang", language);
+  }
+
+  function setupLanguage() {
+    var button = document.getElementById("lang-toggle");
+    button.addEventListener("click", function () {
+      language = language === "zh" ? "en" : "zh";
+      try { localStorage.setItem("mclang-manual-lang", language); } catch (error) { /* 忽略隐私模式 */ }
+      applyLanguage();
+    });
+    applyLanguage();
+  }
+
+  /* 为每个 <pre><code> 建立带标题与复制按钮的外框，并渲染高亮。 */
+  function setupCodeBlocks() {
+    $$("pre > code").forEach(function (code) {
+      code.__base = code.textContent;
+      code.__baseLang = detectBaseLanguage(code.__base);
+      code.__translatable = isTranslatableCode(code);
+      code.__highlighted = isHighlightedCode(code);
+      renderCode(code);
+
+      var pre = code.parentNode;
+      var wrapper = document.createElement("div");
+      wrapper.className = "code";
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+
+      var bar = document.createElement("div");
+      bar.className = "code-bar";
+      var title = document.createElement("span");
+      title.className = "code-title";
+      title.textContent = code.getAttribute("data-title") || "";
+      bar.appendChild(title);
+
+      var badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = code.getAttribute("data-kind") || "mcl";
+      bar.appendChild(badge);
+
+      var spacer = document.createElement("span");
+      spacer.className = "spacer";
+      bar.appendChild(spacer);
+
+      var copy = document.createElement("button");
+      copy.type = "button";
+      copy.textContent = "复制";
+      copy.addEventListener("click", function () {
+        var done = function () {
+          copy.textContent = "已复制";
+          window.setTimeout(function () { copy.textContent = "复制"; }, 1200);
+        };
+        var current = code.textContent;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(current).then(done, done);
+        } else {
+          var area = document.createElement("textarea");
+          area.value = current;
+          document.body.appendChild(area);
+          area.select();
+          try { document.execCommand("copy"); } catch (error) { /* 忽略 */ }
+          document.body.removeChild(area);
+          done();
+        }
+      });
+      bar.appendChild(copy);
+
+      wrapper.insertBefore(bar, pre);
+    });
+  }
+
+  /* ---------- 标签页（中英文示例切换） ---------- */
+  function setupTabs() {
+    $$(".tabs").forEach(function (tabs) {
+      var buttons = $$(".tab-btns button", tabs);
+      var panels = $$(".tab-panel", tabs);
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          var name = button.getAttribute("data-tab");
+          buttons.forEach(function (other) { other.classList.toggle("active", other === button); });
+          panels.forEach(function (panel) {
+            panel.classList.toggle("active", panel.getAttribute("data-panel") === name);
+          });
+        });
+      });
+    });
+  }
+
+  /* ---------- 关键词过滤 ---------- */
+  function setupFilter() {
+    var input = document.getElementById("keyword-filter");
+    if (!input) { return; }
+    var rows = $$("#keyword-table tbody tr");
+    var count = document.getElementById("keyword-count");
+    function apply() {
+      var needle = input.value.trim().toLowerCase();
+      var visible = 0;
+      rows.forEach(function (row) {
+        var hit = !needle || row.textContent.toLowerCase().indexOf(needle) !== -1;
+        row.classList.toggle("filtered-out", !hit);
+        if (hit) { visible += 1; }
+      });
+      if (count) { count.textContent = "显示 " + visible + " / " + rows.length + " 条"; }
+    }
+    input.addEventListener("input", apply);
+    apply();
+  }
+
+  /* ---------- 滚动高亮目录与回到顶部 ---------- */
+  function setupScroll() {
+    var links = $$('#toc a[href^="#"]');
+    var byId = Object.create(null);
+    links.forEach(function (link) { byId[link.getAttribute("href").slice(1)] = link; });
+    var targets = $$("h1[id], h2[id], h3[id]").filter(function (heading) { return byId[heading.id]; });
+
+    function activate() {
+      var current = null;
+      var threshold = 120;
+      targets.forEach(function (heading) {
+        if (heading.getBoundingClientRect().top <= threshold) { current = heading; }
+      });
+      links.forEach(function (link) {
+        link.classList.toggle("active", current !== null && link === byId[current.id]);
+      });
+      document.getElementById("to-top").classList.toggle("show", window.scrollY > 600);
+    }
+    /* 点击后立刻高亮，避免平滑滚动期间旧项仍然显示为激活。 */
+    links.forEach(function (link) {
+      link.addEventListener("click", function () {
+        links.forEach(function (other) { other.classList.toggle("active", other === link); });
+      });
+    });
+    window.addEventListener("scroll", activate, { passive: true });
+    window.addEventListener("resize", activate);
+    window.addEventListener("hashchange", activate);
+    window.addEventListener("load", activate);
+    activate();
+
+    document.getElementById("to-top").addEventListener("click", function () {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  setupCodeBlocks();
+  setupInlineKeywords();
+  setupBilingual();
+  setupLanguage();
+  setupTabs();
+  setupFilter();
+  setupScroll();
+})();
+</script>
+</body>
+</html>

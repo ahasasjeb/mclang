@@ -17,7 +17,7 @@ Mclang 源码应表达 Minecraft 行为，而不是要求作者先会写 mcfunct
 - `each`：逐个进入查询结果的实体及位置上下文。
 - `spawn`：生成实体并在新实体上下文中执行初始化代码。
 - `in_dimension`：切换维度执行上下文。
-- `self.*`：修改当前实体标签和无敌状态，保存、恢复或清空容器，消费或移除实体；`remove_preserving_items` 封装安全收起容器的不变量。
+- `self.*`：修改当前实体标签和无敌状态，保存、恢复或清空容器，消费或移除实体；`remove_preserving_items` 封装安全收起容器的不变量，`return_to_owner` 把掉落物原样交还投掷者。
 - `message.*`：用普通文本和颜色生成合法文本组件，不要求作者手写 JSON 或玩家选择器。
 - `sound.self`：用经过检查的声音资源位置和分类播放声音。
 - `predicate(...)`：把声明的数据包 predicate 作为普通布尔条件组合。
