@@ -62,6 +62,13 @@ cargo run -- check examples/give_reward.mcl --deny-raw
 cargo run -- build examples/give_reward.mcl --deny-raw
 ```
 
+`potion_lab` 展示效果、经验、清空物品、函数标签和带小数的调度，同样完全不含底层命令字符串：
+
+```powershell
+cargo run -- check examples/potion_lab.mcl --deny-raw
+cargo run -- build examples/potion_lab.mcl --deny-raw
+```
+
 `--deny-raw` 会递归拒绝任何 `run` 或字符串形式的 `execute`，适合要求全部使用 Mclang 标准层的新项目。它也可以用于 `check`。
 
 构建会维护输出目录中的 `.mclang-manifest`。再次构建时只删除上一次由 Mclang 生成的文件，目录中的其他文件保持原样。

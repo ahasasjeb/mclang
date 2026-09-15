@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use crate::ast::*;
 
 use super::CompiledPack;
-use emit::{empty_slot_source, pack_metadata, tag_json};
+use emit::{empty_slot_source, function_tag_json, pack_metadata, tag_json};
 use names::{build_holders, objective_name};
 
 /// 表达式求值结果：编译期整数或运行时计分项。
@@ -139,6 +139,29 @@ impl<'a> Compiler<'a> {
                     .join(&resource.kind)
                     .join(format!("{}.json", resource.name)),
                 contents,
+            );
+        }
+        for tag in &self.program.function_tags {
+            let values = tag
+                .values
+                .iter()
+                .map(|entry| match entry {
+                    FunctionTagEntry::Function(name, _) => {
+                        format!("{}:{name}", self.program.namespace)
+                    }
+                    FunctionTagEntry::Tag(name, _) => {
+                        format!("#{}:{name}", self.program.namespace)
+                    }
+                    FunctionTagEntry::External(value, _) => value.clone(),
+                })
+                .collect::<Vec<_>>();
+            files.insert(
+                PathBuf::from("data")
+                    .join(&self.program.namespace)
+                    .join("tags")
+                    .join("function")
+                    .join(format!("{}.json", tag.name)),
+                function_tag_json(&values, tag.replace),
             );
         }
 

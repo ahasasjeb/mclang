@@ -24,7 +24,28 @@ pub struct Program {
     pub item_stacks: Vec<ItemStackDecl>,
     pub storages: Vec<StorageDecl>,
     pub resources: Vec<ResourceDecl>,
+    pub function_tags: Vec<FunctionTagDecl>,
     pub functions: Vec<Function>,
+}
+
+/// `fn_tag` 声明的函数标签，输出到 `data/<命名空间>/tags/function/<名称>.json`。
+#[derive(Debug)]
+pub struct FunctionTagDecl {
+    pub name: String,
+    pub values: Vec<FunctionTagEntry>,
+    /// 对应标签文件的 `replace` 字段；26.3 的默认值是 `false`（与低优先级包合并）。
+    pub replace: bool,
+    pub span: Span,
+}
+
+#[derive(Debug)]
+pub enum FunctionTagEntry {
+    /// 本命名空间内的函数。
+    Function(String, Span),
+    /// `#名称`：本命名空间内的函数标签。
+    Tag(String, Span),
+    /// 字符串形式的外部引用，`#` 前缀表示标签；内容按资源位置校验，不做存在性检查。
+    External(String, Span),
 }
 
 #[derive(Debug)]
@@ -190,6 +211,28 @@ pub enum StatementKind {
         count: Option<u32>,
         count_span: Option<Span>,
     },
+    EffectGive {
+        target: String,
+        effect: String,
+        duration: EffectDuration,
+        amplifier: Option<u32>,
+        hide_particles: bool,
+    },
+    EffectClear {
+        target: String,
+        effect: Option<String>,
+    },
+    XpChange {
+        target: String,
+        kind: XpKind,
+        operation: XpOperation,
+        amount: i32,
+    },
+    ClearInventory {
+        target: String,
+        item: Option<String>,
+        max_count: Option<u32>,
+    },
     SelfAction(SelfAction),
     Message {
         target: MessageTarget,
@@ -201,7 +244,7 @@ pub enum StatementKind {
         source: String,
     },
     Call {
-        function: String,
+        target: CallTarget,
         arguments: Vec<Expr>,
     },
     Let {
@@ -209,9 +252,12 @@ pub enum StatementKind {
         value: Expr,
     },
     Schedule {
-        function: String,
+        target: CallTarget,
         delay: String,
         mode: ScheduleMode,
+    },
+    ScheduleClear {
+        function: String,
     },
     Assign {
         target: String,
@@ -231,7 +277,51 @@ pub enum StatementKind {
         condition: Condition,
         body: Vec<Statement>,
     },
-    Return(Option<Expr>),
+    Return(ReturnKind),
+}
+
+/// `effect give` 的持续时间：整数秒或 `infinite`。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EffectDuration {
+    Seconds(u32),
+    Infinite,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum XpOperation {
+    Add,
+    Set,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum XpKind {
+    Points,
+    Levels,
+}
+
+impl XpKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Points => "points",
+            Self::Levels => "levels",
+        }
+    }
+}
+
+/// 被调用或被调度的目标：本命名空间函数或 `#` 函数标签。
+#[derive(Debug)]
+pub enum CallTarget {
+    Function(String),
+    Tag(String),
+}
+
+/// `return` 的四种形式。
+#[derive(Debug)]
+pub enum ReturnKind {
+    Void,
+    Value(Expr),
+    Fail,
+    Run(String),
 }
 
 #[derive(Debug)]
@@ -325,6 +415,10 @@ pub enum ExprKind {
     Call {
         function: String,
         arguments: Vec<Expr>,
+    },
+    XpQuery {
+        target: String,
+        kind: XpKind,
     },
     Negate(Box<Expr>),
     Binary {

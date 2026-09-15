@@ -8,6 +8,7 @@ mod items;
 mod recursion;
 mod rules;
 mod statements;
+mod tags;
 
 use std::collections::{HashMap, HashSet};
 
@@ -22,18 +23,23 @@ use rules::{
     valid_resource_path, validate_identifier, windows_reserved_name,
 };
 use statements::{collect_local_declarations, validate_statements};
+use tags::{collect_function_tags, validate_function_tags};
 
 pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     validate_namespace(program, &mut diagnostics);
     let scores = collect_scores(program, &mut diagnostics);
+    let function_tags = collect_function_tags(program, &mut diagnostics);
+    let signatures = collect_signatures(program, &scores, &mut diagnostics);
+    validate_function_tags(&function_tags, &signatures, &mut diagnostics);
     let declarations = Declarations {
         queries: collect_queries(program, &mut diagnostics),
         item_stacks: collect_item_stacks(program, &mut diagnostics),
         storages: collect_storages(program, &mut diagnostics),
         predicates: validate_resources(program, &mut diagnostics),
-        signatures: collect_signatures(program, &scores, &mut diagnostics),
+        function_tags,
+        signatures,
         scores,
     };
 
@@ -49,6 +55,7 @@ struct Declarations<'a> {
     item_stacks: HashMap<&'a str, &'a ItemStackDecl>,
     storages: HashSet<&'a str>,
     predicates: HashSet<&'a str>,
+    function_tags: HashMap<&'a str, &'a FunctionTagDecl>,
     signatures: HashMap<&'a str, Signature>,
 }
 
@@ -294,14 +301,11 @@ fn validate_function_declaration(
     if function.returns_score
         && !matches!(
             function.body.last().map(|statement| &statement.kind),
-            Some(StatementKind::Return(Some(_)))
+            Some(StatementKind::Return(_))
         )
     {
         diagnostics.push(Diagnostic::new(
-            format!(
-                "返回 score 的函数 `{}` 必须以 return 表达式结束",
-                function.name
-            ),
+            format!("返回 score 的函数 `{}` 必须以 return 结束", function.name),
             function.span,
         ));
     }
@@ -336,6 +340,7 @@ fn validate_function_bodies(
             item_stacks: &declarations.item_stacks,
             storages: &declarations.storages,
             predicates: &declarations.predicates,
+            function_tags: &declarations.function_tags,
         };
         validate_statements(
             &function.body,

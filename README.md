@@ -28,12 +28,12 @@ fn tick() {
 
 ## 特性
 
-- **结构化标准层**：`query`、`item_stack`、`item_list`、`give`、`each`、`spawn`、`in_dimension`、`self.*`、`message.*`、`sound.self`、`predicate`、`schedule`、`score` 返回值等都是独立的 AST 节点，而不是命令字符串。
+- **结构化标准层**：`query`、`item_stack`、`item_list`、`give`、`each`、`spawn`、`in_dimension`、`self.*`、`message.*`、`sound.self`、`effect.*`、`xp.*`、`clear`、`fn_tag`、`predicate`、`schedule`、`return fail`/`return run`、`score` 返回值等都是独立的 AST 节点，而不是命令字符串。
 - **编译期检查**：命名、资源位置、标签、范围、枚举、执行上下文、返回值、调用图递归、JSON 资源都在写出数据包之前报错，并一次返回全部诊断。
 - **精确的执行上下文**：区分“无 / 任意实体 / 非玩家实体 / 玩家”，`data` 类 NBT 操作只允许非玩家实体，玩家数据不会被错误修改。
 - **中英文双关键词**：任意结构都有英文和中文写法，可以在同一文件里混用，两种写法生成逐字节相同的产物。
 - **可复现产物**：输出使用 `BTreeMap` 与稳定哈希，同一份源码总是生成同样的文件与内容。
-- **严格模式**：`--deny-raw` 递归拒绝 `run` 和字符串 `execute`，让项目完全停留在标准层。
+- **严格模式**：`--deny-raw` 递归拒绝 `run`、字符串 `execute` 和 `return run`，让项目完全停留在标准层。
 - **安全重建**：`.mclang-manifest` 记录上次生成的文件，重建只清理自己的产物，不碰目录里的其他文件。
 
 ## 快速开始
@@ -104,7 +104,15 @@ mclang help | version
 | `self.save_items(s)` / `self.restore_items(s)` | `data modify … entity @s Items`（非玩家实体上下文） |
 | `message.self("x", gold)` | `tellraw @s <文本组件 JSON>` |
 | `sound.self("…", master)` | `playsound <声音> <分类> @s ~ ~ ~ 1 1` |
+| `effect.give(q, "…", 30[, 等级][, 隐藏粒子])` | `execute as <选择器> at @s run effect give @s …` |
+| `xp.add/set(q, points\|levels, n)` | `execute as <选择器> at @s run xp add/set @s n <类型>` |
+| `xp.query(q, levels)` | `store result score … run xp query @s levels`（查询需要 `limit(1)`） |
+| `clear(q[, "…"][, n])` | `execute as <选择器> at @s run clear @s …` |
+| `call #标签()` / `schedule #标签() after 2 s` | `function #<命名空间>:标签` / `schedule function #…` |
+| `fn_tag 名称 { value(函数); }` | `data/<命名空间>/tags/function/<名称>.json` |
+| `return fail` / `return run "…"` | `return fail` / `return run …` |
 | `schedule f() after 20 t` | `schedule function <命名空间>:f 20t replace` |
+| `schedule.clear(f)` | `schedule clear <命名空间>:f` |
 | `@load` / `@tick` | `minecraft:load` / `minecraft:tick` 函数标签 |
 
 生成的数据包结构与计分板 ABI 约定见

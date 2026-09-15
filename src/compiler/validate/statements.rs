@@ -10,19 +10,22 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    AssignOp, Condition, Expr, GiveItem, GiveTarget, MessageTarget, SelfAction, Span, Statement,
-    StatementKind,
+    AssignOp, CallTarget, Condition, EffectDuration, EntityQueryDecl, Expr, GiveItem, GiveTarget,
+    MessageTarget, ReturnKind, SelfAction, Span, Statement, StatementKind, XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
 use crate::diagnostic::Diagnostic;
 
-use super::expressions::{validate_call_context, validate_condition, validate_expr};
+use super::expressions::{
+    execution_context_label, validate_call_context, validate_condition, validate_expr,
+};
 use super::items::validate_give_count;
 use super::rules::{
     valid_entity_tag, valid_resource_location, valid_sound_source, valid_text_color,
     validate_identifier,
 };
+use super::tags::reachable_functions;
 
 /// 遍历函数体时保持不变的校验环境。
 #[derive(Clone, Copy)]
@@ -80,11 +83,16 @@ pub(super) fn collect_local_declarations<'a>(
             }
             StatementKind::Run(_)
             | StatementKind::Give { .. }
+            | StatementKind::EffectGive { .. }
+            | StatementKind::EffectClear { .. }
+            | StatementKind::XpChange { .. }
+            | StatementKind::ClearInventory { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
             | StatementKind::Call { .. }
             | StatementKind::Schedule { .. }
+            | StatementKind::ScheduleClear { .. }
             | StatementKind::Assign { .. }
             | StatementKind::Return(_) => {}
         }
@@ -134,6 +142,49 @@ fn validate_statement<'a>(
         StatementKind::SelfAction(action) => {
             validate_self_action(action, statement.span, ctx, diagnostics);
         }
+        StatementKind::EffectGive {
+            target,
+            effect,
+            duration,
+            amplifier,
+            ..
+        } => validate_effect_give(
+            target,
+            effect,
+            *duration,
+            *amplifier,
+            statement.span,
+            ctx,
+            diagnostics,
+        ),
+        StatementKind::EffectClear { target, effect } => {
+            validate_effect_clear(target, effect.as_deref(), statement.span, ctx, diagnostics);
+        }
+        StatementKind::XpChange {
+            target,
+            operation,
+            amount,
+            ..
+        } => validate_xp_change(
+            target,
+            *operation,
+            *amount,
+            statement.span,
+            ctx,
+            diagnostics,
+        ),
+        StatementKind::ClearInventory {
+            target,
+            item,
+            max_count,
+        } => validate_clear_inventory(
+            target,
+            item.as_deref(),
+            *max_count,
+            statement.span,
+            ctx,
+            diagnostics,
+        ),
         StatementKind::Message { target, color, .. } => {
             validate_message(target, color.as_deref(), statement.span, ctx, diagnostics);
         }
@@ -149,23 +200,33 @@ fn validate_statement<'a>(
         StatementKind::Spawn { entity_type, body } => {
             validate_spawn(entity_type, body, locals, statement.span, ctx, diagnostics);
         }
-        StatementKind::Return(value) => {
-            validate_return(value.as_ref(), locals, statement.span, ctx, diagnostics);
+        StatementKind::Return(kind) => {
+            validate_return(kind, locals, statement.span, ctx, diagnostics);
         }
-        StatementKind::Call {
-            function,
-            arguments,
-        } => {
-            validate_call(
-                function,
-                arguments,
-                locals,
-                statement.span,
-                ctx,
-                diagnostics,
-            );
-        }
-        StatementKind::Schedule { function, .. } => {
+        StatementKind::Call { target, arguments } => match target {
+            CallTarget::Function(function) => {
+                validate_call(
+                    function,
+                    arguments,
+                    locals,
+                    statement.span,
+                    ctx,
+                    diagnostics,
+                );
+            }
+            CallTarget::Tag(tag) => {
+                validate_tag_call(tag, arguments, locals, statement.span, ctx, diagnostics);
+            }
+        },
+        StatementKind::Schedule { target, .. } => match target {
+            CallTarget::Function(function) => {
+                validate_schedule(function, statement.span, ctx, diagnostics);
+            }
+            CallTarget::Tag(tag) => {
+                validate_tag_schedule(tag, statement.span, ctx, diagnostics);
+            }
+        },
+        StatementKind::ScheduleClear { function } => {
             validate_schedule(function, statement.span, ctx, diagnostics);
         }
         StatementKind::Assign {
@@ -324,6 +385,210 @@ fn validate_self_action(
     }
 }
 
+fn validate_effect_give(
+    target: &str,
+    effect: &str,
+    duration: EffectDuration,
+    amplifier: Option<u32>,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    query_reference(target, span, ctx, diagnostics);
+    if !valid_resource_location(effect) {
+        diagnostics.push(Diagnostic::new(
+            format!("`{effect}` 不是有效的效果资源位置"),
+            span,
+        ));
+    }
+    if let EffectDuration::Seconds(seconds) = duration
+        && !(1..=1_000_000).contains(&seconds)
+    {
+        diagnostics.push(Diagnostic::new(
+            "effect 持续秒数必须是 1 到 1000000 之间的整数",
+            span,
+        ));
+    }
+    if let Some(amplifier) = amplifier
+        && amplifier > 255
+    {
+        diagnostics.push(Diagnostic::new(
+            "effect 等级必须是 0 到 255 之间的整数",
+            span,
+        ));
+    }
+}
+
+fn validate_effect_clear(
+    target: &str,
+    effect: Option<&str>,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    query_reference(target, span, ctx, diagnostics);
+    if let Some(effect) = effect
+        && !valid_resource_location(effect)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("`{effect}` 不是有效的效果资源位置"),
+            span,
+        ));
+    }
+}
+
+fn validate_xp_change(
+    target: &str,
+    operation: XpOperation,
+    amount: i32,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    require_player_query(target, span, ctx, diagnostics);
+    if operation == XpOperation::Set && amount < 0 {
+        diagnostics.push(Diagnostic::new("xp.set 的数量必须是非负整数", span));
+    }
+}
+
+fn validate_clear_inventory(
+    target: &str,
+    item: Option<&str>,
+    max_count: Option<u32>,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    require_player_query(target, span, ctx, diagnostics);
+    if let Some(item) = item
+        && !valid_resource_location(item)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("`{item}` 不是有效的物品资源位置"),
+            span,
+        ));
+    }
+    if let Some(max_count) = max_count
+        && max_count > i32::MAX as u32
+    {
+        diagnostics.push(Diagnostic::new("clear 最大数量不能超过 2147483647", span));
+    }
+}
+
+/// 解析实体查询引用；未声明时报告并返回 `None`。
+fn query_reference<'b>(
+    name: &str,
+    span: Span,
+    ctx: ValidationContext<'_, 'b>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<&'b EntityQueryDecl> {
+    match ctx.symbols.queries.get(name).copied() {
+        Some(query) => Some(query),
+        None => {
+            diagnostics.push(Diagnostic::new(format!("找不到实体查询 `{name}`"), span));
+            None
+        }
+    }
+}
+
+/// 解析并要求查询匹配玩家；命令目标是玩家而查询不匹配时报告。
+pub(super) fn require_player_query<'b>(
+    name: &str,
+    span: Span,
+    ctx: ValidationContext<'_, 'b>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<&'b EntityQueryDecl> {
+    let query = query_reference(name, span, ctx, diagnostics)?;
+    if query.entity_type != "minecraft:player" {
+        diagnostics.push(Diagnostic::new(
+            format!("查询 `{name}` 必须匹配 minecraft:player"),
+            span,
+        ));
+    }
+    Some(query)
+}
+
+fn validate_tag_call<'a>(
+    tag: &str,
+    arguments: &'a [Expr],
+    locals: &HashSet<&'a str>,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match ctx.symbols.function_tags.get(tag) {
+        None => diagnostics.push(Diagnostic::new(format!("找不到函数标签 `{tag}`"), span)),
+        Some(_) if !arguments.is_empty() => diagnostics.push(Diagnostic::new(
+            "函数标签调用不接受参数，标签不能传递实参",
+            span,
+        )),
+        Some(_) => {
+            for function in reachable_functions(tag, ctx.symbols.function_tags) {
+                let Some(signature) = ctx.symbols.functions.get(function) else {
+                    continue;
+                };
+                if signature.parameters > 0 {
+                    diagnostics.push(Diagnostic::new(
+                        format!(
+                            "函数标签 `{tag}` 中的函数 `{function}` 需要 {} 个参数，标签调用无法传递",
+                            signature.parameters
+                        ),
+                        span,
+                    ));
+                }
+                if !ctx.context.satisfies(signature.required_context)
+                    && let Some((attribute, kind)) =
+                        execution_context_label(signature.required_context)
+                {
+                    diagnostics.push(Diagnostic::new(
+                        format!(
+                            "函数标签 `{tag}` 中的 {attribute} 函数 `{function}` 需要{kind}执行上下文"
+                        ),
+                        span,
+                    ));
+                }
+            }
+        }
+    }
+    for argument in arguments {
+        validate_expr(argument, locals, ctx, diagnostics);
+    }
+}
+
+fn validate_tag_schedule(
+    tag: &str,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if !ctx.symbols.function_tags.contains_key(tag) {
+        diagnostics.push(Diagnostic::new(format!("找不到函数标签 `{tag}`"), span));
+        return;
+    }
+    for function in reachable_functions(tag, ctx.symbols.function_tags) {
+        let Some(signature) = ctx.symbols.functions.get(function) else {
+            continue;
+        };
+        if signature.required_context != ExecutionContext::None {
+            diagnostics.push(Diagnostic::new(
+                format!(
+                    "不能调度函数标签 `{tag}` 中需要执行上下文的函数 `{function}`，调度不会保留实体或玩家"
+                ),
+                span,
+            ));
+        }
+        if signature.parameters > 0 {
+            diagnostics.push(Diagnostic::new(
+                format!(
+                    "不能调度函数标签 `{tag}` 中需要 {} 个参数的函数 `{function}`",
+                    signature.parameters
+                ),
+                span,
+            ));
+        }
+    }
+}
+
 fn validate_message(
     target: &MessageTarget,
     color: Option<&str>,
@@ -469,7 +734,7 @@ fn non_summonable_entity(entity_type: &str) -> bool {
 }
 
 fn validate_return<'a>(
-    value: Option<&'a Expr>,
+    kind: &'a ReturnKind,
     locals: &HashSet<&'a str>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
@@ -481,16 +746,18 @@ fn validate_return<'a>(
             span,
         ));
     }
-    match (ctx.return_rules.returns_score, value) {
-        (true, Some(value)) => validate_expr(value, locals, ctx, diagnostics),
-        (true, None) => diagnostics.push(Diagnostic::new(
-            "返回 score 的函数需要 `return <表达式>;`",
+    match (ctx.return_rules.returns_score, kind) {
+        (true, ReturnKind::Value(value)) => validate_expr(value, locals, ctx, diagnostics),
+        (true, ReturnKind::Run(_) | ReturnKind::Fail) => {}
+        (true, ReturnKind::Void) => diagnostics.push(Diagnostic::new(
+            "返回 score 的函数需要 `return <表达式>;`、`return run \"命令\";` 或 `return fail;`",
             span,
         )),
-        (false, Some(_)) => {
-            diagnostics.push(Diagnostic::new("无返回值函数只能使用 `return;`", span))
-        }
-        (false, None) => {}
+        (false, ReturnKind::Value(_)) => diagnostics.push(Diagnostic::new(
+            "无返回值函数只能使用 `return;`、`return fail;` 或 `return run \"命令\";`",
+            span,
+        )),
+        (false, ReturnKind::Void | ReturnKind::Run(_) | ReturnKind::Fail) => {}
     }
 }
 

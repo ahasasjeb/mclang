@@ -30,6 +30,7 @@ pub struct CheckSummary {
     pub item_stacks: usize,
     pub storages: usize,
     pub resources: usize,
+    pub function_tags: usize,
     pub raw_statements: usize,
 }
 
@@ -45,6 +46,7 @@ pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
         item_stacks: program.item_stacks.len(),
         storages: program.storages.len(),
         resources: program.resources.len(),
+        function_tags: program.function_tags.len(),
         raw_statements: raw_statement_count(&program.functions),
     })
 }
@@ -83,6 +85,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
         .iter()
         .map(|statement| match &statement.kind {
             ast::StatementKind::Run(_) => 1,
+            ast::StatementKind::Return(ast::ReturnKind::Run(_)) => 1,
             ast::StatementKind::Execute { body, .. } => 1 + raw_count_in_block(body),
             ast::StatementKind::Each { body, .. }
             | ast::StatementKind::InDimension { body, .. }
@@ -94,12 +97,17 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
                 ..
             } => raw_count_in_block(then_body) + raw_count_in_block(else_body),
             ast::StatementKind::Give { .. }
+            | ast::StatementKind::EffectGive { .. }
+            | ast::StatementKind::EffectClear { .. }
+            | ast::StatementKind::XpChange { .. }
+            | ast::StatementKind::ClearInventory { .. }
             | ast::StatementKind::SelfAction(_)
             | ast::StatementKind::Message { .. }
             | ast::StatementKind::PlaySound { .. }
             | ast::StatementKind::Call { .. }
             | ast::StatementKind::Let { .. }
             | ast::StatementKind::Schedule { .. }
+            | ast::StatementKind::ScheduleClear { .. }
             | ast::StatementKind::Assign { .. }
             | ast::StatementKind::Return(_) => 0,
         })
@@ -196,6 +204,7 @@ fn frontend(sources: &[SourceFile]) -> Result<ast::Program, String> {
         program.item_stacks.append(&mut other.item_stacks);
         program.storages.append(&mut other.storages);
         program.resources.append(&mut other.resources);
+        program.function_tags.append(&mut other.function_tags);
         program.functions.append(&mut other.functions);
     }
     if diagnostics.is_empty() {
@@ -359,5 +368,37 @@ mod tests {
         }];
         let program = frontend(&sources).unwrap();
         assert_eq!(raw_statement_count(&program.functions), 3);
+    }
+
+    #[test]
+    fn counts_return_run_as_raw_statement() {
+        let sources = vec![SourceFile {
+            path: PathBuf::from("strict.mcl"),
+            text: r#"
+                namespace strict;
+                fn structured() { return fail; }
+                fn raw() -> score { return run "time query gametime"; }
+            "#
+            .to_owned(),
+        }];
+        let program = frontend(&sources).unwrap();
+        assert_eq!(raw_statement_count(&program.functions), 1);
+    }
+
+    #[test]
+    fn merges_function_tags_across_files() {
+        let sources = vec![
+            SourceFile {
+                path: PathBuf::from("main.mcl"),
+                text: "namespace demo; fn a() {} fn_tag t { value(a); }".to_owned(),
+            },
+            SourceFile {
+                path: PathBuf::from("helper.mcl"),
+                text: "namespace demo; fn main() { call #t(); }".to_owned(),
+            },
+        ];
+        let program = frontend(&sources).unwrap();
+        assert_eq!(program.function_tags.len(), 1);
+        assert!(compile(&program, "test").is_ok());
     }
 }

@@ -75,11 +75,16 @@ pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut 
             | StatementKind::While { body, .. } => collect_local_names(body, locals),
             StatementKind::Run(_)
             | StatementKind::Give { .. }
+            | StatementKind::EffectGive { .. }
+            | StatementKind::EffectClear { .. }
+            | StatementKind::XpChange { .. }
+            | StatementKind::ClearInventory { .. }
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
             | StatementKind::Call { .. }
             | StatementKind::Schedule { .. }
+            | StatementKind::ScheduleClear { .. }
             | StatementKind::Assign { .. }
             | StatementKind::Return(_) => {}
         }

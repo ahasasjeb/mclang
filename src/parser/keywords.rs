@@ -5,7 +5,7 @@
 //! 声音分类等）按领域保持独立函数，规范形式统一为英文；中文别名只在解析边界
 //! 出现，进入 AST 后所有阶段只处理英文规范值。
 
-use crate::ast::{Attribute, ItemRarity};
+use crate::ast::{Attribute, ItemRarity, XpKind};
 
 /// 语言关键词的规范英文写法与中文别名。
 pub(crate) struct Keyword {
@@ -60,12 +60,20 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "函数",
     },
     Keyword {
+        english: "fn_tag",
+        chinese: "函数标签",
+    },
+    Keyword {
         english: "let",
         chinese: "令",
     },
     Keyword {
         english: "return",
         chinese: "返回",
+    },
+    Keyword {
+        english: "fail",
+        chinese: "失败",
     },
     Keyword {
         english: "if",
@@ -130,6 +138,18 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
     Keyword {
         english: "sound",
         chinese: "声音",
+    },
+    Keyword {
+        english: "effect",
+        chinese: "效果",
+    },
+    Keyword {
+        english: "xp",
+        chinese: "经验",
+    },
+    Keyword {
+        english: "clear",
+        chinese: "清除",
     },
     Keyword {
         english: "run",
@@ -224,6 +244,15 @@ pub(super) fn item_property(value: &str) -> Option<&'static str> {
     }
 }
 
+/// `fn_tag` 声明体允许的属性与中文别名。
+pub(super) fn function_tag_property(value: &str) -> Option<&'static str> {
+    match value {
+        "value" | "值" => Some("value"),
+        "replace" | "替换" => Some("replace"),
+        _ => None,
+    }
+}
+
 pub(super) fn item_stack_property(value: &str) -> Option<&'static str> {
     match value {
         "count" | "数量" => Some("count"),
@@ -300,6 +329,32 @@ pub(super) fn message_target(value: &str) -> Option<&'static str> {
         "all" | "全部" => Some("all"),
         "self" | "自身" => Some("self"),
         "nearest" | "最近" => Some("nearest"),
+        _ => None,
+    }
+}
+
+pub(super) fn effect_method(value: &str) -> Option<&'static str> {
+    match value {
+        "give" | "给予" => Some("give"),
+        "give_infinite" | "给予无限" => Some("give_infinite"),
+        "clear" | "清除" => Some("clear"),
+        _ => None,
+    }
+}
+
+pub(super) fn xp_method(value: &str) -> Option<&'static str> {
+    match value {
+        "add" | "增加" => Some("add"),
+        "set" | "设置" => Some("set"),
+        "query" | "查询" => Some("query"),
+        _ => None,
+    }
+}
+
+pub(super) fn xp_kind(value: &str) -> Option<XpKind> {
+    match value {
+        "points" | "点数" => Some(XpKind::Points),
+        "levels" | "等级" => Some(XpKind::Levels),
         _ => None,
     }
 }

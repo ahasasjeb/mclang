@@ -5,6 +5,7 @@ use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
 
 use super::Parser;
+use super::keywords::{word_matches, xp_kind};
 
 impl Parser {
     pub(super) fn expression(&mut self) -> Result<Expr, Diagnostic> {
@@ -109,6 +110,8 @@ impl Parser {
                         },
                         span,
                     })
+                } else if self.check(&TokenKind::Dot) {
+                    self.named_expression(name, token.span)
                 } else {
                     Ok(Expr {
                         kind: ExprKind::Score(name),
@@ -144,5 +147,35 @@ impl Parser {
         }
         self.expect(TokenKind::RightParen, "实参列表缺少 `)`")?;
         Ok(arguments)
+    }
+
+    /// 具名表达式：目前只有 `xp.query(查询, points|levels)`。
+    fn named_expression(&mut self, receiver: String, start_span: Span) -> Result<Expr, Diagnostic> {
+        self.expect(TokenKind::Dot, "名称后需要 `.`")?;
+        let (method, method_span) = self.ident("名称方法")?;
+        if !word_matches(&receiver, "xp") || !word_matches(&method, "query") {
+            return Err(Diagnostic::new(
+                format!(
+                    "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`"
+                ),
+                start_span.merge(method_span),
+            ));
+        }
+        self.expect(TokenKind::LeftParen, "xp.query 后需要 `(`")?;
+        let (target, _) = self.ident("xp.query 目标查询名称")?;
+        self.expect(TokenKind::Comma, "xp.query 目标后需要 `,`")?;
+        let (kind, kind_span) = self.ident("xp 类型 points 或 levels")?;
+        let Some(kind) = xp_kind(&kind) else {
+            return Err(Diagnostic::new(
+                "xp 类型只能是 points/点数 或 levels/等级",
+                kind_span,
+            ));
+        };
+        self.expect(TokenKind::RightParen, "xp.query 调用缺少 `)`")?;
+        let span = start_span.merge(self.previous().span);
+        Ok(Expr {
+            kind: ExprKind::XpQuery { target, kind },
+            span,
+        })
     }
 }

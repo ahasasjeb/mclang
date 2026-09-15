@@ -4,6 +4,7 @@ use crate::ast::{BinaryOp, Comparison, Condition, Expr, ExprKind};
 
 use super::Compiler;
 use super::Value;
+use super::emit::entity_query_clause;
 use crate::compiler::constant::constant_value;
 
 impl Compiler<'_> {
@@ -31,6 +32,26 @@ impl Compiler<'_> {
                     self.objective, self.program.namespace
                 ));
                 Value::Score(target)
+            }
+            ExprKind::XpQuery { target, kind } => {
+                let query = self
+                    .program
+                    .queries
+                    .iter()
+                    .find(|candidate| candidate.name == *target)
+                    .expect("semantic validation guarantees the entity query exists");
+                let result = self.temporary();
+                commands.push(format!(
+                    "scoreboard players set {result} {} 0",
+                    self.objective
+                ));
+                commands.push(format!(
+                    "execute {} store result score {result} {} run xp query @s {}",
+                    entity_query_clause(query),
+                    self.objective,
+                    kind.as_str()
+                ));
+                Value::Score(result)
             }
             ExprKind::Negate(value) => {
                 let source_value = self.compile_expr(value, owner, commands);

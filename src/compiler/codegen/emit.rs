@@ -210,6 +210,27 @@ pub(super) fn tag_json(values: &[String]) -> String {
     format!("{{\n  \"values\": [\n{values}\n  ]\n}}\n")
 }
 
+/// 函数标签文件。`replace` 为假（26.3 默认值）时省略字段，保持输出最小。
+pub(super) fn function_tag_json(values: &[String], replace: bool) -> String {
+    let values = if values.is_empty() {
+        "[]".to_owned()
+    } else {
+        format!(
+            "[\n{}\n  ]",
+            values
+                .iter()
+                .map(|value| format!("    \"{}\"", json_escape(value)))
+                .collect::<Vec<_>>()
+                .join(",\n")
+        )
+    };
+    if replace {
+        format!("{{\n  \"values\": {values},\n  \"replace\": true\n}}\n")
+    } else {
+        format!("{{\n  \"values\": {values}\n}}\n")
+    }
+}
+
 fn json_escape(value: &str) -> String {
     let mut escaped = String::new();
     for character in value.chars() {

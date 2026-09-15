@@ -1,0 +1,85 @@
+// 药水实验室：演示效果、经验、清空物品、函数标签与带小数的调度。
+namespace lab;
+
+score charges = 3;
+score announced = 0;
+
+query player = entity("minecraft:player") { limit(1); }
+query nearby = entity("minecraft:player") { within(16); }
+
+@load
+fn load() {
+    message.all("药水实验室已加载", green);
+}
+
+fn prepare() {
+    effect.give(nearby, "minecraft:regeneration", 10);
+}
+
+fn distribute() {
+    effect.give(player, "minecraft:speed", 30, 1, true);
+    effect.give_infinite(player, "minecraft:night_vision");
+    xp.add(player, points, 25);
+    xp.set(player, levels, 5);
+}
+
+fn cleanup() {
+    effect.clear(nearby);
+    clear(nearby, "minecraft:glass_bottle", 8);
+}
+
+fn announce() {
+    message.all("批次完成", aqua);
+}
+
+fn report_level() {
+    if xp.query(player, levels) >= 5 {
+        message.all("等级已达 5", gold);
+    }
+}
+
+fn_tag batch {
+    value(prepare);
+    value(distribute);
+    value(cleanup);
+    value(#announcement);
+}
+
+fn_tag announcement {
+    value(announce);
+    value(report_level);
+}
+
+fn queue() {
+    schedule #batch() after 2.5 s append;
+    schedule cleanup() after 5 s;
+}
+
+fn cancel_pending() {
+    schedule.clear(cleanup);
+}
+
+// `return fail` 只能位于函数最外层代码块，给调用方一个失败信号。
+fn abort() {
+    return fail;
+}
+
+fn wrap_up() {
+    if announced == 0 {
+        announced = 1;
+        message.all("充能耗尽", red);
+        call cancel_pending();
+        call abort();
+    }
+}
+
+@tick
+fn cycle() {
+    if charges > 0 {
+        charges -= 1;
+        call #batch();
+        queue();
+    } else {
+        call wrap_up();
+    }
+}

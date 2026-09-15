@@ -5,8 +5,10 @@ use crate::diagnostic::Diagnostic;
 pub enum TokenKind {
     Ident(String),
     Number(i64),
+    Decimal(f64),
     String(String),
     At,
+    Hash,
     LeftParen,
     RightParen,
     LeftBrace,
@@ -86,6 +88,7 @@ impl Lexer<'_> {
                 '"' if self.source[self.cursor..].starts_with("\"\"\"") => self.raw_string(start),
                 '"' => self.string(start),
                 '@' => self.single(TokenKind::At),
+                '#' => self.single(TokenKind::Hash),
                 '(' => self.single(TokenKind::LeftParen),
                 ')' => self.single(TokenKind::RightParen),
                 '{' => self.single(TokenKind::LeftBrace),
@@ -152,6 +155,32 @@ impl Lexer<'_> {
     fn number(&mut self, start: usize) {
         while matches!(self.peek(), Some('0'..='9')) {
             self.advance();
+        }
+        // 小数只在点号后紧跟数字时成立，`self.remove()` 之类的成员访问不受影响。
+        if self.peek() == Some('.') && self.peek_second().is_some_and(|c| c.is_ascii_digit()) {
+            self.advance();
+            while matches!(self.peek(), Some('0'..='9')) {
+                self.advance();
+            }
+            let text = &self.source[start..self.cursor];
+            return match text.parse::<f64>() {
+                Ok(value) if value.is_finite() => self.tokens.push(Token {
+                    kind: TokenKind::Decimal(value),
+                    span: Span {
+                        source: self.source_id,
+                        start,
+                        end: self.cursor,
+                    },
+                }),
+                _ => self.diagnostics.push(Diagnostic::new(
+                    "小数超出支持范围",
+                    Span {
+                        source: self.source_id,
+                        start,
+                        end: self.cursor,
+                    },
+                )),
+            };
         }
         let text = &self.source[start..self.cursor];
         match text.parse::<i64>() {
@@ -346,5 +375,14 @@ mod tests {
         assert!(matches!(&tokens[0].kind, TokenKind::Ident(value) if value == "命名空间"));
         assert!(matches!(&tokens[4].kind, TokenKind::Ident(value) if value == "每刻"));
         assert!(matches!(&tokens[5].kind, TokenKind::Ident(value) if value == "函数"));
+    }
+
+    #[test]
+    fn lexes_decimals_hashes_and_member_access() {
+        let tokens = lex("after 1.5 s; call #cleanup(); self.remove();", 0).unwrap();
+        assert!(matches!(tokens[1].kind, TokenKind::Decimal(value) if value == 1.5));
+        assert_eq!(tokens[5].kind, TokenKind::Hash);
+        assert!(matches!(&tokens[6].kind, TokenKind::Ident(value) if value == "cleanup"));
+        assert!(tokens.iter().any(|token| token.kind == TokenKind::Dot));
     }
 }

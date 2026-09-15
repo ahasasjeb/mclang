@@ -22,16 +22,25 @@ pub(super) fn validate_call_context(
     if ctx.context.satisfies(signature.required_context) {
         return;
     }
-    let (attribute, kind) = match signature.required_context {
-        ExecutionContext::Player => ("@player", "玩家"),
-        ExecutionContext::Mob => ("@non_player", "非玩家实体"),
-        ExecutionContext::Entity => ("@entity", "实体"),
-        ExecutionContext::None => return,
+    let Some((attribute, kind)) = execution_context_label(signature.required_context) else {
+        return;
     };
     diagnostics.push(Diagnostic::new(
         format!("{attribute} 函数 `{function}` 需要{kind}执行上下文"),
         span,
     ));
+}
+
+/// 执行上下文对应的函数属性与中文描述，供调用点组织诊断文本。
+pub(super) fn execution_context_label(
+    context: ExecutionContext,
+) -> Option<(&'static str, &'static str)> {
+    match context {
+        ExecutionContext::Player => Some(("@player", "玩家")),
+        ExecutionContext::Mob => Some(("@non_player", "非玩家实体")),
+        ExecutionContext::Entity => Some(("@entity", "实体")),
+        ExecutionContext::None => None,
+    }
 }
 
 pub(super) fn validate_condition(
@@ -111,6 +120,17 @@ pub(super) fn validate_expr(
             }
             for argument in arguments {
                 validate_expr(argument, locals, ctx, diagnostics);
+            }
+        }
+        ExprKind::XpQuery { target, .. } => {
+            if let Some(query) =
+                super::statements::require_player_query(target, expression.span, ctx, diagnostics)
+                && query.limit != Some(1)
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("xp.query 需要 limit(1) 的单个玩家查询 `{target}`"),
+                    expression.span,
+                ));
             }
         }
         ExprKind::Negate(value) => validate_expr(value, locals, ctx, diagnostics),

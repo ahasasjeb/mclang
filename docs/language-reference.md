@@ -16,6 +16,9 @@
 | `storage` | `存储` | `item_list` | `物品列表` |
 | `resource` | `资源` | `predicate` | `谓词` |
 | `contents` | `内容` | `fn` | `函数` |
+| `fn_tag` | `函数标签` | `fail` | `失败` |
+| `effect` | `效果` | `xp` | `经验` |
+| `clear` | `清除` | | |
 | `let` | `令` | `return` | `返回` |
 | `if` | `如果` | `else` | `否则` |
 | `while` | `当` | `each` | `遍历` |
@@ -60,8 +63,11 @@
 | 物品稀有度 | `common` / `uncommon` / `rare` / `epic` | `普通` / `罕见` / `稀有` / `史诗` |
 | 布尔值 | `true` / `false` | `真` / `假` |
 | 调度单位 | `t` / `s` / `d` | `刻` / `秒` / `天` |
+| 经验类型 | `points` / `levels` | `点数` / `等级` |
 | 声音分类 | `master` / `music` / `record` / `weather` / `block` | `主音量` / `音乐` / `唱片` / `天气` / `方块` |
 | 声音分类 | `hostile` / `neutral` / `player` / `ambient` / `voice` / `ui` | `敌对` / `中立` / `玩家` / `环境` / `语音` / `界面` |
+
+方法名也可以写中文：`效果.给予`、`效果.给予无限`、`效果.清除`、`经验.增加`、`经验.设置`、`经验.查询`，以及函数标签里的 `值` 和 `替换`。
 
 文本颜色支持 `black`/`黑色`、`dark_blue`/`深蓝色`、`dark_green`/`深绿色`、`dark_aqua`/`深青色`、`dark_red`/`深红色`、`dark_purple`/`深紫色`、`gold`/`金色`、`gray`/`灰色`、`dark_gray`/`深灰色`、`blue`/`蓝色`、`green`/`绿色`、`aqua`/`青色`、`red`/`红色`、`light_purple`/`亮紫色`、`yellow`/`黄色` 和 `white`/`白色`。
 
@@ -126,7 +132,7 @@ fn caller() {
 
 参数是函数私有的 32 位计分值，可以参与表达式和赋值。同步递归被禁止，因此嵌套调用不会覆盖仍在使用的参数。入口函数不能带参数；需要参数的函数也不能直接 `schedule`，可以调度一个无参数包装函数。参数化函数应由 Mclang 代码调用，直接从 Minecraft 执行它会沿用上次调用留下的参数值。
 
-函数默认没有值返回。`return;` 会提前结束这种函数。追加 `-> score` 后，函数必须以返回表达式结束，调用可以出现在任意计分表达式中：
+函数默认没有值返回。`return;` 会提前结束这种函数。追加 `-> score` 后，函数必须以 `return` 结束，调用可以出现在任意计分表达式中：
 
 ```mcl
 fn double(value) -> score {
@@ -139,7 +145,21 @@ fn use_value() {
 }
 ```
 
-返回值使用 Minecraft 原生 `return` 和 `execute store result score` 传递。当前版本只允许 `return` 直接位于函数最外层代码块，不能放入 `if`、`while`、`each`、`spawn`、`in_dimension` 或 `execute` 块；需要条件结果时先赋给局部变量，在函数末尾返回。
+返回值使用 Minecraft 原生 `return` 和 `execute store result score` 传递。返回 score 的函数还可以用 `return run "命令"` 把一条命令的结果作为返回值，或用 `return fail` 报告失败；无返回值函数省略分数即可：
+
+```mcl
+fn gametime() -> score {
+    return run "time query gametime";
+}
+
+fn abort() {
+    return fail;
+}
+```
+
+`return run` 的命令字符串与 `run` 使用同一套检查（不能为空、不能以 `/` 开头、只能一行）。它是唯一需要原始命令文本的结构化形式，因此 `--deny-raw` 会把 `return run` 计为一条底层语句。
+
+当前版本只允许 `return` 直接位于函数最外层代码块，不能放入 `if`、`while`、`each`、`spawn`、`in_dimension` 或 `execute` 块；需要条件结果时先赋给局部变量，在函数末尾返回。
 
 ## 局部变量
 
@@ -343,8 +363,12 @@ sound.self("minecraft:block.note_block.pling", master);
 | 算术表达式 | `scoreboard players operation` 与 `#t<n>` 临时项 | 常量在编译期折叠 |
 | `if`、`while`、`&&`、`\|\|`、`!` | `execute if score` 与辅助函数 | 条件先求值为 0/1 |
 | `call f(...)`、`f(...)` | `function <ns>:f` | 实参经假玩家传递 |
+| `call #标签()` | `function #<ns>:标签` | 标签成员在编译期检查上下文与参数 |
 | `return e;` | `return <值>`、`return run scoreboard players get` | 计分返回约定 |
+| `return fail;` | `return fail` | 失败返回，store result 得到 0 |
+| `return run "命令";` | `return run <命令>` | 命令结果作为返回值；计入底层语句 |
 | `@load`、`@tick` | `minecraft:load`、`minecraft:tick` 函数标签 | 入口函数 |
+| `fn_tag 名称 { ... }` | `data/<ns>/tags/function/<名称>.json` | 函数标签声明 |
 | 普通函数 | `data/<ns>/function/<名称>.mcfunction` | 每个函数一个文件 |
 | `each(q) {}` | `execute as <选择器> at @s run function <辅助函数>` | 查询下降为选择器 |
 | `spawn(t) {}` | `execute summon <t> run function <辅助函数>` | 暂不支持初始 NBT |
@@ -363,8 +387,16 @@ sound.self("minecraft:block.note_block.pling", master);
 | `self.remove_preserving_items(s)` | 保存、清空、`kill @s` | 非玩家实体上下文 |
 | `message.all/self/nearest` | `tellraw <玩家选择器> <文本组件 JSON>` | 文本组件由编译器生成 |
 | `sound.self(声音, 分类)` | `playsound <声音> <分类> @s ~ ~ ~ 1 1` | 玩家上下文 |
+| `effect.give(q, 效果, 秒[, 等级][, 隐藏粒子])` | `execute as <选择器> at @s run effect give @s ...` | 目标为实体查询 |
+| `effect.give_infinite(q, 效果[, 等级][, 隐藏粒子])` | `... effect give @s <效果> infinite ...` | 无限时长 |
+| `effect.clear(q[, 效果])` | `... effect clear @s [<效果>]` | |
+| `xp.add/set(q, points\|levels, 数量)` | `... xp add/set @s <数量> <类型>` | 目标必须是玩家查询 |
+| `xp.query(q, points\|levels)` | `... store result score #tN ... run xp query @s <类型>` | 表达式；查询需要 `limit(1)` |
+| `clear(q[, 物品][, 数量])` | `... clear @s [<物品>] [<数量>]` | 目标必须是玩家查询 |
 | `predicate(p)` | `execute if predicate <ns>:p` | 可与 `!`、`&&`、`\|\|` 组合 |
-| `schedule f() after n t [append]` | `schedule function <ns>:f <n>t [append]` | 单位 `t`、`s`、`d` |
+| `schedule f() after n t [append]` | `schedule function <ns>:f <n>t [append]` | 单位 `t`、`s`、`d`，支持小数 |
+| `schedule #标签() after n t` | `schedule function #<ns>:标签 <n>t` | |
+| `schedule.clear(f)` | `schedule clear <ns>:f` | 只接受函数 |
 | `run "命令"` | 命令原样写入 `.mcfunction` | 底层接口 |
 | `query ... = entity(...)` | 选择器 `@e[...]`、`if items entity @s <槽> <物品谓词>` | 编译期检查全部参数 |
 | `item ... = item_stack(...)` | 物品组件 SNBT | 编译期检查全部组件 |
@@ -379,7 +411,7 @@ run "particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3";
 
 `run` 只用于标准层尚未覆盖的 Minecraft 能力，定位类似内联汇编。字符串内容原样成为一行 `.mcfunction` 命令，无法得到实体、资源位置、NBT 或参数的静态检查。常规项目应优先使用类型化语句。命令不要写开头的 `/`；字符串支持 `\"`、`\\`、`\n`、`\r` 和 `\t` 转义，实际换行会被拒绝。
 
-新项目可以启用严格检查，递归拒绝 `run` 和字符串形式的 `execute`：
+新项目可以启用严格检查，递归拒绝 `run`、字符串形式的 `execute` 和 `return run`：
 
 ```powershell
 mclang check path/to/project --deny-raw
@@ -479,10 +511,74 @@ execute "as @a at @s" {
 ```mcl
 schedule cleanup() after 20 t;
 schedule cleanup() after 5 s append;
+schedule cleanup() after 1.5 s;
 schedule cleanup() after 1 d replace;
+schedule.clear(cleanup);
 ```
 
-单位支持游戏刻 `t`、秒 `s` 和游戏日 `d`。默认模式为 `replace`；`append` 允许保留同函数已有的调度。
+单位支持游戏刻 `t`、秒 `s` 和游戏日 `d`，数量可以是整数或小数；编译器按原版 `TimeArgument` 的规则四舍五入到游戏刻，并拒绝不足 1 刻或超出 32 位范围的延迟。默认模式为 `replace`；`append` 允许保留同函数已有的调度。`schedule.clear` 取消尚未执行的一次调度，它只接受函数名：原版无法取消标签调度。
+
+## 效果与经验
+
+```mcl
+query mobs = entity("minecraft:zombie") { within(32); }
+query player = entity("minecraft:player") { limit(1); }
+
+fn buff() {
+    effect.give(mobs, "minecraft:speed", 30);          // 30 秒
+    effect.give(mobs, "minecraft:speed", 30, 1);       // 等级 1
+    effect.give(mobs, "minecraft:speed", 30, 0, true); // 隐藏粒子
+    effect.give_infinite(mobs, "minecraft:night_vision");
+    effect.clear(mobs);
+    effect.clear(mobs, "minecraft:speed");
+}
+
+fn reward() {
+    xp.add(player, points, 10);      // 增加 10 点经验
+    xp.add(player, levels, 1);       // 增加 1 级
+    xp.set(player, points, 0);       // 把经验点设为 0
+    xp.set(player, levels, 5);       // 把等级设为 5
+    let level = xp.query(player, levels);
+}
+```
+
+`effect.give` 的持续秒数范围是 1 到 1000000，等级范围是 0 到 255；`effect.give_infinite` 生成无限时长。`xp.query` 只能作为表达式使用（原版查询命令没有副作用），它要求目标查询是 `limit(1)` 的玩家查询，因为原版只接受单个玩家。`xp.set` 的数量不能为负；`xp.add` 可以为负，表示扣除。
+
+## 清除物品
+
+```mcl
+clear(player);                          // 清空全部物品
+clear(player, "minecraft:diamond");     // 只清除钻石
+clear(player, "minecraft:diamond", 5);  // 最多清除 5 个
+```
+
+目标必须是玩家查询，物品是资源位置，数量最大为 2147483647。
+
+## 函数标签
+
+`fn_tag` 声明输出 `data/<命名空间>/tags/function/<名称>.json`，用 `call #标签()` 同步调用、用 `schedule #标签() after ...` 调度：
+
+```mcl
+fn cleanup() { effect.clear(mobs); }
+fn report() { message.all("cleanup done", green); }
+
+fn_tag tick_work {
+    value(cleanup);
+    value(report);
+    value(#aliases);        // 嵌套标签
+    value("minecraft:tick"); // 其他命名空间的资源
+    replace = true;
+}
+
+fn main() {
+    call #tick_work();
+    schedule #tick_work() after 2 s append;
+}
+```
+
+标签条目有三种写法：裸标识符是本命名空间的函数，`#名称` 是本命名空间的标签，字符串是外部资源位置（以 `#` 开头表示标签），外部条目只做语法检查。`replace` 对应标签文件的同名字段，默认 `false`（与低优先级数据包合并），写成 `true` 时替换。
+
+编译器会检查条目引用的函数和标签存在、标签不能循环引用、`call #标签()` 不能带参数；被调用标签里的所有函数都必须满足当前执行上下文且没有参数，被调度的标签里的所有函数都不能要求执行上下文或参数。
 
 ## 诊断和静态检查
 

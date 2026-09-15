@@ -24,16 +24,16 @@
 | 不可达 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 不建模 | 可由其他结构化语句等价表达，或对数据包无意义 |
 
-当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 13 个有部分结构化入口，**没有命令被完整覆盖**；48 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
+当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **5 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`），11 个有部分结构化入口；45 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
 
 ### 1.1 执行、函数与数据核心
 
 | 命令 | 原版形态（26.3-rc-2） | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
 | `execute` | `run`；`if`/`unless`（block、biome、loaded、dimension、score、blocks、entity、predicate、function、stopwatch、data、items、slots）；修饰符 as、at、positioned、rotated、facing、align、anchored、in、on（8 种关系）、summon；store result/success | 部分 | 只有 `execute "子句" {}` 字符串包装；缺全部结构化子句、条件与 store |
-| `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call` 与表达式调用只支持无参函数；缺函数标签与宏参数 |
-| `return` | `<int>`；`fail`；`run <命令>` | 部分 | 计分返回值与 store ABI 已有；缺 `fail`、`run` |
-| `schedule` | `function <fn> <time> [replace\|append]`；`clear <fn>` | 部分 | 仅整数时间与 replace/append；缺 `clear`、浮点时间 |
+| `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call`、表达式调用与 `#tag` 已支持，标签成员在编译期检查执行上下文与参数；缺 `<fn> <nbt>` 宏参数与 `with` |
+| `return` | `<int>`；`fail`；`run <命令>` | 完成 | 计分返回值、store ABI、`return fail`、`return run` 全覆盖；`return run` 的命令文本计入 `--deny-raw` |
+| `schedule` | `function <fn> <time> [replace\|append]`；`clear <fn>` | 完成 | 整数与浮点时间（按原版 `TimeArgument` 换算为游戏刻）、`replace`/`append`、`schedule.clear`、`#tag` 调度 |
 | `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 部分 | 仅 `item_list` 的 `modify set from` 与 `set value []`；无通用访问器与路径 |
 | `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 部分 | 只有编译器内部 ABI objective；无用户计分板、显示槽、trigger 解锁 |
 | `item` | replace/fill/override/modify（entity/block 目标、槽位集合、from/with/loot_modifier） | 部分 | 只有 `give(..., self.item)` 用的 `replace ... from entity ... contents` |
@@ -58,10 +58,10 @@
 | `tag` | `add`/`remove`/`list` | 部分 | 只有 `self.add_tag`/`self.remove_tag`；无多目标与 `list` |
 | `team` | list/add/remove/empty/join/leave/modify（displayName/color/friendlyFire/seeFriendlyInvisibles/nametagVisibility/deathMessageVisibility/collisionRule/prefix/suffix） | 缺失 | — |
 | `attribute` | get；base set/get/reset；modifier add/remove/value get | 缺失 | — |
-| `effect` | give（时长/等级/隐藏粒子/infinite）；clear | 缺失 | — |
+| `effect` | give（时长/等级/隐藏粒子/infinite）；clear | 完成 | `effect.give`、`effect.give_infinite`、`effect.clear`；秒数与等级按 26.3 范围编译期检查 |
 | `enchant` | `<targets> <enchantment> [level]` | 缺失 | — |
-| `experience`（`xp`） | add/set/query（points/levels） | 缺失 | — |
-| `clear` | `[targets] [item] [maxCount]` | 缺失 | — |
+| `experience`（`xp`） | add/set/query（points/levels） | 完成 | `xp.add`/`xp.set`；`xp.query` 作为表达式，要求 `limit(1)` 玩家查询 |
+| `clear` | `[targets] [item] [maxCount]` | 完成 | `clear(玩家查询[, 物品][, 数量])`，数量上限 2147483647 |
 | `damage` | `<target> <amount> [damage_type] [at <pos>\|by <entity> [from <cause>]]` | 缺失 | — |
 | `teleport`（`tp`） | 坐标/实体/朝向 | 缺失 | — |
 | `ride` | mount/dismount | 缺失 | — |
@@ -133,7 +133,7 @@
 | `pack.mcmeta` | `description`（文本或组件）、`min_format`/`max_format`、`overlays`、`filters`、`features.enabled` | 部分 | 只写 description 与固定 `[121,0]`；overlay、filter、特性标志均无 |
 | `pack.png` | 包图标 | 缺失 | — |
 | 函数文件 | `data/<ns>/function/*.mcfunction` | 完成 | 每个函数一个文件，带生成注释头 |
-| 函数标签 | `data/<ns>/tags/function/*.json` | 部分 | 只生成 `minecraft:load`/`tick` 指向内部函数；无用户标签（`function #tag` 与 `schedule` 需要） |
+| 函数标签 | `data/<ns>/tags/function/*.json` | 完成 | `fn_tag` 声明输出用户标签，支持函数、嵌套 `#标签`、外部字符串条目与 `replace`、编译期环路检查；`minecraft:load`/`tick` 仍由编译器生成 |
 | 注册表标签 | `data/<ns>/tags/<注册表>/**`：16 个顶层注册表（banner_pattern、block、damage_type、dialog、enchantment、entity_type、fluid、game_event、instrument、item、painting_variant、point_of_interest_type、potion、timeline、villager_trade、worldgen）及子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等） | 缺失 | 无结构化声明 |
 | predicate | JSON | 部分 | 原始 JSON；只检查同命名空间引用 |
 | loot_table | JSON | 部分 | 原始 JSON |
@@ -172,6 +172,16 @@
 - [x] `--deny-raw` 严格模式；零底层命令字符串的便携箱子示例验收。
 - [x] `resource` 声明：26.3 注册表类型限制、编译期 JSON 解析、稳定格式化输出。
 
+命令补全（本次批次）：
+
+- [x] 函数标签：`fn_tag` 声明、`call #tag()`、`schedule #tag()`、嵌套引用与循环引用检查；`function`/`schedule` 的标签成员在编译期检查执行上下文与参数。
+- [x] `return fail`、`return run "命令"`；`return run` 计入 `--deny-raw` 的底层语句统计。
+- [x] `schedule.clear(函数)` 与浮点延迟（`1.5 s` 按原版 `TimeArgument` 换算，拒绝不足 1 刻的延迟）。
+- [x] `effect.give`/`effect.give_infinite`/`effect.clear`，秒数与等级范围检查。
+- [x] `xp.add`/`xp.set` 与作为表达式的 `xp.query`（要求 `limit(1)` 玩家查询）。
+- [x] `clear(玩家查询[, 物品][, 数量])`。
+- [x] `examples/potion_lab.mcl`：严格模式示例，覆盖以上全部能力并通过 `--deny-raw`。
+
 ## 三、路线图
 
 实施约定：
@@ -209,7 +219,7 @@
 - [ ] 2.7 消息组件化：`message.all/self/nearest/player` 接受 1.3 的文本组件。
 - [ ] 2.8 声音完整参数：`sound.play(sound, source, targets, pos, volume, pitch, min_volume)`，保留 `sound.self` 简写。
 - [ ] 2.9 `spawn` 完整化：`spawn("id", pos) { nbt { ... } ... }`；继续拒绝 `noSummon` 类型。
-- [ ] 2.10 `function`/`schedule`/`return` 收尾：`#tag` 调用与函数标签声明（9.2）、浮点时间、`schedule.clear`、`return fail`、`return run`、宏参数（与 8.3 联动）。
+- [x] 2.10 `function`/`schedule`/`return` 收尾：`#tag` 调用与函数标签声明（9.2）、浮点时间、`schedule.clear`、`return fail`、`return run`；宏参数进阶见 8.3。
 
 ### 第 3 阶段：世界与方块命令族
 
@@ -228,10 +238,10 @@
 
 ### 第 4 阶段：实体与玩家命令族
 
-- [ ] 4.1 `effect.give(targets, effect, duration[, amplifier][, hide_particles])`、`effect.give_infinite(...)`、`effect.clear(targets[, effect])`；时长支持 `t`/`s`/`d`。
+- [x] 4.1 `effect.give(targets, effect, seconds[, amplifier][, hide_particles])`、`effect.give_infinite(...)`、`effect.clear(targets[, effect])`；秒数与等级按 26.3 的 `EffectCommands` 范围检查。
 - [ ] 4.2 `enchant(targets, enchantment[, level])`。
-- [ ] 4.3 `xp.add/set/query`（points/levels），query 提供结果表达式。
-- [ ] 4.4 `clear(targets[, item_filter][, max_count])`，返回清理数量。
+- [x] 4.3 `xp.add`/`xp.set`（points/levels）与 `xp.query` 结果表达式。
+- [x] 4.4 `clear(targets[, item_filter][, max_count])`；目标为玩家查询，数量上限 2147483647。
 - [ ] 4.5 `damage(target, amount[, damage_type][, at pos | by entity [from cause]])`；枚举 damage_type 来自注册表。
 - [ ] 4.6 `attribute` 全子命令：`get`、`base set/get/reset`、`modifier add/remove/value get`。
 - [ ] 4.7 `teleport(targets, pos[, rotation][, facing ...])` 与 `teleport(targets, entity)`；`tp` 为中文 `传送` 的英文别名。
@@ -285,13 +295,14 @@
 - [ ] 8.4 静态命令校验与补全：用 1.1 命令树校验 `run` 字符串的根命令、参数形状与权限等级，在编译期报告不可能加载的命令。
 - [ ] 8.5 增量构建与源映射：只重建受影响函数，产物与源码行对应。
 - [ ] 8.6 语言服务器与编辑器集成：补全、悬停、跳转、格式化、即时诊断。
-- [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收。
+- [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收。`docs/manual.html` 的在线手册尚未同步本批次的函数标签、`effect`/`xp`/`clear`、`return fail`/`run` 与 `schedule.clear` 章节；`docs/language-reference.md` 与 `docs/compiler-design.md` 已经更新。
 
 ### 第 9 阶段：数据包内容与资源 schema（非命令）
 
 - [ ] 9.1 `pack.mcmeta` 完整化：支持文本组件 `description`、`supported_formats` 范围、`overlays`（目录覆盖层）、`filters`（block/allow）、`features.enabled`（特性包）；字段取值来自 1.1 的版本元数据；可选 `pack.png` 图标。
 - [ ] 9.2 标签系统：`tag <注册表> <名称> { values = [...]; replace = 假; required = 真; }` 声明，覆盖 16 个标签注册表与子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等）；条目支持 `#tag` 嵌套、`required` 与 `replace` 语义。
-  - 函数标签：`fn_tag` 声明输出 `tags/function/<名称>.json`，供 `function #ns:tag` 与 `schedule` 使用；`minecraft:load`/`tick` 的生成迁移到同一机制。
+  - 函数标签：`fn_tag` 声明输出 `data/<ns>/tags/function/<名称>.json`，供 `function #ns:tag` 与 `schedule` 使用；条目支持本命名空间函数、嵌套 `#标签`、外部字符串资源位置与 `replace`，编译期检查引用与循环。`minecraft:load`/`tick` 的生成保留在编译器的内部机制中。
+  - 其他注册表标签：16 个顶层注册表与子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等）尚未建模，`required` 语义也只在函数标签的外部条目上默认保留原版行为。
   - 校验：注册表与条目 id 存在、嵌套标签可解析；默认拒绝写入 `minecraft:` 命名空间，需要时显式放开。
 - [ ] 9.3 资源 schema 化：把 raw JSON 升级为结构化声明，检查字段类型、枚举与未知字段；结构与原始 JSON 可共存，同类型同名称重复声明报错。
   - 第一批：predicate 条件树、loot_table（pool/entry/condition/function）、item_modifier、advancement（criteria/requirements/display/rewards/parent）。
@@ -307,7 +318,7 @@
 
 - 1.1 是全部注册表校验与补全数据的前提；1.2/1.4 是第 3、4、5 阶段的参数类型前提；1.3 支撑 2.7 与第 6 阶段；1.5 支撑 2.2、4.3、7.1–7.3。
 - 2.1/2.2 的 `execute` 与条件模型是第 3、4、5 阶段的世界/实体命令在非默认上下文中执行的前提。
-- 9.1/9.2 依赖 1.1 的版本元数据与注册表快照；9.3–9.6 依赖 1.4 的结构化 NBT 与值类型；9.7/9.8 依赖输出层与 1.1 的版本数据。函数标签（9.2）是 2.10 的 `#tag` 调用前提。
+- 9.1/9.2 依赖 1.1 的版本元数据与注册表快照；函数标签部分已经落地，不依赖注册表数据；9.3–9.6 依赖 1.4 的结构化 NBT 与值类型；9.7/9.8 依赖输出层与 1.1 的版本数据。函数标签（9.2）是 2.10 的 `#tag` 调用前提。
 - 每个阶段的验收：编译器零警告；`examples/` 项目通过 `--deny-raw`；`src/compiler/tests.rs` 断言生成命令与资源文件；中英文关键词产物逐字节一致；文档与手册同步。
 
 ## 四、旧待办与设计项映射
@@ -320,7 +331,7 @@
 | 增加结构化 NBT 数据类型和数据包资源 schema，使字段错误在编译期出现 | 1.4、9.3–9.5 |
 | 建立中间表示和版本后端，让同一份高层源码选择兼容的 Minecraft 目标 | 9.8 |
 | 模块/import 系统 | 8.1 |
-| 基于 26.3 函数宏的高级调用 | 2.10、8.3 |
+| 基于 26.3 函数宏的高级调用 | 8.3 |
 | 实体上下文类型、存储/NBT 类型和复合数据 | 1.4、2.4 |
 | `for`、break/continue 和更强的控制流优化 | 8.2 |
 | 增量构建、源映射、语言服务器与编辑器集成 | 8.5、8.6 |

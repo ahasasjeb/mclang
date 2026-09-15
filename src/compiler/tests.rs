@@ -74,6 +74,18 @@ fn rejects_synchronous_recursion_but_allows_scheduled_self_call() {
             .files
             .contains_key(&PathBuf::from("data/demo/function/heartbeat.mcfunction"))
     );
+
+    let tag_recursive = parse(
+        lex(
+            "namespace demo; fn a() { call #loop(); } fn_tag loop { value(a); }",
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&tag_recursive, "test").unwrap_err();
+    assert_eq!(errors.len(), 1, "{errors:#?}");
+    assert!(errors[0].message.contains("同步递归调用环"));
 }
 
 #[test]
@@ -758,4 +770,318 @@ fn rejects_non_summonable_entity_types() {
             .iter()
             .all(|error| error.message.contains("不支持实体类型"))
     );
+}
+
+#[test]
+fn lowers_return_fail_and_run() {
+    let pack = compile_text(
+        r#"
+            namespace demo;
+            fn fail_now() { return fail; }
+            fn gametime() -> score { return run "time query gametime"; }
+            "#,
+    );
+    let fail_now = &pack.files[&PathBuf::from("data/demo/function/fail_now.mcfunction")];
+    assert!(fail_now.contains("return fail"));
+    let gametime = &pack.files[&PathBuf::from("data/demo/function/gametime.mcfunction")];
+    assert!(gametime.contains("return run time query gametime"));
+
+    let invalid =
+        parse(lex("namespace demo; fn bad() { return run \"/say hi\"; }", 0).unwrap()).unwrap_err();
+    assert!(invalid[0].message.contains("不能以 `/` 开头"));
+}
+
+#[test]
+fn lowers_schedule_clear_and_fractional_delays() {
+    let pack = compile_text(
+        r#"
+            namespace demo;
+            fn cleanup() {}
+            fn main() {
+                schedule cleanup() after 1.5 s append;
+                schedule cleanup() after 2 d;
+                schedule cleanup() after 30 t replace;
+                schedule.clear(cleanup);
+            }
+            "#,
+    );
+    let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
+    assert!(main.contains("schedule function demo:cleanup 1.5s append"));
+    assert!(main.contains("schedule function demo:cleanup 2d replace"));
+    assert!(main.contains("schedule function demo:cleanup 30t replace"));
+    assert!(main.contains("schedule clear demo:cleanup"));
+
+    let too_small = parse(lex("namespace demo; fn f() { schedule f() after 0.01 s; }", 0).unwrap());
+    assert!(
+        too_small
+            .unwrap_err()
+            .iter()
+            .any(|error| error.message.contains("至少为 1 游戏刻"))
+    );
+}
+
+#[test]
+fn emits_function_tags_and_tag_calls() {
+    let pack = compile_text(
+        r#"
+            namespace demo;
+            fn a() {}
+            fn b() {}
+            fn main() { call #cleanup(); schedule #cleanup() after 2 s; }
+            fn_tag cleanup {
+                value(a);
+                value(#nested);
+                value("minecraft:tick");
+                replace = true;
+            }
+            fn_tag nested { value(b); }
+            "#,
+    );
+    let main = &pack.files[&PathBuf::from("data/demo/function/main.mcfunction")];
+    assert!(main.contains("function #demo:cleanup"));
+    assert!(main.contains("schedule function #demo:cleanup 2s replace"));
+    let cleanup = &pack.files[&PathBuf::from("data/demo/tags/function/cleanup.json")];
+    assert!(cleanup.contains("\"demo:a\""), "{cleanup}");
+    assert!(cleanup.contains("\"#demo:nested\""), "{cleanup}");
+    assert!(cleanup.contains("\"minecraft:tick\""), "{cleanup}");
+    assert!(cleanup.contains("\"replace\": true"), "{cleanup}");
+    let nested = &pack.files[&PathBuf::from("data/demo/tags/function/nested.json")];
+    assert!(nested.contains("\"demo:b\""), "{nested}");
+    assert!(!nested.contains("replace"), "{nested}");
+
+    let empty = compile_text("namespace demo; fn_tag nothing { }");
+    let empty = &empty.files[&PathBuf::from("data/demo/tags/function/nothing.json")];
+    assert!(empty.contains("\"values\": []"), "{empty}");
+}
+
+#[test]
+fn lowers_effect_xp_and_clear_commands() {
+    let pack = compile_text(
+        r#"
+            namespace demo;
+            score total = 0;
+            query players = entity("minecraft:player") { limit(1); }
+            query mobs = entity("minecraft:zombie") {}
+            @tick fn tick() {
+                effect.give(mobs, "minecraft:speed", 30);
+                effect.give(mobs, "minecraft:speed", 30, 2);
+                effect.give(mobs, "minecraft:speed", 30, 0, true);
+                effect.give_infinite(players, "minecraft:night_vision");
+                effect.give_infinite(players, "minecraft:night_vision", 1, true);
+                effect.clear(mobs);
+                effect.clear(mobs, "minecraft:speed");
+                xp.add(players, points, 10);
+                xp.set(players, levels, 3);
+                total = xp.query(players, levels) + 1;
+                if xp.query(players, levels) >= 5 {
+                    message.all("veteran", gold);
+                }
+                clear(players);
+                clear(players, "minecraft:diamond");
+                clear(players, "minecraft:diamond", 5);
+            }
+            "#,
+    );
+    let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
+    assert!(
+        generated.contains("run effect give @s minecraft:speed 30\n"),
+        "{generated}"
+    );
+    assert!(generated.contains("run effect give @s minecraft:speed 30 2\n"));
+    assert!(generated.contains("run effect give @s minecraft:speed 30 0 true\n"));
+    assert!(generated.contains("run effect give @s minecraft:night_vision infinite\n"));
+    assert!(generated.contains("run effect give @s minecraft:night_vision infinite 1 true\n"));
+    assert!(generated.contains("run effect clear @s\n"));
+    assert!(generated.contains("run effect clear @s minecraft:speed\n"));
+    assert!(generated.contains("run xp add @s 10 points\n"));
+    assert!(generated.contains("run xp set @s 3 levels\n"));
+    assert!(generated.contains("run xp query @s levels"));
+    assert_eq!(generated.matches("run xp query @s levels").count(), 2);
+    assert!(generated.contains("run clear @s\n"));
+    assert!(generated.contains("run clear @s minecraft:diamond\n"));
+    assert!(generated.contains("run clear @s minecraft:diamond 5\n"));
+}
+
+#[test]
+fn rejects_invalid_effects_xp_clear_and_tags() {
+    let program = parse(
+        lex(
+            r#"
+            namespace demo;
+            query players = entity("minecraft:player") {}
+            query mobs = entity("minecraft:zombie") {}
+            fn ok() {}
+            fn wrong() {
+                effect.give(mobs, "Invalid Effect", 30);
+                effect.give(mobs, "minecraft:speed", 0);
+                effect.give(mobs, "minecraft:speed", 30, 300);
+                xp.add(mobs, points, 5);
+                xp.set(players, levels, -1);
+            }
+            fn wrong_query() -> score {
+                return xp.query(players, levels);
+            }
+            fn wrong_clear() {
+                clear(mobs);
+                clear(players, "Invalid Item");
+                clear(players, "minecraft:diamond", 4294967295);
+            }
+            fn_tag broken {
+                value(missing_function);
+                value(#missing_tag);
+                value("Invalid Location");
+            }
+            fn call_missing() { call #missing_tag(); }
+            fn call_args() { call #broken_function(1); }
+            fn_tag broken_function { value(ok); }
+            fn_tag self_cycle { value(#self_cycle); }
+            fn schedule_problems() {
+                schedule.clear(missing_function);
+                schedule missing_function() after 1 t;
+            }
+            "#,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    let messages = errors
+        .iter()
+        .map(|error| error.message.as_str())
+        .collect::<Vec<_>>();
+    for expected in [
+        "不是有效的效果资源位置",
+        "effect 持续秒数必须是 1 到 1000000",
+        "effect 等级必须是 0 到 255",
+        "查询 `mobs` 必须匹配 minecraft:player",
+        "xp.set 的数量必须是非负整数",
+        "xp.query 需要 limit(1) 的单个玩家查询",
+        "`Invalid Item` 不是有效的物品资源位置",
+        "clear 最大数量不能超过 2147483647",
+        "引用了不存在的函数 `missing_function`",
+        "引用了不存在的标签 `missing_tag`",
+        "`Invalid Location` 不是有效的资源位置",
+        "函数标签 `self_cycle` 形成循环引用",
+        "找不到函数标签 `missing_tag`",
+        "函数标签调用不接受参数",
+        "找不到函数 `missing_function`",
+    ] {
+        assert!(
+            messages.iter().any(|message| message.contains(expected)),
+            "missing `{expected}` in: {messages:#?}"
+        );
+    }
+
+    let duplicate_replace = parse(
+        lex(
+            "namespace demo; fn_tag t { replace = true; replace = false; }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        duplicate_replace
+            .unwrap_err()
+            .iter()
+            .any(|error| error.message.contains("只能声明一次 replace"))
+    );
+
+    let tag_context = parse(
+        lex(
+            r#"
+            namespace demo;
+            query players = entity("minecraft:player") {}
+            @player fn needs_player() {}
+            fn_tag needs_context { value(needs_player); }
+            fn main() {
+                call #needs_context();
+                schedule #needs_context() after 1 t;
+            }
+            "#,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&tag_context, "test").unwrap_err();
+    assert!(errors.iter().any(|error| {
+        error.message.contains(
+            "函数标签 `needs_context` 中的 @player 函数 `needs_player` 需要玩家执行上下文",
+        )
+    }));
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("不能调度函数标签 `needs_context`"))
+    );
+
+    let tag_parameters = parse(
+        lex(
+            r#"
+            namespace demo;
+            fn add(amount) {}
+            fn_tag with_args { value(add); }
+            fn main() { call #with_args(); }
+            "#,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&tag_parameters, "test").unwrap_err();
+    assert!(errors.iter().any(|error| {
+        error
+            .message
+            .contains("函数标签 `with_args` 中的函数 `add` 需要 1 个参数")
+    }));
+}
+
+#[test]
+fn new_commands_are_keyword_symmetric() {
+    let english = compile_text(
+        r#"
+            namespace demo;
+            query players = entity("minecraft:player") { limit(1); }
+            query mobs = entity("minecraft:zombie") {}
+            fn a() {}
+            fn b() { schedule #cleanup() after 1.5 s; }
+            fn main() {
+                call #cleanup();
+                effect.give(mobs, "minecraft:speed", 30, 2, true);
+                effect.give_infinite(players, "minecraft:night_vision");
+                effect.clear(mobs, "minecraft:speed");
+                xp.add(players, points, 5);
+                xp.set(players, levels, 2);
+                let level = xp.query(players, levels);
+                clear(players, "minecraft:diamond", 3);
+                return fail;
+            }
+            fn_tag cleanup { value(a); value(#nested); replace = true; }
+            fn_tag nested { value(b); }
+            "#,
+    );
+    let chinese = compile_text(
+        r#"
+            命名空间 demo;
+            查询 players = 实体("minecraft:player") { 上限(1); }
+            查询 mobs = 实体("minecraft:zombie") {}
+            函数 a() {}
+            函数 b() { 调度 #cleanup() 延后 1.5 秒; }
+            函数 main() {
+                调用 #cleanup();
+                效果.给予(mobs, "minecraft:speed", 30, 2, 真);
+                效果.给予无限(players, "minecraft:night_vision");
+                效果.清除(mobs, "minecraft:speed");
+                经验.增加(players, 点数, 5);
+                经验.设置(players, 等级, 2);
+                令 level = 经验.查询(players, 等级);
+                清除(players, "minecraft:diamond", 3);
+                返回 失败;
+            }
+            函数标签 cleanup { 值(a); 值(#nested); 替换 = 真; }
+            函数标签 nested { 值(b); }
+            "#,
+    );
+    assert_eq!(english.files, chinese.files);
 }

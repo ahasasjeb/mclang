@@ -50,6 +50,7 @@ impl Parser {
         let mut item_stacks = Vec::new();
         let mut storages = Vec::new();
         let mut resources = Vec::new();
+        let mut function_tags = Vec::new();
         let mut functions = Vec::new();
         while !self.check(&TokenKind::Eof) {
             if self.check_word("score") {
@@ -62,6 +63,8 @@ impl Parser {
                 storages.push(self.storage()?);
             } else if self.check_word("resource") {
                 resources.push(self.resource()?);
+            } else if self.check_word("fn_tag") {
+                function_tags.push(self.function_tag()?);
             } else {
                 functions.push(self.function()?);
             }
@@ -74,6 +77,7 @@ impl Parser {
             item_stacks,
             storages,
             resources,
+            function_tags,
             functions,
         })
     }

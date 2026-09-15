@@ -87,12 +87,13 @@ fn run() -> Result<(), String> {
                 ));
             }
             println!(
-                "检查通过：{} 个函数，{} 个计分变量，{} 个实体查询，{} 个物品定义，{} 个物品存储，{} 个 JSON 资源，{} 条底层语句",
+                "检查通过：{} 个函数，{} 个计分变量，{} 个实体查询，{} 个物品定义，{} 个物品存储，{} 个函数标签，{} 个 JSON 资源，{} 条底层语句",
                 summary.functions,
                 summary.scores,
                 summary.queries,
                 summary.item_stacks,
                 summary.storages,
+                summary.function_tags,
                 summary.resources,
                 summary.raw_statements
             );

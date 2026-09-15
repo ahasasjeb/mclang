@@ -44,6 +44,34 @@ impl Compiler<'_> {
                 count,
                 ..
             } => self.compile_give(target, item, *count, owner, commands),
+            StatementKind::EffectGive {
+                target,
+                effect,
+                duration,
+                amplifier,
+                hide_particles,
+            } => self.compile_effect_give(
+                target,
+                effect,
+                *duration,
+                *amplifier,
+                *hide_particles,
+                commands,
+            ),
+            StatementKind::EffectClear { target, effect } => {
+                self.compile_effect_clear(target, effect.as_deref(), commands);
+            }
+            StatementKind::XpChange {
+                target,
+                kind,
+                operation,
+                amount,
+            } => self.compile_xp_change(target, *kind, *operation, *amount, commands),
+            StatementKind::ClearInventory {
+                target,
+                item,
+                max_count,
+            } => self.compile_clear_inventory(target, item.as_deref(), *max_count, commands),
             StatementKind::SelfAction(action) => commands.extend(self.compile_self_action(action)),
             StatementKind::Message {
                 target,
@@ -55,15 +83,20 @@ impl Compiler<'_> {
             StatementKind::PlaySound { sound, source } => {
                 commands.push(format!("playsound {sound} {source} @s ~ ~ ~ 1 1"));
             }
-            StatementKind::Call {
-                function,
-                arguments,
-            } => self.compile_call(function, arguments, owner, commands),
+            StatementKind::Call { target, arguments } => {
+                self.compile_call(target, arguments, owner, commands)
+            }
             StatementKind::Schedule {
-                function,
+                target,
                 delay,
                 mode,
-            } => self.compile_schedule(function, delay, *mode, commands),
+            } => self.compile_schedule(target, delay, *mode, commands),
+            StatementKind::ScheduleClear { function } => {
+                commands.push(format!(
+                    "schedule clear {}:{function}",
+                    self.program.namespace
+                ));
+            }
             StatementKind::Assign {
                 target,
                 operation,
@@ -83,7 +116,7 @@ impl Compiler<'_> {
             StatementKind::Execute { clauses, body } => {
                 self.compile_execute(clauses, body, owner, commands);
             }
-            StatementKind::Return(value) => self.compile_return(value.as_ref(), owner, commands),
+            StatementKind::Return(kind) => self.compile_return(kind, owner, commands),
         }
     }
 
@@ -138,16 +171,17 @@ impl Compiler<'_> {
 
     fn compile_schedule(
         &self,
-        function: &str,
+        target: &CallTarget,
         delay: &str,
         mode: ScheduleMode,
         commands: &mut Vec<String>,
     ) {
+        let name = match target {
+            CallTarget::Function(function) => format!("{}:{function}", self.program.namespace),
+            CallTarget::Tag(tag) => format!("#{}:{tag}", self.program.namespace),
+        };
         commands.push(format!(
-            "schedule function {}:{} {} {}",
-            self.program.namespace,
-            function,
-            delay,
+            "schedule function {name} {delay} {}",
             match mode {
                 ScheduleMode::Replace => "replace",
                 ScheduleMode::Append => "append",
@@ -169,29 +203,37 @@ impl Compiler<'_> {
         ));
     }
 
-    fn compile_return(&mut self, value: Option<&Expr>, owner: &str, commands: &mut Vec<String>) {
-        let Some(expression) = value else {
-            commands.push("return 0".to_owned());
-            return;
-        };
-        match self.compile_expr(expression, owner, commands) {
-            Value::Integer(value) => commands.push(format!("return {value}")),
-            Value::Score(score) => commands.push(format!(
-                "return run scoreboard players get {score} {}",
-                self.objective
-            )),
+    fn compile_return(&mut self, kind: &ReturnKind, owner: &str, commands: &mut Vec<String>) {
+        match kind {
+            ReturnKind::Void => commands.push("return 0".to_owned()),
+            ReturnKind::Fail => commands.push("return fail".to_owned()),
+            ReturnKind::Run(command) => commands.push(format!("return run {command}")),
+            ReturnKind::Value(expression) => match self.compile_expr(expression, owner, commands) {
+                Value::Integer(value) => commands.push(format!("return {value}")),
+                Value::Score(score) => commands.push(format!(
+                    "return run scoreboard players get {score} {}",
+                    self.objective
+                )),
+            },
         }
     }
 
     fn compile_call(
         &mut self,
-        function: &str,
+        target: &CallTarget,
         arguments: &[Expr],
         owner: &str,
         commands: &mut Vec<String>,
     ) {
-        self.bind_arguments(function, arguments, owner, commands);
-        commands.push(format!("function {}:{function}", self.program.namespace));
+        match target {
+            CallTarget::Function(function) => {
+                self.bind_arguments(function, arguments, owner, commands);
+                commands.push(format!("function {}:{function}", self.program.namespace));
+            }
+            CallTarget::Tag(tag) => {
+                commands.push(format!("function #{}:{tag}", self.program.namespace))
+            }
+        }
     }
 
     /// 从左到右求值全部实参，再复制到被调用函数的参数计分项。

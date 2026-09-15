@@ -6,7 +6,8 @@ use crate::lexer::TokenKind;
 
 use super::Parser;
 use super::keywords::{
-    boolean_word, message_target, self_method, sound_source, text_color, time_unit, word_matches,
+    boolean_word, effect_method, message_target, self_method, sound_source, text_color, time_unit,
+    word_matches, xp_kind, xp_method,
 };
 
 impl Parser {
@@ -52,29 +53,14 @@ impl Parser {
         } else if self.take_word("sound").is_some() {
             self.sound_statement()?
         } else if self.take_word("run").is_some() {
-            let (command, span) = self.string("run 后需要命令字符串")?;
-            if command.trim().is_empty() {
-                return Err(Diagnostic::new("run 命令不能为空", span));
-            }
-            if command.starts_with('/') {
-                return Err(Diagnostic::new(
-                    "Minecraft 函数中的命令不能以 `/` 开头",
-                    span,
-                ));
-            }
-            if command.contains(['\n', '\r']) {
-                return Err(Diagnostic::new("一条 run 语句只能包含一行命令", span));
-            }
+            let (command, _) = self.command_string("run")?;
             self.expect(TokenKind::Semicolon, "命令后需要 `;`")?;
             StatementKind::Run(command)
         } else if self.take_word("call").is_some() {
-            let (name, _) = self.ident("被调用函数名称")?;
+            let target = self.call_target("被调用函数名称")?;
             let arguments = self.call_arguments()?;
             self.expect(TokenKind::Semicolon, "函数调用后需要 `;`")?;
-            StatementKind::Call {
-                function: name,
-                arguments,
-            }
+            StatementKind::Call { target, arguments }
         } else if self.take_word("schedule").is_some() {
             self.schedule_statement()?
         } else if self.take_word("if").is_some() {
@@ -110,27 +96,40 @@ impl Parser {
             let (body, _) = self.block()?;
             StatementKind::Execute { clauses, body }
         } else if self.take_word("return").is_some() {
-            let value = if self.take(&TokenKind::Semicolon).is_some() {
-                None
+            let kind = if self.take(&TokenKind::Semicolon).is_some() {
+                ReturnKind::Void
+            } else if self.take_word("fail").is_some() {
+                self.expect(TokenKind::Semicolon, "return fail 后需要 `;`")?;
+                ReturnKind::Fail
+            } else if self.take_word("run").is_some() {
+                let (command, _) = self.command_string("return run")?;
+                self.expect(TokenKind::Semicolon, "return run 后需要 `;`")?;
+                ReturnKind::Run(command)
             } else {
                 let value = self.expression()?;
                 self.expect(TokenKind::Semicolon, "return 表达式后需要 `;`")?;
-                Some(value)
+                ReturnKind::Value(value)
             };
-            StatementKind::Return(value)
+            StatementKind::Return(kind)
         } else if self.take_word("let").is_some() {
             let (name, _) = self.ident("局部变量名称")?;
             self.expect(TokenKind::Equal, "局部变量需要初始值")?;
             let value = self.expression()?;
             self.expect(TokenKind::Semicolon, "局部变量声明后需要 `;`")?;
             StatementKind::Let { name, value }
+        } else if self.take_word("effect").is_some() {
+            self.effect_statement()?
+        } else if self.take_word("xp").is_some() {
+            self.xp_statement()?
+        } else if self.take_word("clear").is_some() {
+            self.clear_statement()?
         } else {
             let (name, _) = self.ident("语句")?;
             if self.check(&TokenKind::LeftParen) {
                 let arguments = self.call_arguments()?;
                 self.expect(TokenKind::Semicolon, "函数调用后需要 `;`")?;
                 StatementKind::Call {
-                    function: name,
+                    target: CallTarget::Function(name),
                     arguments,
                 }
             } else {
@@ -302,23 +301,13 @@ impl Parser {
     }
 
     fn schedule_statement(&mut self) -> Result<StatementKind, Diagnostic> {
-        let (function, _) = self.ident("被调度函数名称")?;
+        if self.take(&TokenKind::Dot).is_some() {
+            return self.schedule_clear_statement();
+        }
+        let target = self.call_target("被调度函数名称")?;
         self.empty_arguments()?;
         self.expect_word("after")?;
-        let number_token = self.advance().clone();
-        let TokenKind::Number(number) = number_token.kind else {
-            return Err(Diagnostic::new("调度延迟需要正整数", number_token.span));
-        };
-        if !(1..=i64::from(i32::MAX)).contains(&number) {
-            return Err(Diagnostic::new(
-                "调度延迟必须是 1 到 2147483647 之间的整数",
-                number_token.span,
-            ));
-        }
-        let (unit, unit_span) = self.ident("时间单位 t、s 或 d")?;
-        let Some(unit) = time_unit(&unit) else {
-            return Err(Diagnostic::new("时间单位只能是 t、s 或 d", unit_span));
-        };
+        let delay = self.time_argument()?;
         let mode = if self.take_word("append").is_some() {
             ScheduleMode::Append
         } else {
@@ -327,10 +316,241 @@ impl Parser {
         };
         self.expect(TokenKind::Semicolon, "调度语句后需要 `;`")?;
         Ok(StatementKind::Schedule {
-            function,
-            delay: format!("{number}{unit}"),
+            target,
+            delay,
             mode,
         })
+    }
+
+    /// `schedule.clear(函数)`：取消尚未执行的同名调度。
+    ///
+    /// 26.3 的 `schedule clear` 只接受普通资源位置，标签调度无法取消，因此这里也
+    /// 只允许函数名。
+    fn schedule_clear_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        let (method, method_span) = self.ident("schedule 方法")?;
+        if !word_matches(&method, "clear") {
+            return Err(Diagnostic::new(
+                "schedule 只支持 `函数() after <时间>` 或 `schedule.clear(函数)`",
+                method_span,
+            ));
+        }
+        self.expect(TokenKind::LeftParen, "schedule.clear 后需要 `(`")?;
+        let (function, _) = self.ident("被清除调度的函数名称")?;
+        self.expect(TokenKind::RightParen, "schedule.clear 缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "schedule.clear 后需要 `;`")?;
+        Ok(StatementKind::ScheduleClear { function })
+    }
+
+    /// 读取 `<正数><单位>`，换算为游戏刻并生成规范化的延迟文本。
+    ///
+    /// 原版 `TimeArgument` 使用浮点数并按单位四舍五入，因此 `1.5 s` 与 `30 t`
+    /// 等价；这里沿用同一换算，并在编译期拒绝不足 1 刻或超出 32 位范围的延迟。
+    fn time_argument(&mut self) -> Result<String, Diagnostic> {
+        let token = self.advance().clone();
+        let (number, text) = match token.kind {
+            TokenKind::Number(value) => {
+                if !(1..=i64::from(i32::MAX)).contains(&value) {
+                    return Err(Diagnostic::new(
+                        "调度延迟必须是 1 到 2147483647 之间的整数",
+                        token.span,
+                    ));
+                }
+                (value as f64, value.to_string())
+            }
+            TokenKind::Decimal(value) => {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(Diagnostic::new("调度延迟必须是大于 0 的小数", token.span));
+                }
+                (value, format!("{value}"))
+            }
+            _ => {
+                return Err(Diagnostic::new(
+                    "调度延迟需要正数，例如 `1 s` 或 `1.5 s`",
+                    token.span,
+                ));
+            }
+        };
+        let (unit, unit_span) = self.ident("时间单位 t、s 或 d")?;
+        let Some(unit) = time_unit(&unit) else {
+            return Err(Diagnostic::new("时间单位只能是 t、s 或 d", unit_span));
+        };
+        let factor = match unit {
+            "t" => 1.0,
+            "s" => 20.0,
+            "d" => 24000.0,
+            _ => unreachable!("time_unit 只返回 t、s、d"),
+        };
+        let ticks = (number * factor + 0.5).floor();
+        if ticks < 1.0 {
+            return Err(Diagnostic::new(
+                "调度延迟至少为 1 游戏刻",
+                token.span.merge(unit_span),
+            ));
+        }
+        if ticks > f64::from(i32::MAX) {
+            return Err(Diagnostic::new(
+                "调度延迟超出 32 位游戏刻范围",
+                token.span.merge(unit_span),
+            ));
+        }
+        Ok(format!("{text}{unit}"))
+    }
+
+    fn call_target(&mut self, label: &str) -> Result<CallTarget, Diagnostic> {
+        if self.take(&TokenKind::Hash).is_some() {
+            let (name, _) = self.ident("函数标签名称")?;
+            Ok(CallTarget::Tag(name))
+        } else {
+            let (name, _) = self.ident(label)?;
+            Ok(CallTarget::Function(name))
+        }
+    }
+
+    fn effect_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::Dot, "effect 后需要 `.`")?;
+        let (method, method_span) = self.ident("effect 方法")?;
+        let Some(method) = effect_method(&method) else {
+            return Err(Diagnostic::new(
+                format!("未知 effect 方法 `{method}`"),
+                method_span,
+            ));
+        };
+        self.expect(TokenKind::LeftParen, "effect 方法后需要 `(`")?;
+        let (target, _) = self.ident("effect 目标查询名称")?;
+        let kind = match method {
+            "give" | "give_infinite" => {
+                self.expect(TokenKind::Comma, "目标后需要 `,`")?;
+                let (effect, _) = self.string("effect 需要效果资源位置")?;
+                let duration = if method == "give" {
+                    self.expect(TokenKind::Comma, "效果资源位置后需要 `,`")?;
+                    EffectDuration::Seconds(self.unsigned("effect 持续秒数")?)
+                } else {
+                    EffectDuration::Infinite
+                };
+                let mut amplifier = None;
+                let mut hide_particles = false;
+                if self.take(&TokenKind::Comma).is_some() {
+                    amplifier = Some(self.unsigned("effect 等级")?);
+                    if self.take(&TokenKind::Comma).is_some() {
+                        let (value, value_span) = self.ident("true 或 false")?;
+                        hide_particles = match boolean_word(&value) {
+                            Some("true") => true,
+                            Some("false") => false,
+                            _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
+                        };
+                    }
+                }
+                StatementKind::EffectGive {
+                    target,
+                    effect,
+                    duration,
+                    amplifier,
+                    hide_particles,
+                }
+            }
+            "clear" => {
+                let effect = if self.take(&TokenKind::Comma).is_some() {
+                    Some(self.string("effect 需要效果资源位置")?.0)
+                } else {
+                    None
+                };
+                StatementKind::EffectClear { target, effect }
+            }
+            _ => unreachable!(),
+        };
+        self.expect(TokenKind::RightParen, "effect 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "effect 调用后需要 `;`")?;
+        Ok(kind)
+    }
+
+    fn xp_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::Dot, "xp 后需要 `.`")?;
+        let (method, method_span) = self.ident("xp 方法")?;
+        let Some(method) = xp_method(&method) else {
+            return Err(Diagnostic::new(
+                format!("未知 xp 方法 `{method}`"),
+                method_span,
+            ));
+        };
+        if method == "query" {
+            return Err(Diagnostic::new(
+                "xp.query 只能出现在表达式里，例如 `let level = xp.query(players, levels);`",
+                method_span,
+            ));
+        }
+        self.expect(TokenKind::LeftParen, "xp 方法后需要 `(`")?;
+        let (target, _) = self.ident("xp 目标查询名称")?;
+        self.expect(TokenKind::Comma, "目标后需要 `,`")?;
+        let (kind, kind_span) = self.ident("xp 类型 points 或 levels")?;
+        let Some(kind) = xp_kind(&kind) else {
+            return Err(Diagnostic::new(
+                "xp 类型只能是 points/点数 或 levels/等级",
+                kind_span,
+            ));
+        };
+        self.expect(TokenKind::Comma, "xp 类型后需要 `,`")?;
+        let amount = self.signed("xp 数量")?;
+        self.expect(TokenKind::RightParen, "xp 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "xp 调用后需要 `;`")?;
+        Ok(StatementKind::XpChange {
+            target,
+            kind,
+            operation: if method == "add" {
+                XpOperation::Add
+            } else {
+                XpOperation::Set
+            },
+            amount,
+        })
+    }
+
+    fn clear_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "clear 后需要 `(`")?;
+        let (target, _) = self.ident("clear 目标查询名称")?;
+        let item = if self.take(&TokenKind::Comma).is_some() {
+            Some(self.string("clear 需要物品资源位置")?.0)
+        } else {
+            None
+        };
+        let max_count = if self.take(&TokenKind::Comma).is_some() {
+            if item.is_none() {
+                return Err(Diagnostic::new(
+                    "clear 的数量需要先写出物品，例如 `clear(players, \"minecraft:diamond\", 5);`",
+                    self.previous().span,
+                ));
+            }
+            Some(self.unsigned("clear 最大数量")?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::RightParen, "clear 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "clear 调用后需要 `;`")?;
+        Ok(StatementKind::ClearInventory {
+            target,
+            item,
+            max_count,
+        })
+    }
+
+    /// 读取一条底层命令字符串，执行与 `run` 相同的空值、斜杠和换行检查。
+    fn command_string(&mut self, label: &str) -> Result<(String, Span), Diagnostic> {
+        let (command, span) = self.string(&format!("{label} 后需要命令字符串"))?;
+        if command.trim().is_empty() {
+            return Err(Diagnostic::new(format!("{label} 命令不能为空"), span));
+        }
+        if command.starts_with('/') {
+            return Err(Diagnostic::new(
+                "Minecraft 函数中的命令不能以 `/` 开头",
+                span,
+            ));
+        }
+        if command.contains(['\n', '\r']) {
+            return Err(Diagnostic::new(
+                format!("一条 {label} 语句只能包含一行命令"),
+                span,
+            ));
+        }
+        Ok((command, span))
     }
 
     fn assignment_operator(&mut self) -> Result<AssignOp, Diagnostic> {
