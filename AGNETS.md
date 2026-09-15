@@ -113,4 +113,4 @@ cargo run -- build examples/give_reward.mcl -o build/give_reward --description "
 - `docs/language-design.md`：语言设计取舍。
 - `docs/compiler-design.md`：编译流水线、代码生成约定和 26.3-rc-2 兼容依据。
 - `docs/quickstart.md`：从零构建第一个数据包。
-- `DEVELOPMENT_PLAN.md`：已完成能力与后续路线。
+- `DEVELOPMENT_PLAN.md`：已完成能力与后续路线，根据项目实际进展进行主动修改打勾。
