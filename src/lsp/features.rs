@@ -1,0 +1,372 @@
+//! 语言特性：补全、悬停与跳转。
+//!
+//! 关键词与属性直接来自解析器的中英文关键词表，补全和悬停因此不会与语言定义脱节；
+//! 声明名称来自 [`crate::analysis`] 的符号表。
+
+use std::path::Path;
+
+use serde_json::{Value, json};
+
+use crate::analysis::{SourceFile, Symbol, SymbolKind};
+use crate::parser::keywords::{ATTRIBUTES, KEYWORDS};
+
+use super::convert::{offset_to_position, path_to_uri, word_at};
+
+/// 每个关键词的一句话说明，悬停与补全文档使用；与 `KEYWORDS` 逐项对应。
+const KEYWORD_DOCS: &[(&str, &str)] = &[
+    (
+        "namespace",
+        "声明项目命名空间；同一项目内的所有文件必须一致。",
+    ),
+    ("score", "声明全局计分变量，并给出初始值。"),
+    (
+        "query",
+        "声明可复用的实体查询，供 each、give、effect 等语句使用。",
+    ),
+    ("entity", "实体查询构造器，参数是实体类型资源位置。"),
+    ("item", "声明可复用的物品定义。"),
+    ("item_stack", "物品堆构造器，参数是物品资源位置。"),
+    (
+        "item_list",
+        "物品列表存储构造器，参数是存储资源位置与 NBT 路径。",
+    ),
+    ("storage", "声明物品列表存储，用于保存与恢复实体物品。"),
+    ("resource", "声明原始 JSON 资源，例如 predicate。"),
+    (
+        "predicate",
+        "resource 可声明的资源类型；条件中可按名称引用谓词。",
+    ),
+    ("fn", "声明函数，可选参数与 `-> score` 返回值。"),
+    (
+        "fn_tag",
+        "声明函数标签，供 `call #标签()` 与 schedule 使用。",
+    ),
+    ("let", "声明只在当前函数体内可见的局部变量。"),
+    ("return", "结束函数：返回计分值、`fail` 或 `run` 原生命令。"),
+    ("fail", "`return fail`：让调用方看到这次执行失败。"),
+    ("if", "条件分支。"),
+    ("else", "条件分支的否定分支。"),
+    ("while", "条件循环。"),
+    ("each", "对查询结果逐个执行，并进入实体上下文。"),
+    ("call", "调用函数或 `#标签`。"),
+    ("schedule", "延时调度函数或 `#标签`。"),
+    ("after", "schedule 的延迟时间，例如 `after 2 s`。"),
+    ("append", "调度模式：追加一次调度，而不是替换。"),
+    (
+        "replace",
+        "调度模式：替换已有调度；也用于函数标签的 replace 属性。",
+    ),
+    ("give", "把物品定义交给查询中的玩家。"),
+    ("origin", "give 的目标形式：投掷者或来源实体。"),
+    ("in_dimension", "在指定维度的上下文中执行。"),
+    ("spawn", "召唤实体并进入新的实体上下文。"),
+    ("self", "当前实体上下文；`self.*` 是实体操作。"),
+    ("message", "向玩家发送文本消息。"),
+    ("sound", "播放声音。"),
+    ("effect", "状态效果操作。"),
+    ("xp", "经验值操作。"),
+    ("clear", "清空查询玩家的物品。"),
+    ("stopwatch", "秒表操作。"),
+    ("run", "原生命令逃生口：执行未结构化的命令文本。"),
+    (
+        "execute",
+        "原生命令子句逃生口：在额外执行上下文中运行语句。",
+    ),
+    ("contents", "物品查询的槽位名：容器内容。"),
+];
+
+/// 函数属性的说明，与 `ATTRIBUTES` 逐项对应。
+const ATTRIBUTE_DOCS: &[(&str, &str)] = &[
+    ("load", "服务器加载时运行。"),
+    ("tick", "每游戏刻运行。"),
+    ("entity", "要求任意实体上下文。"),
+    ("player", "要求玩家上下文。"),
+    ("non_player", "要求非玩家实体上下文。"),
+];
+
+/// 补全：根据光标前的字符区分属性、函数标签与普通名称。
+pub fn completion(text: &str, offset: usize, path: &Path, symbols: &[Symbol]) -> Value {
+    let (prefix, start) = prefix_at(text, offset);
+    let preceding = text[..start].chars().next_back();
+    let items = match preceding {
+        Some('@') => attribute_items(),
+        Some('#') => tag_items(symbols),
+        // 点号成员（`self.add_tag` 等）暂不提供补全，避免给出错误的方法名。
+        Some('.') => Vec::new(),
+        _ => name_items(prefix, path, offset, symbols),
+    };
+    Value::Array(items)
+}
+
+/// 悬停：关键词显示中英文对照与说明，声明名称显示声明摘要和位置。
+pub fn hover(
+    text: &str,
+    offset: usize,
+    path: &Path,
+    symbols: &[Symbol],
+    sources: &[SourceFile],
+) -> Option<Value> {
+    let (word, start, end) = word_at(text, offset)?;
+    let range = range_json(text, start, end);
+    if let Some(contents) = keyword_hover(&word) {
+        return Some(json!({"contents": contents, "range": range}));
+    }
+    let symbol = find_symbol(symbols, &word, path, offset)?;
+    let mut value = format!(
+        "**{}** `{}`\n\n```mclang\n{}\n```",
+        symbol.kind.label(),
+        symbol.name,
+        symbol.detail
+    );
+    if let Some(source) = sources.iter().find(|source| source.path == symbol.path) {
+        let (line, _) = offset_to_position(&source.text, symbol.name_span.start);
+        value.push_str(&format!(
+            "\n\n定义：`{}:{}`",
+            symbol.path.display(),
+            line + 1
+        ));
+    }
+    Some(json!({
+        "contents": {"kind": "markdown", "value": value},
+        "range": range,
+    }))
+}
+
+/// 跳转：光标处的名称跳到它的声明位置，可以跨文件。
+pub fn definition(
+    text: &str,
+    offset: usize,
+    path: &Path,
+    symbols: &[Symbol],
+    sources: &[SourceFile],
+) -> Option<Value> {
+    let (word, _, _) = word_at(text, offset)?;
+    let symbol = find_symbol(symbols, &word, path, offset)?;
+    let source = sources.iter().find(|source| source.path == symbol.path)?;
+    Some(json!({
+        "uri": path_to_uri(&symbol.path),
+        "range": range_json(&source.text, symbol.name_span.start, symbol.name_span.end),
+    }))
+}
+
+fn keyword_hover(word: &str) -> Option<Value> {
+    for entry in KEYWORDS.iter().chain(ATTRIBUTES.iter()) {
+        let english = entry.english == word;
+        let chinese = entry.chinese == word;
+        if !english && !chinese {
+            continue;
+        }
+        let docs = if ATTRIBUTES
+            .iter()
+            .any(|attribute| attribute.english == entry.english)
+        {
+            ("函数属性", attribute_doc(entry.english))
+        } else {
+            ("关键词", keyword_doc(entry.english))
+        };
+        let label = if english {
+            format!("`{}` / `{}`", entry.english, entry.chinese)
+        } else {
+            format!("`{}` / `{}`", entry.chinese, entry.english)
+        };
+        let text = match docs.1 {
+            Some(doc) => format!("**{}** {label}\n\n{doc}", docs.0),
+            None => format!("**{}** {label}", docs.0),
+        };
+        return Some(json!({"kind": "markdown", "value": text}));
+    }
+    None
+}
+
+fn keyword_doc(english: &str) -> Option<&'static str> {
+    KEYWORD_DOCS
+        .iter()
+        .find(|(name, _)| *name == english)
+        .map(|(_, doc)| *doc)
+}
+
+fn attribute_doc(english: &str) -> Option<&'static str> {
+    ATTRIBUTE_DOCS
+        .iter()
+        .find(|(name, _)| *name == english)
+        .map(|(_, doc)| *doc)
+}
+
+fn name_items(prefix: &str, path: &Path, offset: usize, symbols: &[Symbol]) -> Vec<Value> {
+    let mut items = Vec::new();
+    for symbol in visible_symbols(symbols, path, offset) {
+        if !symbol.name.starts_with(prefix) {
+            continue;
+        }
+        items.push(json!({
+            "label": symbol.name,
+            "kind": completion_kind(symbol.kind),
+            "detail": symbol.detail,
+            "sortText": format!("0{}", symbol.name),
+        }));
+    }
+    for entry in KEYWORDS {
+        for (label, alias) in [
+            (entry.english, entry.chinese),
+            (entry.chinese, entry.english),
+        ] {
+            if !label.starts_with(prefix) {
+                continue;
+            }
+            items.push(json!({
+                "label": label,
+                "kind": 14,
+                "detail": format!("关键词 · {alias}"),
+                "documentation": {"kind": "markdown", "value": keyword_doc(entry.english).unwrap_or_default()},
+                "sortText": format!("1{label}"),
+            }));
+        }
+    }
+    items
+}
+
+fn attribute_items() -> Vec<Value> {
+    let mut items = Vec::new();
+    for entry in ATTRIBUTES {
+        for (label, alias) in [
+            (entry.english, entry.chinese),
+            (entry.chinese, entry.english),
+        ] {
+            items.push(json!({
+                "label": format!("@{label}"),
+                "kind": 14,
+                "detail": format!("函数属性 · {alias}"),
+                "documentation": {"kind": "markdown", "value": attribute_doc(entry.english).unwrap_or_default()},
+                "sortText": format!("2{label}"),
+            }));
+        }
+    }
+    items
+}
+
+fn tag_items(symbols: &[Symbol]) -> Vec<Value> {
+    symbols
+        .iter()
+        .filter(|symbol| symbol.kind == SymbolKind::FunctionTag)
+        .map(|symbol| {
+            json!({
+                "label": symbol.name,
+                "kind": 18,
+                "detail": symbol.detail,
+                "sortText": format!("0{}", symbol.name),
+            })
+        })
+        .collect()
+}
+
+/// 参数与局部变量只在所属函数体内可见；顶层声明处处可见。
+fn visible_symbols<'a>(
+    symbols: &'a [Symbol],
+    path: &Path,
+    offset: usize,
+) -> impl Iterator<Item = &'a Symbol> {
+    symbols.iter().filter(move |symbol| match symbol.scope {
+        None => true,
+        Some(scope) => symbol.path == path && scope.start <= offset && offset <= scope.end,
+    })
+}
+
+fn find_symbol<'a>(
+    symbols: &'a [Symbol],
+    word: &str,
+    path: &Path,
+    offset: usize,
+) -> Option<&'a Symbol> {
+    symbols
+        .iter()
+        .find(|symbol| {
+            symbol.name == word
+                && symbol.path == path
+                && symbol
+                    .scope
+                    .is_none_or(|scope| scope.start <= offset && offset <= scope.end)
+        })
+        .or_else(|| {
+            symbols
+                .iter()
+                .find(|symbol| symbol.name == word && symbol.scope.is_none())
+        })
+}
+
+fn completion_kind(kind: SymbolKind) -> u8 {
+    match kind {
+        SymbolKind::Function => 3,
+        SymbolKind::Score | SymbolKind::Parameter | SymbolKind::Local => 6,
+        SymbolKind::Query => 18,
+        SymbolKind::ItemStack => 12,
+        SymbolKind::Storage => 9,
+        SymbolKind::Resource => 17,
+        SymbolKind::FunctionTag => 18,
+    }
+}
+
+/// 光标前的标识符前缀及其起始偏移；`@`、`#`、`.` 等前缀字符不属于标识符。
+fn prefix_at(text: &str, offset: usize) -> (&str, usize) {
+    let mut start = offset.min(text.len());
+    while start > 0 {
+        let previous = match text[..start].chars().next_back() {
+            Some(character) => character,
+            None => break,
+        };
+        if previous == '_' || previous.is_alphanumeric() {
+            start -= previous.len_utf8();
+        } else {
+            break;
+        }
+    }
+    (&text[start..offset.min(text.len())], start)
+}
+
+fn range_json(text: &str, start: usize, end: usize) -> Value {
+    let (start_line, start_character) = offset_to_position(text, start);
+    let (end_line, end_character) = offset_to_position(text, end);
+    json!({
+        "start": {"line": start_line, "character": start_character},
+        "end": {"line": end_line, "character": end_character},
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn every_keyword_and_attribute_has_documentation() {
+        for entry in KEYWORDS {
+            assert!(
+                KEYWORD_DOCS.iter().any(|(name, _)| *name == entry.english),
+                "关键词 `{}` 缺少悬停说明",
+                entry.english
+            );
+        }
+        assert_eq!(KEYWORD_DOCS.len(), KEYWORDS.len());
+        for entry in ATTRIBUTES {
+            assert!(
+                ATTRIBUTE_DOCS
+                    .iter()
+                    .any(|(name, _)| *name == entry.english),
+                "属性 `@{}` 缺少悬停说明",
+                entry.english
+            );
+        }
+        assert_eq!(ATTRIBUTE_DOCS.len(), ATTRIBUTES.len());
+    }
+
+    #[test]
+    fn hover_explains_both_english_and_chinese_keywords() {
+        let chinese = "如果 ticks >= 10 { }";
+        let english = "fn tick() { if ticks >= 10 { } }";
+        let hovered = hover(chinese, 1, &PathBuf::from("a.mcl"), &[], &[]).unwrap();
+        let value = hovered["contents"]["value"].as_str().unwrap();
+        assert!(value.contains("`如果`"));
+        assert!(value.contains("`if`"));
+        assert!(hover(english, 13, &PathBuf::from("a.mcl"), &[], &[]).is_some());
+    }
+}

@@ -1,0 +1,76 @@
+{
+  "name": "mclang",
+  "displayName": "Mclang",
+  "description": "Mclang 数据包语言的语法高亮、即时诊断、补全、悬停与跳转",
+  "version": "0.5.0",
+  "publisher": "mclang",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:mclang"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "mclang",
+        "aliases": [
+          "Mclang",
+          "mcl"
+        ],
+        "extensions": [
+          ".mcl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mclang",
+        "scopeName": "source.mclang",
+        "path": "./syntaxes/mclang.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "mclang.restartServer",
+        "title": "重启语言服务器",
+        "category": "Mclang"
+      }
+    ],
+    "configuration": {
+      "title": "Mclang",
+      "properties": {
+        "mclang.server.path": {
+          "type": "string",
+          "default": "",
+          "description": "mclang 可执行文件路径。留空时依次在 PATH、工作区 target/release 与 target/debug 中查找。"
+        },
+        "mclang.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "记录语言服务器与客户端之间的通信。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.1"
+  }
+}

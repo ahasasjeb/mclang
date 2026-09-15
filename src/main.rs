@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use mclang::{BuildOptions, build_file, check_file};
+use mclang::{BuildOptions, build_file, check_file, serve};
 
 fn main() {
     if let Err(error) = run() {
@@ -99,6 +99,12 @@ fn run() -> Result<(), String> {
             );
             Ok(())
         }
+        "lsp" => {
+            if args.next().is_some() {
+                return Err("`mclang lsp` 不接受参数：它通过标准输入输出与编辑器通信".to_owned());
+            }
+            serve().map_err(|error| format!("语言服务器退出：{error}"))
+        }
         "help" | "-h" | "--help" => {
             print_help();
             Ok(())
@@ -117,9 +123,11 @@ fn print_help() {
     println!(
         "mclang — Minecraft 26.3 数据包编译器\n\n\
          用法:\n  \
-           mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]\n  \
-           mclang check <源文件.mcl|项目目录> [--deny-raw]\n  \
-           mclang help\n\n\
-         默认输出目录为 build/<源文件名>。"
+            mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]\n  \
+            mclang check <源文件.mcl|项目目录> [--deny-raw]\n  \
+            mclang lsp\n  \
+            mclang help\n\n\
+         默认输出目录为 build/<源文件名>。\n\
+         `mclang lsp` 是给编辑器用的语言服务器，不直接从终端运行。"
     );
 }

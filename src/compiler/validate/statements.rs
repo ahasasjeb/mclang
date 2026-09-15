@@ -248,7 +248,7 @@ fn validate_statement<'a>(
                 diagnostics,
             );
         }
-        StatementKind::Let { name, value } => {
+        StatementKind::Let { name, value, .. } => {
             validate_let(name, value, locals, ctx, diagnostics);
         }
         StatementKind::If {

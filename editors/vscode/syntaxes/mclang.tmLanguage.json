@@ -1,0 +1,209 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Mclang",
+  "scopeName": "source.mclang",
+  "comment": "中英文关键词与解析器的 src/parser/keywords.rs 一一对应；src/lsp/mod.rs 的 grammar_covers_every_keyword 测试会检查这层同步。",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#attributes" },
+    { "include": "#strings" },
+    { "include": "#declarations" },
+    { "include": "#keywords" },
+    { "include": "#booleans" },
+    { "include": "#function-tags" },
+    { "include": "#calls" },
+    { "include": "#members" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "match": "//.*$",
+          "name": "comment.line.double-slash.mclang"
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "match": "(@)(load|加载|tick|每刻|entity|实体|player|玩家|non_player|非玩家)",
+          "captures": {
+            "1": { "name": "punctuation.definition.annotation.mclang" },
+            "2": { "name": "entity.name.tag.mclang" }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "name": "string.quoted.triple.mclang"
+        },
+        {
+          "begin": "\"",
+          "end": "\"|\\n",
+          "name": "string.quoted.double.mclang",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.mclang"
+            }
+          ]
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(namespace|命名空间)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "entity.name.namespace.mclang" }
+          }
+        },
+        {
+          "match": "\\b(score|计分)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "variable.other.mclang" }
+          }
+        },
+        {
+          "match": "\\b(query|查询)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "entity.name.type.mclang" }
+          }
+        },
+        {
+          "match": "\\b(item|物品)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "entity.name.type.mclang" }
+          }
+        },
+        {
+          "match": "\\b(storage|存储)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "entity.name.type.mclang" }
+          }
+        },
+        {
+          "match": "\\b(resource|资源)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)\\s+([\\p{L}_][\\p{L}\\p{N}_]*|\"[^\"]*\")",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "entity.name.type.mclang" },
+            "3": { "name": "entity.name.tag.mclang" }
+          }
+        },
+        {
+          "match": "\\b(fn_tag|函数标签)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "entity.name.type.mclang" }
+          }
+        },
+        {
+          "match": "\\b(fn|函数)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.mclang" },
+            "2": { "name": "entity.name.function.mclang" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\b(namespace|命名空间|score|计分|query|查询|item_stack|物品堆|item_list|物品列表|item|物品|storage|存储|resource|资源|predicate|谓词|fn_tag|函数标签|fn|函数|let|令)\\b",
+          "name": "storage.type.mclang"
+        },
+        {
+          "match": "\\b(if|如果|else|否则|while|当|each|遍历|call|调用|schedule|调度|after|延后|append|追加|replace|替换|return|返回|fail|失败|run|原生命令)\\b",
+          "name": "keyword.control.mclang"
+        },
+        {
+          "match": "\\b(entity|实体|self|自身|message|消息|sound|声音|effect|效果|xp|经验|clear|清除|stopwatch|秒表|spawn|召唤|give|给予|origin|投掷者|in_dimension|在维度|contents|内容|execute|原生执行)\\b",
+          "name": "support.function.mclang"
+        }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        {
+          "match": "\\b(true|false|真|假)\\b",
+          "name": "constant.language.mclang"
+        }
+      ]
+    },
+    "function-tags": {
+      "patterns": [
+        {
+          "match": "#([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "entity.name.type.mclang" }
+          }
+        }
+      ]
+    },
+    "calls": {
+      "patterns": [
+        {
+          "match": "([\\p{L}_][\\p{L}\\p{N}_]*)(?=\\s*\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.mclang" }
+          }
+        }
+      ]
+    },
+    "members": {
+      "patterns": [
+        {
+          "match": "(\\.)([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "captures": {
+            "1": { "name": "punctuation.accessor.mclang" },
+            "2": { "name": "support.function.mclang" }
+          }
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b\\d+(?:\\.\\d+)?\\b",
+          "name": "constant.numeric.mclang"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "(==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|->|[=<>+\\-*/%!])",
+          "name": "keyword.operator.mclang"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": "[{}()]",
+          "name": "punctuation.section.mclang"
+        },
+        {
+          "match": "[;,]",
+          "name": "punctuation.separator.mclang"
+        },
+        {
+          "match": "\\.",
+          "name": "punctuation.accessor.mclang"
+        }
+      ]
+    }
+  }
+}

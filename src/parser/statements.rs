@@ -112,11 +112,15 @@ impl Parser {
             };
             StatementKind::Return(kind)
         } else if self.take_word("let").is_some() {
-            let (name, _) = self.ident("局部变量名称")?;
+            let (name, name_span) = self.ident("局部变量名称")?;
             self.expect(TokenKind::Equal, "局部变量需要初始值")?;
             let value = self.expression()?;
             self.expect(TokenKind::Semicolon, "局部变量声明后需要 `;`")?;
-            StatementKind::Let { name, value }
+            StatementKind::Let {
+                name,
+                name_span,
+                value,
+            }
         } else if self.take_word("effect").is_some() {
             self.effect_statement()?
         } else if self.take_word("xp").is_some() {

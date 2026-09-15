@@ -110,7 +110,7 @@ impl Compiler<'_> {
                 operation,
                 value,
             } => self.compile_assignment(target, *operation, value, owner, commands),
-            StatementKind::Let { name, value } => {
+            StatementKind::Let { name, value, .. } => {
                 self.compile_assignment(name, AssignOp::Set, value, owner, commands);
             }
             StatementKind::If {

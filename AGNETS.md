@@ -15,6 +15,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 - 命令行：
   - `mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]`
   - `mclang check <源文件.mcl|项目目录> [--deny-raw]`
+  - `mclang lsp`（标准输入输出上的语言服务器，供编辑器插件调用）
   - `mclang help` / `mclang version`
 - 默认输出到 `build/<项目名>`；`.mclang-manifest` 记录上次产物，重建只清理自己上次生成的文件。
 
@@ -37,7 +38,9 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 | `src/main.rs` | 命令行参数解析与入口 |
 | `src/lib.rs` | 项目级编排：发现/读取源文件、跨文件合并、写数据包 |
 | `src/lexer.rs` | 词法分析 |
-| `src/ast.rs` | AST 与源范围定义 |
+| `src/ast.rs` | AST 与源范围定义（声明带 `name_span`，供编辑器跳转） |
+| `src/analysis.rs` | 工具侧分析入口：内存源文件 → 结构化诊断与符号表 |
+| `src/lsp/` | 语言服务器：`rpc`（分帧）、`convert`（位置换算）、`server`（会话与分派）、`features`（补全/悬停/跳转） |
 | `src/parser/` | 递归下降解析：`mod.rs`（游标导航与顶层分派）、`declarations`、`items`、`statements`、`conditions`、`expressions`、`keywords` |
 | `src/compiler/mod.rs` | `compile()` 入口与 `CompiledPack` |
 | `src/compiler/types.rs` | 校验与生成共享的内部类型 |
@@ -45,6 +48,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 | `src/compiler/validate/` | 只读语义检查：`rules`（名称/路径/标签等规则）、`items`、`statements`、`expressions`、`recursion` |
 | `src/compiler/codegen/` | 代码生成：`statements`（控制流与辅助函数）、`actions`（give 与 self 操作）、`expressions`、`names`（假玩家/objective）、`emit`（命令与 JSON 格式化） |
 | `docs/` | 语言与编译器文档 |
+| `editors/vscode/` | VSCode 插件：TextMate 语法、语言配置、语言客户端（`npm install` 后 `npx vsce package`） |
 | `examples/` | 端到端示例项目 |
 
 模块只向下依赖：`ast` 不认识其他模块；`validate` 只读 AST 并产出 `Diagnostic`；`codegen` 只处理已经

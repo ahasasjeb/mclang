@@ -32,6 +32,7 @@ pub struct Program {
 #[derive(Debug)]
 pub struct FunctionTagDecl {
     pub name: String,
+    pub name_span: Span,
     pub values: Vec<FunctionTagEntry>,
     /// 对应标签文件的 `replace` 字段；26.3 的默认值是 `false`（与低优先级包合并）。
     pub replace: bool,
@@ -51,6 +52,7 @@ pub enum FunctionTagEntry {
 #[derive(Debug)]
 pub struct EntityQueryDecl {
     pub name: String,
+    pub name_span: Span,
     pub entity_type: String,
     pub tags: Vec<String>,
     pub excluded_tags: Vec<String>,
@@ -92,6 +94,7 @@ pub struct ItemFilter {
 #[derive(Debug)]
 pub struct ItemStackDecl {
     pub name: String,
+    pub name_span: Span,
     pub item_id: String,
     pub count: u32,
     pub custom_name: Option<String>,
@@ -139,6 +142,7 @@ pub struct ItemEnchantment {
 #[derive(Debug)]
 pub struct StorageDecl {
     pub name: String,
+    pub name_span: Span,
     pub storage_id: String,
     pub path: String,
     pub span: Span,
@@ -148,6 +152,7 @@ pub struct StorageDecl {
 pub struct ResourceDecl {
     pub kind: String,
     pub name: String,
+    pub name_span: Span,
     pub json: String,
     pub span: Span,
 }
@@ -155,6 +160,7 @@ pub struct ResourceDecl {
 #[derive(Debug)]
 pub struct ScoreDecl {
     pub name: String,
+    pub name_span: Span,
     pub initial: i32,
     pub span: Span,
 }
@@ -162,6 +168,7 @@ pub struct ScoreDecl {
 #[derive(Debug)]
 pub struct Function {
     pub name: String,
+    pub name_span: Span,
     pub parameters: Vec<Parameter>,
     pub returns_score: bool,
     pub attributes: Vec<Attribute>,
@@ -253,6 +260,7 @@ pub enum StatementKind {
     },
     Let {
         name: String,
+        name_span: Span,
         value: Expr,
     },
     Schedule {

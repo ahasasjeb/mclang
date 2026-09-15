@@ -215,7 +215,7 @@ pub(crate) fn keyword_alias(english: &str) -> Option<&'static str> {
         .map(|keyword| keyword.chinese)
 }
 
-pub(super) fn word_matches(value: &str, english: &str) -> bool {
+pub(crate) fn word_matches(value: &str, english: &str) -> bool {
     value == english || keyword_alias(english).is_some_and(|alias| alias == value)
 }
 

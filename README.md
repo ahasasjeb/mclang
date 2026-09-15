@@ -82,12 +82,28 @@ fn tick() {
 ```text
 mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]
 mclang check <源文件.mcl|项目目录> [--deny-raw]
+mclang lsp
 mclang help | version
 ```
 
 - 输入可以是单个 `.mcl` 文件，也可以是递归包含 `.mcl` 的项目目录；项目内所有文件必须声明相同命名空间，声明与引用在整个项目内可见。
 - `check` 只做检查并打印统计；`build` 通过全部检查后才写出文件。
 - 默认输出目录是 `build/<源文件名>`。
+- `lsp` 在标准输入输出上启动语言服务器，供编辑器插件调用，不面向终端交互。
+
+## 编辑器支持
+
+仓库自带 VSCode 插件（[`editors/vscode`](editors/vscode)）和语言服务器：
+
+```powershell
+cargo build --release
+cd editors/vscode
+npm install
+npx vsce package
+code --install-extension mclang-0.5.0.vsix
+```
+
+插件提供中英文关键词的语法高亮、即时诊断（与命令行同一套检查，未保存的编辑也会检查）、声明与关键词补全、悬停说明和跨文件跳转。语言服务器是编译器的一部分（`mclang lsp`），插件会在工作区 `target/release`、`target/debug` 与 `PATH` 中自动查找可执行文件，也可以用 `mclang.server.path` 指定。
 
 ## 与原生命令的对应关系
 
@@ -127,10 +143,13 @@ mclang help | version
 | `src/lexer.rs` | 词法分析（Unicode 感知，用于识别中文关键词） |
 | `src/parser/` | 递归下降解析：声明、语句、条件、表达式、关键词表 |
 | `src/ast.rs` | 语法树与源范围 |
+| `src/analysis.rs` | 工具侧分析入口：结构化诊断与符号表 |
+| `src/lsp/` | 语言服务器：JSON-RPC、位置换算、补全、悬停、跳转 |
 | `src/compiler/validate/` | 整程序语义检查（名称、资源、上下文、递归、JSON） |
 | `src/compiler/codegen/` | 函数、辅助函数、资源与函数标签的代码生成 |
 | `src/lib.rs` / `src/main.rs` | 项目编排、数据包写入与命令行入口 |
 | `docs/` | 语言参考、语言设计、编译器设计和在线手册 |
+| `editors/vscode/` | VSCode 插件：语法高亮、语言配置与语言客户端 |
 | `examples/` | 端到端示例项目 |
 | `minecraft_client_26.3-rc-2/` | 随仓库固定的目标版本源码（用于核对注册表与命令签名） |
 

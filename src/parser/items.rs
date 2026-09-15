@@ -10,7 +10,7 @@ use super::keywords::{boolean_word, item_stack_property, rarity_value};
 impl Parser {
     pub(super) fn item_stack(&mut self) -> Result<ItemStackDecl, Diagnostic> {
         let start = self.expect_word("item")?.span;
-        let (name, _) = self.ident("物品定义名称")?;
+        let (name, name_span) = self.ident("物品定义名称")?;
         self.expect(TokenKind::Equal, "物品定义名称后需要 `=`")?;
         self.expect_word("item_stack")?;
         self.expect(TokenKind::LeftParen, "item_stack 后需要 `(`")?;
@@ -185,6 +185,7 @@ impl Parser {
         self.take(&TokenKind::Semicolon);
         Ok(ItemStackDecl {
             name,
+            name_span,
             item_id,
             count,
             custom_name,

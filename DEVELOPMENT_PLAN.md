@@ -296,6 +296,9 @@
 - [ ] 8.4 静态命令校验与补全：用 1.1 命令树校验 `run` 字符串的根命令、参数形状与权限等级，在编译期报告不可能加载的命令。
 - [ ] 8.5 增量构建与源映射：只重建受影响函数，产物与源码行对应。
 - [ ] 8.6 语言服务器与编辑器集成：补全、悬停、跳转、格式化、即时诊断。
+  - [x] `mclang lsp` 语言服务器：UTF-16 位置换算、全文同步、项目级即时诊断、声明与关键词补全（`@`/`#` 上下文）、关键词与声明悬停、跨文件跳转；`analysis::analyze` 提供结构化诊断与符号表。
+  - [x] VSCode 插件 `editors/vscode`：TextMate 语法高亮（中英文关键词表与解析器同步测试）、语言配置、按 `mclang.server.path`/`target/(release|debug)`/`PATH` 解析可执行文件的语言客户端。
+  - [ ] 剩余：文档格式化、代码操作（快速修复）、点号成员（`self.*`、`effect.*` 等）补全与语义高亮。
 - [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收。`docs/manual.html` 的在线手册尚未同步本批次的函数标签、`effect`/`xp`/`clear`、`return fail`/`run` 与 `schedule.clear` 章节；`docs/language-reference.md` 与 `docs/compiler-design.md` 已经更新。
 
 ### 第 9 阶段：数据包内容与资源 schema（非命令）

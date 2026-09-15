@@ -72,3 +72,27 @@ cargo run -- build examples/potion_lab.mcl --deny-raw
 `--deny-raw` 会递归拒绝任何 `run` 或字符串形式的 `execute`，适合要求全部使用 Mclang 标准层的新项目。它也可以用于 `check`。
 
 构建会维护输出目录中的 `.mclang-manifest`。再次构建时只删除上一次由 Mclang 生成的文件，目录中的其他文件保持原样。
+
+## 编辑器支持（VSCode）
+
+仓库自带 VSCode 插件（`editors/vscode`）与配套语言服务器。先构建编译器，再打包安装：
+
+```powershell
+cargo build --release
+cd editors/vscode
+npm install
+npx vsce package
+code --install-extension mclang-0.5.0.vsix
+```
+
+打开包含 `.mcl` 文件的工作区后，插件提供：
+
+- 语法高亮：中英文关键词、函数属性、`#函数标签`、字符串与注释；
+- 即时诊断：词法、语法和整项目语义错误直接标在编辑器里，保存与否都即时更新；
+- 补全：已声明的函数、计分变量、查询、物品、存储、函数标签，以及全部中英文关键词；`@` 后补全函数属性，`#` 后补全函数标签；
+- 悬停：关键词显示中英文对照与一句话说明，声明显示摘要和定义位置；
+- 跳转：从引用跳到声明，支持跨文件。
+
+语言服务器可以独立使用：`mclang lsp` 在标准输入输出上说 LSP。插件依次在工作区的 `target/release`、`target/debug` 和 `PATH` 中查找 `mclang` 可执行文件，也可以用设置 `mclang.server.path` 显式指定。
+
+编辑器按打开的文档推断项目：同一命名空间、同一目录树下的文件属于一个项目，工作区里互不相关的项目（比如仓库里的多个示例）不会互相干扰；如果目录里出现命名空间不一致的文件，命令行 `mclang check` 仍会报错。

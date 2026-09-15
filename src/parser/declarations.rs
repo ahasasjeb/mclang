@@ -16,7 +16,7 @@ use super::keywords::{
 impl Parser {
     pub(super) fn score(&mut self) -> Result<ScoreDecl, Diagnostic> {
         let start = self.expect_word("score")?.span;
-        let (name, _) = self.ident("计分变量名称")?;
+        let (name, name_span) = self.ident("计分变量名称")?;
         self.expect(
             TokenKind::Equal,
             "计分变量需要初始值，例如 `score count = 0;`",
@@ -40,6 +40,7 @@ impl Parser {
             .span;
         Ok(ScoreDecl {
             name,
+            name_span,
             initial,
             span: start.merge(end),
         })
@@ -47,7 +48,7 @@ impl Parser {
 
     pub(super) fn query(&mut self) -> Result<EntityQueryDecl, Diagnostic> {
         let start = self.expect_word("query")?.span;
-        let (name, _) = self.ident("查询名称")?;
+        let (name, name_span) = self.ident("查询名称")?;
         self.expect(TokenKind::Equal, "查询名称后需要 `=`")?;
         self.expect_word("entity")?;
         self.expect(TokenKind::LeftParen, "entity 后需要 `(`")?;
@@ -133,6 +134,7 @@ impl Parser {
         self.take(&TokenKind::Semicolon);
         Ok(EntityQueryDecl {
             name,
+            name_span,
             entity_type,
             tags,
             excluded_tags,
@@ -203,7 +205,7 @@ impl Parser {
 
     pub(super) fn storage(&mut self) -> Result<StorageDecl, Diagnostic> {
         let start = self.expect_word("storage")?.span;
-        let (name, _) = self.ident("存储名称")?;
+        let (name, name_span) = self.ident("存储名称")?;
         self.expect(TokenKind::Equal, "存储名称后需要 `=`")?;
         self.expect_word("item_list")?;
         self.expect(TokenKind::LeftParen, "item_list 后需要 `(`")?;
@@ -216,6 +218,7 @@ impl Parser {
             .span;
         Ok(StorageDecl {
             name,
+            name_span,
             storage_id,
             path,
             span: start.merge(end),
@@ -225,7 +228,7 @@ impl Parser {
     /// `fn_tag 名称 { value(函数或#标签); replace = 真; }`
     pub(super) fn function_tag(&mut self) -> Result<FunctionTagDecl, Diagnostic> {
         let start = self.expect_word("fn_tag")?.span;
-        let (name, _) = self.ident("函数标签名称")?;
+        let (name, name_span) = self.ident("函数标签名称")?;
         self.expect(TokenKind::LeftBrace, "函数标签需要 `{`")?;
         let mut values = Vec::new();
         let mut replace = false;
@@ -272,6 +275,7 @@ impl Parser {
         self.take(&TokenKind::Semicolon);
         Ok(FunctionTagDecl {
             name,
+            name_span,
             values,
             replace,
             span: start.merge(end),
@@ -312,7 +316,7 @@ impl Parser {
         let start = self.expect_word("resource")?.span;
         let (kind, _) = self.resource_path("资源类型")?;
         let kind = resource_kind(&kind).unwrap_or(&kind).to_owned();
-        let (name, _) = self.resource_path("资源名称")?;
+        let (name, name_span) = self.resource_path("资源名称")?;
         self.expect(TokenKind::Equal, "资源名称后需要 `=`")?;
         let (json, _) = self.string("资源内容需要 JSON 字符串")?;
         let end = self
@@ -321,6 +325,7 @@ impl Parser {
         Ok(ResourceDecl {
             kind,
             name,
+            name_span,
             json,
             span: start.merge(end),
         })
@@ -351,7 +356,7 @@ impl Parser {
             attributes.push(attribute);
         }
         self.expect_word("fn")?;
-        let (name, _) = self.ident("函数名称")?;
+        let (name, name_span) = self.ident("函数名称")?;
         self.expect(TokenKind::LeftParen, "函数名称后需要 `(`")?;
         let mut parameters = Vec::new();
         if !self.check(&TokenKind::RightParen) {
@@ -373,6 +378,7 @@ impl Parser {
         let (body, end) = self.block()?;
         Ok(Function {
             name,
+            name_span,
             parameters,
             returns_score,
             attributes,

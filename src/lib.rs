@@ -1,17 +1,21 @@
+mod analysis;
 mod ast;
 mod compiler;
 mod diagnostic;
 mod lexer;
+mod lsp;
 mod parser;
 
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+use analysis::{SourceFile, merge_programs, parse_all};
 use compiler::{CompiledPack, compile};
 use diagnostic::Diagnostic;
-use lexer::lex;
-use parser::parse;
+
+pub use analysis::{FileDiagnostic, ProjectAnalysis, Span, Symbol, SymbolKind, analyze};
+pub use lsp::serve;
 
 pub struct BuildOptions {
     pub description: String,
@@ -115,11 +119,6 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
         .sum()
 }
 
-struct SourceFile {
-    path: PathBuf,
-    text: String,
-}
-
 fn read_sources(path: &Path) -> Result<Vec<SourceFile>, String> {
     let metadata =
         fs::metadata(path).map_err(|error| format!("无法访问 {}：{error}", path.display()))?;
@@ -146,7 +145,7 @@ fn read_sources(path: &Path) -> Result<Vec<SourceFile>, String> {
         .collect()
 }
 
-fn discover_sources(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), String> {
+pub(crate) fn discover_sources(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), String> {
     let entries = fs::read_dir(directory)
         .map_err(|error| format!("无法读取目录 {}：{error}", directory.display()))?;
     for entry in entries {
@@ -158,7 +157,9 @@ fn discover_sources(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), St
         if file_type.is_dir() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if !name.starts_with('.') && name != "target" && name != "build" {
+            if !name.starts_with('.')
+                && !matches!(name.as_ref(), "target" | "build" | "node_modules")
+            {
                 discover_sources(&path, paths)?;
             }
         } else if file_type.is_file()
@@ -171,48 +172,11 @@ fn discover_sources(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), St
 }
 
 fn frontend(sources: &[SourceFile]) -> Result<ast::Program, String> {
-    let mut programs = Vec::new();
-    let mut diagnostics = Vec::new();
-    for (source_id, source) in sources.iter().enumerate() {
-        match lex(&source.text, source_id) {
-            Ok(tokens) => match parse(tokens) {
-                Ok(program) => programs.push(program),
-                Err(mut errors) => diagnostics.append(&mut errors),
-            },
-            Err(mut errors) => diagnostics.append(&mut errors),
-        }
-    }
+    let (programs, diagnostics) = parse_all(sources);
     if !diagnostics.is_empty() {
         return Err(render(sources, diagnostics));
     }
-
-    let mut programs = programs.into_iter();
-    let mut program = programs
-        .next()
-        .expect("read_sources guarantees at least one source");
-    for mut other in programs {
-        if other.namespace != program.namespace {
-            diagnostics.push(Diagnostic::new(
-                format!(
-                    "项目命名空间必须一致：预期 `{}`，实际为 `{}`",
-                    program.namespace, other.namespace
-                ),
-                other.namespace_span,
-            ));
-        }
-        program.scores.append(&mut other.scores);
-        program.queries.append(&mut other.queries);
-        program.item_stacks.append(&mut other.item_stacks);
-        program.storages.append(&mut other.storages);
-        program.resources.append(&mut other.resources);
-        program.function_tags.append(&mut other.function_tags);
-        program.functions.append(&mut other.functions);
-    }
-    if diagnostics.is_empty() {
-        Ok(program)
-    } else {
-        Err(render(sources, diagnostics))
-    }
+    merge_programs(programs).map_err(|diagnostics| render(sources, diagnostics))
 }
 
 fn render(sources: &[SourceFile], diagnostics: Vec<Diagnostic>) -> String {
