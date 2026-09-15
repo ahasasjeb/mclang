@@ -12,22 +12,23 @@
 | --- | --- | --- | --- |
 | `namespace` | `命名空间` | `score` | `计分` |
 | `query` | `查询` | `entity` | `实体` |
-| `storage` | `存储` | `items` | `物品` |
 | `item` | `物品` | `item_stack` | `物品堆` |
+| `storage` | `存储` | `item_list` | `物品列表` |
 | `resource` | `资源` | `predicate` | `谓词` |
-| `fn` | `函数` | `let` | `令` |
-| `return` | `返回` | `if` | `如果` |
-| `else` | `否则` | `while` | `当` |
+| `contents` | `内容` | `fn` | `函数` |
+| `let` | `令` | `return` | `返回` |
+| `if` | `如果` | `else` | `否则` |
+| `while` | `当` | `each` | `遍历` |
 | `call` | `调用` | `schedule` | `调度` |
 | `after` | `延后` | `append` | `追加` |
-| `replace` | `替换` | `each` | `遍历` |
-| `give` | `给予` | `in_dimension` | `在维度` |
-| `spawn` | `召唤` |  |  |
-| `self` | `自身` | `message` | `消息` |
-| `sound` | `声音` | `run` | `原生命令` |
-| `execute` | `原生执行` |  |  |
+| `replace` | `替换` | `give` | `给予` |
+| `in_dimension` | `在维度` | `spawn` | `召唤` |
+| `origin` | `投掷者` | `self` | `自身` |
+| `message` | `消息` | `sound` | `声音` |
+| `run` | `原生命令` | `execute` | `原生执行` |
 
-函数属性为 `@load`/`@加载`、`@tick`/`@每刻`、`@entity`/`@实体` 和 `@player`/`@玩家`。返回类型 `-> score` 也可以写成 `-> 计分`。
+函数属性为 `@load`/`@加载`、`@tick`/`@每刻`、`@entity`/`@实体`、`@non_player`/`@非玩家`
+和 `@player`/`@玩家`。返回类型 `-> score` 也可以写成 `-> 计分`。
 
 查询、物品和实体操作：
 
@@ -49,7 +50,6 @@
 | `set_invulnerable` | `设置无敌` | `save_items` | `保存物品` |
 | `restore_items` | `恢复物品` | `remove_preserving_items` | `保存并移除` |
 | `clear_items` | `清空物品` | `remove` | `移除` |
-| `consume` | `消耗` | `return_to_owner` | `返还投掷者` |
 
 目标和枚举值：
 
@@ -176,12 +176,12 @@ query triggers = entity("minecraft:item") {
 
 查询还支持 `tag("name")`、`limit(1)`、`within(16)` 和 `sort(nearest)`；排序值可以是 `nearest`、`furthest`、`random` 或 `arbitrary`。实体类型、物品类型、标签、范围、数量和 `contents` 槽都会在编译期检查。
 
-`each` 为每个匹配实体建立 `self` 和实体所在位置。实体类型为 `minecraft:player` 的查询会建立更精确的玩家上下文：
+`each` 为每个匹配实体建立 `self` 和实体所在位置。实体类型为 `minecraft:player` 的查询会建立玩家上下文，其他查询建立非玩家实体上下文：
 
 ```mcl
 each(triggers) {
     self.add_tag("handled");
-    self.consume();
+    self.remove();
 }
 ```
 
@@ -202,27 +202,46 @@ in_dimension("minecraft:the_nether") {
 }
 ```
 
-可用实体方法包括 `add_tag`、`remove_tag`、`set_invulnerable`、`save_items`、`restore_items`、`remove_preserving_items`、`clear_items`、`remove`、`consume` 和 `return_to_owner`。这些方法只能用于 `each`、`spawn` 或 `@entity` 函数建立的实体上下文。
+可用实体方法按所需上下文分成三层：
 
-`return_to_owner` 用于掉落物实体：它读取实体的 `Thrower`，把同一个实体传送到投掷者并把 `PickupDelay` 置零，由原版拾取逻辑把完整物品堆放回背包。物品的名称、附魔、Lore 等组件原样保留；没有投掷者（例如命令直接生成的掉落物）或投掷者背包已满时，实体保持原样留在世界。掉落物与投掷者应当处于同一维度。
+- `add_tag`、`remove_tag` 和 `remove` 只要求任意实体上下文；
+- `set_invulnerable`、`save_items`、`restore_items`、`remove_preserving_items` 和
+  `clear_items` 通过 `data` 命令修改实体 NBT，而 Minecraft 拒绝修改玩家数据，
+  因此要求非玩家实体上下文；
+- `give_item` 要求玩家上下文。
+
+编译器跟踪四种执行上下文，并在编译期检查每条语句需要哪一种：
+
+| 上下文 | 来源 | `self` 指向 |
+| --- | --- | --- |
+| 无 | `@load`、`@tick`、普通函数 | 没有实体 |
+| 任意实体 | `@entity` 函数 | 实体，但可能是玩家 |
+| 非玩家实体 | 非玩家查询的 `each`、`spawn`、`@non_player` 函数 | 确定不是玩家的实体 |
+| 玩家 | 玩家查询的 `each`、`@player` 函数 | 确定是玩家 |
+
+`spawn` 只生成非玩家实体：`minecraft:player` 和 `minecraft:fishing_bobber` 在 26.3 中标记为 `noSummon`，编译器会拒绝 `spawn` 它们。
 
 ```mcl
 @entity
 fn mark_current_entity() {
-    self.add_tag("marked");
+    self.add_tag("marked");          // 任意实体都可以
 }
-```
 
-调用 `@entity` 函数时必须已有实体上下文。需要当前执行者确实是玩家的操作使用 `@player`：
+@non_player
+fn prepare_box() {
+    self.set_invulnerable(true);     // 只对非玩家实体安全
+}
 
-```mcl
 @player
 fn reward_current_player() {
     self.give_item(welcome_gift);
 }
 ```
 
-玩家上下文可以调用 `@player` 或 `@entity` 函数，普通实体上下文只能调用 `@entity` 函数。两类上下文函数都不能被 `schedule`，因为原版调度不会保留执行实体。
+`@entity` 函数可以被任何实体上下文调用，其中不能使用只对非玩家实体安全的 NBT 方法。
+需要这类方法的可复用逻辑应声明为 `@non_player`，并只从非玩家查询的 `each`、`spawn`
+或另一个 `@non_player` 函数调用。玩家上下文满足 `@entity` 的调用要求，但反过来不成立。
+`@entity`、`@non_player` 和 `@player` 函数都不能被 `schedule`，因为原版调度不会保留执行实体。
 
 ## 类型化物品与给予
 
@@ -250,9 +269,19 @@ fn grant_self() {
     self.give_item(welcome_gift);      // 当前玩家，使用物品定义的 count
     self.give_item(welcome_gift, 5);   // 当前玩家，本次给予 5 个
 }
+
+fn return_drop() {
+    each(drops) {
+        give(origin, self.item);       // 把当前实体的物品原样交给投掷者
+    }
+}
 ```
 
-`give` 的目标必须是 `minecraft:player` 类型的查询；编译器为每个匹配玩家生成 `execute as <选择器> at @s run give @s ...`。`self.give_item` 是当前玩家上下文的简写，只能用于玩家查询建立的 `each` 块或 `@player` 函数。
+`give` 的目标写成查询时必须是 `minecraft:player` 类型，编译器为每个匹配玩家生成 `execute as <选择器> at @s run give @s ...`。`self.give_item` 是当前玩家上下文的简写，只能用于玩家查询建立的 `each` 块或 `@player` 函数。
+
+目标还可以写成 `origin`（中文 `投掷者`）：它对应原版实体关系 `origin`，对掉落物来说是 `Thrower`，因此可以把物品交还给投掷者。投掷者运行时必须解析到玩家，否则不执行。物品来源除了已声明的物品定义，还可以写成 `self.item`（中文 `自身.物品`）：它读取当前实体槽位 0 的物品堆 NBT（掉落物就是它的 `Item`），把它原样放进目标玩家快捷栏或主背包的第一个空槽（不含盔甲、副手和合成槽），不合并、不改变组件。原样给予不能附带数量；复制成功后源槽被清空，掉落物自行消失，背包已满时源实体保持原样。对普通玩家查询使用 `self.item` 时，只有第一个有空位的匹配玩家会收到物品。
+
+物品来源是物品定义时走普通 `/give` 路径：会与背包中已有的同名物品堆叠，装不下时掉在玩家脚边，数量和上限规则与查询目标相同。因此额外奖励只需再写一条 `give(origin, <物品定义>);`，与 `self.item` 的原样交还可以并用。
 
 数量省略时使用物品定义的 `count`，显式数量总是覆盖它。与 26.3 `GiveCommand` 一致，数量上限是物品最大堆叠数乘以 100：未声明 `max_stack_size` 时物品的原型堆叠数至少为 1，因此保守上限为 100；声明 `max_stack_size = n` 后上限为 `n × 100`。
 
@@ -281,10 +310,10 @@ fn grant_self() {
 ## 类型化物品存储
 
 ```mcl
-storage saved = items("demo:state", "saved_items");
+storage saved = item_list("demo:state", "saved_items");
 ```
 
-声明创建一个保存容器 `Items` 列表的持久位置。编译器在数据包 load 入口中仅于路径不存在时初始化空列表，因此 `/reload` 不会覆盖内容。在实体上下文中使用 `self.save_items(saved)` 和 `self.restore_items(saved)` 保存或恢复完整槽位数据。`self.remove_preserving_items(saved)` 是安全收起容器的原子语言操作，后端固定按保存、清空、删除的顺序生成命令。
+声明创建一个保存容器 `Items` 列表的持久位置。编译器在数据包 load 入口中仅于路径不存在时初始化空列表，因此 `/reload` 不会覆盖内容。在非玩家实体上下文（非玩家查询的 `each`、`spawn` 或 `@non_player` 函数）中使用 `self.save_items(saved)` 和 `self.restore_items(saved)` 保存或恢复完整槽位数据。`self.remove_preserving_items(saved)` 是安全收起容器的原子语言操作，后端固定按保存、清空、删除的顺序生成命令。
 
 ## 消息
 
@@ -303,6 +332,44 @@ sound.self("minecraft:block.note_block.pling", master);
 ```
 
 `sound.self` 在当前玩家位置向该玩家播放声音，需要玩家上下文。编译器检查声音资源位置和 26.3 的声音分类。当前分类包括 `master`、`music`、`record`、`weather`、`block`、`hostile`、`neutral`、`player`、`ambient`、`voice` 和 `ui`。
+
+## 与原生命令的对应关系
+
+标准层是原生命令的类型化外壳：每条结构化语句都会在编译期检查，再下降为确定的命令形状。下表给出完整对应关系，便于和 `run` 中的手写命令互相换算。
+
+| Mclang | 生成的命令 | 说明 |
+| --- | --- | --- |
+| `score x = 1;`、赋值 | `scoreboard players set/add/remove/operation` | 假玩家 `#v_x`，32 位整数 |
+| 算术表达式 | `scoreboard players operation` 与 `#t<n>` 临时项 | 常量在编译期折叠 |
+| `if`、`while`、`&&`、`\|\|`、`!` | `execute if score` 与辅助函数 | 条件先求值为 0/1 |
+| `call f(...)`、`f(...)` | `function <ns>:f` | 实参经假玩家传递 |
+| `return e;` | `return <值>`、`return run scoreboard players get` | 计分返回约定 |
+| `@load`、`@tick` | `minecraft:load`、`minecraft:tick` 函数标签 | 入口函数 |
+| 普通函数 | `data/<ns>/function/<名称>.mcfunction` | 每个函数一个文件 |
+| `each(q) {}` | `execute as <选择器> at @s run function <辅助函数>` | 查询下降为选择器 |
+| `spawn(t) {}` | `execute summon <t> run function <辅助函数>` | 暂不支持初始 NBT |
+| `in_dimension(d) {}` | `execute in <d> run function <辅助函数>` | |
+| `execute "子句" {}` | `execute <子句> run function <辅助函数>` | 底层接口 |
+| `give(q, 物品[, n])` | `execute as <选择器> at @s run give @s <物品> <数量>` | 目标必须是玩家查询 |
+| `give(origin, 物品)` | `execute on origin if entity @s[type=minecraft:player] run give ...` | 原版实体关系 |
+| `give(q, self.item)` | `item replace entity @s <空槽来源> from entity <源实体> contents` | 原样复制后清空源槽 |
+| `self.give_item(...)` | `give @s <物品> <数量>` | 玩家上下文 |
+| `self.add_tag(x)`、`self.remove_tag(x)` | `tag @s add/remove x` | 任意实体上下文 |
+| `self.remove()` | `kill @s` | 任意实体上下文 |
+| `self.set_invulnerable(b)` | `data merge entity @s {Invulnerable:1b/0b}` | 非玩家实体上下文 |
+| `self.save_items(s)` | `data modify storage ... set from entity @s Items` | 非玩家实体上下文 |
+| `self.restore_items(s)` | `data modify entity @s Items set from storage ...` | 非玩家实体上下文 |
+| `self.clear_items()` | `data modify entity @s Items set value []` | 非玩家实体上下文 |
+| `self.remove_preserving_items(s)` | 保存、清空、`kill @s` | 非玩家实体上下文 |
+| `message.all/self/nearest` | `tellraw <玩家选择器> <文本组件 JSON>` | 文本组件由编译器生成 |
+| `sound.self(声音, 分类)` | `playsound <声音> <分类> @s ~ ~ ~ 1 1` | 玩家上下文 |
+| `predicate(p)` | `execute if predicate <ns>:p` | 可与 `!`、`&&`、`\|\|` 组合 |
+| `schedule f() after n t [append]` | `schedule function <ns>:f <n>t [append]` | 单位 `t`、`s`、`d` |
+| `run "命令"` | 命令原样写入 `.mcfunction` | 底层接口 |
+| `query ... = entity(...)` | 选择器 `@e[...]`、`if items entity @s <槽> <物品谓词>` | 编译期检查全部参数 |
+| `item ... = item_stack(...)` | 物品组件 SNBT | 编译期检查全部组件 |
+| `storage ... = item_list(...)` | `data` 路径；load 时 `execute unless data ... run data modify ... set value []` | 幂等初始化 |
+| `resource ... = """JSON"""` | `data/<ns>/<类型>/<名称>.json` | 编译期解析并统一格式化 |
 
 ## 底层兼容接口
 

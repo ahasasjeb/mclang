@@ -3,6 +3,7 @@
 //! [`validate`] 按源码顺序检查顶层声明，收集符号表，再逐函数校验函数体，
 //! 最后分析同步调用图。所有诊断都会返回，不提前退出，方便用户一次修完。
 
+mod expressions;
 mod items;
 mod recursion;
 mod rules;
@@ -262,21 +263,31 @@ fn validate_function_declaration(
         ));
     }
     if is_entry
-        && function
-            .attributes
-            .iter()
-            .any(|attribute| matches!(attribute, Attribute::Entity | Attribute::Player))
+        && function.attributes.iter().any(|attribute| {
+            matches!(
+                attribute,
+                Attribute::Entity | Attribute::Player | Attribute::NonPlayer
+            )
+        })
     {
         diagnostics.push(Diagnostic::new(
-            "@entity 和 @player 不能与 @load 或 @tick 用在同一个函数上",
+            "@entity、@non_player 和 @player 不能与 @load 或 @tick 用在同一个函数上",
             function.span,
         ));
     }
-    if function.attributes.contains(&Attribute::Entity)
-        && function.attributes.contains(&Attribute::Player)
-    {
+    let entity_attributes = function
+        .attributes
+        .iter()
+        .filter(|attribute| {
+            matches!(
+                attribute,
+                Attribute::Entity | Attribute::Player | Attribute::NonPlayer
+            )
+        })
+        .count();
+    if entity_attributes > 1 {
         diagnostics.push(Diagnostic::new(
-            "同一个函数不能同时使用 @entity 和 @player",
+            "同一个函数只能在 @entity、@non_player 和 @player 中选择一个执行上下文属性",
             function.span,
         ));
     }

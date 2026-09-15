@@ -15,7 +15,8 @@
 mod conditions;
 mod declarations;
 mod expressions;
-mod keywords;
+mod items;
+pub(crate) mod keywords;
 mod statements;
 
 #[cfg(test)]

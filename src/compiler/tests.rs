@@ -199,16 +199,17 @@ fn chinese_and_english_keywords_compile_identically() {
                 dyed_color = 16711680;
                 enchantment_glint_override = true;
             }
-            storage saved = items("demo:state", "saved_items");
+            storage saved = item_list("demo:state", "saved_items");
             resource predicate coin = """{"condition":"minecraft:random_chance","chance":0.5}""";
             @load fn load() { message.all("loaded", green); }
             @entity fn mark() { self.add_tag("handled"); }
+            @non_player fn prepare() { self.set_invulnerable(true); self.clear_items(); }
             @tick fn tick() {
                 each(triggers) {
                     call mark();
                     if predicate(coin) {
                         spawn("minecraft:chest_minecart") {
-                            self.set_invulnerable(true);
+                            call prepare();
                             self.restore_items(saved);
                         }
                         message.nearest(16, "ready", gold);
@@ -217,8 +218,8 @@ fn chinese_and_english_keywords_compile_identically() {
                             self.remove_preserving_items(saved);
                         }
                     }
-                    self.return_to_owner();
-                    self.consume();
+                    give(origin, self.item);
+                    self.remove();
                 }
                 each(players) {
                     self.give_item(reward, 2);
@@ -267,16 +268,17 @@ fn chinese_and_english_keywords_compile_identically() {
                 染色 = 16711680;
                 附魔光效 = 真;
             }
-            存储 saved = 物品("demo:state", "saved_items");
+            存储 saved = 物品列表("demo:state", "saved_items");
             资源 谓词 coin = """{"condition":"minecraft:random_chance","chance":0.5}""";
             @加载 函数 load() { 消息.全部("loaded", 绿色); }
             @实体 函数 mark() { 自身.添加标签("handled"); }
+            @非玩家 函数 prepare() { 自身.设置无敌(真); 自身.清空物品(); }
             @每刻 函数 tick() {
                 遍历(triggers) {
                     调用 mark();
                     如果 谓词(coin) {
                         召唤("minecraft:chest_minecart") {
-                            自身.设置无敌(真);
+                            调用 prepare();
                             自身.恢复物品(saved);
                         }
                         消息.最近(16, "ready", 金色);
@@ -285,8 +287,8 @@ fn chinese_and_english_keywords_compile_identically() {
                             自身.保存并移除(saved);
                         }
                     }
-                    自身.返还投掷者();
-                    自身.消耗();
+                    给予(投掷者, 自身.物品);
+                    自身.移除();
                 }
                 遍历(players) {
                     自身.给予物品(reward, 2);
@@ -363,20 +365,56 @@ fn captures_score_function_results_in_expressions() {
 }
 
 #[test]
-fn lowers_return_to_owner_for_dropped_items() {
+fn lowers_self_item_give_through_empty_slot_source() {
     let pack = compile_text(
-        "namespace demo; query drops = entity(\"minecraft:item\") {} fn collect() { each(drops) { self.return_to_owner(); } }",
+        "namespace demo; item bonus = item_stack(\"minecraft:diamond\") { custom_name = \"B\"; } query drops = entity(\"minecraft:item\") {} fn collect() { each(drops) { give(origin, self.item); give(origin, bonus); } }",
     );
     let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
-    assert!(generated.contains("tag @s add mcl_"));
     assert!(
-        generated.contains("execute on origin at @s run tp @e[tag=mcl_"),
-        "missing teleport to origin:\n{generated}"
+        generated
+            .contains("execute on origin if entity @s[type=minecraft:player] store success score"),
+        "missing origin dispatch:\n{generated}"
     );
-    assert!(generated.contains("_returning,limit=1] ~ ~ ~"));
-    assert!(generated.contains("data merge entity @e[tag=mcl_"));
-    assert!(generated.contains("_returning,limit=1] {PickupDelay:0}"));
-    assert!(generated.contains("tag @s remove mcl_"));
+    assert!(
+        generated
+            .contains("run item replace entity @s demo:__mcl/empty_slot from entity @e[tag=mcl_")
+    );
+    assert!(generated.contains("_give,limit=1] contents"));
+    assert!(
+        generated.contains("matches 1 run item replace entity @s contents with minecraft:air"),
+        "missing source clear:\n{generated}"
+    );
+    assert!(
+        generated.contains(
+            "execute on origin if entity @s[type=minecraft:player] run give @s minecraft:diamond[minecraft:custom_name={text:\"B\"}] 1"
+        ),
+        "missing bonus give to origin:\n{generated}"
+    );
+    let slot_source = &pack.files[&PathBuf::from("data/demo/slot_source/__mcl/empty_slot.json")];
+    assert!(slot_source.contains("\"type\": \"minecraft:filtered\""));
+    assert!(slot_source.contains("\"type\": \"minecraft:group\""));
+    assert!(slot_source.contains("\"slots\": \"hotbar.*\""));
+    assert!(slot_source.contains("\"slots\": \"inventory.*\""));
+    assert!(!slot_source.contains("container.*"));
+    assert!(slot_source.contains("\"count\": 0"));
+
+    let players = compile_text(
+        "namespace demo; item gem = item_stack(\"minecraft:emerald\") {} query players = entity(\"minecraft:player\") {} fn collect() { each(players) { give(origin, gem); give(players, self.item); } }",
+    );
+    let generated = players
+        .files
+        .values()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(generated.contains(
+        "execute on origin if entity @s[type=minecraft:player] run give @s minecraft:emerald 1"
+    ));
+    assert!(
+        generated.contains(
+            "execute as @e[type=minecraft:player] at @s run function demo:__mcl/collect/"
+        )
+    );
 }
 
 #[test]
@@ -393,7 +431,7 @@ fn lowers_typed_minecraft_queries_storage_and_actions() {
                     custom_name = "A";
                 }
             }
-            storage saved = items("demo:state", "saved_items");
+            storage saved = item_list("demo:state", "saved_items");
             @tick fn tick() {
                 each(triggers) {
                     self.add_tag("handled");
@@ -498,6 +536,8 @@ fn lowers_typed_item_giving_and_checks_player_context() {
                     give(players, bounded, 1601);
                     give(players, bounded, 0);
                 }
+                fn wrong_origin() { give(origin, self.item); }
+                fn wrong_self_item() { give(players, self.item, 3); }
                 fn wrong_call() { wrong_entity(); }
                 fn wrong_schedule() { schedule needs_player() after 1 t; }
                 "#,
@@ -572,6 +612,16 @@ fn lowers_typed_item_giving_and_checks_player_context() {
             .iter()
             .any(|error| error.message.contains("不能调度需要执行上下文"))
     );
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("投掷者目标需要实体执行上下文"))
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("原样给予 self.item 时不能指定数量"))
+    );
 }
 
 #[test]
@@ -606,5 +656,106 @@ fn checks_entity_context_and_typed_references() {
         errors
             .iter()
             .any(|error| error.message.contains("不是有效的文本颜色"))
+    );
+}
+
+#[test]
+fn rejects_player_nbt_mutations_and_accepts_non_player_contexts() {
+    let invalid = parse(
+        lex(
+            r#"
+                namespace demo;
+                query players = entity("minecraft:player") {}
+                storage saved = item_list("demo:state", "saved_items");
+                @player fn player_nbt() {
+                    self.set_invulnerable(true);
+                    self.save_items(saved);
+                }
+                @entity fn unknown_entity_nbt() {
+                    self.clear_items();
+                }
+                @tick fn tick() {
+                    each(players) { self.remove_preserving_items(saved); }
+                }
+                "#,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&invalid, "test").unwrap_err();
+    assert_eq!(errors.len(), 4, "{errors:#?}");
+    assert!(
+        errors
+            .iter()
+            .all(|error| error.message.contains("Minecraft 不允许修改玩家数据"))
+    );
+
+    let valid = compile_text(
+        r#"
+            namespace demo;
+            query mobs = entity("minecraft:zombie") {}
+            storage saved = item_list("demo:state", "saved_items");
+            @non_player fn mob_init() {
+                self.set_invulnerable(true);
+                self.restore_items(saved);
+            }
+            fn spawn_all() {
+                spawn("minecraft:armor_stand") { mob_init(); }
+                each(mobs) { mob_init(); self.add_tag("ready"); }
+            }
+            "#,
+    );
+    let generated = valid.files.values().cloned().collect::<Vec<_>>().join("\n");
+    assert!(generated.contains("data merge entity @s {Invulnerable:1b}"));
+    assert!(
+        generated.contains("data modify entity @s Items set from storage demo:state saved_items")
+    );
+    assert!(generated.contains("tag @s add ready"));
+
+    let wrong_caller = parse(
+        lex(
+            r#"
+                namespace demo;
+                @non_player fn mob_only() {}
+                @entity fn any_entity() { mob_only(); }
+                fn no_context() { mob_only(); }
+                "#,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&wrong_caller, "test").unwrap_err();
+    assert_eq!(errors.len(), 2, "{errors:#?}");
+    assert!(errors.iter().all(|error| {
+        error
+            .message
+            .contains("@non_player 函数 `mob_only` 需要非玩家实体执行上下文")
+    }));
+}
+
+#[test]
+fn rejects_non_summonable_entity_types() {
+    let program = parse(
+        lex(
+            r#"
+                namespace demo;
+                fn bad() {
+                    spawn("minecraft:player") { self.add_tag("x"); }
+                    spawn("minecraft:fishing_bobber") { self.add_tag("x"); }
+                }
+                "#,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    assert_eq!(errors.len(), 2, "{errors:#?}");
+    assert!(
+        errors
+            .iter()
+            .all(|error| error.message.contains("不支持实体类型"))
     );
 }

@@ -10,12 +10,38 @@ pub(super) struct Signature {
     pub(super) required_context: ExecutionContext,
 }
 
-/// 执行上下文层级，`None < Entity < Player`。
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// 执行上下文，代码生成时决定 `@s` 指向什么。
+///
+/// - `None`：没有执行实体，例如 `@load`/`@tick` 入口函数；
+/// - `Entity`：有实体，但可能是玩家，`@entity` 函数属于这一类；
+/// - `Mob`：确定不是玩家的实体，来自非玩家查询的 `each`、非玩家 `spawn`
+///   和 `@non_player` 函数；
+/// - `Player`：确定是玩家，来自玩家查询的 `each` 和 `@player` 函数。
+///
+/// `Mob` 和 `Player` 都是 `Entity` 的特例，但互不包含：Minecraft 拒绝
+/// `data ... entity` 作用于玩家，所以修改实体 NBT 的操作只允许 `Mob`。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ExecutionContext {
     None,
     Entity,
+    Mob,
     Player,
+}
+
+impl ExecutionContext {
+    pub(super) fn is_entity(self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    /// 当前上下文是否满足某个最低要求。`Mob` 满足 `Entity`，但也仅此而已。
+    pub(super) fn satisfies(self, required: Self) -> bool {
+        match required {
+            Self::None => true,
+            Self::Entity => self.is_entity(),
+            Self::Mob => matches!(self, Self::Mob),
+            Self::Player => matches!(self, Self::Player),
+        }
+    }
 }
 
 /// 当前语句位置是否允许 `return`，以及所在函数是否返回 score。

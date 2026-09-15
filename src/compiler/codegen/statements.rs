@@ -1,14 +1,14 @@
-//! 语句下降：把控制流、调用和实体操作展开为数据包函数与命令。
+//! 控制流下降：语句分派、条件分支、循环、调用和辅助函数分配。
 //!
-//! `compile_block` 只做分发，每种语句对应一个独立方法；需要独立执行上下文的
-//! 结构块（`if`/`while`/`each`/`spawn`/`in_dimension`/`execute`）通过分配辅助
-//! 函数实现。
+//! `compile_block` 只做分发；需要独立执行上下文的结构块
+//! （`if`/`while`/`each`/`spawn`/`in_dimension`/`execute`）通过分配辅助函数实现。
+//! `give` 与 `self` 实体操作在 [`super::actions`]。
 
 use crate::ast::*;
 
 use super::Compiler;
 use super::Value;
-use super::emit::{compile_message, entity_query_clause, item_stack_argument};
+use super::emit::{compile_message, entity_query_clause};
 use super::names::parameter_holder;
 
 impl Compiler<'_> {
@@ -43,7 +43,7 @@ impl Compiler<'_> {
                 item,
                 count,
                 ..
-            } => self.compile_give(target, item, *count, commands),
+            } => self.compile_give(target, item, *count, owner, commands),
             StatementKind::SelfAction(action) => commands.extend(self.compile_self_action(action)),
             StatementKind::Message {
                 target,
@@ -136,33 +136,6 @@ impl Compiler<'_> {
         ));
     }
 
-    fn compile_give(
-        &self,
-        target: &str,
-        item: &str,
-        count: Option<u32>,
-        commands: &mut Vec<String>,
-    ) {
-        let query = self
-            .program
-            .queries
-            .iter()
-            .find(|candidate| candidate.name == target)
-            .expect("semantic validation guarantees the entity query exists");
-        let item = self
-            .program
-            .item_stacks
-            .iter()
-            .find(|candidate| candidate.name == item)
-            .expect("semantic validation guarantees the item definition exists");
-        commands.push(format!(
-            "execute {} run give @s {} {}",
-            entity_query_clause(query),
-            item_stack_argument(item),
-            count.unwrap_or(item.count)
-        ));
-    }
-
     fn compile_schedule(
         &self,
         function: &str,
@@ -207,89 +180,6 @@ impl Compiler<'_> {
                 "return run scoreboard players get {score} {}",
                 self.objective
             )),
-        }
-    }
-
-    fn compile_self_action(&self, action: &SelfAction) -> Vec<String> {
-        match action {
-            SelfAction::AddTag(tag) => vec![format!("tag @s add {tag}")],
-            SelfAction::RemoveTag(tag) => vec![format!("tag @s remove {tag}")],
-            SelfAction::SetInvulnerable(value) => vec![format!(
-                "data merge entity @s {{Invulnerable:{}b}}",
-                if *value { 1 } else { 0 }
-            )],
-            SelfAction::SaveItems(name) => {
-                let storage = self
-                    .program
-                    .storages
-                    .iter()
-                    .find(|candidate| candidate.name == *name)
-                    .expect("semantic validation guarantees the item storage exists");
-                vec![format!(
-                    "data modify storage {} {} set from entity @s Items",
-                    storage.storage_id, storage.path
-                )]
-            }
-            SelfAction::RestoreItems(name) => {
-                let storage = self
-                    .program
-                    .storages
-                    .iter()
-                    .find(|candidate| candidate.name == *name)
-                    .expect("semantic validation guarantees the item storage exists");
-                vec![format!(
-                    "data modify entity @s Items set from storage {} {}",
-                    storage.storage_id, storage.path
-                )]
-            }
-            SelfAction::RemovePreservingItems(name) => {
-                let storage = self
-                    .program
-                    .storages
-                    .iter()
-                    .find(|candidate| candidate.name == *name)
-                    .expect("semantic validation guarantees the item storage exists");
-                vec![
-                    format!(
-                        "data modify storage {} {} set from entity @s Items",
-                        storage.storage_id, storage.path
-                    ),
-                    "data modify entity @s Items set value []".to_owned(),
-                    "kill @s".to_owned(),
-                ]
-            }
-            SelfAction::GiveItem { item, count, .. } => {
-                let item = self
-                    .program
-                    .item_stacks
-                    .iter()
-                    .find(|candidate| candidate.name == *item)
-                    .expect("semantic validation guarantees the item definition exists");
-                vec![format!(
-                    "give @s {} {}",
-                    item_stack_argument(item),
-                    count.unwrap_or(item.count)
-                )]
-            }
-            SelfAction::ClearItems => {
-                vec!["data modify entity @s Items set value []".to_owned()]
-            }
-            // 把掉落物交还投掷者：`execute on origin` 读取 ItemEntity 的 Thrower
-            // （TraceableEntity.getOwner）。临时标签在本函数内独占，命令按顺序
-            // 执行，不会与其它掉落物的处理重叠；实体由原版拾取逻辑收进背包，
-            // 投掷者不存在或背包已满时实体保持原样。
-            SelfAction::ReturnToOwner => {
-                let tag = format!("{}_returning", self.objective);
-                vec![
-                    format!("tag @s add {tag}"),
-                    format!("execute on origin at @s run tp @e[tag={tag},limit=1] ~ ~ ~"),
-                    format!(
-                        "execute on origin at @s run data merge entity @e[tag={tag},limit=1] {{PickupDelay:0}}"
-                    ),
-                    format!("tag @s remove {tag}"),
-                ]
-            }
-            SelfAction::Remove | SelfAction::Consume => vec!["kill @s".to_owned()],
         }
     }
 
@@ -461,7 +351,7 @@ impl Compiler<'_> {
         path
     }
 
-    fn next_helper_path(&mut self, owner: &str) -> String {
+    pub(super) fn next_helper_path(&mut self, owner: &str) -> String {
         let counter = self.helper_counters.entry(owner.to_owned()).or_default();
         let path = format!("__mcl/{owner}/{}", *counter);
         *counter += 1;

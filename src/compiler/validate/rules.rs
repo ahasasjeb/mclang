@@ -2,6 +2,7 @@
 
 use crate::ast::{Function, Span};
 use crate::diagnostic::Diagnostic;
+use crate::parser::keywords::reserved_word;
 
 pub(super) fn valid_name(name: &str) -> bool {
     let mut characters = name.chars();
@@ -154,40 +155,6 @@ pub(super) fn validate_identifier(
     span: Span,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    const RESERVED: &[&str] = &[
-        "namespace",
-        "score",
-        "resource",
-        "query",
-        "item",
-        "item_stack",
-        "storage",
-        "entity",
-        "items",
-        "fn",
-        "let",
-        "run",
-        "call",
-        "schedule",
-        "after",
-        "append",
-        "replace",
-        "if",
-        "else",
-        "while",
-        "execute",
-        "each",
-        "in_dimension",
-        "spawn",
-        "self",
-        "message",
-        "sound",
-        "predicate",
-        "player",
-        "true",
-        "false",
-        "return",
-    ];
     if !valid_name(name) {
         diagnostics.push(Diagnostic::new(
             format!("{kind}名 `{name}` 只能包含小写 ASCII 字母、数字和下划线，且不能以数字开头"),
@@ -203,7 +170,7 @@ pub(super) fn validate_identifier(
             format!("函数名 `{name}` 会与 Windows 设备名冲突"),
             span,
         ));
-    } else if RESERVED.contains(&name) {
+    } else if reserved_word(name) {
         diagnostics.push(Diagnostic::new(
             format!("`{name}` 是保留字，不能用作{kind}名"),
             span,
@@ -217,6 +184,8 @@ pub(super) fn function_context(function: &Function) -> super::ExecutionContext {
 
     if function.attributes.contains(&Attribute::Player) {
         super::ExecutionContext::Player
+    } else if function.attributes.contains(&Attribute::NonPlayer) {
+        super::ExecutionContext::Mob
     } else if function.attributes.contains(&Attribute::Entity) {
         super::ExecutionContext::Entity
     } else {

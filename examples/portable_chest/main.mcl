@@ -8,20 +8,28 @@ fn load() {
     message.all("便携箱子已加载：丢出单个命名为 A 的绿宝石即可切换。", green);
 }
 
+// 矿车初始化只操作实体 NBT，因此声明为非玩家实体上下文。
+@non_player
+fn prepare_box() {
+    self.add_tag("portable_chest_box");
+    self.set_invulnerable(true);
+    self.restore_items(saved_items);
+}
+
 @tick
 fn tick() {
     each(trigger_items) {
         // 先标记触发物，避免同一个掉落物每刻重复切换。
         self.add_tag("portable_chest_processed");
 
+        // 两个分支最后都把触发用的绿宝石原样交还投掷者。
         if active == 0 {
             spawn("minecraft:chest_minecart") {
-                self.add_tag("portable_chest_box");
-                self.set_invulnerable(true);
-                self.restore_items(saved_items);
+                prepare_box();
             }
             active = 1;
             message.nearest(16, "便携箱子已放出。", green);
+            give(origin, self.item);
         } else {
             in_dimension("minecraft:overworld") {
                 each(chest_boxes) {
@@ -40,10 +48,7 @@ fn tick() {
             }
             active = 0;
             message.nearest(16, "便携箱子已收起，物品已保存。", gold);
+            give(origin, self.item);
         }
-
-        // 触发用的绿宝石原样交还投掷者：同一个实体传送到投掷者并立即可被拾取。
-        // 投掷者不存在或背包已满时，实体保持原样留在世界，不会丢失。
-        self.return_to_owner();
     }
 }

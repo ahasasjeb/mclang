@@ -635,7 +635,7 @@ score ticks = 0; // 行尾注释</code></pre>
       </tbody>
     </table>
   </div>
-  <p>不能用作标识符的保留字：<code>namespace</code>、<code>score</code>、<code>query</code>、<code>entity</code>、<code>items</code>、<code>item</code>、<code>item_stack</code>、<code>storage</code>、<code>resource</code>、<code>fn</code>、<code>let</code>、<code>run</code>、<code>call</code>、<code>schedule</code>、<code>after</code>、<code>append</code>、<code>replace</code>、<code>if</code>、<code>else</code>、<code>while</code>、<code>execute</code>、<code>each</code>、<code>in_dimension</code>、<code>spawn</code>、<code>self</code>、<code>message</code>、<code>sound</code>、<code>predicate</code>、<code>player</code>、<code>return</code>、<code>true</code>、<code>false</code>。</p>
+  <p>不能用作标识符的保留字：<code>namespace</code>、<code>score</code>、<code>query</code>、<code>entity</code>、<code>item</code>、<code>item_stack</code>、<code>item_list</code>、<code>storage</code>、<code>resource</code>、<code>fn</code>、<code>let</code>、<code>run</code>、<code>call</code>、<code>schedule</code>、<code>after</code>、<code>append</code>、<code>replace</code>、<code>if</code>、<code>else</code>、<code>while</code>、<code>execute</code>、<code>each</code>、<code>in_dimension</code>、<code>spawn</code>、<code>self</code>、<code>message</code>、<code>sound</code>、<code>predicate</code>、<code>origin</code>、<code>contents</code>、<code>return</code>、<code>true</code>、<code>false</code>。</p>
   <div class="callout note">
     <p><span class="tag">注意</span> 资源位置（比如 <code>minecraft:emerald</code>、<code>demo:state</code>）遵循 Minecraft 自己的规则，可以使用命名空间前缀和路径段，不受上面的标识符规则限制。命名空间前缀和路径段的合法字符见<a href="#checks">静态检查</a>。</p>
   </div>
@@ -716,7 +716,7 @@ fn tick() {
         <tr><td><a href="#decl-score">计分变量</a></td><td><code>score ticks = 0;</code></td><td>跨函数共享的 32 位整数</td></tr>
         <tr><td><a href="#decl-query">实体查询</a></td><td><code>query q = entity("minecraft:item") { ... }</code></td><td>可复用的实体集合与物品条件</td></tr>
         <tr><td><a href="#decl-item">物品定义</a></td><td><code>item gift = item_stack("minecraft:emerald") { ... }</code></td><td>可复用的物品堆与组件</td></tr>
-        <tr><td><a href="#decl-storage">物品存储</a></td><td><code>storage s = items("demo:state", "saved_items");</code></td><td>持久保存完整槽位列表的容器</td></tr>
+        <tr><td><a href="#decl-storage">物品存储</a></td><td><code>storage s = item_list("demo:state", "saved_items");</code></td><td>持久保存完整槽位列表的容器</td></tr>
         <tr><td><a href="#decl-resource">JSON 资源</a></td><td><code>resource predicate p = """{...}""";</code></td><td>带校验的 JSON 数据包资源</td></tr>
         <tr><td><a href="#decl-fn">函数</a></td><td><code>@tick fn tick() { ... }</code></td><td>可调用、可返回 score 的代码块</td></tr>
       </tbody>
@@ -814,7 +814,7 @@ fn tick() {
   <p>上面的查询会生成选择器 <code>@e[type=minecraft:item,tag=!handled,sort=nearest,limit=1,distance=..16]</code>，并追加物品组件检查：</p>
   <pre><code class="mcf" data-title="生成片段" data-kind="mcfunction">execute as @e[type=minecraft:item,tag=!handled,sort=nearest,limit=1,distance=..16] at @s if items entity @s contents minecraft:emerald[minecraft:custom_name={text:"A"},minecraft:count=1] run function demo:__mcl/tick/0</code></pre>
   <div class="callout warn">
-    <p><span class="tag">注意</span> 实体类型为 <code>minecraft:player</code> 的查询在 <code>each</code> 和 <code>give</code> 中会建立<strong>玩家上下文</strong>；其他类型只建立普通实体上下文。这是后面所有 <code>self.*</code> 限制的来源，详见<a href="#context">执行上下文</a>。</p>
+    <p><span class="tag">注意</span> 实体类型为 <code>minecraft:player</code> 的查询在 <code>each</code> 和 <code>give</code> 中会建立<strong>玩家上下文</strong>；其他类型建立<strong>非玩家实体上下文</strong>。这是后面所有 <code>self.*</code> 限制的来源，详见<a href="#context">执行上下文</a>。</p>
   </div>
 </section>
 
@@ -892,12 +892,12 @@ fn grant_self() {
   <pre><code class="mcf" data-title="生成片段" data-kind="mcfunction">execute as @e[type=minecraft:player] at @s run give @s minecraft:emerald[minecraft:custom_name={text:"Welcome Gift"},minecraft:lore=[{text:"First lore line"},{text:"Second lore line"}],minecraft:enchantments={"minecraft:fortune":2},minecraft:unbreakable={}] 3</code></pre>
 
   <h3 id="decl-storage">物品存储 <code data-zh="">storage</code> <a class="anchor" href="#decl-storage">#</a></h3>
-  <pre><code class="mcl" data-title="语法" data-kind="syntax">storage &lt;名称&gt; = items("&lt;存储资源位置&gt;", "&lt;NBT 路径&gt;");
-// 中文：存储 &lt;名称&gt; = 物品("&lt;存储资源位置&gt;", "&lt;NBT 路径&gt;");</code></pre>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">storage &lt;名称&gt; = item_list("&lt;存储资源位置&gt;", "&lt;NBT 路径&gt;");
+// 中文：存储 &lt;名称&gt; = 物品列表("&lt;存储资源位置&gt;", "&lt;NBT 路径&gt;");</code></pre>
   <p>声明一个持久保存完整 <code>Items</code> 槽位列表的位置。存储资源位置是普通的 <code>命名空间:路径</code>；NBT 路径由点分隔的段组成，每段只能包含 ASCII 字母数字和下划线。</p>
   <ul>
     <li>编译器在合成 load 函数里加入幂等初始化：<code>execute unless data storage &lt;位置&gt; &lt;路径&gt; run data modify storage &lt;位置&gt; &lt;路径&gt; set value []</code>。路径已存在时不覆盖，所以 <code>/reload</code> 不会清空收藏。</li>
-    <li>在实体上下文中用 <a href="#stmt-self"><code>self.save_items</code></a> 保存、<code>self.restore_items</code> 恢复、<code>self.remove_preserving_items</code> 安全收起容器。</li>
+    <li>在非玩家实体上下文中用 <a href="#stmt-self"><code>self.save_items</code></a> 保存、<code>self.restore_items</code> 恢复、<code>self.remove_preserving_items</code> 安全收起容器。</li>
     <li><code>remove_preserving_items</code> 固定生成三步：保存完整槽位列表 → 把实体的 <code>Items</code> 置空 → 删除实体。它把“先保存再删除”的不变量固化在语言里，避免容器里的东西掉一地。</li>
   </ul>
   <pre><code class="mcl" data-title="示例" data-check="full">namespace stash;
@@ -906,7 +906,7 @@ query boxes = entity("minecraft:chest_minecart") {
     tag("stash_box");
 }
 
-storage saved_items = items("stash:state", "saved_items");
+storage saved_items = item_list("stash:state", "saved_items");
 
 @tick
 fn tick() {
@@ -973,7 +973,8 @@ fn &lt;名称&gt;(&lt;参数列表&gt;) -&gt; score {   // -&gt; score 可省略
       <tbody>
         <tr><td><code>@load</code></td><td><code>@加载</code></td><td>数据包加载或 <code>/reload</code> 后调用。可以标记多个函数，按源码顺序调用</td></tr>
         <tr><td><code>@tick</code></td><td><code>@每刻</code></td><td>每个游戏刻调用一次。可以标记多个函数</td></tr>
-        <tr><td><code>@entity</code></td><td><code>@实体</code></td><td>函数要求普通实体执行上下文，<code>self.*</code> 可以安全使用</td></tr>
+        <tr><td><code>@entity</code></td><td><code>@实体</code></td><td>函数要求任意实体执行上下文，只应使用对玩家同样安全的操作</td></tr>
+        <tr><td><code>@non_player</code></td><td><code>@非玩家</code></td><td>函数要求非玩家实体执行上下文，可以使用 <code>data</code> 类 NBT 操作</td></tr>
         <tr><td><code>@player</code></td><td><code>@玩家</code></td><td>函数要求玩家执行上下文，可以使用玩家专用操作</td></tr>
       </tbody>
     </table>
@@ -1029,7 +1030,7 @@ fn also_wrong() {
   </div>
   <h4>函数契约</h4>
   <ul>
-    <li>同一个函数上不能重复使用相同属性；<code>@entity</code> 与 <code>@player</code> 互斥；<code>@entity</code>/<code>@player</code> 不能与 <code>@load</code>/<code>@tick</code> 组合。</li>
+    <li>同一个函数上不能重复使用相同属性；<code>@entity</code>、<code>@non_player</code> 和 <code>@player</code> 三者互斥；它们都不能与 <code>@load</code>/<code>@tick</code> 组合。</li>
     <li><code>@load</code>/<code>@tick</code> 不能声明参数，也不能返回值。</li>
     <li>需要执行上下文的函数、带参数的函数都不能被 <code>schedule</code>：原版调度不会保留执行实体，也不会携带参数。</li>
     <li>同步调用图里不允许任何直接或间接递归：递归会覆盖仍在使用的参数与表达式临时值。需要跨刻重复执行时用 <code>schedule</code>。</li>
@@ -1205,7 +1206,7 @@ return &lt;表达式&gt;;                // 结束 -&gt; score 函数并给出�
   <ul>
     <li>实参是从左到右求值的计分表达式，数量必须与参数列表一致；求值完成后复制到被调用函数的私有参数槽位，然后 <code>function &lt;命名空间&gt;:&lt;名字&gt;</code>。</li>
     <li>无返回值函数只能作为语句调用；<code>-&gt; score</code> 函数的调用可以出现在任意表达式和实参中，生成 <code>execute store result score &lt;临时槽&gt; … run function …</code> 捕获结果。</li>
-    <li>调用会检查执行上下文：<code>@player</code> 函数只能从玩家上下文调用，<code>@entity</code> 函数可以从实体或玩家上下文调用。</li>
+    <li>调用会检查执行上下文：<code>@player</code> 函数只能从玩家上下文调用，<code>@non_player</code> 函数只能从非玩家实体上下文调用，<code>@entity</code> 函数可以从任意实体上下文调用。</li>
     <li>同步调用图不允许任何直接或间接递归；<code>schedule</code> 产生的调用不属于同步调用图，因此“每刻调用自己一次”这种模式是允许的。</li>
   </ul>
   <pre><code class="mcl" data-title="完整示例" data-check="full">namespace callpack;
@@ -1248,7 +1249,7 @@ return run scoreboard players get #t0 mcl_8b21f4c52ab4</code></pre>
   <pre><code class="mcl" data-title="语法" data-kind="syntax">each(&lt;查询名&gt;) { ... }   // 中文：遍历(&lt;查询名&gt;) { ... }</code></pre>
   <ul>
     <li>为查询匹配的每个实体建立执行上下文：块内的 <code>self</code> 指向该实体，位置是实体所在位置（生成 <code>execute as @e[...] at @s run function ...</code>）。</li>
-    <li>查询类型是 <code>minecraft:player</code> 时建立<strong>玩家上下文</strong>，否则建立普通实体上下文。</li>
+    <li>查询类型是 <code>minecraft:player</code> 时建立<strong>玩家上下文</strong>，否则建立<strong>非玩家实体上下文</strong>。</li>
     <li>块体是单独的辅助函数；实体逐个在各自上下文中执行。块内修改的全局计分值对所有实体持续生效。</li>
   </ul>
   <pre><code class="mcl" data-title="完整示例" data-check="full">namespace entitydemo;
@@ -1268,7 +1269,7 @@ fn tick() {
 
   <h3 id="stmt-spawn">生成实体 <code data-zh="召唤">spawn</code> <a class="anchor" href="#stmt-spawn">#</a></h3>
   <pre><code class="mcl" data-title="语法" data-kind="syntax">spawn("&lt;实体类型&gt;") { ... }   // 中文：召唤("&lt;实体类型&gt;") { ... }</code></pre>
-  <p>在当前执行位置生成实体，块内的 <code>self</code> 指向新生成的实体，建立普通实体上下文。生成 <code>execute summon &lt;类型&gt; run function &lt;辅助函数&gt;</code>——原版 <code>execute summon</code> 会把执行者切换到新实体，因此块内的通用操作天然作用于新实体。</p>
+  <p>在当前执行位置生成实体，块内的 <code>self</code> 指向新生成的实体，总是建立非玩家实体上下文。<code>minecraft:player</code> 和 <code>minecraft:fishing_bobber</code> 在 26.3 中标记为 <code>noSummon</code>，编译器会直接拒绝。生成 <code>execute summon &lt;类型&gt; run function &lt;辅助函数&gt;</code>——原版 <code>execute summon</code> 会把执行者切换到新实体，因此块内的通用操作天然作用于新实体。</p>
   <pre><code class="mcl" data-title="完整示例" data-check="full">namespace spawning;
 
 query boxes = entity("minecraft:chest_minecart") {
@@ -1318,26 +1319,24 @@ fn clear_all() {
       <tbody>
         <tr><td><code>add_tag("x")</code></td><td><code>添加标签</code></td><td>实体</td><td><code>tag @s add x</code></td></tr>
         <tr><td><code>remove_tag("x")</code></td><td><code>移除标签</code></td><td>实体</td><td><code>tag @s remove x</code></td></tr>
-        <tr><td><code>set_invulnerable(true|false)</code></td><td><code>设置无敌</code></td><td>实体</td><td><code>data merge entity @s {Invulnerable:1b}</code> 或 <code>0b</code></td></tr>
-        <tr><td><code>save_items(存储)</code></td><td><code>保存物品</code></td><td>实体</td><td><code>data modify storage &lt;位置&gt; &lt;路径&gt; set from entity @s Items</code></td></tr>
-        <tr><td><code>restore_items(存储)</code></td><td><code>恢复物品</code></td><td>实体</td><td><code>data modify entity @s Items set from storage &lt;位置&gt; &lt;路径&gt;</code></td></tr>
-        <tr><td><code>remove_preserving_items(存储)</code></td><td><code>保存并移除</code></td><td>实体</td><td>保存 → <code>data modify entity @s Items set value []</code> → <code>kill @s</code></td></tr>
-        <tr><td><code>clear_items()</code></td><td><code>清空物品</code></td><td>实体</td><td><code>data modify entity @s Items set value []</code></td></tr>
+        <tr><td><code>set_invulnerable(true|false)</code></td><td><code>设置无敌</code></td><td><strong>非玩家</strong></td><td><code>data merge entity @s {Invulnerable:1b}</code> 或 <code>0b</code></td></tr>
+        <tr><td><code>save_items(存储)</code></td><td><code>保存物品</code></td><td><strong>非玩家</strong></td><td><code>data modify storage &lt;位置&gt; &lt;路径&gt; set from entity @s Items</code></td></tr>
+        <tr><td><code>restore_items(存储)</code></td><td><code>恢复物品</code></td><td><strong>非玩家</strong></td><td><code>data modify entity @s Items set from storage &lt;位置&gt; &lt;路径&gt;</code></td></tr>
+        <tr><td><code>remove_preserving_items(存储)</code></td><td><code>保存并移除</code></td><td><strong>非玩家</strong></td><td>保存 → <code>data modify entity @s Items set value []</code> → <code>kill @s</code></td></tr>
+        <tr><td><code>clear_items()</code></td><td><code>清空物品</code></td><td><strong>非玩家</strong></td><td><code>data modify entity @s Items set value []</code></td></tr>
         <tr><td><code>remove()</code></td><td><code>移除</code></td><td>实体</td><td><code>kill @s</code></td></tr>
-        <tr><td><code>consume()</code></td><td><code>消耗</code></td><td>实体</td><td><code>kill @s</code>（语义上表示“消耗掉触发物”）</td></tr>
-        <tr><td><code>return_to_owner()</code></td><td><code>返还投掷者</code></td><td>实体</td><td>通过 <code>execute on origin</code> 找到掉落物的 <code>Thrower</code>，把同一个实体传送到投掷者并置 <code>PickupDelay:0</code>，由原版拾取逻辑收进背包；没有投掷者或背包已满时实体保持原样</td></tr>
         <tr><td><code>give_item(物品[, 数量])</code></td><td><code>给予物品</code></td><td><strong>玩家</strong></td><td><code>give @s &lt;物品&gt; &lt;数量&gt;</code></td></tr>
       </tbody>
     </table>
   </div>
-  <p>除 <code>give_item</code> 外的 <code>self</code> 方法都要求实体上下文（<code>each</code>、<code>spawn</code> 或 <code>@entity</code> 函数）；<code>give_item</code> 要求玩家上下文（玩家查询的 <code>each</code>、<code>spawn</code> 除外）。需要的上下文可以在嵌套里获得，编译器按最内层块判断。</p>
+  <p><code>set_invulnerable</code>、<code>save_items</code>、<code>restore_items</code>、<code>remove_preserving_items</code> 和 <code>clear_items</code> 生成 <code>data</code> 命令；26.3 的 <code>EntityDataAccessor</code> 拒绝对玩家执行 <code>data</code> 修改，因此它们只允许非玩家实体上下文（非玩家查询的 <code>each</code>、非玩家 <code>spawn</code> 或 <code>@non_player</code> 函数）。<code>add_tag</code>、<code>remove_tag</code> 和 <code>remove</code> 对玩家同样成立，只需要任意实体上下文；<code>give_item</code> 要求玩家上下文。需要的上下文可以在嵌套里获得，编译器按最内层块判断。</p>
   <pre><code class="mcl" data-title="完整示例" data-check="full">namespace selfdemo;
 
 query boxes = entity("minecraft:chest_minecart") {
     tag("self_box");
 }
 
-storage saved = items("selfdemo:state", "saved_items");
+storage saved = item_list("selfdemo:state", "saved_items");
 
 @tick
 fn tick() {
@@ -1393,26 +1392,63 @@ fn ping() {
 }</code></pre>
 
   <h3 id="stmt-give">给予 <code data-zh="">give</code> <a class="anchor" href="#stmt-give">#</a></h3>
-  <pre><code class="mcl" data-title="语法" data-kind="syntax">give(&lt;玩家查询&gt;, &lt;物品定义&gt;[, &lt;数量&gt;]);   // 中文：给予(...)</code></pre>
+  <pre><code class="mcl" data-title="语法" data-kind="syntax">give(&lt;目标&gt;, &lt;物品来源&gt;[, &lt;数量&gt;]);   // 中文：给予(...)
+// 目标：玩家查询 | origin（投掷者）
+// 物品来源：物品定义 | self.item（自身.物品，按 NBT 原样给予）</code></pre>
   <ul>
-    <li>目标必须是 <code>minecraft:player</code> 类型的查询，否则报“give 目标查询必须匹配 minecraft:player”。</li>
-    <li>数量省略时使用物品定义的 <code>count</code>；显式数量覆盖它，合法范围是 1 到 <code>max_stack_size × 100</code>（未声明 <code>max_stack_size</code> 时为 100）。数量 0 或越界都会编译失败。</li>
-    <li>生成 <code>execute as &lt;选择器&gt; at @s run give @s &lt;物品&gt; &lt;数量&gt;</code>，即给每个匹配玩家各发一份。语句本身不要求当前执行上下文。</li>
+    <li>目标写成查询时必须是 <code>minecraft:player</code> 类型，否则报“give 目标查询必须匹配 minecraft:player”；生成 <code>execute as &lt;选择器&gt; at @s run give @s …</code>，给每个匹配玩家各发一份。</li>
+    <li>目标写成 <code>origin</code>（中文 <code>投掷者</code>）时，生成 <code>execute on origin if entity @s[type=minecraft:player] run …</code>：把物品给当前实体的投掷者（原版实体关系 <code>origin</code>，掉落物即 <code>Thrower</code>），运行时解析不到玩家就不执行。该目标需要实体上下文。</li>
+    <li>物品来源是物品定义时：数量省略则使用定义的 <code>count</code>；显式数量覆盖它，合法范围是 1 到 <code>max_stack_size × 100</code>（未声明 <code>max_stack_size</code> 时为 100）。数量 0 或越界都会编译失败。</li>
+    <li>物品来源写成 <code>self.item</code>（中文 <code>自身.物品</code>）时按 NBT 原样给予：读取当前实体槽位 0 的物品堆（掉落物就是它的 <code>Item</code>），把完整组件复制进目标玩家快捷栏或主背包的第一个空槽（不含盔甲、副手与合成槽），不合并、不改变组件。不能附带数量；复制成功后清空源槽、掉落物自行消失；投掷者不存在或背包已满时不修改源实体。对普通查询使用 <code>self.item</code> 时，只有第一个有空位的匹配玩家会收到物品。</li>
     <li>在玩家上下文中，<code>self.give_item(物品[, 数量])</code> 是“给当前玩家”的简写，生成不带目标包装的 <code>give @s ...</code>。</li>
   </ul>
+  <p><code>origin</code> 在运行时如何解析：</p>
+  <div class="table-wrap">
+    <table class="compact">
+      <thead><tr><th>当前实体</th><th><code>origin</code> 解析为</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td>玩家丢出的掉落物</td><td>投掷玩家</td><td>物品进入该玩家背包</td></tr>
+        <tr><td>没有投掷者的掉落物（命令生成等）</td><td>空</td><td>整条命令不执行，源物品保持原样</td></tr>
+        <tr><td>箭、三叉戟等投射物</td><td>发射者</td><td>发射者是玩家时才执行</td></tr>
+        <tr><td>没有实体上下文</td><td>编译期报错</td><td>“投掷者目标需要实体执行上下文”</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>两种物品来源走不同的原版路径：<strong>物品定义</strong>用普通 <code>/give</code>，会和背包里已有的同名物品堆叠、装不下时掉在玩家脚边；<strong><code>self.item</code></strong> 读取实体 NBT，只进第一个空槽、不合并、不改组件。两者可以同时使用，因此“原样交还触发物 + 额外奖励一件声明物品”就是两条并排的 give。</p>
   <pre><code class="mcl" data-title="完整示例" data-check="full">namespace giving;
 
 item reward = item_stack("minecraft:diamond") {
     count = 2;
 }
 
+item bonus = item_stack("minecraft:diamond") {
+    count = 1;
+    custom_name = "B";
+}
+
 query players = entity("minecraft:player") { }
+query drops = entity("minecraft:item") { }
 
 @load
 fn load() {
     give(players, reward);
     give(players, reward, 8);
+}
+
+@tick
+fn collect() {
+    each(drops) {
+        give(origin, self.item);   // 原样交还触发物
+        give(origin, bonus);       // 额外奖励名字为 B 的钻石
+    }
 }</code></pre>
+  <p><code>give(origin, self.item)</code> 的生成结果（省略具体哈希与命名空间）：</p>
+  <pre><code class="mcf" data-title="生成片段" data-kind="mcfunction">tag @s add …_give
+scoreboard players set #t… … 0
+execute on origin if entity @s[type=minecraft:player] store success score #t… … run item replace entity @s 命名空间:__mcl/empty_slot from entity @e[tag=…_give,limit=1] contents
+execute if score #t… … matches 1 run item replace entity @s contents with minecraft:air
+tag @s remove …_give</code></pre>
+  <p>编译器还会为使用该形式的项目输出 <code>data/&lt;命名空间&gt;/slot_source/__mcl/empty_slot.json</code>：一个 <code>filtered</code> 槽位来源，底层用 <code>group</code> 组合 <code>hotbar.*</code> 与 <code>inventory.*</code>（玩家快捷栏与主背包，不含盔甲、副手和合成槽），物品谓词只接受空堆（<code>"count": 0</code>），因此物品只会进入空槽，不会覆盖任何已有物品。</p>
 
   <h3 id="stmt-schedule">调度 <code data-zh="">schedule</code> <a class="anchor" href="#stmt-schedule">#</a></h3>
   <pre><code class="mcl" data-title="语法" data-kind="syntax">schedule &lt;函数名&gt;() after &lt;数量&gt; &lt;单位&gt; [append|replace];
@@ -1429,7 +1465,7 @@ fn load() {
   </div>
   <ul>
     <li>延迟必须是 1 到 2147483647 的整数；默认 <code>replace</code>，<code>append</code> 保留同一函数已有的调度。</li>
-    <li>被调度函数必须无参数，且不能需要执行上下文（<code>@entity</code>/<code>@player</code> 或依赖上下文的内联代码都不行）：原版调度不会保留执行实体，也不会携带参数。</li>
+    <li>被调度函数必须无参数，且不能需要执行上下文（<code>@entity</code>/<code>@non_player</code>/<code>@player</code> 或依赖上下文的内联代码都不行）：原版调度不会保留执行实体，也不会携带参数。</li>
     <li>需要给带参数的函数定时调用时，写一个无参数包装函数：
       <pre><code class="mcl" data-title="包装模式" data-check="full">namespace wrapper;
 
@@ -1490,12 +1526,12 @@ particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3</code></pre>
 
 <section class="section" id="context">
   <h2>执行上下文 <a class="anchor" href="#context">#</a></h2>
-  <p>Mclang 用三级上下文描述“这段代码在谁身上执行”：<strong>无上下文 &lt; 实体 &lt; 玩家</strong>。编译器在编译期跟踪当前上下文，拒绝把玩家专用操作用在普通实体上，也拒绝在无实体时使用 <code>self</code>。</p>
+  <p>Mclang 用四种上下文描述“这段代码在谁身上执行”：<strong>无上下文、任意实体、非玩家实体、玩家</strong>。任意实体表示“有实体，但可能是玩家”；非玩家实体和玩家都是它的特例，但互不包含。编译器据此拒绝把玩家专用操作用在普通实体上，也拒绝让 <code>data</code> 类 NBT 操作落在可能命中玩家的位置。</p>
 
   <div class="flow">
     <span class="step">无上下文<br><small>@load / @tick / 普通函数</small></span><span class="arrow">→</span>
-    <span class="step">实体上下文<br><small>each(非玩家查询) / spawn / @entity</small></span><span class="arrow">→</span>
-    <span class="step">玩家上下文<br><small>each(玩家查询) / @player</small></span>
+    <span class="step">任意实体<br><small>@entity 函数</small></span><span class="arrow">→</span>
+    <span class="step">非玩家实体 / 玩家<br><small>each / spawn / @non_player / @player</small></span>
   </div>
 
   <h3>上下文如何建立与传递</h3>
@@ -1504,11 +1540,12 @@ particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3</code></pre>
       <thead><tr><th>位置</th><th>块内上下文</th></tr></thead>
       <tbody>
         <tr><td><code>@load</code> / <code>@tick</code> / 未标注函数</td><td>无上下文</td></tr>
-        <tr><td><code>@entity</code> 函数</td><td>实体</td></tr>
+        <tr><td><code>@entity</code> 函数</td><td>任意实体</td></tr>
+        <tr><td><code>@non_player</code> 函数</td><td>非玩家实体</td></tr>
         <tr><td><code>@player</code> 函数</td><td>玩家</td></tr>
         <tr><td><code>each(玩家查询)</code></td><td>玩家</td></tr>
-        <tr><td><code>each(其他查询)</code></td><td>实体</td></tr>
-        <tr><td><code>spawn("...")</code></td><td>实体（新生成的实体）</td></tr>
+        <tr><td><code>each(其他查询)</code></td><td>非玩家实体</td></tr>
+        <tr><td><code>spawn("...")</code></td><td>非玩家实体（新生成的实体；<code>minecraft:player</code> 和 <code>minecraft:fishing_bobber</code> 因 <code>noSummon</code> 被拒绝）</td></tr>
         <tr><td><code>in_dimension("...")</code></td><td>保持外层上下文</td></tr>
         <tr><td><code>execute "..."</code></td><td>保持外层上下文（原版 <code>execute</code> 可能改变执行者，但编译器以声明的上下文为准）</td></tr>
       </tbody>
@@ -1520,13 +1557,14 @@ particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3</code></pre>
     <table>
       <thead><tr><th>操作</th><th>最低上下文</th></tr></thead>
       <tbody>
-        <tr><td>普通 <code>self.*</code>（标签、无敌、物品保存/恢复/清空、<code>remove</code>、<code>consume</code>）</td><td>实体</td></tr>
+        <tr><td><code>self.add_tag</code>、<code>self.remove_tag</code>、<code>self.remove</code>、<code>give(origin, ...)</code></td><td>任意实体</td></tr>
+        <tr><td><code>self.set_invulnerable</code>、<code>self.save_items</code>、<code>self.restore_items</code>、<code>self.remove_preserving_items</code>、<code>self.clear_items</code></td><td><strong>非玩家实体</strong></td></tr>
         <tr><td><code>self.give_item</code>、<code>message.self</code>、<code>sound.self</code></td><td>玩家</td></tr>
         <tr><td><code>give(...)</code>、<code>message.all</code>、<code>message.nearest</code>、<code>schedule</code>、<code>run</code></td><td>无</td></tr>
       </tbody>
     </table>
   </div>
-  <p>函数调用同样检查：调用要求“当前上下文 ≥ 函数要求的上下文”。玩家上下文可以调用 <code>@player</code> 或 <code>@entity</code> 函数；普通实体上下文只能调用 <code>@entity</code> 函数。</p>
+  <p>函数调用按同一张表检查：调用点上下文必须满足被调用函数的要求。玩家和非玩家实体都能调用 <code>@entity</code> 函数；<code>@non_player</code> 函数只能从非玩家实体上下文调用，<code>@player</code> 函数只能从玩家上下文调用。</p>
 
   <h3>常见错误与解决</h3>
   <div class="table-wrap">
@@ -1534,10 +1572,12 @@ particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3</code></pre>
       <thead><tr><th>错误信息包含</th><th>原因</th><th>解决</th></tr></thead>
       <tbody>
         <tr><td>“self 方法需要实体执行上下文”</td><td>在 <code>@tick</code> 等无上下文函数里直接用了 <code>self</code></td><td>放进 <code>each</code>/<code>spawn</code> 块，或给函数加 <code>@entity</code></td></tr>
+        <tr><td>“Minecraft 不允许修改玩家数据”</td><td>在玩家或任意实体上下文里用了 <code>set_invulnerable</code>、<code>save_items</code>、<code>restore_items</code>、<code>remove_preserving_items</code>、<code>clear_items</code></td><td>移到非玩家查询的 <code>each</code>、非玩家 <code>spawn</code>，或 <code>@non_player</code> 函数</td></tr>
         <tr><td>“self.give_item 需要玩家执行上下文”</td><td>实体上下文或普通查询的 <code>each</code> 里给物品</td><td>用玩家查询的 <code>each</code>，或加 <code>@player</code>，或改用 <code>give(players, item)</code></td></tr>
         <tr><td>“@player 函数 <code>f</code> 需要玩家执行上下文”</td><td>从实体或无上下文处调用了 <code>@player</code> 函数</td><td>外层先进入玩家查询的 <code>each</code>，或改用 <code>@entity</code>/普通函数</td></tr>
-        <tr><td>“不能调度需要执行上下文的函数”</td><td><code>schedule</code> 一个 <code>@entity</code>/<code>@player</code> 函数</td><td>改为调度无上下文包装函数，让包装函数进入上下文</td></tr>
-        <tr><td>“@entity 和 @player 不能与 @load 或 @tick 用在同一个函数上”</td><td>入口函数被同时标注上下文属性</td><td>拆成两个函数</td></tr>
+        <tr><td>“@non_player 函数 <code>f</code> 需要非玩家实体执行上下文”</td><td>从 <code>@entity</code>、玩家或无上下文处调用了 <code>@non_player</code> 函数</td><td>从非玩家查询的 <code>each</code>、非玩家 <code>spawn</code> 或 <code>@non_player</code> 函数调用</td></tr>
+        <tr><td>“不能调度需要执行上下文的函数”</td><td><code>schedule</code> 一个 <code>@entity</code>/<code>@non_player</code>/<code>@player</code> 函数</td><td>改为调度无上下文包装函数，让包装函数进入上下文</td></tr>
+        <tr><td>“不能与 @load 或 @tick 用在同一个函数上”</td><td>入口函数被同时标注上下文属性</td><td>拆成两个函数</td></tr>
       </tbody>
     </table>
   </div>
@@ -1605,6 +1645,18 @@ particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3</code></pre>
         <tr><td><code>execute "子句"</code></td><td><code>execute &lt;子句&gt; run function &lt;辅助函数&gt;</code></td></tr>
         <tr><td>函数调用</td><td>先绑定实参，再 <code>function &lt;命名空间&gt;:&lt;名字&gt;</code>；表达式调用用 <code>execute store result score</code></td></tr>
         <tr><td><code>return</code></td><td>常量直接 <code>return &lt;整数&gt;</code>；计分值 <code>return run scoreboard players get …</code></td></tr>
+        <tr><td><code>score</code> 声明与赋值</td><td><code>scoreboard players set/add/remove/operation</code>；算术表达式用 <code>#t&lt;编号&gt;</code> 临时项，常量在编译期折叠</td></tr>
+        <tr><td><code>give(查询, 物品[, n])</code></td><td><code>execute as &lt;玩家选择器&gt; at @s run give @s &lt;物品&gt; &lt;数量&gt;</code></td></tr>
+        <tr><td><code>give(origin, …)</code></td><td><code>execute on origin if entity @s[type=minecraft:player] run give …</code></td></tr>
+        <tr><td><code>give(…, self.item)</code></td><td><code>item replace entity @s &lt;空槽来源&gt; from entity &lt;源&gt; contents</code>，成功后清空源槽</td></tr>
+        <tr><td><code>self.add_tag</code> / <code>remove_tag</code> / <code>remove</code></td><td><code>tag @s add|remove …</code>、<code>kill @s</code></td></tr>
+        <tr><td><code>self.set_invulnerable</code> / <code>save_items</code> / <code>restore_items</code> / <code>clear_items</code> / <code>remove_preserving_items</code></td><td><code>data merge entity</code>、<code>data modify … entity @s Items</code>；只允许非玩家实体上下文</td></tr>
+        <tr><td><code>self.give_item</code></td><td><code>give @s &lt;物品&gt; &lt;数量&gt;</code></td></tr>
+        <tr><td><code>message.all</code> / <code>self</code> / <code>nearest</code></td><td><code>tellraw &lt;玩家选择器&gt; &lt;文本组件 JSON&gt;</code></td></tr>
+        <tr><td><code>sound.self</code></td><td><code>playsound &lt;声音&gt; &lt;分类&gt; @s ~ ~ ~ 1 1</code></td></tr>
+        <tr><td><code>predicate(名称)</code></td><td><code>execute if predicate &lt;命名空间&gt;:&lt;名称&gt;</code></td></tr>
+        <tr><td><code>schedule</code></td><td><code>schedule function &lt;命名空间&gt;:&lt;名字&gt; &lt;数量&gt;&lt;单位&gt; [append]</code></td></tr>
+        <tr><td><code>run "命令"</code></td><td>命令原样写入 <code>.mcfunction</code></td></tr>
       </tbody>
     </table>
   </div>
@@ -1670,7 +1722,7 @@ particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3</code></pre>
         </tr>
         <tr>
           <td>上下文与调度</td>
-          <td><code>self.*</code>、<code>message.self</code>、<code>sound.self</code> 的上下文；跨函数调用的上下文；不能调度带参数或需要上下文的函数；入口函数限制</td>
+          <td><code>self.*</code>、<code>message.self</code>、<code>sound.self</code> 的上下文；<code>data</code> 类 NBT 操作的玩家数据限制；<code>spawn</code> 的 <code>noSummon</code> 实体类型；跨函数调用的上下文；<code>give</code> 的 <code>origin</code>/<code>self.item</code> 上下文与数量限制；不能调度带参数或需要上下文的函数；入口函数限制</td>
         </tr>
         <tr>
           <td>值语义</td>
@@ -1832,7 +1884,7 @@ item welcome_gift = item_stack("minecraft:emerald") {
     unbreakable = true;
 }
 
-storage saved = items("tour:state", "saved_items");
+storage saved = item_list("tour:state", "saved_items");
 
 resource predicate coin_flip = """
 {
@@ -1880,7 +1932,7 @@ fn collect_drops() {
                 self.remove_preserving_items(saved);
             }
         }
-        self.consume();
+        self.remove();
     }
 }
 
@@ -1903,7 +1955,7 @@ fn later() {
   <ul>
     <li><code>players</code> 用 <code>without_tag</code> 只匹配还没欢迎过的玩家，配合 <code>@tick</code> 里的 100 刻计时实现“每人只欢迎一次”。</li>
     <li><code>drops</code> 是带物品组件条件的掉落物查询：只匹配单个（<code>limit(1)</code>）、16 格内、最近优先、命名为 <code>A</code> 的绿宝石。</li>
-    <li><code>collect_drops</code> 用 <code>predicate</code> 做五五开：正面时召唤箱子矿车并恢复保存的物品，反面时尝试安全收起主世界中的矿车，最后消耗触发物。</li>
+    <li><code>collect_drops</code> 用 <code>predicate</code> 做五五开：正面时召唤箱子矿车并恢复保存的物品，反面时尝试安全收起主世界中的矿车，最后移除触发物。</li>
     <li><code>difference</code> 展示 <code>-&gt; score</code> 返回值参与 <code>while</code> 循环体的赋值；<code>later</code> 展示“跨刻重复执行用 <code>schedule</code>”的写法。</li>
   </ul>
 </section>
@@ -2079,7 +2131,7 @@ execute as @e[type=minecraft:player,tag=!give_reward_received] at @s run functio
 
 <section class="section" id="examples-chest">
   <h3>旗舰项目：<code>examples/portable_chest</code></h3>
-  <p>一个完全不含底层命令字符串的实际项目。丢出单个命名为 <code>A</code> 的绿宝石，它会在落点召唤一辆不可被普通伤害破坏的箱子矿车，绿宝石由 <code>return_to_owner</code> 原样交还投掷者、立即回到背包；再次丢出，矿车被安全收起（物品完整保存）；第三次触发会重新放出矿车并恢复槽位。</p>
+  <p>一个完全不含底层命令字符串的实际项目。丢出单个命名为 <code>A</code> 的绿宝石，它会在落点召唤一辆不可被普通伤害破坏的箱子矿车，绿宝石由 <code>give(origin, self.item)</code> 原样回到投掷者背包；再次丢出，矿车被安全收起（物品完整保存）；第三次触发会重新放出矿车并恢复槽位。</p>
   <pre><code class="text" data-title="目录结构" data-kind="text">examples/portable_chest/
 ├── PROJECT.md      # 项目说明与手工验收清单
 ├── chest.mcl       # 实体查询与物品存储声明
@@ -2106,8 +2158,8 @@ query chest_boxes = entity("minecraft:chest_minecart") {
     tag("portable_chest_box");
 }
 
-// items 是类型化容器存储；编译器会在首次加载时自动初始化空列表。
-storage saved_items = items("portable_chest:state", "saved_items");</code></pre>
+// item_list 是类型化容器存储；编译器会在首次加载时自动初始化空列表。
+storage saved_items = item_list("portable_chest:state", "saved_items");</code></pre>
     </div>
     <div class="tab-panel" data-panel="main">
       <pre><code class="mcl" data-title="main.mcl" data-kind="mcl">namespace portable_chest;
@@ -2120,20 +2172,28 @@ fn load() {
     message.all("便携箱子已加载：丢出单个命名为 A 的绿宝石即可切换。", green);
 }
 
+// 矿车初始化只操作实体 NBT，因此声明为非玩家实体上下文。
+@non_player
+fn prepare_box() {
+    self.add_tag("portable_chest_box");
+    self.set_invulnerable(true);
+    self.restore_items(saved_items);
+}
+
 @tick
 fn tick() {
     each(trigger_items) {
         // 先标记触发物，避免同一个掉落物每刻重复切换。
         self.add_tag("portable_chest_processed");
 
+        // 两个分支最后都把触发用的绿宝石原样交还投掷者。
         if active == 0 {
             spawn("minecraft:chest_minecart") {
-                self.add_tag("portable_chest_box");
-                self.set_invulnerable(true);
-                self.restore_items(saved_items);
+                prepare_box();
             }
             active = 1;
             message.nearest(16, "便携箱子已放出。", green);
+            give(origin, self.item);
         } else {
             in_dimension("minecraft:overworld") {
                 each(chest_boxes) {
@@ -2152,11 +2212,8 @@ fn tick() {
             }
             active = 0;
             message.nearest(16, "便携箱子已收起，物品已保存。", gold);
+            give(origin, self.item);
         }
-
-        // 触发用的绿宝石原样交还投掷者：同一个实体传送到投掷者并立即可被拾取。
-        // 投掷者不存在或背包已满时，实体保持原样留在世界，不会丢失。
-        self.return_to_owner();
     }
 }</code></pre>
     </div>
@@ -2166,6 +2223,32 @@ fn tick() {
 data modify storage portable_chest:state saved_items set from entity @s Items
 data modify entity @s Items set value []
 kill @s</code></pre>
+  <p>放在两个分支里的 <code>give(origin, self.item)</code> 各展开为“标记源实体 → 复制进第一个空槽 → 成功后清空源槽”的安全序列（两个分支各自生成一份，临时计分槽不同），并附带说明空槽的槽位来源资源：</p>
+  <pre><code class="mcf" data-title="data/portable_chest/function/__mcl/tick/1.mcfunction（片段）" data-kind="mcfunction">tag @s add mcl_8bbe5f1f3c7c_give
+scoreboard players set #t2 mcl_8bbe5f1f3c7c 0
+execute on origin if entity @s[type=minecraft:player] store success score #t2 mcl_8bbe5f1f3c7c run item replace entity @s portable_chest:__mcl/empty_slot from entity @e[tag=mcl_8bbe5f1f3c7c_give,limit=1] contents
+execute if score #t2 mcl_8bbe5f1f3c7c matches 1 run item replace entity @s contents with minecraft:air
+tag @s remove mcl_8bbe5f1f3c7c_give</code></pre>
+  <pre><code class="json" data-title="data/portable_chest/slot_source/__mcl/empty_slot.json" data-kind="json">{
+  "type": "minecraft:filtered",
+  "slot_source": {
+    "type": "minecraft:group",
+    "terms": [
+      {
+        "type": "minecraft:slot_range",
+        "slots": "hotbar.*"
+      },
+      {
+        "type": "minecraft:slot_range",
+        "slots": "inventory.*"
+      }
+    ]
+  },
+  "item_filter": {
+    "count": 0
+  }
+}</code></pre>
+  <p><code>hotbar.*</code> 覆盖 0 到 8 号槽，<code>inventory.*</code> 覆盖 9 到 35 号槽，合起来正好是快捷栏与主背包；刻意不使用范围更大的 <code>container.*</code>，避免交还的物品被放进盔甲、副手或合成槽。</p>
   <p>这个项目通过严格模式检查，说明标准层已经覆盖了它的全部需求：</p>
   <pre><code class="pwsh" data-title="验证" data-kind="pwsh">cargo run -- check examples/portable_chest --deny-raw
 cargo run -- build examples/portable_chest --deny-raw</code></pre>
@@ -2214,7 +2297,7 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
 
   <details class="faq">
     <summary>什么时候可以用 <code>self</code>？为什么总报“需要实体执行上下文”？</summary>
-    <p><code>self</code> 需要实体上下文，只有四种位置能提供：非玩家查询的 <code>each</code> 块、<code>spawn</code> 块、<code>@entity</code> 函数、<code>@player</code> 函数。玩家专用的 <code>self.give_item</code>、<code>message.self</code>、<code>sound.self</code> 还要求玩家上下文。把语句移进正确的块即可。</p>
+    <p><code>self</code> 需要实体上下文：非玩家查询的 <code>each</code> 块、<code>spawn</code> 块、<code>@entity</code>、<code>@non_player</code>、<code>@player</code> 函数都能提供。其中 <code>set_invulnerable</code>、<code>save_items</code>、<code>restore_items</code>、<code>remove_preserving_items</code>、<code>clear_items</code> 还会修改实体 NBT，Minecraft 不允许修改玩家数据，因此只能在非玩家实体上下文（非玩家查询的 <code>each</code>、非玩家 <code>spawn</code>、<code>@non_player</code> 函数）中使用；玩家专用的 <code>self.give_item</code>、<code>message.self</code>、<code>sound.self</code> 要求玩家上下文。把语句移进正确的块即可。</p>
   </details>
 
   <details class="faq">
@@ -2328,14 +2411,15 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
         <tr><td><code>query</code></td><td><code>查询</code></td><td>顶层声明：实体查询</td></tr>
         <tr><td><code>entity</code></td><td><code>实体</code></td><td>查询构造器</td></tr>
         <tr><td><code>storage</code></td><td><code>存储</code></td><td>顶层声明：物品存储</td></tr>
-        <tr><td><code>items</code></td><td><code>物品</code></td><td>存储构造器（<code>items("位置", "路径")</code>）</td></tr>
+        <tr><td><code>item_list</code></td><td><code>物品列表</code></td><td>存储构造器（<code>item_list("位置", "路径")</code>）</td></tr>
         <tr><td><code>item</code></td><td><code>物品</code></td><td>顶层声明：物品定义；查询属性：物品过滤</td></tr>
         <tr><td><code>item_stack</code></td><td><code>物品堆</code></td><td>物品构造器</td></tr>
         <tr><td><code>resource</code></td><td><code>资源</code></td><td>顶层声明：JSON 资源</td></tr>
         <tr><td><code>fn</code></td><td><code>函数</code></td><td>顶层声明：函数</td></tr>
         <tr><td><code>@load</code></td><td><code>@加载</code></td><td>函数属性：加载/reload</td></tr>
         <tr><td><code>@tick</code></td><td><code>@每刻</code></td><td>函数属性：每游戏刻</td></tr>
-        <tr><td><code>@entity</code></td><td><code>@实体</code></td><td>函数属性：要求实体上下文</td></tr>
+        <tr><td><code>@entity</code></td><td><code>@实体</code></td><td>函数属性：要求任意实体上下文；只能用对玩家同样安全的操作</td></tr>
+        <tr><td><code>@non_player</code></td><td><code>@非玩家</code></td><td>函数属性：要求非玩家实体上下文</td></tr>
         <tr><td><code>@player</code></td><td><code>@玩家</code></td><td>函数属性：要求玩家上下文</td></tr>
         <tr><td><code>let</code></td><td><code>令</code></td><td>语句：局部变量</td></tr>
         <tr><td><code>return</code></td><td><code>返回</code></td><td>语句：函数返回</td></tr>
@@ -2387,8 +2471,8 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
         <tr><td><code>give_item(i[, n])</code></td><td><code>给予物品(i[, n])</code></td><td>self 方法（玩家上下文）</td></tr>
         <tr><td><code>clear_items()</code></td><td><code>清空物品()</code></td><td>self 方法</td></tr>
         <tr><td><code>remove()</code></td><td><code>移除()</code></td><td>self 方法</td></tr>
-        <tr><td><code>consume()</code></td><td><code>消耗()</code></td><td>self 方法</td></tr>
-        <tr><td><code>return_to_owner()</code></td><td><code>返还投掷者()</code></td><td>self 方法（掉落物）</td></tr>
+        <tr><td><code>origin</code></td><td><code>投掷者</code></td><td>give 目标：当前实体的投掷者</td></tr>
+        <tr><td><code>self.item</code></td><td><code>自身.物品</code></td><td>give 来源：当前实体的物品 NBT</td></tr>
         <tr><td><code>all</code></td><td><code>全部</code></td><td>消息目标</td></tr>
         <tr><td><code>nearest(n, ...)</code></td><td><code>最近(n, ...)</code></td><td>消息目标</td></tr>
         <tr><td><code>true</code> / <code>false</code></td><td><code>真</code> / <code>假</code></td><td>布尔值</td></tr>
@@ -2512,7 +2596,7 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
         <tr><td>查询 <code>limit</code></td><td>1 到 2147483647</td></tr>
         <tr><td>查询 <code>within</code>、<code>message.nearest</code> 距离</td><td>1 到 30000000</td></tr>
         <tr><td>查询物品过滤 <code>count</code></td><td>1 到 99</td></tr>
-        <tr><td>物品 <code>count</code>、<code>give</code> 数量</td><td>1 到 <code>max_stack_size × 100</code>；未声明最大堆叠时按 1 计算，即 1 到 100</td></tr>
+        <tr><td>物品 <code>count</code>、<code>give</code> 数量</td><td>1 到 <code>max_stack_size × 100</code>；未声明最大堆叠时按 1 计算，即 1 到 100（<code>self.item</code> 原样给予不接受数量）</td></tr>
         <tr><td><code>lore</code> 行数</td><td>不超过 256 行；名称与 Lore 不能含控制字符</td></tr>
         <tr><td>附魔等级</td><td>1 到 255；同一附魔不能重复声明</td></tr>
         <tr><td>物品 <code>damage</code></td><td>0 到 2147483647</td></tr>
@@ -2586,11 +2670,11 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
 
   /* ---------- 代码高亮 ---------- */
   var KEYWORDS = [
-    "namespace", "score", "query", "entity", "storage", "items", "item", "item_stack",
+    "namespace", "score", "query", "entity", "storage", "item_list", "item", "item_stack",
     "resource", "fn", "each", "give", "in_dimension", "spawn", "self", "message", "sound",
     "run", "call", "schedule", "after", "append", "replace", "if", "else", "while",
     "execute", "return", "let", "predicate", "predicate",
-    "命名空间", "计分", "查询", "实体", "存储", "物品", "物品堆", "资源", "函数", "遍历",
+    "命名空间", "计分", "查询", "实体", "存储", "物品列表", "物品", "物品堆", "资源", "函数", "遍历",
     "给予", "在维度", "召唤", "自身", "消息", "声音", "原生命令", "调用", "调度", "延后",
     "追加", "替换", "如果", "否则", "当", "原生执行", "返回", "令", "谓词",
     "tag", "标签", "without_tag", "排除标签", "limit", "上限", "within", "范围", "sort", "排序",
@@ -2601,7 +2685,7 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
     "unbreakable", "无法破坏", "add_tag", "添加标签", "remove_tag", "移除标签",
     "set_invulnerable", "设置无敌", "save_items", "保存物品", "restore_items", "恢复物品",
     "remove_preserving_items", "保存并移除", "give_item", "给予物品", "clear_items", "清空物品",
-    "remove", "移除", "consume", "消耗", "return_to_owner", "返还投掷者",
+    "remove", "移除", "origin", "投掷者",
     "contents", "内容", "all", "全部", "nearest", "最近"
   ];
   var LITERALS = [
@@ -2628,7 +2712,7 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
      属性、方法、属性和枚举值。这样不会误伤注释里的英文与字符串里的 JSON。 */
   var EN_TO_ZH = {
     namespace: "命名空间", score: "计分", query: "查询", entity: "实体",
-    storage: "存储", items: "物品", item: "物品", item_stack: "物品堆",
+    storage: "存储", item_list: "物品列表", item: "物品", item_stack: "物品堆",
     resource: "资源", fn: "函数", each: "遍历", give: "给予",
     in_dimension: "在维度", spawn: "召唤", self: "自身", message: "消息",
     sound: "声音", run: "原生命令", execute: "原生执行", call: "调用",
@@ -2645,8 +2729,8 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
     add_tag: "添加标签", remove_tag: "移除标签", set_invulnerable: "设置无敌",
     save_items: "保存物品", restore_items: "恢复物品",
     remove_preserving_items: "保存并移除", give_item: "给予物品",
-    clear_items: "清空物品", remove: "移除", consume: "消耗",
-    return_to_owner: "返还投掷者",
+    clear_items: "清空物品", remove: "移除",
+    origin: "投掷者",
     all: "全部", nearest: "最近", furthest: "最远", random: "随机",
     arbitrary: "任意", true: "真", false: "假",
     common: "普通", uncommon: "罕见", rare: "稀有", epic: "史诗",
@@ -2660,12 +2744,10 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
   };
   var ZH_TO_EN = {};
   Object.keys(EN_TO_ZH).forEach(function (english) {
-    var chinese = EN_TO_ZH[english];
-    if (chinese === "物品") { return; } // item 与 items 共用中文名，单独按上下文还原
-    ZH_TO_EN[chinese] = english;
+    ZH_TO_EN[EN_TO_ZH[english]] = english;
   });
-  var ATTR_EN_TO_ZH = { load: "加载", tick: "每刻", entity: "实体", player: "玩家" };
-  var ATTR_ZH_TO_EN = { "加载": "load", "每刻": "tick", "实体": "entity", "玩家": "player" };
+  var ATTR_EN_TO_ZH = { load: "加载", tick: "每刻", entity: "实体", non_player: "非玩家", player: "玩家" };
+  var ATTR_ZH_TO_EN = { "加载": "load", "每刻": "tick", "实体": "entity", "非玩家": "non_player", "玩家": "player" };
   var UNIT_EN_TO_ZH = { t: "刻", s: "秒", d: "天" };
   var UNIT_ZH_TO_EN = { "刻": "t", "秒": "s", "天": "d" };
 
@@ -2708,7 +2790,7 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
         continue;
       }
       if (first === "#") { continue; }
-      if (ZH_TO_EN[token] || token === "物品") { return "zh"; }
+      if (ZH_TO_EN[token]) { return "zh"; }
     }
     return "en";
   }
@@ -2734,15 +2816,6 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
       return EN_TO_ZH[token] || token;
     }
     if (UNIT_ZH_TO_EN[token]) { return UNIT_ZH_TO_EN[token]; }
-    if (token === "物品") {
-      // 物品(contents) 是 item 过滤槽；物品("资源", "路径") 是 items 存储。
-      var next = significantToken(tokens, index + 1, 1);
-      if (next === "(") {
-        var inside = significantToken(tokens, index + 2, 1);
-        return inside && inside.charAt(0) === '"' ? "items" : "item";
-      }
-      return "item";
-    }
     return ZH_TO_EN[token] || token;
   }
 
@@ -2789,7 +2862,7 @@ cargo run -- check examples/portable_chest --deny-raw</code></pre>
   /* 命令行与目录树不做 Mclang 词法高亮，避免把 run、# 之类误标成语言记号。 */
   function isHighlightedCode(code) {
     var kind = code.getAttribute("data-kind") || "mcl";
-    return kind === "mcl" || kind === "syntax" || kind === "mcfunction" || kind === "mcf";
+    return kind === "mcl" || kind === "syntax" || kind === "mcfunction" || kind === "mcf" || kind === "json";
   }
 
   function renderCode(code) {

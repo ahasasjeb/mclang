@@ -1,47 +1,206 @@
 //! 关键词、属性和枚举值的中英文规范化表。
 //!
-//! 解析器在构造 AST 时把中英文写法归一到同一个内部值，后续阶段不再关心语言。
+//! [`KEYWORDS`] 是语言关键词的唯一来源：解析器的 `word_matches`、保留字检查和
+//! 诊断文本都从这里派生，新增关键词只改这一处。枚举值（排序、稀有度、颜色、
+//! 声音分类等）按领域保持独立函数，规范形式统一为英文；中文别名只在解析边界
+//! 出现，进入 AST 后所有阶段只处理英文规范值。
 
-use crate::ast::ItemRarity;
+use crate::ast::{Attribute, ItemRarity};
 
-pub(super) fn word_matches(value: &str, english: &str) -> bool {
-    value == english || keyword_alias(english) == Some(value)
+/// 语言关键词的规范英文写法与中文别名。
+pub(crate) struct Keyword {
+    pub english: &'static str,
+    pub chinese: &'static str,
 }
 
-pub(super) fn keyword_alias(english: &str) -> Option<&'static str> {
+/// 全部语言关键词。中英文写法都必须全局唯一，测试 `keywords_are_unique` 保证这一点。
+pub(crate) const KEYWORDS: &[Keyword] = &[
+    Keyword {
+        english: "namespace",
+        chinese: "命名空间",
+    },
+    Keyword {
+        english: "score",
+        chinese: "计分",
+    },
+    Keyword {
+        english: "query",
+        chinese: "查询",
+    },
+    Keyword {
+        english: "entity",
+        chinese: "实体",
+    },
+    Keyword {
+        english: "item",
+        chinese: "物品",
+    },
+    Keyword {
+        english: "item_stack",
+        chinese: "物品堆",
+    },
+    Keyword {
+        english: "item_list",
+        chinese: "物品列表",
+    },
+    Keyword {
+        english: "storage",
+        chinese: "存储",
+    },
+    Keyword {
+        english: "resource",
+        chinese: "资源",
+    },
+    Keyword {
+        english: "predicate",
+        chinese: "谓词",
+    },
+    Keyword {
+        english: "fn",
+        chinese: "函数",
+    },
+    Keyword {
+        english: "let",
+        chinese: "令",
+    },
+    Keyword {
+        english: "return",
+        chinese: "返回",
+    },
+    Keyword {
+        english: "if",
+        chinese: "如果",
+    },
+    Keyword {
+        english: "else",
+        chinese: "否则",
+    },
+    Keyword {
+        english: "while",
+        chinese: "当",
+    },
+    Keyword {
+        english: "each",
+        chinese: "遍历",
+    },
+    Keyword {
+        english: "call",
+        chinese: "调用",
+    },
+    Keyword {
+        english: "schedule",
+        chinese: "调度",
+    },
+    Keyword {
+        english: "after",
+        chinese: "延后",
+    },
+    Keyword {
+        english: "append",
+        chinese: "追加",
+    },
+    Keyword {
+        english: "replace",
+        chinese: "替换",
+    },
+    Keyword {
+        english: "give",
+        chinese: "给予",
+    },
+    Keyword {
+        english: "origin",
+        chinese: "投掷者",
+    },
+    Keyword {
+        english: "in_dimension",
+        chinese: "在维度",
+    },
+    Keyword {
+        english: "spawn",
+        chinese: "召唤",
+    },
+    Keyword {
+        english: "self",
+        chinese: "自身",
+    },
+    Keyword {
+        english: "message",
+        chinese: "消息",
+    },
+    Keyword {
+        english: "sound",
+        chinese: "声音",
+    },
+    Keyword {
+        english: "run",
+        chinese: "原生命令",
+    },
+    Keyword {
+        english: "execute",
+        chinese: "原生执行",
+    },
+    Keyword {
+        english: "contents",
+        chinese: "内容",
+    },
+];
+
+/// 函数属性的规范英文写法与中文别名，`@` 之后使用。
+pub(crate) const ATTRIBUTES: &[Keyword] = &[
+    Keyword {
+        english: "load",
+        chinese: "加载",
+    },
+    Keyword {
+        english: "tick",
+        chinese: "每刻",
+    },
+    Keyword {
+        english: "entity",
+        chinese: "实体",
+    },
+    Keyword {
+        english: "player",
+        chinese: "玩家",
+    },
+    Keyword {
+        english: "non_player",
+        chinese: "非玩家",
+    },
+];
+
+pub(crate) fn attribute_word(value: &str) -> Option<Attribute> {
+    let english = ATTRIBUTES
+        .iter()
+        .find(|keyword| keyword.english == value || keyword.chinese == value)?
+        .english;
     match english {
-        "namespace" => Some("命名空间"),
-        "score" => Some("计分"),
-        "query" => Some("查询"),
-        "entity" => Some("实体"),
-        "storage" => Some("存储"),
-        "items" => Some("物品"),
-        "item" => Some("物品"),
-        "item_stack" => Some("物品堆"),
-        "resource" => Some("资源"),
-        "fn" => Some("函数"),
-        "each" => Some("遍历"),
-        "give" => Some("给予"),
-        "in_dimension" => Some("在维度"),
-        "spawn" => Some("召唤"),
-        "self" => Some("自身"),
-        "message" => Some("消息"),
-        "sound" => Some("声音"),
-        "run" => Some("原生命令"),
-        "call" => Some("调用"),
-        "schedule" => Some("调度"),
-        "after" => Some("延后"),
-        "append" => Some("追加"),
-        "replace" => Some("替换"),
-        "if" => Some("如果"),
-        "else" => Some("否则"),
-        "while" => Some("当"),
-        "execute" => Some("原生执行"),
-        "return" => Some("返回"),
-        "let" => Some("令"),
-        "predicate" => Some("谓词"),
-        _ => None,
+        "load" => Some(Attribute::Load),
+        "tick" => Some(Attribute::Tick),
+        "entity" => Some(Attribute::Entity),
+        "player" => Some(Attribute::Player),
+        "non_player" => Some(Attribute::NonPlayer),
+        _ => unreachable!("ATTRIBUTES 表与 attribute_word 不同步"),
     }
+}
+
+pub(crate) fn keyword_alias(english: &str) -> Option<&'static str> {
+    KEYWORDS
+        .iter()
+        .find(|keyword| keyword.english == english)
+        .map(|keyword| keyword.chinese)
+}
+
+pub(super) fn word_matches(value: &str, english: &str) -> bool {
+    value == english || keyword_alias(english).is_some_and(|alias| alias == value)
+}
+
+/// 不能用作标识符的保留字：全部规范关键词和布尔字面量。
+///
+/// 属性名（`load`、`tick`、`player` 等）不算保留字：`@` 前缀已经把它们和标识符
+/// 区分开，`@load fn load()` 这类自然命名应当保持可用。
+pub(crate) fn reserved_word(value: &str) -> bool {
+    KEYWORDS.iter().any(|keyword| keyword.english == value) || matches!(value, "true" | "false")
 }
 
 pub(super) fn query_property(value: &str) -> Option<&'static str> {
@@ -85,6 +244,22 @@ pub(super) fn item_stack_property(value: &str) -> Option<&'static str> {
     }
 }
 
+/// 类型化物品查询目前只支持 `contents` 槽；`内容` 是它的中文写法。
+pub(super) fn slot_name(value: &str) -> Option<&'static str> {
+    match value {
+        "contents" | "内容" => Some("contents"),
+        _ => None,
+    }
+}
+
+/// `resource` 声明允许把常用资源类型写成中文。
+pub(super) fn resource_kind(value: &str) -> Option<&'static str> {
+    match value {
+        "predicate" | "谓词" => Some("predicate"),
+        _ => None,
+    }
+}
+
 pub(super) fn rarity_value(value: &str) -> Option<ItemRarity> {
     match value {
         "common" | "普通" => Some(ItemRarity::Common),
@@ -116,8 +291,6 @@ pub(super) fn self_method(value: &str) -> Option<&'static str> {
         "give_item" | "给予物品" => Some("give_item"),
         "clear_items" | "清空物品" => Some("clear_items"),
         "remove" | "移除" => Some("remove"),
-        "consume" | "消耗" => Some("consume"),
-        "return_to_owner" | "返还投掷者" => Some("return_to_owner"),
         _ => None,
     }
 }
@@ -184,5 +357,69 @@ pub(super) fn sound_source(value: &str) -> Option<&'static str> {
         "voice" | "语音" => Some("voice"),
         "ui" | "界面" => Some("ui"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn keywords_are_unique() {
+        let mut english = HashSet::new();
+        let mut chinese = HashSet::new();
+        for keyword in KEYWORDS {
+            assert!(
+                english.insert(keyword.english),
+                "重复的英文关键词 `{}`",
+                keyword.english
+            );
+            assert!(
+                chinese.insert(keyword.chinese),
+                "重复的中文关键词 `{}`",
+                keyword.chinese
+            );
+            assert_ne!(keyword.english, keyword.chinese);
+        }
+        let mut attribute_english = HashSet::new();
+        let mut attribute_chinese = HashSet::new();
+        for attribute in ATTRIBUTES {
+            assert!(
+                attribute_english.insert(attribute.english),
+                "重复的英文属性 `@{}`",
+                attribute.english
+            );
+            assert!(
+                attribute_chinese.insert(attribute.chinese),
+                "重复的中文属性 `@{}`",
+                attribute.chinese
+            );
+        }
+    }
+
+    #[test]
+    fn aliases_resolve_in_both_directions() {
+        for keyword in KEYWORDS {
+            assert!(word_matches(keyword.english, keyword.english));
+            assert!(word_matches(keyword.chinese, keyword.english));
+            for other in KEYWORDS
+                .iter()
+                .filter(|other| other.english != keyword.english)
+            {
+                assert!(
+                    !word_matches(keyword.chinese, other.english),
+                    "`{}` 同时匹配 `{}` 和 `{}`",
+                    keyword.chinese,
+                    keyword.english,
+                    other.english
+                );
+            }
+        }
+        for attribute in ATTRIBUTES {
+            assert!(attribute_word(attribute.english).is_some());
+            assert!(attribute_word(attribute.chinese).is_some());
+        }
     }
 }

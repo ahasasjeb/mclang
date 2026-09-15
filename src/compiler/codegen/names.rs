@@ -7,38 +7,23 @@
 //! - `#l_<hash>`：词法局部变量；
 //! - `#t<number>`：表达式临时值；
 //! - `mcl_<hash>`：每个命名空间唯一的 objective。
+//!
+//! 编译器构造时一次性建立 `<函数, 名称> -> 假玩家` 表，代码生成不再反复扫描
+//! 函数体判断某个名字是参数、局部变量还是全局变量。
 
-use crate::ast::{Statement, StatementKind};
+use std::collections::HashMap;
+
+use crate::ast::{Program, Statement, StatementKind};
 
 use super::Compiler;
 
 impl Compiler<'_> {
     /// 变量名解析：优先函数参数，其次词法局部变量，最后全局计分变量。
     pub(super) fn variable_holder(&self, owner: &str, name: &str) -> String {
-        let is_parameter = self
-            .program
-            .functions
-            .iter()
-            .find(|function| function.name == owner)
-            .is_some_and(|function| {
-                function
-                    .parameters
-                    .iter()
-                    .any(|parameter| parameter.name == name)
-            });
-        if is_parameter {
-            parameter_holder(owner, name)
-        } else if self
-            .program
-            .functions
-            .iter()
-            .find(|function| function.name == owner)
-            .is_some_and(|function| function_has_local(&function.body, name))
-        {
-            local_holder(owner, name)
-        } else {
-            score_holder(name)
-        }
+        self.holders
+            .get(&(owner, name))
+            .cloned()
+            .unwrap_or_else(|| score_holder(name))
     }
 
     /// 分配一个表达式临时计分项，允许被后续表达式覆盖。
@@ -46,6 +31,58 @@ impl Compiler<'_> {
         let temporary = format!("#t{}", self.temporary_counter);
         self.temporary_counter += 1;
         temporary
+    }
+}
+
+/// 收集整程序中每个函数的参数与局部变量，建立内部假玩家名称表。
+pub(super) fn build_holders(program: &Program) -> HashMap<(&str, &str), String> {
+    let mut holders = HashMap::new();
+    for function in &program.functions {
+        for parameter in &function.parameters {
+            holders.insert(
+                (function.name.as_str(), parameter.name.as_str()),
+                parameter_holder(&function.name, &parameter.name),
+            );
+        }
+        let mut locals = Vec::new();
+        collect_local_names(&function.body, &mut locals);
+        for name in locals {
+            holders.insert(
+                (function.name.as_str(), name),
+                local_holder(&function.name, name),
+            );
+        }
+    }
+    holders
+}
+
+pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut Vec<&'a str>) {
+    for statement in statements {
+        match &statement.kind {
+            StatementKind::Let { name, .. } => locals.push(name),
+            StatementKind::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                collect_local_names(then_body, locals);
+                collect_local_names(else_body, locals);
+            }
+            StatementKind::Execute { body, .. }
+            | StatementKind::Each { body, .. }
+            | StatementKind::InDimension { body, .. }
+            | StatementKind::Spawn { body, .. }
+            | StatementKind::While { body, .. } => collect_local_names(body, locals),
+            StatementKind::Run(_)
+            | StatementKind::Give { .. }
+            | StatementKind::SelfAction(_)
+            | StatementKind::Message { .. }
+            | StatementKind::PlaySound { .. }
+            | StatementKind::Call { .. }
+            | StatementKind::Schedule { .. }
+            | StatementKind::Assign { .. }
+            | StatementKind::Return(_) => {}
+        }
     }
 }
 
@@ -65,31 +102,6 @@ pub(super) fn local_holder(function: &str, local: &str) -> String {
         "#l_{:012x}",
         stable_hash(&format!("{function}:{local}")) & 0xffffffffffff
     )
-}
-
-fn function_has_local(statements: &[Statement], name: &str) -> bool {
-    statements.iter().any(|statement| match &statement.kind {
-        StatementKind::Let { name: local, .. } => local == name,
-        StatementKind::If {
-            then_body,
-            else_body,
-            ..
-        } => function_has_local(then_body, name) || function_has_local(else_body, name),
-        StatementKind::Execute { body, .. }
-        | StatementKind::Each { body, .. }
-        | StatementKind::InDimension { body, .. }
-        | StatementKind::Spawn { body, .. }
-        | StatementKind::While { body, .. } => function_has_local(body, name),
-        StatementKind::Run(_)
-        | StatementKind::Give { .. }
-        | StatementKind::SelfAction(_)
-        | StatementKind::Message { .. }
-        | StatementKind::PlaySound { .. }
-        | StatementKind::Call { .. }
-        | StatementKind::Schedule { .. }
-        | StatementKind::Assign { .. }
-        | StatementKind::Return(_) => false,
-    })
 }
 
 pub(super) fn objective_name(namespace: &str) -> String {

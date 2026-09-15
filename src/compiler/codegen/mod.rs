@@ -4,11 +4,13 @@
 //! 再合成 load 函数，最后由 [`Compiler::finish`] 落盘为 [`CompiledPack`]。
 //! 具体下降逻辑按职责拆分成子模块：
 //!
-//! - [`statements`]：语句结构（each/if/while/call 等）与辅助函数分配；
+//! - [`statements`]：控制流（each/if/while/call 等）与辅助函数分配；
+//! - [`actions`]：`give` 与 `self` 实体操作；
 //! - [`expressions`]：表达式与条件求值，以及临时计分项；
 //! - [`names`]：假玩家、objective 和稳定哈希命名；
 //! - [`emit`]：Minecraft 命令片段与 JSON 文本的格式化。
 
+mod actions;
 mod emit;
 mod expressions;
 mod names;
@@ -20,8 +22,8 @@ use std::path::PathBuf;
 use crate::ast::*;
 
 use super::CompiledPack;
-use emit::{pack_metadata, tag_json};
-use names::objective_name;
+use emit::{empty_slot_source, pack_metadata, tag_json};
+use names::{build_holders, objective_name};
 
 /// 表达式求值结果：编译期整数或运行时计分项。
 #[derive(Clone)]
@@ -34,9 +36,13 @@ enum Value {
 pub(super) struct Compiler<'a> {
     program: &'a Program,
     objective: String,
+    /// `<函数名, 变量名> -> 假玩家`，构造时一次算好。
+    holders: HashMap<(&'a str, &'a str), String>,
     functions: BTreeMap<String, Vec<String>>,
     helper_counters: HashMap<String, usize>,
     temporary_counter: usize,
+    /// 是否使用了 `give(..., self.item)` 需要的空槽来源资源。
+    uses_empty_slot: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -44,9 +50,11 @@ impl<'a> Compiler<'a> {
         Self {
             program,
             objective: objective_name(&program.namespace),
+            holders: build_holders(program),
             functions: BTreeMap::new(),
             helper_counters: HashMap::new(),
             temporary_counter: 0,
+            uses_empty_slot: false,
         }
     }
 
@@ -98,6 +106,15 @@ impl<'a> Compiler<'a> {
     pub(super) fn finish(self, description: &str) -> CompiledPack {
         let mut files = BTreeMap::new();
         files.insert(PathBuf::from("pack.mcmeta"), pack_metadata(description));
+        if self.uses_empty_slot {
+            files.insert(
+                PathBuf::from("data")
+                    .join(&self.program.namespace)
+                    .join("slot_source")
+                    .join("__mcl/empty_slot.json"),
+                empty_slot_source().to_owned(),
+            );
+        }
         for (name, commands) in self.functions {
             let path = PathBuf::from("data")
                 .join(&self.program.namespace)

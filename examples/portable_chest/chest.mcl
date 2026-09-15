@@ -14,5 +14,5 @@ query chest_boxes = entity("minecraft:chest_minecart") {
     tag("portable_chest_box");
 }
 
-// items 是类型化容器存储；编译器会在首次加载时自动初始化空列表。
-storage saved_items = items("portable_chest:state", "saved_items");
+// item_list 是类型化容器存储；编译器会在首次加载时自动初始化空列表。
+storage saved_items = item_list("portable_chest:state", "saved_items");

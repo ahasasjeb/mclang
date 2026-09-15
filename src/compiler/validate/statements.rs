@@ -1,20 +1,23 @@
-//! 函数体内的语句、表达式和条件校验。
+//! 函数体内的语句校验：控制流、实体操作、调用、赋值与作用域。
 //!
 //! 校验器遍历树时携带三层信息：当前可见的局部变量、符号表
 //! （[`StatementSymbols`]）和当前执行上下文/返回规则。后两者放进
 //! [`ValidationContext`]，避免每个辅助函数都接收一长串参数。每个语句种类对应
 //! 一个独立的小函数，`validate_statement` 只负责分派。
+//!
+//! 表达式与条件的检查在 [`super::expressions`]。
 
 use std::collections::HashSet;
 
 use crate::ast::{
-    AssignOp, BinaryOp, Condition, Expr, ExprKind, MessageTarget, SelfAction, Span, Statement,
+    AssignOp, Condition, Expr, GiveItem, GiveTarget, MessageTarget, SelfAction, Span, Statement,
     StatementKind,
 };
 use crate::compiler::constant::constant_value;
-use crate::compiler::types::{ExecutionContext, ReturnRules, Signature, StatementSymbols};
+use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
 use crate::diagnostic::Diagnostic;
 
+use super::expressions::{validate_call_context, validate_condition, validate_expr};
 use super::items::validate_give_count;
 use super::rules::{
     valid_entity_tag, valid_resource_location, valid_sound_source, valid_text_color,
@@ -23,10 +26,10 @@ use super::rules::{
 
 /// 遍历函数体时保持不变的校验环境。
 #[derive(Clone, Copy)]
-struct ValidationContext<'a, 'b> {
-    symbols: &'a StatementSymbols<'b>,
-    context: ExecutionContext,
-    return_rules: ReturnRules,
+pub(super) struct ValidationContext<'a, 'b> {
+    pub(super) symbols: &'a StatementSymbols<'b>,
+    pub(super) context: ExecutionContext,
+    pub(super) return_rules: ReturnRules,
 }
 
 /// 收集函数体内的全部 `let` 声明，并报告重名、与全局计分变量或参数冲突。
@@ -200,28 +203,54 @@ fn validate_statement<'a>(
 }
 
 fn validate_give_statement(
-    target: &str,
-    item: &str,
+    target: &GiveTarget,
+    item: &GiveItem,
     count: Option<u32>,
     count_span: Option<Span>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    match ctx.symbols.queries.get(target) {
-        None => diagnostics.push(Diagnostic::new(format!("找不到实体查询 `{target}`"), span)),
-        Some(query) if query.entity_type != "minecraft:player" => {
-            diagnostics.push(Diagnostic::new(
-                format!("give 目标查询 `{target}` 必须匹配 minecraft:player"),
-                span,
-            ));
+    match target {
+        GiveTarget::Query(name) => match ctx.symbols.queries.get(name.as_str()) {
+            None => diagnostics.push(Diagnostic::new(format!("找不到实体查询 `{name}`"), span)),
+            Some(query) if query.entity_type != "minecraft:player" => {
+                diagnostics.push(Diagnostic::new(
+                    format!("give 目标查询 `{name}` 必须匹配 minecraft:player"),
+                    span,
+                ));
+            }
+            Some(_) => {}
+        },
+        GiveTarget::Origin => {
+            if !ctx.context.is_entity() {
+                diagnostics.push(Diagnostic::new(
+                    "give 的 origin/投掷者目标需要实体执行上下文",
+                    span,
+                ));
+            }
         }
-        Some(_) => {}
     }
-    match ctx.symbols.item_stacks.get(item) {
-        None => diagnostics.push(Diagnostic::new(format!("找不到物品定义 `{item}`"), span)),
-        Some(declaration) => {
-            validate_give_count(declaration, count, span, count_span, diagnostics);
+    match item {
+        GiveItem::Definition(name) => match ctx.symbols.item_stacks.get(name.as_str()) {
+            None => diagnostics.push(Diagnostic::new(format!("找不到物品定义 `{name}`"), span)),
+            Some(declaration) => {
+                validate_give_count(declaration, count, span, count_span, diagnostics);
+            }
+        },
+        GiveItem::SelfItem => {
+            if !ctx.context.is_entity() {
+                diagnostics.push(Diagnostic::new(
+                    "self.item 需要实体执行上下文；请放入 each/spawn 块，或给函数添加 @entity",
+                    span,
+                ));
+            }
+            if count.is_some() {
+                diagnostics.push(Diagnostic::new(
+                    "原样给予 self.item 时不能指定数量",
+                    count_span.unwrap_or(span),
+                ));
+            }
         }
     }
 }
@@ -232,17 +261,40 @@ fn validate_self_action(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let required_context = if matches!(action, SelfAction::GiveItem { .. }) {
-        ExecutionContext::Player
-    } else {
-        ExecutionContext::Entity
+    let method = match action {
+        SelfAction::AddTag(_) => "add_tag",
+        SelfAction::RemoveTag(_) => "remove_tag",
+        SelfAction::SetInvulnerable(_) => "set_invulnerable",
+        SelfAction::SaveItems(_) => "save_items",
+        SelfAction::RestoreItems(_) => "restore_items",
+        SelfAction::RemovePreservingItems(_) => "remove_preserving_items",
+        SelfAction::GiveItem { .. } => "give_item",
+        SelfAction::ClearItems => "clear_items",
+        SelfAction::Remove => "remove",
     };
-    if ctx.context < required_context {
-        let message = if required_context == ExecutionContext::Player {
-            "self.give_item 需要玩家执行上下文；请放入玩家 query 的 each 块，或给函数添加 @player"
-        } else {
-            "self 方法需要实体执行上下文；请放入 each/spawn 块，或给函数添加 @entity"
-        };
+    let (required, message) = match action {
+        SelfAction::GiveItem { .. } => (
+            ExecutionContext::Player,
+            format!(
+                "self.{method} 需要玩家执行上下文；请放入玩家 query 的 each 块，或给函数添加 @player"
+            ),
+        ),
+        SelfAction::SetInvulnerable(_)
+        | SelfAction::SaveItems(_)
+        | SelfAction::RestoreItems(_)
+        | SelfAction::RemovePreservingItems(_)
+        | SelfAction::ClearItems => (
+            ExecutionContext::Mob,
+            format!(
+                "self.{method} 通过 data 命令修改实体 NBT，Minecraft 不允许修改玩家数据；只能在确定不是玩家的实体上下文中使用（非玩家查询的 each、非玩家 spawn，或 @non_player 函数）"
+            ),
+        ),
+        SelfAction::AddTag(_) | SelfAction::RemoveTag(_) | SelfAction::Remove => (
+            ExecutionContext::Entity,
+            format!("self.{method} 需要实体执行上下文；请放入 each/spawn 块，或给函数添加 @entity"),
+        ),
+    };
+    if !ctx.context.satisfies(required) {
         diagnostics.push(Diagnostic::new(message, span));
     }
     match action {
@@ -268,11 +320,7 @@ fn validate_self_action(
                 validate_give_count(declaration, *count, span, *count_span, diagnostics);
             }
         },
-        SelfAction::SetInvulnerable(_)
-        | SelfAction::ClearItems
-        | SelfAction::Remove
-        | SelfAction::Consume
-        | SelfAction::ReturnToOwner => {}
+        SelfAction::SetInvulnerable(_) | SelfAction::ClearItems | SelfAction::Remove => {}
     }
 }
 
@@ -283,7 +331,9 @@ fn validate_message(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if matches!(target, MessageTarget::SelfEntity) && ctx.context < ExecutionContext::Player {
+    if matches!(target, MessageTarget::SelfEntity)
+        && !ctx.context.satisfies(ExecutionContext::Player)
+    {
         diagnostics.push(Diagnostic::new("message.self 需要玩家执行上下文", span));
     }
     if let MessageTarget::Nearest { within } = target
@@ -311,7 +361,7 @@ fn validate_play_sound(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if ctx.context < ExecutionContext::Player {
+    if !ctx.context.satisfies(ExecutionContext::Player) {
         diagnostics.push(Diagnostic::new("sound.self 需要玩家执行上下文", span));
     }
     if !valid_resource_location(sound) {
@@ -340,11 +390,11 @@ fn validate_each<'a>(
     if query_decl.is_none() {
         diagnostics.push(Diagnostic::new(format!("找不到实体查询 `{query}`"), span));
     }
-    let body_context = query_decl.map_or(ExecutionContext::Entity, |query| {
+    let body_context = query_decl.map_or(ExecutionContext::Mob, |query| {
         if query.entity_type == "minecraft:player" {
             ExecutionContext::Player
         } else {
-            ExecutionContext::Entity
+            ExecutionContext::Mob
         }
     });
     let mut body_locals = locals.clone();
@@ -396,16 +446,26 @@ fn validate_spawn<'a>(
             format!("`{entity_type}` 不是有效的实体类型资源位置"),
             span,
         ));
+    } else if non_summonable_entity(entity_type) {
+        diagnostics.push(Diagnostic::new(
+            format!("Minecraft 的 /summon 不支持实体类型 `{entity_type}`"),
+            span,
+        ));
     }
     let mut body_locals = locals.clone();
     validate_statements(
         body,
         &mut body_locals,
         ctx.symbols,
-        ExecutionContext::Entity,
+        ExecutionContext::Mob,
         ctx.return_rules.nested(),
         diagnostics,
     );
+}
+
+/// 26.3 的 `EntityTypes` 用 `noSummon` 标记不可召唤的类型。
+fn non_summonable_entity(entity_type: &str) -> bool {
+    matches!(entity_type, "minecraft:player" | "minecraft:fishing_bobber")
 }
 
 fn validate_return<'a>(
@@ -582,121 +642,4 @@ fn validate_execute<'a>(
         ctx.return_rules.nested(),
         diagnostics,
     );
-}
-
-fn validate_call_context(
-    function: &str,
-    signature: Signature,
-    span: Span,
-    ctx: ValidationContext<'_, '_>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    if ctx.context >= signature.required_context {
-        return;
-    }
-    let (attribute, kind) = match signature.required_context {
-        ExecutionContext::Player => ("@player", "玩家"),
-        ExecutionContext::Entity => ("@entity", "实体"),
-        ExecutionContext::None => return,
-    };
-    diagnostics.push(Diagnostic::new(
-        format!("{attribute} 函数 `{function}` 需要{kind}执行上下文"),
-        span,
-    ));
-}
-
-fn validate_condition(
-    condition: &Condition,
-    locals: &HashSet<&str>,
-    ctx: ValidationContext<'_, '_>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    match condition {
-        Condition::Predicate { name, span } => {
-            if !ctx.symbols.predicates.contains(name.as_str()) {
-                diagnostics.push(Diagnostic::new(
-                    format!("找不到 predicate 资源 `{name}`"),
-                    *span,
-                ));
-            }
-        }
-        Condition::Compare { left, right, .. } => {
-            validate_expr(left, locals, ctx, diagnostics);
-            validate_expr(right, locals, ctx, diagnostics);
-        }
-        Condition::Not(condition) => validate_condition(condition, locals, ctx, diagnostics),
-        Condition::And(left, right) | Condition::Or(left, right) => {
-            validate_condition(left, locals, ctx, diagnostics);
-            validate_condition(right, locals, ctx, diagnostics);
-        }
-    }
-}
-
-fn validate_expr(
-    expression: &Expr,
-    locals: &HashSet<&str>,
-    ctx: ValidationContext<'_, '_>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    match &expression.kind {
-        ExprKind::Integer(_) => {}
-        ExprKind::Score(name) => {
-            if !ctx.symbols.scores.contains(name.as_str())
-                && !ctx.symbols.parameters.contains(name.as_str())
-                && !locals.contains(name.as_str())
-            {
-                diagnostics.push(Diagnostic::new(
-                    format!("找不到计分变量 `{name}`"),
-                    expression.span,
-                ));
-            }
-        }
-        ExprKind::Call {
-            function,
-            arguments,
-        } => {
-            match ctx.symbols.functions.get(function.as_str()) {
-                None => diagnostics.push(Diagnostic::new(
-                    format!("找不到函数 `{function}`"),
-                    expression.span,
-                )),
-                Some(signature) => {
-                    if !signature.returns_score {
-                        diagnostics.push(Diagnostic::new(
-                            format!("无返回值函数 `{function}` 不能用于表达式"),
-                            expression.span,
-                        ));
-                    }
-                    validate_call_context(function, *signature, expression.span, ctx, diagnostics);
-                    if arguments.len() != signature.parameters {
-                        diagnostics.push(Diagnostic::new(
-                            format!(
-                                "函数 `{function}` 需要 {} 个参数，实际提供 {} 个",
-                                signature.parameters,
-                                arguments.len()
-                            ),
-                            expression.span,
-                        ));
-                    }
-                }
-            }
-            for argument in arguments {
-                validate_expr(argument, locals, ctx, diagnostics);
-            }
-        }
-        ExprKind::Negate(value) => validate_expr(value, locals, ctx, diagnostics),
-        ExprKind::Binary {
-            left,
-            operation,
-            right,
-        } => {
-            validate_expr(left, locals, ctx, diagnostics);
-            validate_expr(right, locals, ctx, diagnostics);
-            if matches!(operation, BinaryOp::Divide | BinaryOp::Modulo)
-                && constant_value(right) == Some(0)
-            {
-                diagnostics.push(Diagnostic::new("不能除以零", right.span));
-            }
-        }
-    }
 }

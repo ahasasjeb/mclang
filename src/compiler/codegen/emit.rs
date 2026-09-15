@@ -172,6 +172,35 @@ pub(super) fn pack_metadata(description: &str) -> String {
     )
 }
 
+/// `give(..., self.item)` 使用的槽位来源：目标玩家背包里的第一个空槽。
+///
+/// 26.3 的 `filtered` 槽位来源把 `slot_source` 与物品谓词组合起来；空堆的
+/// `count` 是 0，因此 `"count": 0` 只选中空槽。`hotbar.*` 覆盖 0 到 8 号槽，
+/// `inventory.*` 覆盖 9 到 35 号槽，合起来正好是玩家的 36 格快捷栏与主背包；
+/// 刻意不包含 `container.*` 里的盔甲、副手和合成槽，避免物品被放进装备槽。
+pub(super) fn empty_slot_source() -> &'static str {
+    r#"{
+  "type": "minecraft:filtered",
+  "slot_source": {
+    "type": "minecraft:group",
+    "terms": [
+      {
+        "type": "minecraft:slot_range",
+        "slots": "hotbar.*"
+      },
+      {
+        "type": "minecraft:slot_range",
+        "slots": "inventory.*"
+      }
+    ]
+  },
+  "item_filter": {
+    "count": 0
+  }
+}
+"#
+}
+
 pub(super) fn tag_json(values: &[String]) -> String {
     let values = values
         .iter()

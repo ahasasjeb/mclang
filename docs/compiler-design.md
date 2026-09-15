@@ -8,11 +8,11 @@
 
 实体查询、物品定义、物品存储、维度、消息、`give` 和 `self` 操作在 AST 中保留为结构化节点。物品定义中的名称、Lore、普通附魔、存储附魔、损伤、最大损伤、最大堆叠、稀有度、物品模型、染色、附魔光效覆盖和无法破坏也是独立字段。语义阶段检查资源位置、查询、物品和存储引用、执行上下文、范围、计数、附魔等级、标签及枚举值；代码生成阶段才创建选择器、物品组件谓词、`give` 参数、NBT 命令和文本组件 JSON。Mclang 源码因此不依赖这些底层字符串的拼写。
 
-`give` 语句的目标必须解析为 `minecraft:player` 查询，后端生成 `execute as <选择器> at @s run give @s <物品> <数量>`。数量省略时取物品定义的 `count`；上限按 26.3 `GiveCommand` 的 `最大堆叠数 × 100` 计算，未声明 `max_stack_size` 时按最小堆叠数 1 取保守上限 100。`self.give_item` 生成同形状但没有目标包装的 `give @s` 命令。
+`give` 语句的目标写成查询时必须解析为 `minecraft:player`，后端生成 `execute as <选择器> at @s run give @s <物品> <数量>`。数量省略时取物品定义的 `count`；上限按 26.3 `GiveCommand` 的 `最大堆叠数 × 100` 计算，未声明 `max_stack_size` 时按最小堆叠数 1 取保守上限 100。`self.give_item` 生成同形状但没有目标包装的 `give @s` 命令。
 
-语义阶段使用 `无上下文 < 实体 < 玩家` 的上下文层级。`each` 根据查询的实体类型建立实体或玩家上下文，`spawn` 建立普通实体上下文；`@entity` 和 `@player` 把最低上下文要求加入函数签名。`self.give_item`、`message.self` 和 `sound.self` 要求玩家，其余 `self` 操作要求实体；`give` 语句自带目标查询，不要求当前上下文。上下文函数不能被调度。`storage ... = items(...)` 还会向合成 load 函数加入幂等的空列表初始化。
+语义阶段使用四种执行上下文：无、任意实体、非玩家实体和玩家。任意实体来自 `@entity` 函数，非玩家实体来自非玩家查询的 `each`、`spawn` 和 `@non_player` 函数，玩家来自玩家查询的 `each` 和 `@player` 函数。`spawn` 因为 `noSummon` 限制不能生成 `minecraft:player` 和 `minecraft:fishing_bobber`，语义阶段会拒绝这两个类型。`@entity`、`@non_player` 和 `@player` 把最低上下文要求加入函数签名，调用点用 `satisfies` 判定：非玩家实体满足任意实体，玩家也满足任意实体，但两者互不满足。`self.give_item`、`message.self` 和 `sound.self` 要求玩家；`set_invulnerable`、`save_items`、`restore_items`、`remove_preserving_items` 和 `clear_items` 通过 `data` 命令修改实体 NBT，26.3 的 `EntityDataAccessor` 对玩家抛出 `commands.data.entity.invalid`，因此要求非玩家实体；其余 `self` 操作只要求任意实体。`give` 语句自带目标查询，不要求当前上下文。上下文函数不能被调度。`storage ... = item_list(...)` 还会向合成 load 函数加入幂等的空列表初始化。
 
-`self.return_to_owner` 面向掉落物：生成临时标签、`execute on origin at @s run tp` 和 `data merge entity … {PickupDelay:0}`，借助 ItemEntity 的 `Thrower`（`TraceableEntity.getOwner`）把实体交还投掷者，再由原版拾取逻辑放入背包，因此物品组件原样保留；投掷者不存在或背包已满时实体留在世界。临时标签由该命名空间的 objective 名派生，同一命令序列内独占，不会与其它掉落物互相干扰。
+`give` 在目标为 `origin`（原版实体关系，掉落物对应 `Thrower`）或物品来源为 `self.item` 时改变形状：`origin` 生成 `execute on origin if entity @s[type=minecraft:player] run ...`；`self.item` 额外生成临时标签、成功标志与辅助函数，用 `item replace … from entity … contents` 把源实体槽位 0 的物品堆复制进目标玩家背包的第一个空槽。编译器为此输出 `data/<命名空间>/slot_source/__mcl/empty_slot.json`：一个 `filtered` 槽位来源，底层 `group` 组合 `hotbar.*`（0 到 8 号槽）与 `inventory.*`（9 到 35 号槽），正好覆盖快捷栏与主背包而不含盔甲、副手和合成槽；物品谓词只接受空堆（`"count": 0`）。复制成功后清空源槽，掉落物随之下一次 tick 自行消失；投掷者不存在或背包已满时不修改源实体。物品堆的组件不重新构造，原样保留。
 
 算术值存储在同一个内部 scoreboard objective。用户变量使用 `#v_<name>` 假玩家，表达式临时值使用 `#t<number>`，函数参数和局部变量使用函数名与变量名的稳定哈希假玩家，避免与真实玩家冲突。调用前先从左到右计算全部实参，再复制到被调用函数的参数计分项。语义检查器单独维护词法块作用域，保证局部变量在生成阶段已经完成名称解析。objective 名由命名空间的稳定 FNV-1a 哈希生成，格式为 16 字符的 `mcl_<12 hex>`，满足 Minecraft 的 objective 长度限制。
 

@@ -99,6 +99,7 @@ impl Parser {
             if clauses.trim().is_empty()
                 || clauses.contains(['\n', '\r'])
                 || clauses.starts_with("execute ")
+                || clauses.starts_with("run ")
                 || clauses.ends_with(" run")
             {
                 return Err(Diagnostic::new(
@@ -152,9 +153,27 @@ impl Parser {
 
     fn give_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::LeftParen, "give 后需要 `(`")?;
-        let (target, _) = self.ident("give 需要玩家查询名称")?;
-        self.expect(TokenKind::Comma, "查询名称后需要 `,`")?;
-        let (item, _) = self.ident("give 需要物品定义名称")?;
+        let target = if self.take_word("origin").is_some() {
+            GiveTarget::Origin
+        } else {
+            let (name, _) = self.ident("give 需要玩家查询名称或 origin/投掷者")?;
+            GiveTarget::Query(name)
+        };
+        self.expect(TokenKind::Comma, "give 目标后需要 `,`")?;
+        let item = if self.take_word("self").is_some() {
+            self.expect(TokenKind::Dot, "self 后需要 `.`")?;
+            let (member, span) = self.ident("self 的物品成员")?;
+            if !word_matches(&member, "item") {
+                return Err(Diagnostic::new(
+                    "原样给予的写法是 `self.item`（中文 `自身.物品`）",
+                    span,
+                ));
+            }
+            GiveItem::SelfItem
+        } else {
+            let (name, _) = self.ident("give 需要物品定义名称或 self.item/自身.物品")?;
+            GiveItem::Definition(name)
+        };
         let (count, count_span) = self.optional_count("give 数量")?;
         self.expect(TokenKind::RightParen, "give 调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "give 调用后需要 `;`")?;
@@ -219,8 +238,6 @@ impl Parser {
             }
             "clear_items" => SelfAction::ClearItems,
             "remove" => SelfAction::Remove,
-            "consume" => SelfAction::Consume,
-            "return_to_owner" => SelfAction::ReturnToOwner,
             _ => unreachable!(),
         };
         self.expect(TokenKind::RightParen, "self 方法缺少 `)`")?;

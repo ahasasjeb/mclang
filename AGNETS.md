@@ -7,6 +7,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 
 - 语言提供命名空间、全局计分变量、函数与参数、score 返回值、`let` 词法局部变量、`if`/`while`、
   实体查询、物品定义、`give`、`self` 操作、`message`/`sound`、`schedule` 和 JSON 资源等结构化语法；
+  执行上下文分为无、任意实体、非玩家实体和玩家，对应 `@entity`/`@non_player`/`@player` 属性；
   `run`/`execute` 是底层逃生口，`--deny-raw` 可以强制整个项目只用结构化语法。
 - 关键词中英文等价且可混用，两种写法必须生成逐字节相同的产物。
 - 目标版本固定为仓库内 `minecraft_client_26.3-rc-2/` 源码，数据包格式 `121.0`。
@@ -37,12 +38,12 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 | `src/lib.rs` | 项目级编排：发现/读取源文件、跨文件合并、写数据包 |
 | `src/lexer.rs` | 词法分析 |
 | `src/ast.rs` | AST 与源范围定义 |
-| `src/parser/` | 递归下降解析：`mod.rs`（游标导航与顶层分派）、`declarations`、`statements`、`conditions`、`expressions`、`keywords` |
+| `src/parser/` | 递归下降解析：`mod.rs`（游标导航与顶层分派）、`declarations`、`items`、`statements`、`conditions`、`expressions`、`keywords` |
 | `src/compiler/mod.rs` | `compile()` 入口与 `CompiledPack` |
 | `src/compiler/types.rs` | 校验与生成共享的内部类型 |
 | `src/compiler/constant.rs` | 编译期常量折叠 |
-| `src/compiler/validate/` | 只读语义检查：`rules`（名称/路径/标签等规则）、`items`、`statements`、`recursion` |
-| `src/compiler/codegen/` | 代码生成：`statements`（语句与辅助函数）、`expressions`、`names`（假玩家/objective）、`emit`（命令与 JSON 格式化） |
+| `src/compiler/validate/` | 只读语义检查：`rules`（名称/路径/标签等规则）、`items`、`statements`、`expressions`、`recursion` |
+| `src/compiler/codegen/` | 代码生成：`statements`（控制流与辅助函数）、`actions`（give 与 self 操作）、`expressions`、`names`（假玩家/objective）、`emit`（命令与 JSON 格式化） |
 | `docs/` | 语言与编译器文档 |
 | `examples/` | 端到端示例项目 |
 

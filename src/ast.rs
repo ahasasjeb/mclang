@@ -160,6 +160,7 @@ pub enum Attribute {
     Tick,
     Entity,
     Player,
+    NonPlayer,
 }
 
 #[derive(Debug)]
@@ -184,8 +185,8 @@ pub enum StatementKind {
         body: Vec<Statement>,
     },
     Give {
-        target: String,
-        item: String,
+        target: GiveTarget,
+        item: GiveItem,
         count: Option<u32>,
         count_span: Option<Span>,
     },
@@ -234,6 +235,18 @@ pub enum StatementKind {
 }
 
 #[derive(Debug)]
+pub enum GiveTarget {
+    Query(String),
+    Origin,
+}
+
+#[derive(Debug)]
+pub enum GiveItem {
+    Definition(String),
+    SelfItem,
+}
+
+#[derive(Debug)]
 pub enum SelfAction {
     AddTag(String),
     RemoveTag(String),
@@ -248,8 +261,6 @@ pub enum SelfAction {
     },
     ClearItems,
     Remove,
-    Consume,
-    ReturnToOwner,
 }
 
 #[derive(Debug)]
