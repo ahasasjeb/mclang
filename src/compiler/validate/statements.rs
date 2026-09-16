@@ -11,8 +11,8 @@ use std::collections::HashSet;
 
 use crate::ast::{
     AssignOp, CallTarget, Condition, DataSlotKind, EffectDuration, EntityQueryDecl, Expr, GiveItem,
-    GiveTarget, MessageTarget, ReturnKind, ScoreHolder, ScoreTarget, SelfAction, Span, Statement,
-    StatementKind, XpOperation,
+    GiveTarget, Holder, MessageTarget, ReturnKind, ScoreTarget, SelfAction, Span, Statement,
+    StatementKind, TeleportDestination, XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
@@ -112,6 +112,7 @@ pub(super) fn collect_local_declarations<'a>(
             | StatementKind::Assign { .. }
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
+            | StatementKind::Teleport { .. }
             | StatementKind::Return(_) => {}
         }
     }
@@ -271,6 +272,12 @@ fn validate_statement<'a>(
         }
         StatementKind::ScoreReset { target } => {
             validate_score_target(target, statement.span, ctx, diagnostics);
+        }
+        StatementKind::Teleport {
+            targets,
+            destination,
+        } => {
+            validate_teleport(targets, destination, statement.span, ctx, diagnostics);
         }
         StatementKind::Let { name, value, .. } => {
             validate_let(name, value, locals, ctx, diagnostics);
@@ -536,27 +543,70 @@ pub(super) fn validate_score_target(
             target.objective_span,
         ));
     }
-    match &target.holder {
-        ScoreHolder::SelfEntity => {
+    validate_holder(&target.holder, span, ctx, diagnostics);
+}
+
+/// 持有者引用：`self`/`origin` 需要实体上下文，查询必须已声明。
+fn validate_holder(
+    holder: &Holder,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match holder {
+        Holder::SelfEntity => {
             if !ctx.context.is_entity() {
                 diagnostics.push(Diagnostic::new(
-                    "计分持有者 self/自身 需要实体执行上下文；请放入 each/spawn 块，或给函数添加 @entity",
+                    "持有者 self/自身 需要实体执行上下文；请放入 each/spawn 块，或给函数添加 @entity",
                     span,
                 ));
             }
         }
-        ScoreHolder::Origin => {
+        Holder::Origin => {
             if !ctx.context.is_entity() {
                 diagnostics.push(Diagnostic::new(
-                    "计分持有者 origin/投掷者 需要实体执行上下文",
+                    "持有者 origin/投掷者 需要实体执行上下文",
                     span,
                 ));
             }
         }
-        ScoreHolder::Query(name, query_span) => {
+        Holder::Query(name, query_span) => {
             if !ctx.symbols.queries.contains_key(name.as_str()) {
                 diagnostics.push(Diagnostic::new(
                     format!("找不到实体查询 `{name}`"),
+                    *query_span,
+                ));
+            }
+        }
+    }
+}
+
+/// `teleport(持有者, 落点)`：落点是坐标或 `limit(1)` 的单个实体查询。
+fn validate_teleport(
+    targets: &Holder,
+    destination: &TeleportDestination,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    validate_holder(targets, span, ctx, diagnostics);
+    match destination {
+        TeleportDestination::Position(position) => {
+            super::world::validate_block_position(position, diagnostics);
+        }
+        TeleportDestination::Entity { query, query_span } => {
+            if !ctx.symbols.queries.contains_key(query.as_str()) {
+                diagnostics.push(Diagnostic::new(
+                    format!("找不到实体查询 `{query}`"),
+                    *query_span,
+                ));
+                return;
+            }
+            if let Some(declaration) = ctx.symbols.queries.get(query.as_str())
+                && declaration.limit != Some(1)
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("teleport 的落点需要 limit(1) 的单个实体查询 `{query}`"),
                     *query_span,
                 ));
             }

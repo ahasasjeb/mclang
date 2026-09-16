@@ -247,7 +247,7 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
 }
 
 /// 校验方块坐标的绝对分量；相对坐标与局部坐标留给运行时。
-fn validate_block_position(position: &BlockPosition, diagnostics: &mut Vec<Diagnostic>) {
+pub(super) fn validate_block_position(position: &BlockPosition, diagnostics: &mut Vec<Diagnostic>) {
     for (axis, coordinate) in [("X", &position.x), ("Y", &position.y), ("Z", &position.z)] {
         let Some(value) = coordinate.absolute_integer() else {
             continue;

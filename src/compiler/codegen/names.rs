@@ -103,6 +103,7 @@ pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut 
             | StatementKind::Assign { .. }
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
+            | StatementKind::Teleport { .. }
             | StatementKind::Return(_) => {}
         }
     }

@@ -10,7 +10,7 @@
 手写 `.mcfunction` 时，一个“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、`execute as`/`at` 上下文、函数标签、`tellraw` 的 JSON 和 `give` 的物品组件语法。Mclang 把源码分成了明确的层：
 
 - **声明层**：`namespace`、`score`、`objective`、`query`、`item`、`storage`、`data_slot`、`resource`、`fn_tag`、`fn`，编译器检查重名、类型与资源位置。
-- **语句层**：`each`、`spawn`、`give`、`self.*`、`message.*`、`effect.*`、`xp.*`、`scoreboard.*`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都是独立 AST 节点。
+- **语句层**：`each`、`spawn`、`give`、`self.*`、`message.*`、`effect.*`、`xp.*`、`scoreboard.*`、`teleport`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都是独立 AST 节点。
 - **表达式层**：整数、计分值、带返回值的函数调用与 `scoreboard.get`、`xp.query`、`stopwatch.query`、`time.query`、`gamerule.query`、`worldborder.get` 等查询表达式。
 - **逃生口**：`run` 与 `execute` 接受原生命令字符串，`--deny-raw` 可以强制项目完全停留在标准层。
 
@@ -473,8 +473,23 @@ in_dimension("<维度资源位置>") {
 
 块内语句在指定维度执行，执行上下文保持不变。生成 `execute in <维度> run function <辅助函数>`。
 
-### 原生执行子句（execute）
+### 传送（teleport）
 
+```mcl title="语法" fragment
+teleport(<持有者>, <坐标>);
+teleport(<持有者>, <单个实体查询>);
+```
+
+把持有者的实体移动到目标位置。持有者支持 `self`/`自身`（当前实体）、`origin`/`投掷者` 和实体查询（查询命中多个实体时逐个传送）；两者都要求实体执行上下文。落点写 `pos(...)` 时传送到该坐标，支持绝对、`~` 相对与 `^` 局部坐标；写成查询名称时跟随该**单个**实体（查询必须 `limit(1)`），会一并使用目标实体的位置、朝向和维度。
+
+```mcl title="示例：跨维度仓库" fragment
+each(boxes) {
+    teleport(self, pos(29999970, -60, 29999970));   // 送进主世界仓库
+    teleport(self, current_trigger);                // 从仓库取回触发物身边
+}
+```
+
+### 原生执行子句（execute）
 ```mcl title="语法" fragment
 execute "<子句>" {
     ...
@@ -1283,7 +1298,7 @@ cargo run -- check examples/multi_counter --deny-raw
 | `give_reward.mcl` | 查询标签排除、类型化 `give` 与物品组件 |
 | `potion_lab.mcl` | 效果、经验、清空、秒表、函数标签与小数调度 |
 | `world_ops.mcl` | 方块、生物群系、复制、放置、区块加载、时间、天气、规则与边界 |
-| `portable_chest/` | 多文件项目、用户计分板、数据槽、`self.item` 与按玩家绑定的箱子 |
+| `portable_chest/` | 多文件项目、用户计分板、`teleport` 仓库、屏障盒与按玩家绑定的箱子 |
 | `multi_counter/` | 多文件项目、带返回值函数、资源 predicate 与调度心跳 |
 
 ## 附录 A：语言关键词总表 {#appendix-keywords}

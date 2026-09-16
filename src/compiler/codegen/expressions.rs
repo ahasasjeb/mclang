@@ -1,6 +1,6 @@
 //! 表达式与条件下降：产生计分板操作，并管理表达式临时值。
 
-use crate::ast::{BinaryOp, Comparison, Condition, Expr, ExprKind, ScoreHolder};
+use crate::ast::{BinaryOp, Comparison, Condition, Expr, ExprKind, Holder};
 
 use super::Compiler;
 use super::Value;
@@ -64,9 +64,9 @@ impl Compiler<'_> {
                     self.objective
                 ));
                 let prefix = match &target.holder {
-                    ScoreHolder::SelfEntity => "execute ".to_owned(),
-                    ScoreHolder::Origin => "execute on origin ".to_owned(),
-                    ScoreHolder::Query(name, _) => {
+                    Holder::SelfEntity => "execute ".to_owned(),
+                    Holder::Origin => "execute on origin ".to_owned(),
+                    Holder::Query(name, _) => {
                         let query = self
                             .program
                             .queries

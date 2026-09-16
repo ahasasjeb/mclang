@@ -10,16 +10,20 @@
     }
 }
 
-// 已经放出的箱子矿车；每个箱子用 box_key 计分记录属于哪个玩家。
-查询 boxes = 实体("minecraft:chest_minecart") {
+// 已经放出、留在玩家身边的矿车。
+查询 deployed_boxes = 实体("minecraft:chest_minecart") {
     标签("pc_box");
+    排除标签("pc_stowed");
 }
 
-// 当前正在处理的触发物。逐个处理，同一刻不会有两个。
+// 停在世界边界仓库里的矿车。物品一直留在车里，不经过任何数据搬运。
+查询 stowed_boxes = 实体("minecraft:chest_minecart") {
+    标签("pc_box");
+    标签("pc_stowed");
+}
+
+// 当前正在处理的触发物；从仓库取回矿车时作为传送落点。
 查询 current_trigger = 实体("minecraft:item") {
     标签("pc_current");
     上限(1);
 }
-
-// 箱内物品在「收起」时寄存在触发物自带的 custom_data 里，因此每位玩家各自随身携带。
-数据槽 stash = 物品数据("pc_items");

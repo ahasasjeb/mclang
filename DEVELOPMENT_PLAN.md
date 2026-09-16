@@ -63,7 +63,7 @@
 | `experience`（`xp`） | add/set/query（points/levels） | 完成 | `xp.add`/`xp.set`；`xp.query` 作为表达式，要求 `limit(1)` 玩家查询 |
 | `clear` | `[targets] [item] [maxCount]` | 完成 | `clear(玩家查询[, 物品][, 数量])`，数量上限 2147483647 |
 | `damage` | `<target> <amount> [damage_type] [at <pos>\|by <entity> [from <cause>]]` | 缺失 | — |
-| `teleport`（`tp`） | 坐标/实体/朝向 | 缺失 | — |
+| `teleport`（`tp`） | 坐标/实体/朝向 | 部分 | `teleport(持有者, pos(...))` 与 `teleport(持有者, 单个实体查询)`；缺朝向与 `facing`/旋转参数 |
 | `ride` | mount/dismount | 缺失 | — |
 | `rotate` | rotation/facing | 缺失 | — |
 | `spreadplayers` | 中心/间距/范围 + `under` | 缺失 | — |
@@ -190,7 +190,8 @@
 - [x] `data_slot` 声明：`item_data`（物品堆 `minecraft:custom_data`）与 `entity_data`（26.3 实体通用 `data` 字段）两种来源，编译期校验键与实体类型（物品槽必须配 `minecraft:item`，实体槽拒绝玩家）。
 - [x] `self.deposit/withdraw/remove_data`：容器 `Items` 与数据槽之间搬运；`deposit` 追加且空容器静默跳过，`withdraw` 成功后删除来源槽。
 - [x] `self.set_no_gravity` 与 `self.remove_preserving_items(slot, query)`：带成功校验的容器安全移除（追加成功才清空、容器为空才 `kill`），并补齐 `NoGravity` 实体开关。
-- [x] `examples/portable_chest`：中文关键字重写为多玩家版本，每人分配独立编号、矿车按实体计分归属、物品寄存在触发绿宝石里，通过 `--deny-raw` 与双语翻译自检。
+- [x] `teleport(持有者, pos(...) | 单个实体查询)`：`tp @s <坐标>`（支持绝对、`~` 相对）与 `tp @s <实体>`；持有者支持 `self`/`自身`、`origin`/`投掷者` 与查询，落点坐标走世界范围校验。
+- [x] `examples/portable_chest` 改为「仓库」架构：全中文关键字、每人独立编号、矿车按实体计分归属；收起时不销毁也不搬数据，而是把矿车传送到世界边缘的 forceload 屏障盒里，放出时传送回玩家身边，物品始终留在矿车中；通过 `--deny-raw` 与双语翻译自检。
 
 世界与方块（本次批次）：
 

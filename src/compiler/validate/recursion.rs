@@ -119,7 +119,8 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::Schedule { .. }
             | StatementKind::ScheduleClear { .. }
             | StatementKind::ScoreSet { .. }
-            | StatementKind::ScoreReset { .. } => {}
+            | StatementKind::ScoreReset { .. }
+            | StatementKind::Teleport { .. } => {}
         }
     }
 }

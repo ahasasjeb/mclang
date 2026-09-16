@@ -5,14 +5,15 @@
 //! [`super::statements`]。
 
 use crate::ast::{
-    DataSlotDecl, DataSlotKind, EffectDuration, Expr, GiveItem, GiveTarget, ScoreHolder,
-    ScoreTarget, SelfAction, XpKind, XpOperation,
+    DataSlotDecl, DataSlotKind, EffectDuration, Expr, GiveItem, GiveTarget, Holder, ScoreTarget,
+    SelfAction, TeleportDestination, XpKind, XpOperation,
 };
 
 use super::Compiler;
 use super::Value;
 use super::emit::{entity_query_clause, entity_query_selector, item_stack_argument};
 use super::names::user_objective_name;
+use super::world;
 
 impl Compiler<'_> {
     pub(super) fn compile_give(
@@ -252,12 +253,27 @@ impl Compiler<'_> {
         commands.push(format!("{prefix}scoreboard players reset @s {objective}"));
     }
 
+    /// `teleport(持有者, 坐标或实体查询)`：`tp @s` 到坐标或单个实体。
+    pub(super) fn compile_teleport(
+        &self,
+        targets: &Holder,
+        destination: &TeleportDestination,
+        commands: &mut Vec<String>,
+    ) {
+        let prefix = self.score_holder_prefix(targets);
+        let destination = match destination {
+            TeleportDestination::Position(position) => world::position_text(position),
+            TeleportDestination::Entity { query, .. } => entity_query_selector(self.query(query)),
+        };
+        commands.push(format!("{prefix}tp @s {destination}"));
+    }
+
     /// 计分操作的上下文前缀：`@s` 是当前实体、投掷者还是查询命中的实体。
-    pub(super) fn score_holder_prefix(&self, holder: &ScoreHolder) -> String {
+    pub(super) fn score_holder_prefix(&self, holder: &Holder) -> String {
         match holder {
-            ScoreHolder::SelfEntity => String::new(),
-            ScoreHolder::Origin => "execute on origin run ".to_owned(),
-            ScoreHolder::Query(name, _) => {
+            Holder::SelfEntity => String::new(),
+            Holder::Origin => "execute on origin run ".to_owned(),
+            Holder::Query(name, _) => {
                 format!("execute {} run ", entity_query_clause(self.query(name)))
             }
         }

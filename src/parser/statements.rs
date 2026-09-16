@@ -131,6 +131,8 @@ impl Parser {
             self.stopwatch_statement()?
         } else if self.take_word("scoreboard").is_some() {
             self.scoreboard_statement()?
+        } else if self.take_word("teleport").is_some() {
+            self.teleport_statement()?
         } else if self.take_word("set_block").is_some() {
             self.set_block_statement()?
         } else if self.take_word("fill_biome").is_some() {
@@ -652,16 +654,37 @@ impl Parser {
         }
     }
 
+    /// `teleport(持有者, 坐标或实体查询);`
+    ///
+    /// 落点写成 `pos(...)` 时传送到该坐标；写成查询名称时跟随该单个实体的位置与朝向。
+    fn teleport_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "teleport 后需要 `(`")?;
+        let targets = self.score_holder()?;
+        self.expect(TokenKind::Comma, "teleport 目标后需要 `,`")?;
+        let destination = if self.check_word("pos") {
+            TeleportDestination::Position(self.block_position("传送坐标")?)
+        } else {
+            let (query, query_span) = self.ident("实体查询名称")?;
+            TeleportDestination::Entity { query, query_span }
+        };
+        self.expect(TokenKind::RightParen, "teleport 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "teleport 调用后需要 `;`")?;
+        Ok(StatementKind::Teleport {
+            targets,
+            destination,
+        })
+    }
+
     /// 读取计分持有者：`self`/`自身`、`origin`/`投掷者` 或实体查询名称。
-    pub(super) fn score_holder(&mut self) -> Result<ScoreHolder, Diagnostic> {
+    pub(super) fn score_holder(&mut self) -> Result<Holder, Diagnostic> {
         if self.take_word("self").is_some() {
-            return Ok(ScoreHolder::SelfEntity);
+            return Ok(Holder::SelfEntity);
         }
         if self.take_word("origin").is_some() {
-            return Ok(ScoreHolder::Origin);
+            return Ok(Holder::Origin);
         }
         let (name, span) = self.ident("计分持有者 self/自身、origin/投掷者 或实体查询名称")?;
-        Ok(ScoreHolder::Query(name, span))
+        Ok(Holder::Query(name, span))
     }
 
     /// 读取计分目标的 `(持有者, 目标)` 部分，右括号留给调用方。

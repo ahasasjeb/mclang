@@ -135,7 +135,7 @@
     "keywords": {
       "patterns": [
         {
-          "match": "\\b(namespace|命名空间|score|计分|objective|目标|scoreboard|计分板|query|查询|item_stack|物品堆|item_list|物品列表|item_data|物品数据|entity_data|实体数据|data_slot|数据槽|item|物品|storage|存储|resource|资源|predicate|谓词|fn_tag|函数标签|fn|函数|let|令|pos|坐标|column|列坐标|block_state|方块状态)\\b",
+          "match": "\\b(namespace|命名空间|score|计分|objective|目标|scoreboard|计分板|query|查询|item_stack|物品堆|item_list|物品列表|item_data|物品数据|entity_data|实体数据|data_slot|数据槽|item|物品|storage|存储|resource|资源|predicate|谓词|fn_tag|函数标签|fn|函数|let|令|pos|坐标|column|列坐标|block_state|方块状态|teleport|传送)\\b",
           "name": "storage.type.mclang"
         },
         {
@@ -143,7 +143,7 @@
           "name": "keyword.control.mclang"
         },
         {
-          "match": "\\b(entity|实体|self|自身|message|消息|sound|声音|effect|效果|xp|经验|clear|清除|stopwatch|秒表|spawn|召唤|give|给予|origin|投掷者|in_dimension|在维度|contents|内容|execute|原生执行|forceload|强制加载|time|时间|weather|天气|gamerule|游戏规则|worldborder|世界边界|locate|定位)\\b",
+          "match": "\\b(entity|实体|self|自身|message|消息|sound|声音|effect|效果|xp|经验|clear|清除|stopwatch|秒表|spawn|召唤|give|给予|origin|投掷者|in_dimension|在维度|contents|内容|execute|原生执行|forceload|强制加载|time|时间|weather|天气|gamerule|游戏规则|worldborder|世界边界|locate|定位|teleport|传送)\\b",
           "name": "support.function.mclang"
         }
       ]

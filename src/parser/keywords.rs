@@ -235,6 +235,10 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "定位",
     },
     Keyword {
+        english: "teleport",
+        chinese: "传送",
+    },
+    Keyword {
         english: "pos",
         chinese: "坐标",
     },

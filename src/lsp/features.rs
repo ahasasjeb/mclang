@@ -138,6 +138,10 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "定位结构、生物群系或兴趣点：`locate.structure/biome/poi(...)`。",
     ),
     (
+        "teleport",
+        "传送实体：`teleport(持有者, pos(...))` 或 `teleport(持有者, 单个实体查询)`。",
+    ),
+    (
         "pos",
         "方块坐标构造器：`pos(x, y, z)`，支持 `~` 相对与 `^` 局部坐标。",
     ),

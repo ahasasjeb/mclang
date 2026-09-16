@@ -134,6 +134,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::Assign { .. }
             | ast::StatementKind::ScoreSet { .. }
             | ast::StatementKind::ScoreReset { .. }
+            | ast::StatementKind::Teleport { .. }
             | ast::StatementKind::Return(_) => 0,
         })
         .sum()

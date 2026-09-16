@@ -211,6 +211,12 @@ impl Compiler<'_> {
             StatementKind::ScoreReset { target } => {
                 self.compile_score_reset(target, commands);
             }
+            StatementKind::Teleport {
+                targets,
+                destination,
+            } => {
+                self.compile_teleport(targets, destination, commands);
+            }
             StatementKind::Let { name, value, .. } => {
                 self.compile_assignment(name, AssignOp::Set, value, owner, commands);
             }

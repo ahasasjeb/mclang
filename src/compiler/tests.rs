@@ -1710,7 +1710,7 @@ fn rejects_invalid_objective_scoreboard_and_data_slot_usage() {
     assert!(
         messages
             .iter()
-            .any(|message| message.contains("计分持有者 self/自身 需要实体执行上下文")),
+            .any(|message| message.contains("持有者 self/自身 需要实体执行上下文")),
         "{messages:#?}"
     );
 
@@ -1797,6 +1797,81 @@ fn safe_slot_removal_moves_items_before_killing_the_container() {
 }
 
 #[test]
+fn lowers_teleport_targets_positions_and_entities() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            query boxes = entity("minecraft:chest_minecart") { tag("box"); }
+            query current = entity("minecraft:item") { tag("current"); limit(1); }
+            fn open() {
+                each(boxes) {
+                    teleport(self, pos(100, 64, -20));
+                    teleport(current, pos(~, ~1, ~2));
+                }
+            }
+            fn recall() {
+                each(boxes) {
+                    teleport(self, current);
+                }
+            }
+            @entity fn send_home() {
+                teleport(origin, pos(0, 64, 0));
+            }
+            "##,
+    );
+    let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
+    assert!(
+        generated.contains("tp @s 100 64 -20"),
+        "missing absolute teleport:\n{generated}"
+    );
+    assert!(
+        generated.contains(
+            "execute as @e[type=minecraft:item,tag=current,limit=1] at @s run tp @s ~ ~1 ~2"
+        ),
+        "missing relative teleport:\n{generated}"
+    );
+    assert!(
+        generated.contains("tp @s @e[type=minecraft:item,tag=current,limit=1]"),
+        "missing entity destination:\n{generated}"
+    );
+    assert!(
+        generated.contains("execute on origin run tp @s 0 64 0"),
+        "missing origin teleport:\n{generated}"
+    );
+
+    let invalid = parse(
+        lex(
+            r##"
+                namespace demo;
+                query boxes = entity("minecraft:chest_minecart") { tag("box"); }
+                query many = entity("minecraft:item") {}
+                fn broken() { teleport(origin, many); teleport(boxes, pos(40000000, 0, 0)); }
+                "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&invalid, "test").unwrap_err();
+    let messages = errors
+        .iter()
+        .map(|error| error.message.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("teleport 的落点需要 limit(1)")),
+        "{messages:#?}"
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("超出世界范围")),
+        "{messages:#?}"
+    );
+}
+
+#[test]
 fn objectives_and_data_slots_are_keyword_symmetric() {
     let english = compile_text(
         r##"
@@ -1813,6 +1888,8 @@ fn objectives_and_data_slots_are_keyword_symmetric() {
                 self.remove_data(stash);
                 self.set_no_gravity(true);
                 self.remove_preserving_items(stash, current);
+                teleport(self, pos(29999970, -60, 29999970));
+                teleport(self, current);
                 scoreboard.set(self, box_key, next_key);
                 scoreboard.reset(current, box_key);
                 let key = scoreboard.get(self, box_key);
@@ -1835,6 +1912,8 @@ fn objectives_and_data_slots_are_keyword_symmetric() {
                 自身.移除数据(stash);
                 自身.设置无视重力(真);
                 自身.保存并移除(stash, current);
+                传送(自身, 坐标(29999970, -60, 29999970));
+                传送(自身, current);
                 计分板.设置(自身, box_key, next_key);
                 计分板.重置(current, box_key);
                 令 key = 计分板.取(自身, box_key);

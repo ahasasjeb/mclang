@@ -455,6 +455,11 @@ pub enum StatementKind {
     ScoreReset {
         target: ScoreTarget,
     },
+    /// `teleport(持有者, 坐标或实体查询);`：把实体移动到目标位置。
+    Teleport {
+        targets: Holder,
+        destination: TeleportDestination,
+    },
     If {
         condition: Condition,
         then_body: Vec<Statement>,
@@ -727,9 +732,11 @@ pub enum GiveTarget {
     Origin,
 }
 
-/// 计分持有者：当前实体、投掷者（`origin`）或实体查询。
+/// 持有者引用：当前实体、投掷者（`origin`）或实体查询。
+///
+/// 计分读写与传送目标共用这套引用；中文分别是 `自身`、`投掷者` 和查询名称。
 #[derive(Debug)]
-pub enum ScoreHolder {
+pub enum Holder {
     SelfEntity,
     Origin,
     Query(String, Span),
@@ -738,9 +745,16 @@ pub enum ScoreHolder {
 /// 「持有者 + 用户计分板目标」的组合，供计分读写使用。
 #[derive(Debug)]
 pub struct ScoreTarget {
-    pub holder: ScoreHolder,
+    pub holder: Holder,
     pub objective: String,
     pub objective_span: Span,
+}
+
+/// `teleport` 的落点：绝对/相对坐标，或一个单个实体（跟随它的位置与朝向）。
+#[derive(Debug)]
+pub enum TeleportDestination {
+    Position(BlockPosition),
+    Entity { query: String, query_span: Span },
 }
 
 #[derive(Debug)]
