@@ -10,8 +10,9 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    AssignOp, CallTarget, Condition, EffectDuration, EntityQueryDecl, Expr, GiveItem, GiveTarget,
-    MessageTarget, ReturnKind, SelfAction, Span, Statement, StatementKind, XpOperation,
+    AssignOp, CallTarget, Condition, DataSlotKind, EffectDuration, EntityQueryDecl, Expr, GiveItem,
+    GiveTarget, MessageTarget, ReturnKind, ScoreHolder, ScoreTarget, SelfAction, Span, Statement,
+    StatementKind, XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
@@ -109,6 +110,8 @@ pub(super) fn collect_local_declarations<'a>(
             | StatementKind::Schedule { .. }
             | StatementKind::ScheduleClear { .. }
             | StatementKind::Assign { .. }
+            | StatementKind::ScoreSet { .. }
+            | StatementKind::ScoreReset { .. }
             | StatementKind::Return(_) => {}
         }
     }
@@ -262,6 +265,13 @@ fn validate_statement<'a>(
                 diagnostics,
             );
         }
+        StatementKind::ScoreSet { target, value } => {
+            validate_score_target(target, statement.span, ctx, diagnostics);
+            validate_expr(value, locals, ctx, diagnostics);
+        }
+        StatementKind::ScoreReset { target } => {
+            validate_score_target(target, statement.span, ctx, diagnostics);
+        }
         StatementKind::Let { name, value, .. } => {
             validate_let(name, value, locals, ctx, diagnostics);
         }
@@ -360,11 +370,16 @@ fn validate_self_action(
         SelfAction::AddTag(_) => "add_tag",
         SelfAction::RemoveTag(_) => "remove_tag",
         SelfAction::SetInvulnerable(_) => "set_invulnerable",
+        SelfAction::SetNoGravity(_) => "set_no_gravity",
         SelfAction::SaveItems(_) => "save_items",
         SelfAction::RestoreItems(_) => "restore_items",
         SelfAction::RemovePreservingItems(_) => "remove_preserving_items",
+        SelfAction::RemovePreservingSlot { .. } => "remove_preserving_items",
         SelfAction::GiveItem { .. } => "give_item",
         SelfAction::ClearItems => "clear_items",
+        SelfAction::DataStore { .. } => "deposit",
+        SelfAction::DataLoad { .. } => "withdraw",
+        SelfAction::DataClear { .. } => "remove_data",
         SelfAction::Remove => "remove",
     };
     let (required, message) = match action {
@@ -375,10 +390,15 @@ fn validate_self_action(
             ),
         ),
         SelfAction::SetInvulnerable(_)
+        | SelfAction::SetNoGravity(_)
         | SelfAction::SaveItems(_)
         | SelfAction::RestoreItems(_)
         | SelfAction::RemovePreservingItems(_)
-        | SelfAction::ClearItems => (
+        | SelfAction::RemovePreservingSlot { .. }
+        | SelfAction::ClearItems
+        | SelfAction::DataStore { .. }
+        | SelfAction::DataLoad { .. }
+        | SelfAction::DataClear { .. } => (
             ExecutionContext::Mob,
             format!(
                 "self.{method} 通过 data 命令修改实体 NBT，Minecraft 不允许修改玩家数据；只能在确定不是玩家的实体上下文中使用（非玩家查询的 each、非玩家 spawn，或 @non_player 函数）"
@@ -405,6 +425,30 @@ fn validate_self_action(
                 diagnostics.push(Diagnostic::new(format!("找不到物品存储 `{storage}`"), span));
             }
         }
+        SelfAction::DataStore {
+            slot,
+            slot_span,
+            query,
+            query_span,
+        }
+        | SelfAction::DataLoad {
+            slot,
+            slot_span,
+            query,
+            query_span,
+        }
+        | SelfAction::RemovePreservingSlot {
+            slot,
+            slot_span,
+            query,
+            query_span,
+        } => {
+            validate_data_slot(slot, *slot_span, ctx, diagnostics);
+            validate_data_slot_query(slot, *slot_span, query, *query_span, ctx, diagnostics);
+        }
+        SelfAction::DataClear { slot, slot_span } => {
+            validate_data_slot(slot, *slot_span, ctx, diagnostics);
+        }
         SelfAction::GiveItem {
             item,
             count,
@@ -415,7 +459,108 @@ fn validate_self_action(
                 validate_give_count(declaration, *count, span, *count_span, diagnostics);
             }
         },
-        SelfAction::SetInvulnerable(_) | SelfAction::ClearItems | SelfAction::Remove => {}
+        SelfAction::SetInvulnerable(_)
+        | SelfAction::SetNoGravity(_)
+        | SelfAction::ClearItems
+        | SelfAction::Remove => {}
+    }
+}
+
+/// 数据槽引用必须已声明。
+fn validate_data_slot(
+    name: &str,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if !ctx.symbols.data_slots.contains_key(name) {
+        diagnostics.push(Diagnostic::new(format!("找不到数据槽 `{name}`"), span));
+    }
+}
+
+/// `deposit`/`withdraw` 的另一侧查询：必须唯一，且实体类型与数据槽种类相容。
+fn validate_data_slot_query(
+    slot: &str,
+    slot_span: Span,
+    query: &str,
+    query_span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(declaration) = ctx.symbols.data_slots.get(slot) else {
+        return;
+    };
+    let Some(target) = ctx.symbols.queries.get(query) else {
+        diagnostics.push(Diagnostic::new(
+            format!("找不到实体查询 `{query}`"),
+            query_span,
+        ));
+        return;
+    };
+    if target.limit != Some(1) {
+        diagnostics.push(Diagnostic::new(
+            format!("数据槽操作需要 limit(1) 的单个实体查询 `{query}`"),
+            query_span,
+        ));
+    }
+    match declaration.kind {
+        DataSlotKind::ItemData if target.entity_type != "minecraft:item" => {
+            diagnostics.push(Diagnostic::new(
+                format!(
+                    "物品数据槽 `{slot}` 只能配合 minecraft:item 查询使用；`{query}` 匹配 {}",
+                    target.entity_type
+                ),
+                query_span.merge(slot_span),
+            ));
+        }
+        DataSlotKind::EntityData if target.entity_type == "minecraft:player" => {
+            diagnostics.push(Diagnostic::new(
+                format!("实体数据槽 `{slot}` 不能指向玩家：Minecraft 拒绝修改玩家 NBT"),
+                query_span.merge(slot_span),
+            ));
+        }
+        _ => {}
+    }
+}
+
+/// 计分目标的持有者与目标名都必须已声明，且持有者类型与当前上下文相容。
+pub(super) fn validate_score_target(
+    target: &ScoreTarget,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if !ctx.symbols.objectives.contains(target.objective.as_str()) {
+        diagnostics.push(Diagnostic::new(
+            format!("找不到计分板目标 `{}`", target.objective),
+            target.objective_span,
+        ));
+    }
+    match &target.holder {
+        ScoreHolder::SelfEntity => {
+            if !ctx.context.is_entity() {
+                diagnostics.push(Diagnostic::new(
+                    "计分持有者 self/自身 需要实体执行上下文；请放入 each/spawn 块，或给函数添加 @entity",
+                    span,
+                ));
+            }
+        }
+        ScoreHolder::Origin => {
+            if !ctx.context.is_entity() {
+                diagnostics.push(Diagnostic::new(
+                    "计分持有者 origin/投掷者 需要实体执行上下文",
+                    span,
+                ));
+            }
+        }
+        ScoreHolder::Query(name, query_span) => {
+            if !ctx.symbols.queries.contains_key(name.as_str()) {
+                diagnostics.push(Diagnostic::new(
+                    format!("找不到实体查询 `{name}`"),
+                    *query_span,
+                ));
+            }
+        }
     }
 }
 

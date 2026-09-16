@@ -47,21 +47,27 @@ impl Parser {
         self.expect(TokenKind::Semicolon, "命名空间声明后需要 `;`")?;
 
         let mut scores = Vec::new();
+        let mut objectives = Vec::new();
         let mut queries = Vec::new();
         let mut item_stacks = Vec::new();
         let mut storages = Vec::new();
+        let mut data_slots = Vec::new();
         let mut resources = Vec::new();
         let mut function_tags = Vec::new();
         let mut functions = Vec::new();
         while !self.check(&TokenKind::Eof) {
             if self.check_word("score") {
                 scores.push(self.score()?);
+            } else if self.check_word("objective") {
+                objectives.push(self.objective()?);
             } else if self.check_word("query") {
                 queries.push(self.query()?);
             } else if self.check_word("item") {
                 item_stacks.push(self.item_stack()?);
             } else if self.check_word("storage") {
                 storages.push(self.storage()?);
+            } else if self.check_word("data_slot") {
+                data_slots.push(self.data_slot()?);
             } else if self.check_word("resource") {
                 resources.push(self.resource()?);
             } else if self.check_word("fn_tag") {
@@ -74,9 +80,11 @@ impl Parser {
             namespace,
             namespace_span,
             scores,
+            objectives,
             queries,
             item_stacks,
             storages,
+            data_slots,
             resources,
             function_tags,
             functions,

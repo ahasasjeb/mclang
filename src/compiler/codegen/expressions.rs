@@ -1,10 +1,11 @@
 //! 表达式与条件下降：产生计分板操作，并管理表达式临时值。
 
-use crate::ast::{BinaryOp, Comparison, Condition, Expr, ExprKind};
+use crate::ast::{BinaryOp, Comparison, Condition, Expr, ExprKind, ScoreHolder};
 
 use super::Compiler;
 use super::Value;
 use super::emit::entity_query_clause;
+use super::names::user_objective_name;
 use crate::compiler::constant::constant_value;
 
 impl Compiler<'_> {
@@ -50,6 +51,34 @@ impl Compiler<'_> {
                     entity_query_clause(query),
                     self.objective,
                     kind.as_str()
+                ));
+                Value::Score(result)
+            }
+            ExprKind::ScoreQuery { target } => {
+                let objective = user_objective_name(&self.program.namespace, &target.objective);
+                let result = self.temporary();
+                // 持有者不存在（没有投掷者或查询无匹配）时原版不会触发 store 回调，
+                // 先置 0 保证读到的是「未赋值」而不是上一次调用留下的值。
+                commands.push(format!(
+                    "scoreboard players set {result} {} 0",
+                    self.objective
+                ));
+                let prefix = match &target.holder {
+                    ScoreHolder::SelfEntity => "execute ".to_owned(),
+                    ScoreHolder::Origin => "execute on origin ".to_owned(),
+                    ScoreHolder::Query(name, _) => {
+                        let query = self
+                            .program
+                            .queries
+                            .iter()
+                            .find(|candidate| candidate.name == *name)
+                            .expect("semantic validation guarantees the entity query exists");
+                        format!("execute {} ", entity_query_clause(query))
+                    }
+                };
+                commands.push(format!(
+                    "{prefix}store result score {result} {} run scoreboard players get @s {objective}",
+                    self.objective
                 ));
                 Value::Score(result)
             }

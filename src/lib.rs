@@ -30,9 +30,11 @@ pub struct BuildResult {
 pub struct CheckSummary {
     pub functions: usize,
     pub scores: usize,
+    pub objectives: usize,
     pub queries: usize,
     pub item_stacks: usize,
     pub storages: usize,
+    pub data_slots: usize,
     pub resources: usize,
     pub function_tags: usize,
     pub raw_statements: usize,
@@ -46,9 +48,11 @@ pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
     Ok(CheckSummary {
         functions: program.functions.len(),
         scores: program.scores.len(),
+        objectives: program.objectives.len(),
         queries: program.queries.len(),
         item_stacks: program.item_stacks.len(),
         storages: program.storages.len(),
+        data_slots: program.data_slots.len(),
         resources: program.resources.len(),
         function_tags: program.function_tags.len(),
         raw_statements: raw_statement_count(&program.functions),
@@ -128,6 +132,8 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::Schedule { .. }
             | ast::StatementKind::ScheduleClear { .. }
             | ast::StatementKind::Assign { .. }
+            | ast::StatementKind::ScoreSet { .. }
+            | ast::StatementKind::ScoreReset { .. }
             | ast::StatementKind::Return(_) => 0,
         })
         .sum()

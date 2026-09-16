@@ -35,9 +35,11 @@ pub struct FileDiagnostic {
 pub enum SymbolKind {
     Function,
     Score,
+    Objective,
     Query,
     ItemStack,
     Storage,
+    DataSlot,
     Resource,
     FunctionTag,
     Parameter,
@@ -49,9 +51,11 @@ impl SymbolKind {
         match self {
             Self::Function => "函数",
             Self::Score => "计分变量",
+            Self::Objective => "计分板目标",
             Self::Query => "实体查询",
             Self::ItemStack => "物品定义",
             Self::Storage => "物品存储",
+            Self::DataSlot => "数据槽",
             Self::Resource => "JSON 资源",
             Self::FunctionTag => "函数标签",
             Self::Parameter => "参数",
@@ -158,9 +162,11 @@ pub(crate) fn merge_programs(
             ));
         }
         program.scores.append(&mut other.scores);
+        program.objectives.append(&mut other.objectives);
         program.queries.append(&mut other.queries);
         program.item_stacks.append(&mut other.item_stacks);
         program.storages.append(&mut other.storages);
+        program.data_slots.append(&mut other.data_slots);
         program.resources.append(&mut other.resources);
         program.function_tags.append(&mut other.function_tags);
         program.functions.append(&mut other.functions);
@@ -187,6 +193,16 @@ fn collect_symbols(sources: &[SourceFile], programs: &[(usize, ast::Program)]) -
                 name_span: score.name_span,
                 scope: None,
                 detail: format!("score {} = {}", score.name, score.initial),
+            });
+        }
+        for objective in &program.objectives {
+            symbols.push(Symbol {
+                name: objective.name.clone(),
+                kind: SymbolKind::Objective,
+                path: path.clone(),
+                name_span: objective.name_span,
+                scope: None,
+                detail: format!("objective {}", objective.name),
             });
         }
         for query in &program.queries {
@@ -219,6 +235,19 @@ fn collect_symbols(sources: &[SourceFile], programs: &[(usize, ast::Program)]) -
                 detail: format!(
                     "storage {} = item_list({:?}, {:?})",
                     storage.name, storage.storage_id, storage.path
+                ),
+            });
+        }
+        for slot in &program.data_slots {
+            symbols.push(Symbol {
+                name: slot.name.clone(),
+                kind: SymbolKind::DataSlot,
+                path: path.clone(),
+                name_span: slot.name_span,
+                scope: None,
+                detail: format!(
+                    "data_slot {} = {:?}(\"{}\")",
+                    slot.name, slot.kind, slot.key
                 ),
             });
         }

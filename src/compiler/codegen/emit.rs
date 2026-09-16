@@ -2,7 +2,7 @@
 
 use crate::ast::{EntityQueryDecl, ItemEnchantment, ItemStackDecl, MessageTarget};
 
-pub(super) fn entity_query_clause(query: &EntityQueryDecl) -> String {
+pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
     let mut selector = vec![format!("type={}", query.entity_type)];
     selector.extend(query.tags.iter().map(|tag| format!("tag={tag}")));
     selector.extend(query.excluded_tags.iter().map(|tag| format!("tag=!{tag}")));
@@ -15,8 +15,11 @@ pub(super) fn entity_query_clause(query: &EntityQueryDecl) -> String {
     if let Some(within) = query.within {
         selector.push(format!("distance=..{within}"));
     }
+    format!("@e[{}]", selector.join(","))
+}
 
-    let mut clause = format!("as @e[{}] at @s", selector.join(","));
+pub(super) fn entity_query_clause(query: &EntityQueryDecl) -> String {
+    let mut clause = format!("as {} at @s", entity_query_selector(query));
     if let Some(item) = &query.item {
         let mut components = Vec::new();
         if let Some(custom_name) = &item.custom_name {

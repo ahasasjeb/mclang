@@ -1,54 +1,73 @@
-namespace portable_chest;
+命名空间 portable_chest;
 
-// 0 表示矿车已收起，1 表示矿车已召唤。计分值会随世界保存。
-score active = 0;
+// 下一个待分配的箱子编号。编号只增不减，保证每位玩家拿到唯一编号。
+计分 next_key = 0;
 
-@load
-fn load() {
-    message.all("便携箱子已加载：丢出单个命名为 A 的绿宝石即可切换。", green);
+// 每位玩家的箱子编号；0 表示尚未分配。
+目标 box_key;
+
+// 每位玩家是否已经放出箱子：0 表示收起，1 表示放出。
+目标 box_active;
+
+@加载
+函数 load() {
+    消息.全部("便携箱子已加载：丢出单个命名为 A 的绿宝石即可切换。", 绿色);
 }
 
-// 矿车初始化只操作实体 NBT，因此声明为非玩家实体上下文。
-@non_player
-fn prepare_box() {
-    self.add_tag("portable_chest_box");
-    self.set_invulnerable(true);
-    self.restore_items(saved_items);
+// 箱子初始化只操作实体 NBT，因此声明为非玩家实体上下文。
+// 无视重力让矿车停在召唤位置，不会下落或顺坡滑动；无敌防止外部伤害摧毁它。
+@非玩家
+函数 prepare_box() {
+    自身.添加标签("pc_box");
+    自身.设置无敌(true);
+    自身.设置无视重力(true);
 }
 
-@tick
-fn tick() {
-    each(trigger_items) {
-        // 先标记触发物，避免同一个掉落物每刻重复切换。
-        self.add_tag("portable_chest_processed");
+@每刻
+函数 tick() {
+    遍历(trigger_items) {
+        // 先标记触发物，避免同一个掉落物每刻重复切换；
+        // pc_current 让箱子块里的语句能找到这枚绿宝石。
+        自身.添加标签("pc_processed");
+        自身.添加标签("pc_current");
 
-        // 两个分支最后都把触发用的绿宝石原样交还投掷者。
-        if active == 0 {
-            spawn("minecraft:chest_minecart") {
-                prepare_box();
-            }
-            active = 1;
-            message.nearest(16, "便携箱子已放出。", green);
-            give(origin, self.item);
-        } else {
-            in_dimension("minecraft:overworld") {
-                each(chest_boxes) {
-                    self.remove_preserving_items(saved_items);
-                }
-            }
-            in_dimension("minecraft:the_nether") {
-                each(chest_boxes) {
-                    self.remove_preserving_items(saved_items);
-                }
-            }
-            in_dimension("minecraft:the_end") {
-                each(chest_boxes) {
-                    self.remove_preserving_items(saved_items);
-                }
-            }
-            active = 0;
-            message.nearest(16, "便携箱子已收起，物品已保存。", gold);
-            give(origin, self.item);
+        // 首次触发时分配专属编号。发射器丢出的绿宝石没有投掷者，
+        // 读取失败会得到 0，下面的分支直接跳过。
+        如果 计分板.取(投掷者, box_key) == 0 {
+            next_key += 1;
+            计分板.设置(投掷者, box_key, next_key);
         }
+        令 key = 计分板.取(投掷者, box_key);
+
+        如果 key == 0 {
+            // 没有投掷者：不建立也不收起任何箱子。
+        } 否则 {
+            如果 计分板.取(投掷者, box_active) == 1 {
+                // 收起：只处理编号与投掷者一致的箱子。保存并移除会先把箱内物品
+                // 追加进绿宝石，确认写入成功后才清空并移除矿车，因此不会掉落物品。
+                遍历(boxes) {
+                    如果 计分板.取(自身, box_key) == key {
+                        自身.保存并移除(stash, current_trigger);
+                        计分板.重置(自身, box_key);
+                    }
+                }
+                计分板.设置(投掷者, box_active, 0);
+                消息.最近(16, "便携箱子已收起，物品已保存在绿宝石里。", 金色);
+            } 否则 {
+                // 放出：召唤属于投掷者的新箱子，并恢复绿宝石里的物品。
+                召唤("minecraft:chest_minecart") {
+                    prepare_box();
+                    计分板.设置(自身, box_key, key);
+                    自身.取出(stash, current_trigger);
+                }
+                计分板.设置(投掷者, box_active, 1);
+                消息.最近(16, "便携箱子已放出。", 绿色);
+            }
+        }
+
+        自身.移除标签("pc_current");
+
+        // 无论放出还是收起，都把触发用的绿宝石原样交还投掷者。
+        给予(投掷者, 自身.物品);
     }
 }

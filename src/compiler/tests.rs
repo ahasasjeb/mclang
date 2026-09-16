@@ -1545,3 +1545,302 @@ fn new_commands_are_keyword_symmetric() {
     );
     assert_eq!(english.files, chinese.files);
 }
+
+#[test]
+fn lowers_user_objectives_and_scoreboard_access() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            score next_key = 0;
+            objective box_key;
+            objective box_active;
+            query players = entity("minecraft:player") {}
+            query boxes = entity("minecraft:chest_minecart") { tag("box"); limit(1); }
+            fn main() {
+                each(players) {
+                    if scoreboard.get(self, box_key) == 0 {
+                        next_key += 1;
+                        scoreboard.set(self, box_key, next_key);
+                        scoreboard.set(players, box_active, 1);
+                    }
+                    let key = scoreboard.get(self, box_key);
+                    each(boxes) {
+                        if scoreboard.get(self, box_key) == key && scoreboard.get(origin, box_key) == key {
+                            scoreboard.set(origin, box_key, 1);
+                            scoreboard.reset(self, box_key);
+                        }
+                    }
+                }
+            }
+            "##,
+    );
+    let load = &pack.files[&PathBuf::from("data/demo/function/__mcl/load.mcfunction")];
+    assert!(load.contains("scoreboard objectives add demo_box_key dummy"));
+    assert!(load.contains("scoreboard objectives add demo_box_active dummy"));
+    let generated = pack.files.values().cloned().collect::<Vec<_>>().join("\n");
+    assert!(
+        generated.contains("execute store result score #t")
+            && generated.contains("run scoreboard players get @s demo_box_key"),
+        "missing score read:\n{generated}"
+    );
+    assert!(
+        generated.contains("scoreboard players operation @s demo_box_key = #v_next_key"),
+        "missing score copy:\n{generated}"
+    );
+    assert!(
+        generated.contains("execute as @e[type=minecraft:player] at @s run scoreboard players set @s demo_box_active 1"),
+        "missing player score set:\n{generated}"
+    );
+    assert!(
+        generated.contains("execute on origin run scoreboard players set @s demo_box_key 1"),
+        "missing origin score set:\n{generated}"
+    );
+    assert!(
+        generated.contains("execute store result score #t")
+            && generated.contains("run scoreboard players get @s demo_box_key"),
+        "missing score read:\n{generated}"
+    );
+    let origin_read = generated
+        .lines()
+        .find(|line| line.contains("execute on origin store result score"))
+        .unwrap_or_else(|| panic!("missing origin read:\n{generated}"));
+    let temp = origin_read
+        .split_whitespace()
+        .nth(6)
+        .expect("origin 读取行包含计分持有者");
+    assert!(
+        generated.contains(&format!("scoreboard players set {temp} mcl_")),
+        "missing origin read preset:\n{generated}"
+    );
+}
+
+#[test]
+fn lowers_data_slots_between_containers_and_items() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            query current = entity("minecraft:item") { tag("current"); limit(1); }
+            data_slot stash = item_data("pc_items");
+            data_slot note = entity_data("pc_note");
+            @non_player fn box() {
+                self.deposit(stash, current);
+                self.withdraw(stash, current);
+                self.withdraw(note, current);
+                self.remove_data(stash);
+            }
+            "##,
+    );
+    let function = &pack.files[&PathBuf::from("data/demo/function/box.mcfunction")];
+    let selector = "@e[type=minecraft:item,tag=current,limit=1]";
+    let item_path = "Item.components.\"minecraft:custom_data\".pc_items";
+    assert!(
+        function.contains(&format!(
+            "execute if data entity @s Items[0] run data modify entity {selector} {item_path} append from entity @s Items"
+        )),
+        "missing deposit:\n{function}"
+    );
+    assert!(
+        function.contains(&format!(
+            "execute if data entity {selector} {item_path} run data modify entity @s Items set from entity {selector} {item_path}"
+        )),
+        "missing withdraw load:\n{function}"
+    );
+    assert!(
+        function.contains(&format!(
+            "execute if data entity {selector} {item_path} run data remove entity {selector} {item_path}"
+        )),
+        "missing withdraw cleanup:\n{function}"
+    );
+    assert!(
+        function.contains("execute if data entity @s Item.components.\"minecraft:custom_data\".pc_items run data remove entity @s Item.components.\"minecraft:custom_data\".pc_items"),
+        "missing slot clear:\n{function}"
+    );
+    assert!(
+        function.contains(
+            "execute if data entity @e[type=minecraft:item,tag=current,limit=1] data.pc_note run data remove entity"
+        ),
+        "missing entity slot path:\n{function}"
+    );
+}
+
+#[test]
+fn rejects_invalid_objective_scoreboard_and_data_slot_usage() {
+    let program = parse(
+        lex(
+            r##"
+                namespace demo;
+                objective box_key;
+                query players = entity("minecraft:player") {}
+                query boxes = entity("minecraft:chest_minecart") { tag("box"); }
+                data_slot stash = item_data("pc_items");
+                fn broken() {
+                    scoreboard.set(self, missing, 1);
+                    let value = scoreboard.get(boxes, box_key);
+                    self.deposit(stash, boxes);
+                }
+                "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    let messages = errors
+        .iter()
+        .map(|error| error.message.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("找不到计分板目标 `missing`")),
+        "{messages:#?}"
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("scoreboard.get 需要 limit(1)")),
+        "{messages:#?}"
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("物品数据槽 `stash` 只能配合 minecraft:item")),
+        "{messages:#?}"
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("计分持有者 self/自身 需要实体执行上下文")),
+        "{messages:#?}"
+    );
+
+    let player_slot = parse(
+        lex(
+            r##"
+                namespace demo;
+                query players = entity("minecraft:player") { limit(1); }
+                data_slot note = entity_data("pc_note");
+                @player fn broken() { self.withdraw(note, players); }
+                "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&player_slot, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("实体数据槽 `note` 不能指向玩家")),
+        "{errors:#?}"
+    );
+    assert!(
+        errors.iter().any(|error| error
+            .message
+            .contains("self.withdraw 通过 data 命令修改实体 NBT")),
+        "{errors:#?}"
+    );
+
+    let bad_key = parse(
+        lex(
+            "namespace demo; data_slot broken = item_data(\"bad-key\"); fn main() {}",
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&bad_key, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("不是受支持的数据槽键")),
+        "{errors:#?}"
+    );
+}
+
+#[test]
+fn safe_slot_removal_moves_items_before_killing_the_container() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            query current = entity("minecraft:item") { tag("current"); limit(1); }
+            data_slot stash = item_data("pc_items");
+            @non_player fn box() {
+                self.set_no_gravity(true);
+                self.add_tag("box");
+                self.remove_preserving_items(stash, current);
+            }
+            storage saved = item_list("demo:state", "saved");
+            @non_player fn other() {
+                self.remove_preserving_items(saved);
+            }
+            "##,
+    );
+    let function = &pack.files[&PathBuf::from("data/demo/function/box.mcfunction")];
+    assert!(function.contains("data merge entity @s {NoGravity:1b}"));
+    assert!(
+        function.contains("execute if data entity @s Items[0] store success score #t0 mcl_"),
+        "missing guarded append:\n{function}"
+    );
+    let cleared = function
+        .find("matches 1 run data modify entity @s Items set value []")
+        .expect("存档成功后清空容器");
+    let killed = function
+        .find("execute unless data entity @s Items[0] run kill @s")
+        .expect("容器为空才移除实体");
+    assert!(cleared < killed, "清空必须发生在移除之前:\n{function}");
+
+    let other = &pack.files[&PathBuf::from("data/demo/function/other.mcfunction")];
+    assert!(other.contains("data modify storage demo:state saved set from entity @s Items"));
+    assert!(other.contains("data modify entity @s Items set value []"));
+    assert!(other.contains("kill @s"));
+}
+
+#[test]
+fn objectives_and_data_slots_are_keyword_symmetric() {
+    let english = compile_text(
+        r##"
+            namespace demo;
+            score next_key = 0;
+            objective box_key;
+            query players = entity("minecraft:player") { limit(1); }
+            query current = entity("minecraft:item") { tag("current"); limit(1); }
+            data_slot stash = item_data("pc_items");
+            data_slot note = entity_data("pc_note");
+            @non_player fn transfer() {
+                self.deposit(stash, current);
+                self.withdraw(note, current);
+                self.remove_data(stash);
+                self.set_no_gravity(true);
+                self.remove_preserving_items(stash, current);
+                scoreboard.set(self, box_key, next_key);
+                scoreboard.reset(current, box_key);
+                let key = scoreboard.get(self, box_key);
+                scoreboard.set(current, box_key, key);
+            }
+            "##,
+    );
+    let chinese = compile_text(
+        r##"
+            命名空间 demo;
+            计分 next_key = 0;
+            目标 box_key;
+            查询 players = 实体("minecraft:player") { 上限(1); }
+            查询 current = 实体("minecraft:item") { 标签("current"); 上限(1); }
+            数据槽 stash = 物品数据("pc_items");
+            数据槽 note = 实体数据("pc_note");
+            @非玩家 函数 transfer() {
+                自身.存入(stash, current);
+                自身.取出(note, current);
+                自身.移除数据(stash);
+                自身.设置无视重力(真);
+                自身.保存并移除(stash, current);
+                计分板.设置(自身, box_key, next_key);
+                计分板.重置(current, box_key);
+                令 key = 计分板.取(自身, box_key);
+                计分板.设置(current, box_key, key);
+            }
+            "##,
+    );
+    assert_eq!(english.files, chinese.files);
+}

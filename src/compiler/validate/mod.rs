@@ -31,6 +31,7 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
 
     validate_namespace(program, &mut diagnostics);
     let scores = collect_scores(program, &mut diagnostics);
+    let objectives = collect_objectives(program, &mut diagnostics);
     let function_tags = collect_function_tags(program, &mut diagnostics);
     let signatures = collect_signatures(program, &scores, &mut diagnostics);
     validate_function_tags(&function_tags, &signatures, &mut diagnostics);
@@ -38,10 +39,12 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
         queries: collect_queries(program, &mut diagnostics),
         item_stacks: collect_item_stacks(program, &mut diagnostics),
         storages: collect_storages(program, &mut diagnostics),
+        data_slots: collect_data_slots(program, &mut diagnostics),
         predicates: validate_resources(program, &mut diagnostics),
         function_tags,
         signatures,
         scores,
+        objectives,
     };
 
     validate_function_bodies(program, &declarations, &mut diagnostics);
@@ -52,9 +55,11 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
 /// 顶层声明收集出的符号表，供函数体校验共享。
 struct Declarations<'a> {
     scores: HashSet<&'a str>,
+    objectives: HashSet<&'a str>,
     queries: HashMap<&'a str, &'a EntityQueryDecl>,
     item_stacks: HashMap<&'a str, &'a ItemStackDecl>,
     storages: HashSet<&'a str>,
+    data_slots: HashMap<&'a str, &'a DataSlotDecl>,
     predicates: HashSet<&'a str>,
     function_tags: HashMap<&'a str, &'a FunctionTagDecl>,
     signatures: HashMap<&'a str, Signature>,
@@ -81,6 +86,29 @@ fn collect_scores<'a>(program: &'a Program, diagnostics: &mut Vec<Diagnostic>) -
         }
     }
     scores
+}
+
+/// 收集用户计分板目标，并检查名称与内部目标不冲突。
+fn collect_objectives<'a>(
+    program: &'a Program,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> HashSet<&'a str> {
+    let mut objectives = HashSet::new();
+    for objective in &program.objectives {
+        validate_identifier(
+            "计分板目标",
+            &objective.name,
+            objective.name_span,
+            diagnostics,
+        );
+        if !objectives.insert(objective.name.as_str()) {
+            diagnostics.push(Diagnostic::new(
+                format!("重复声明计分板目标 `{}`", objective.name),
+                objective.span,
+            ));
+        }
+    }
+    objectives
 }
 
 fn collect_queries<'a>(
@@ -148,6 +176,34 @@ fn collect_storages<'a>(
         }
     }
     storages
+}
+
+/// 校验 JSON 资源声明，并返回可作为谓词条件引用的资源名集合。
+/// 收集数据槽声明：名称唯一，键必须是受支持的 NBT 路径分段。
+fn collect_data_slots<'a>(
+    program: &'a Program,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> HashMap<&'a str, &'a DataSlotDecl> {
+    let mut data_slots = HashMap::new();
+    for slot in &program.data_slots {
+        validate_identifier("数据槽", &slot.name, slot.name_span, diagnostics);
+        if data_slots.insert(slot.name.as_str(), slot).is_some() {
+            diagnostics.push(Diagnostic::new(
+                format!("重复声明数据槽 `{}`", slot.name),
+                slot.span,
+            ));
+        }
+        if !valid_nbt_path(&slot.key) {
+            diagnostics.push(Diagnostic::new(
+                format!(
+                    "`{}` 不是受支持的数据槽键；键由点分隔，每段只允许字母、数字和下划线",
+                    slot.key
+                ),
+                slot.key_span,
+            ));
+        }
+    }
+    data_slots
 }
 
 /// 校验 JSON 资源声明，并返回可作为谓词条件引用的资源名集合。
@@ -335,11 +391,13 @@ fn validate_function_bodies(
         let mut visible_locals = HashSet::new();
         let symbols = StatementSymbols {
             scores: &declarations.scores,
+            objectives: &declarations.objectives,
             parameters: &parameters,
             functions: &declarations.signatures,
             queries: &declarations.queries,
             item_stacks: &declarations.item_stacks,
             storages: &declarations.storages,
+            data_slots: &declarations.data_slots,
             predicates: &declarations.predicates,
             function_tags: &declarations.function_tags,
         };

@@ -117,7 +117,9 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
             | StatementKind::Schedule { .. }
-            | StatementKind::ScheduleClear { .. } => {}
+            | StatementKind::ScheduleClear { .. }
+            | StatementKind::ScoreSet { .. }
+            | StatementKind::ScoreReset { .. } => {}
         }
     }
 }
@@ -155,6 +157,7 @@ fn collect_expr_calls<'a>(expression: &'a Expr, calls: &mut HashSet<&'a str>) {
         }
         ExprKind::Integer(_)
         | ExprKind::Score(_)
+        | ExprKind::ScoreQuery { .. }
         | ExprKind::XpQuery { .. }
         | ExprKind::StopwatchQuery { .. }
         | ExprKind::TimeQuery { .. }

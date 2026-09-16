@@ -205,6 +205,12 @@ impl Compiler<'_> {
                 operation,
                 value,
             } => self.compile_assignment(target, *operation, value, owner, commands),
+            StatementKind::ScoreSet { target, value } => {
+                self.compile_score_set(target, value, owner, commands);
+            }
+            StatementKind::ScoreReset { target } => {
+                self.compile_score_reset(target, commands);
+            }
             StatementKind::Let { name, value, .. } => {
                 self.compile_assignment(name, AssignOp::Set, value, owner, commands);
             }

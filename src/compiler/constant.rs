@@ -25,6 +25,7 @@ pub(super) fn constant_value(expression: &Expr) -> Option<i32> {
         }
         ExprKind::Score(_)
         | ExprKind::Call { .. }
+        | ExprKind::ScoreQuery { .. }
         | ExprKind::XpQuery { .. }
         | ExprKind::StopwatchQuery { .. }
         | ExprKind::TimeQuery { .. }

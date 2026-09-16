@@ -9,9 +9,9 @@
 
 手写 `.mcfunction` 时，一个“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、`execute as`/`at` 上下文、函数标签、`tellraw` 的 JSON 和 `give` 的物品组件语法。Mclang 把源码分成了明确的层：
 
-- **声明层**：`namespace`、`score`、`query`、`item`、`storage`、`resource`、`fn_tag`、`fn`，编译器检查重名、类型与资源位置。
-- **语句层**：`each`、`spawn`、`give`、`self.*`、`message.*`、`effect.*`、`xp.*`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都是独立 AST 节点。
-- **表达式层**：整数、计分值、带返回值的函数调用与 `xp.query`、`stopwatch.query`、`time.query`、`gamerule.query`、`worldborder.get` 等查询表达式。
+- **声明层**：`namespace`、`score`、`objective`、`query`、`item`、`storage`、`data_slot`、`resource`、`fn_tag`、`fn`，编译器检查重名、类型与资源位置。
+- **语句层**：`each`、`spawn`、`give`、`self.*`、`message.*`、`effect.*`、`xp.*`、`scoreboard.*`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都是独立 AST 节点。
+- **表达式层**：整数、计分值、带返回值的函数调用与 `scoreboard.get`、`xp.query`、`stopwatch.query`、`time.query`、`gamerule.query`、`worldborder.get` 等查询表达式。
 - **逃生口**：`run` 与 `execute` 接受原生命令字符串，`--deny-raw` 可以强制项目完全停留在标准层。
 
 :::tip 中英关键词完全等价
@@ -297,6 +297,37 @@ storage <name> = item_list("<存储资源位置>", "<NBT 路径>");
 
 ```mcl title="示例" fragment
 storage saved_items = item_list("portable_chest:state", "saved_items");
+```
+
+### 计分板目标（objective）
+
+```mcl title="语法" fragment
+objective <name>;
+```
+
+声明一个 dummy 准则的用户计分板目标，运行期名称是 `<命名空间>_<名称>`（例如 `portable_chest_box_key`）。`__mcl/load` 负责创建目标，`/reload` 不会清空已有分数。目标可以同时记录玩家与实体的分数，是「给实体打上属于谁」这类绑定的基础；读写用 `scoreboard.set/reset/get`（见[计分板](#statements-scoreboard)）。
+
+```mcl title="示例" fragment
+objective box_key;
+```
+
+### 数据槽（data_slot）
+
+```mcl title="语法" fragment
+data_slot <name> = item_data("<键>");
+data_slot <name> = entity_data("<键>");
+```
+
+数据槽是一段可读写的命名 NBT 位置，供 `self.deposit/withdraw/remove_data` 搬运容器物品：
+
+- `item_data`（中文 `物品数据`）落在物品堆的 `minecraft:custom_data` 组件里，路径是 `Item.components."minecraft:custom_data".<键>`，只能配合 `minecraft:item` 查询使用；
+- `entity_data`（中文 `实体数据`）落在 26.3 实体的通用 `data` 字段里，路径是 `data.<键>`，不能指向玩家（Minecraft 拒绝修改玩家 NBT）。
+
+键由点分隔，每段只允许字母、数字和下划线；两种数据都随世界保存。
+
+```mcl title="示例" fragment
+data_slot stash = item_data("pc_items");
+data_slot note = entity_data("pc_note");
 ```
 
 ### JSON 资源（resource）
@@ -599,6 +630,39 @@ if stopwatch.query("tour:batch", 1000) >= 10000 {
 }
 ```
 
+### 计分板（scoreboard）{#statements-scoreboard}
+
+```mcl title="语法" fragment
+scoreboard.set(<持有者>, <目标>, <值>);
+scoreboard.reset(<持有者>, <目标>);
+let <name> = scoreboard.get(<持有者>, <目标>);
+```
+
+持有者（中文 `持有者`）有三种写法：`self`/`自身`（当前实体，要求实体上下文）、`origin`/`投掷者`（当前实体的来源实体）和实体查询名称（对查询结果逐个执行；`scoreboard.get` 要求该查询是 `limit(1)` 的单个实体）。目标必须是已声明的 `objective`。
+
+`scoreboard.set` 接受任意表达式，写用户计分板；`scoreboard.reset` 删除计分项；`scoreboard.get` 是表达式，读取失败（计分项不存在）时得到 0，因此可以用 `== 0` 作为「尚未赋值」的哨兵。
+
+```mcl title="示例：按玩家记录状态" verify id=scoreboard_state
+namespace scoreboard_state;
+
+objective visits;
+
+@tick
+fn tick() {
+    each(players) {
+        if scoreboard.get(self, visits) == 0 {
+            scoreboard.set(self, visits, 1);
+            message.self("欢迎第一次触发", green);
+        } else {
+            let total = scoreboard.get(self, visits) + 1;
+            scoreboard.set(self, visits, total);
+        }
+    }
+}
+
+query players = entity("minecraft:player") {}
+```
+
 ### 给予物品（give）
 
 ```mcl title="语法" fragment
@@ -623,9 +687,14 @@ give(origin, self.item);
 self.add_tag("标签");
 self.remove_tag("标签");
 self.set_invulnerable(true | false);
+self.set_no_gravity(true | false);
 self.save_items(<存储>);
 self.restore_items(<存储>);
 self.remove_preserving_items(<存储>);
+self.remove_preserving_items(<数据槽>, <目标查询>);
+self.deposit(<数据槽>, <目标查询>);
+self.withdraw(<数据槽>, <来源查询>);
+self.remove_data(<数据槽>);
 self.give_item(<物品定义>[, <数量>]);
 self.clear_items();
 self.remove();
@@ -636,16 +705,29 @@ self.remove();
 | `self.add_tag` / `self.remove_tag` | 任意实体 | `tag @s add/remove <标签>` |
 | `self.remove` | 任意实体 | `kill @s` |
 | `self.set_invulnerable` | 非玩家实体 | `data merge entity @s {Invulnerable:1b}` |
+| `self.set_no_gravity` | 非玩家实体 | `data merge entity @s {NoGravity:1b}` |
 | `self.save_items(s)` | 非玩家实体 | `data modify storage … set from entity @s Items` |
 | `self.restore_items(s)` | 非玩家实体 | `data modify entity @s Items set from storage …` |
 | `self.remove_preserving_items(s)` | 非玩家实体 | 先存 `Items`、再清空、最后 `kill @s` |
+| `self.remove_preserving_items(slot, q)` | 非玩家实体 | 把 `Items` 追加进数据槽，**确认写入成功**后清空并移除 |
 | `self.clear_items` | 非玩家实体 | `data modify entity @s Items set value []` |
+| `self.deposit(slot, q)` | 非玩家实体 | 把 `@s.Items` **追加**进查询实体的数据槽（槽不存在时创建） |
+| `self.withdraw(slot, q)` | 非玩家实体 | 查询实体的数据槽读进 `@s.Items`，成功后删除来源槽 |
+| `self.remove_data(slot)` | 非玩家实体 | 删除 `@s` 上的数据槽 |
 | `self.give_item(item[, n])` | 玩家 | `give @s <物品> <数量>` |
+
+`deposit`/`withdraw` 的 `@s` 必须是拥有 `Items` 的容器实体（例如箱子矿车），另一侧必须是 `limit(1)` 的单个实体查询；`deposit` 追加而不会覆盖已有内容，容器为空时静默跳过；`withdraw` 成功后会删除来源槽，便于「搬运而不是复制」。
+
+`remove_preserving_items(slot, q)` 是容器实体的安全移除：追加成功才清空 `Items`，容器为空才 `kill @s`，因此不会把箱内物品掉在地上；写入失败（目标查询没有命中）时容器保持原样，便于稍后重试。
 
 ```mcl title="示例" fragment
 each(boxes) {
     self.add_tag("box");
     self.save_items(saved);
+    self.remove();
+}
+each(boxes) {
+    self.deposit(stash, trigger);
     self.remove();
 }
 ```
@@ -850,6 +932,7 @@ fn release() {
 | `<整数>` | 32 位整数常量，纯常量表达式在编译期折叠 |
 | `<计分变量>` | 全局计分变量、函数参数或局部变量 |
 | `<函数>(<实参>...)` | 返回 score 的函数调用，结果写入临时计分项 |
+| `scoreboard.get(<持有者>, <目标>)` | 读取用户计分板，失败时为 0，要求 `limit(1)` 查询 |
 | `xp.query(<查询>, points 或 levels)` | 读取经验值，要求 `limit(1)` |
 | `stopwatch.query("<id>"[, <缩放>])` | 读取秒表，失败时为 0 |
 | `time.query(["<时钟>"])` | 世界时钟的总游戏刻 |
@@ -1200,7 +1283,7 @@ cargo run -- check examples/multi_counter --deny-raw
 | `give_reward.mcl` | 查询标签排除、类型化 `give` 与物品组件 |
 | `potion_lab.mcl` | 效果、经验、清空、秒表、函数标签与小数调度 |
 | `world_ops.mcl` | 方块、生物群系、复制、放置、区块加载、时间、天气、规则与边界 |
-| `portable_chest/` | 多文件项目、`storage`、`self.item` 与跨维度收起 |
+| `portable_chest/` | 多文件项目、用户计分板、数据槽、`self.item` 与按玩家绑定的箱子 |
 | `multi_counter/` | 多文件项目、带返回值函数、资源 predicate 与调度心跳 |
 
 ## 附录 A：语言关键词总表 {#appendix-keywords}

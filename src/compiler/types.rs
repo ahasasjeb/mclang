@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{EntityQueryDecl, FunctionTagDecl, ItemStackDecl};
+use crate::ast::{DataSlotDecl, EntityQueryDecl, FunctionTagDecl, ItemStackDecl};
 
 /// 函数签名的语义摘要，供调用、调度和执行上下文检查使用。
 #[derive(Clone, Copy)]
@@ -64,11 +64,13 @@ impl ReturnRules {
 /// 语句校验可见的符号表。
 pub(super) struct StatementSymbols<'a> {
     pub(super) scores: &'a HashSet<&'a str>,
+    pub(super) objectives: &'a HashSet<&'a str>,
     pub(super) parameters: &'a HashSet<&'a str>,
     pub(super) functions: &'a HashMap<&'a str, Signature>,
     pub(super) queries: &'a HashMap<&'a str, &'a EntityQueryDecl>,
     pub(super) item_stacks: &'a HashMap<&'a str, &'a ItemStackDecl>,
     pub(super) storages: &'a HashSet<&'a str>,
+    pub(super) data_slots: &'a HashMap<&'a str, &'a DataSlotDecl>,
     pub(super) predicates: &'a HashSet<&'a str>,
     pub(super) function_tags: &'a HashMap<&'a str, &'a FunctionTagDecl>,
 }

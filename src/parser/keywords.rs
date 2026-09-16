@@ -27,12 +27,32 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "计分",
     },
     Keyword {
+        english: "objective",
+        chinese: "目标",
+    },
+    Keyword {
+        english: "scoreboard",
+        chinese: "计分板",
+    },
+    Keyword {
         english: "query",
         chinese: "查询",
     },
     Keyword {
         english: "entity",
         chinese: "实体",
+    },
+    Keyword {
+        english: "data_slot",
+        chinese: "数据槽",
+    },
+    Keyword {
+        english: "item_data",
+        chinese: "物品数据",
+    },
+    Keyword {
+        english: "entity_data",
+        chinese: "实体数据",
     },
     Keyword {
         english: "item",
@@ -377,12 +397,35 @@ pub(super) fn self_method(value: &str) -> Option<&'static str> {
         "add_tag" | "添加标签" => Some("add_tag"),
         "remove_tag" | "移除标签" => Some("remove_tag"),
         "set_invulnerable" | "设置无敌" => Some("set_invulnerable"),
+        "set_no_gravity" | "设置无视重力" => Some("set_no_gravity"),
         "save_items" | "保存物品" => Some("save_items"),
         "restore_items" | "恢复物品" => Some("restore_items"),
         "remove_preserving_items" | "保存并移除" => Some("remove_preserving_items"),
         "give_item" | "给予物品" => Some("give_item"),
         "clear_items" | "清空物品" => Some("clear_items"),
+        "deposit" | "存入" => Some("deposit"),
+        "withdraw" | "取出" => Some("withdraw"),
+        "remove_data" | "移除数据" => Some("remove_data"),
         "remove" | "移除" => Some("remove"),
+        _ => None,
+    }
+}
+
+/// `scoreboard.set/reset/get` 的方法名；`get` 只在表达式里使用。
+pub(super) fn scoreboard_method(value: &str) -> Option<&'static str> {
+    match value {
+        "set" | "设置" => Some("set"),
+        "reset" | "重置" => Some("reset"),
+        "get" | "取" => Some("get"),
+        _ => None,
+    }
+}
+
+/// 数据槽声明的来源构造器。
+pub(super) fn data_slot_kind(value: &str) -> Option<&'static str> {
+    match value {
+        "item_data" | "物品数据" => Some("item_data"),
+        "entity_data" | "实体数据" => Some("entity_data"),
         _ => None,
     }
 }

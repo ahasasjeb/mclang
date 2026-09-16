@@ -6,8 +6,8 @@ use crate::lexer::TokenKind;
 
 use super::Parser;
 use super::keywords::{
-    boolean_word, effect_method, message_target, self_method, sound_source, stopwatch_method,
-    text_color, time_unit, word_matches, xp_kind, xp_method,
+    boolean_word, effect_method, message_target, scoreboard_method, self_method, sound_source,
+    stopwatch_method, text_color, time_unit, word_matches, xp_kind, xp_method,
 };
 
 impl Parser {
@@ -129,6 +129,8 @@ impl Parser {
             self.clear_statement()?
         } else if self.take_word("stopwatch").is_some() {
             self.stopwatch_statement()?
+        } else if self.take_word("scoreboard").is_some() {
+            self.scoreboard_statement()?
         } else if self.take_word("set_block").is_some() {
             self.set_block_statement()?
         } else if self.take_word("fill_biome").is_some() {
@@ -236,22 +238,39 @@ impl Parser {
                     SelfAction::RemoveTag(tag)
                 }
             }
-            "set_invulnerable" => {
+            "set_invulnerable" | "set_no_gravity" => {
                 let (value, value_span) = self.ident("true 或 false")?;
                 let value = match boolean_word(&value) {
                     Some("true") => true,
                     Some("false") => false,
                     _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
                 };
-                SelfAction::SetInvulnerable(value)
+                if method_kind == "set_invulnerable" {
+                    SelfAction::SetInvulnerable(value)
+                } else {
+                    SelfAction::SetNoGravity(value)
+                }
             }
-            "save_items" | "restore_items" | "remove_preserving_items" => {
+            "save_items" | "restore_items" => {
                 let (reference, _) = self.ident("物品存储名称")?;
                 match method_kind {
                     "save_items" => SelfAction::SaveItems(reference),
                     "restore_items" => SelfAction::RestoreItems(reference),
-                    "remove_preserving_items" => SelfAction::RemovePreservingItems(reference),
                     _ => unreachable!(),
+                }
+            }
+            "remove_preserving_items" => {
+                let (reference, reference_span) = self.ident("物品存储名称或数据槽名称")?;
+                if self.take(&TokenKind::Comma).is_some() {
+                    let (query, query_span) = self.ident("实体查询名称")?;
+                    SelfAction::RemovePreservingSlot {
+                        slot: reference,
+                        slot_span: reference_span,
+                        query,
+                        query_span,
+                    }
+                } else {
+                    SelfAction::RemovePreservingItems(reference)
                 }
             }
             "give_item" => {
@@ -262,6 +281,30 @@ impl Parser {
                     count,
                     count_span,
                 }
+            }
+            "deposit" | "withdraw" => {
+                let (slot, slot_span) = self.ident("数据槽名称")?;
+                self.expect(TokenKind::Comma, "数据槽后需要 `,`")?;
+                let (query, query_span) = self.ident("实体查询名称")?;
+                if method_kind == "deposit" {
+                    SelfAction::DataStore {
+                        slot,
+                        slot_span,
+                        query,
+                        query_span,
+                    }
+                } else {
+                    SelfAction::DataLoad {
+                        slot,
+                        slot_span,
+                        query,
+                        query_span,
+                    }
+                }
+            }
+            "remove_data" => {
+                let (slot, slot_span) = self.ident("数据槽名称")?;
+                SelfAction::DataClear { slot, slot_span }
             }
             "clear_items" => SelfAction::ClearItems,
             "remove" => SelfAction::Remove,
@@ -572,6 +615,65 @@ impl Parser {
             target,
             item,
             max_count,
+        })
+    }
+
+    /// `scoreboard.set(持有者, 目标, 值);` 与 `scoreboard.reset(持有者, 目标);`
+    ///
+    /// `scoreboard.get` 有返回值，只能在表达式里使用，语句形式会给出引导性诊断。
+    fn scoreboard_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::Dot, "scoreboard 后需要 `.`")?;
+        let (method, method_span) = self.ident("scoreboard 方法")?;
+        let Some(method) = scoreboard_method(&method) else {
+            return Err(Diagnostic::new(
+                format!("未知 scoreboard 方法 `{method}`"),
+                method_span,
+            ));
+        };
+        let target = self.score_target("scoreboard 方法")?;
+        match method {
+            "set" => {
+                self.expect(TokenKind::Comma, "计分目标后需要 `,`")?;
+                let value = self.expression()?;
+                self.expect(TokenKind::RightParen, "scoreboard.set 调用缺少 `)`")?;
+                self.expect(TokenKind::Semicolon, "scoreboard.set 调用后需要 `;`")?;
+                Ok(StatementKind::ScoreSet { target, value })
+            }
+            "reset" => {
+                self.expect(TokenKind::RightParen, "scoreboard.reset 调用缺少 `)`")?;
+                self.expect(TokenKind::Semicolon, "scoreboard.reset 调用后需要 `;`")?;
+                Ok(StatementKind::ScoreReset { target })
+            }
+            "get" => Err(Diagnostic::new(
+                "scoreboard.get 只能出现在表达式里，例如 `let id = scoreboard.get(self, box_key);`",
+                method_span,
+            )),
+            _ => unreachable!("scoreboard_method 只返回 set、reset、get"),
+        }
+    }
+
+    /// 读取计分持有者：`self`/`自身`、`origin`/`投掷者` 或实体查询名称。
+    pub(super) fn score_holder(&mut self) -> Result<ScoreHolder, Diagnostic> {
+        if self.take_word("self").is_some() {
+            return Ok(ScoreHolder::SelfEntity);
+        }
+        if self.take_word("origin").is_some() {
+            return Ok(ScoreHolder::Origin);
+        }
+        let (name, span) = self.ident("计分持有者 self/自身、origin/投掷者 或实体查询名称")?;
+        Ok(ScoreHolder::Query(name, span))
+    }
+
+    /// 读取计分目标的 `(持有者, 目标)` 部分，右括号留给调用方。
+    pub(super) fn score_target(&mut self, label: &str) -> Result<ScoreTarget, Diagnostic> {
+        self.expect(TokenKind::LeftParen, &format!("{label} 后需要 `(`"))?;
+        let holder = self.score_holder()?;
+        self.expect(TokenKind::Comma, "计分持有者后需要 `,`")?;
+        let (objective, objective_span) = self.ident("计分板目标名称")?;
+        Ok(ScoreTarget {
+            holder,
+            objective,
+            objective_span,
         })
     }
 

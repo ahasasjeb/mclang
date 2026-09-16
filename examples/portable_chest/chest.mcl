@@ -1,18 +1,25 @@
-namespace portable_chest;
+命名空间 portable_chest;
 
-// 查询声明由编译器检查并转换成实体选择器和物品组件谓词。
-query trigger_items = entity("minecraft:item") {
-    without_tag("portable_chest_processed");
-    item(contents) {
-        id = "minecraft:emerald";
-        count = 1;
-        custom_name = "A";
+// 触发物：丢出单个命名为 A 的绿宝石。已处理标签避免同一掉落物每刻重复触发。
+查询 trigger_items = 实体("minecraft:item") {
+    排除标签("pc_processed");
+    物品(内容) {
+        类型 = "minecraft:emerald";
+        数量 = 1;
+        自定义名称 = "A";
     }
 }
 
-query chest_boxes = entity("minecraft:chest_minecart") {
-    tag("portable_chest_box");
+// 已经放出的箱子矿车；每个箱子用 box_key 计分记录属于哪个玩家。
+查询 boxes = 实体("minecraft:chest_minecart") {
+    标签("pc_box");
 }
 
-// item_list 是类型化容器存储；编译器会在首次加载时自动初始化空列表。
-storage saved_items = item_list("portable_chest:state", "saved_items");
+// 当前正在处理的触发物。逐个处理，同一刻不会有两个。
+查询 current_trigger = 实体("minecraft:item") {
+    标签("pc_current");
+    上限(1);
+}
+
+// 箱内物品在「收起」时寄存在触发物自带的 custom_data 里，因此每位玩家各自随身携带。
+数据槽 stash = 物品数据("pc_items");

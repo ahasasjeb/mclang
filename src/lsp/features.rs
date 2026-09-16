@@ -20,6 +20,14 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ),
     ("score", "声明全局计分变量，并给出初始值。"),
     (
+        "objective",
+        "声明用户计分板目标；配合 `scoreboard.set/reset/get` 记录玩家或实体的状态。",
+    ),
+    (
+        "scoreboard",
+        "计分板读写：`scoreboard.set(持有者, 目标, 值)`、`scoreboard.reset(持有者, 目标)`，`scoreboard.get(持有者, 目标)` 是表达式。",
+    ),
+    (
         "query",
         "声明可复用的实体查询，供 each、give、effect 等语句使用。",
     ),
@@ -31,6 +39,18 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "物品列表存储构造器，参数是存储资源位置与 NBT 路径。",
     ),
     ("storage", "声明物品列表存储，用于保存与恢复实体物品。"),
+    (
+        "data_slot",
+        "声明数据槽：实体通用数据或物品堆自定义数据里的一个 NBT 位置。",
+    ),
+    (
+        "item_data",
+        "物品数据槽构造器，参数是物品堆 `minecraft:custom_data` 里的键。",
+    ),
+    (
+        "entity_data",
+        "实体数据槽构造器，参数是实体通用 `data` 字段里的键。",
+    ),
     ("resource", "声明原始 JSON 资源，例如 predicate。"),
     (
         "predicate",
@@ -352,10 +372,11 @@ fn find_symbol<'a>(
 fn completion_kind(kind: SymbolKind) -> u8 {
     match kind {
         SymbolKind::Function => 3,
-        SymbolKind::Score | SymbolKind::Parameter | SymbolKind::Local => 6,
+        SymbolKind::Score | SymbolKind::Objective | SymbolKind::Parameter | SymbolKind::Local => 6,
         SymbolKind::Query => 18,
         SymbolKind::ItemStack => 12,
         SymbolKind::Storage => 9,
+        SymbolKind::DataSlot => 9,
         SymbolKind::Resource => 17,
         SymbolKind::FunctionTag => 18,
     }

@@ -34,8 +34,8 @@
 | `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call`、表达式调用与 `#tag` 已支持，标签成员在编译期检查执行上下文与参数；缺 `<fn> <nbt>` 宏参数与 `with` |
 | `return` | `<int>`；`fail`；`run <命令>` | 完成 | 计分返回值、store ABI、`return fail`、`return run` 全覆盖；`return run` 的命令文本计入 `--deny-raw` |
 | `schedule` | `function <fn> <time> [replace\|append]`；`clear <fn>` | 完成 | 整数与浮点时间（按原版 `TimeArgument` 换算为游戏刻）、`replace`/`append`、`schedule.clear`、`#tag` 调度 |
-| `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 部分 | 仅 `item_list` 的 `modify set from` 与 `set value []`；无通用访问器与路径 |
-| `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 部分 | 只有编译器内部 ABI objective；无用户计分板、显示槽、trigger 解锁 |
+| `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 部分 | 已声明数据槽上的实体/物品搬运（`自身.存入/取出/移除数据`）；无通用路径与 get 表达式 |
+| `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 部分 | 已有 `objective` 声明与 `scoreboard.set/reset/get`（支持自身/投掷者/查询持有者，可用作表达式）；无显示槽、enable、operation、displayname 与数字格式 |
 | `item` | replace/fill/override/modify（entity/block 目标、槽位集合、from/with/loot_modifier） | 部分 | 只有 `give(..., self.item)` 用的 `replace ... from entity ... contents` |
 | `loot` | loot/fish/kill/mine + give/insert/replace/spawn | 缺失 | 战利品表资源可声明，但没有取用命令 |
 | `advancement` | grant/revoke × only/from/until/through/everything | 缺失 | — |
@@ -182,6 +182,15 @@
 - [x] `clear(玩家查询[, 物品][, 数量])`。
 - [x] `stopwatch.create/restart/remove(id)` 与作为表达式的 `stopwatch.query(id[, 缩放])`。
 - [x] `examples/potion_lab.mcl`：严格模式示例，覆盖以上全部能力并通过 `--deny-raw`。
+
+按玩家绑定与数据槽（本次批次）：
+
+- [x] `objective` 声明：dummy 用户计分板目标，运行期名 `<命名空间>_<名称>`，由 `__mcl/load` 创建；与内部 ABI objective 隔离。
+- [x] `scoreboard.set/reset` 语句与表达式 `scoreboard.get`：持有者支持 `self`/`自身`、`origin`/`投掷者` 与实体查询（读取要求 `limit(1)`）；读取失败为 0，可作未赋值哨兵。
+- [x] `data_slot` 声明：`item_data`（物品堆 `minecraft:custom_data`）与 `entity_data`（26.3 实体通用 `data` 字段）两种来源，编译期校验键与实体类型（物品槽必须配 `minecraft:item`，实体槽拒绝玩家）。
+- [x] `self.deposit/withdraw/remove_data`：容器 `Items` 与数据槽之间搬运；`deposit` 追加且空容器静默跳过，`withdraw` 成功后删除来源槽。
+- [x] `self.set_no_gravity` 与 `self.remove_preserving_items(slot, query)`：带成功校验的容器安全移除（追加成功才清空、容器为空才 `kill`），并补齐 `NoGravity` 实体开关。
+- [x] `examples/portable_chest`：中文关键字重写为多玩家版本，每人分配独立编号、矿车按实体计分归属、物品寄存在触发绿宝石里，通过 `--deny-raw` 与双语翻译自检。
 
 世界与方块（本次批次）：
 

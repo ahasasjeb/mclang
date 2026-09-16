@@ -28,7 +28,7 @@ fn tick() {
 
 ## 特性
 
-- **结构化标准层**：`query`、`item_stack`、`item_list`、`give`、`each`、`spawn`、`in_dimension`、`self.*`、`message.*`、`sound.self`、`effect.*`、`xp.*`、`clear`、`stopwatch.*`、`fn_tag`、`predicate`、`schedule`、`return fail`/`return run`、`score` 返回值等都是独立的 AST 节点，而不是命令字符串。
+- **结构化标准层**：`query`、`item_stack`、`item_list`、`give`、`each`、`spawn`、`in_dimension`、`self.*`、`message.*`、`sound.self`、`effect.*`、`xp.*`、`clear`、`stopwatch.*`、`objective` 与 `scoreboard.*`、`data_slot` 与数据搬运、`fn_tag`、`predicate`、`schedule`、`return fail`/`return run`、`score` 返回值等都是独立的 AST 节点，而不是命令字符串。
 - **编译期检查**：命名、资源位置、标签、范围、枚举、执行上下文、返回值、调用图递归、JSON 资源都在写出数据包之前报错，并一次返回全部诊断。
 - **精确的执行上下文**：区分“无 / 任意实体 / 非玩家实体 / 玩家”，`data` 类 NBT 操作只允许非玩家实体，玩家数据不会被错误修改。
 - **中英文双关键词**：任意结构都有英文和中文写法，可以在同一文件里混用，两种写法生成逐字节相同的产物。
@@ -118,6 +118,13 @@ code --install-extension mclang-0.5.0.vsix
 | `give(origin, self.item)` | `execute on origin … item replace entity @s <空槽来源> from entity <源> contents` |
 | `self.add_tag("x")` / `self.remove()` | `tag @s add x` / `kill @s` |
 | `self.save_items(s)` / `self.restore_items(s)` | `data modify … entity @s Items`（非玩家实体上下文） |
+| `objective box_key;` | `__mcl/load` 中的 `scoreboard objectives add <命名空间>_box_key dummy` |
+| `scoreboard.set(origin, box_key, 1)` | `execute on origin run scoreboard players set @s <目标> 1` |
+| `scoreboard.get(self, box_key) == key` | `execute store result score … run scoreboard players get @s <目标>` 后比较 |
+| `data_slot stash = item_data("pc_items");` | 物品堆 `Item.components."minecraft:custom_data".pc_items` |
+| `self.deposit(stash, q)` / `self.withdraw(stash, q)` | `data modify entity <选择器> <槽路径> append/set from entity @s Items` |
+| `self.remove_preserving_items(stash, q)` | 追加成功才清空 `Items`、容器为空才 `kill @s`（不会掉落物品） |
+| `self.set_no_gravity(true)` / `self.set_invulnerable(true)` | `data merge entity @s {NoGravity:1b}` / `{Invulnerable:1b}` |
 | `message.self("x", gold)` | `tellraw @s <文本组件 JSON>` |
 | `sound.self("…", master)` | `playsound <声音> <分类> @s ~ ~ ~ 1 1` |
 | `effect.give(q, "…", 30[, 等级][, 隐藏粒子])` | `execute as <选择器> at @s run effect give @s …` |

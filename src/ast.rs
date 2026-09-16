@@ -20,12 +20,49 @@ pub struct Program {
     pub namespace: String,
     pub namespace_span: Span,
     pub scores: Vec<ScoreDecl>,
+    pub objectives: Vec<ObjectiveDecl>,
     pub queries: Vec<EntityQueryDecl>,
     pub item_stacks: Vec<ItemStackDecl>,
     pub storages: Vec<StorageDecl>,
+    pub data_slots: Vec<DataSlotDecl>,
     pub resources: Vec<ResourceDecl>,
     pub function_tags: Vec<FunctionTagDecl>,
     pub functions: Vec<Function>,
+}
+
+/// `objective 名称;`：声明一个用户计分板目标（dummy 准则）。
+///
+/// 运行期目标名是 `<命名空间>_<名称>`，例如 `portable_chest_box_key`；
+/// `__mcl/load` 负责创建，`/reload` 不会清空已有分数。
+#[derive(Debug)]
+pub struct ObjectiveDecl {
+    pub name: String,
+    pub name_span: Span,
+    pub span: Span,
+}
+
+/// 数据槽的来源：实体自带数据或物品堆自定义数据。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DataSlotKind {
+    /// 实体的通用自定义数据，NBT 路径 `data.<键>`（26.3 `Entity` 的 `data` 字段）。
+    EntityData,
+    /// 物品堆的 `minecraft:custom_data` 组件，路径
+    /// `Item.components."minecraft:custom_data".<键>`。
+    ItemData,
+}
+
+/// `data_slot 名称 = item_data("键");` 或 `= entity_data("键");`
+///
+/// 数据槽是可读写任意 NBT 的命名位置，配合 `self.deposit/withdraw/remove_data`
+/// 在容器物品与实体之间搬运数据。
+#[derive(Debug)]
+pub struct DataSlotDecl {
+    pub name: String,
+    pub name_span: Span,
+    pub kind: DataSlotKind,
+    pub key: String,
+    pub key_span: Span,
+    pub span: Span,
 }
 
 /// `fn_tag` 声明的函数标签，输出到 `data/<命名空间>/tags/function/<名称>.json`。
@@ -409,6 +446,15 @@ pub enum StatementKind {
         operation: AssignOp,
         value: Expr,
     },
+    /// `scoreboard.set(持有者, 目标, 值);`：写用户计分板。
+    ScoreSet {
+        target: ScoreTarget,
+        value: Expr,
+    },
+    /// `scoreboard.reset(持有者, 目标);`：删除计分项。
+    ScoreReset {
+        target: ScoreTarget,
+    },
     If {
         condition: Condition,
         then_body: Vec<Statement>,
@@ -681,6 +727,22 @@ pub enum GiveTarget {
     Origin,
 }
 
+/// 计分持有者：当前实体、投掷者（`origin`）或实体查询。
+#[derive(Debug)]
+pub enum ScoreHolder {
+    SelfEntity,
+    Origin,
+    Query(String, Span),
+}
+
+/// 「持有者 + 用户计分板目标」的组合，供计分读写使用。
+#[derive(Debug)]
+pub struct ScoreTarget {
+    pub holder: ScoreHolder,
+    pub objective: String,
+    pub objective_span: Span,
+}
+
 #[derive(Debug)]
 pub enum GiveItem {
     Definition(String),
@@ -692,9 +754,17 @@ pub enum SelfAction {
     AddTag(String),
     RemoveTag(String),
     SetInvulnerable(bool),
+    SetNoGravity(bool),
     SaveItems(String),
     RestoreItems(String),
     RemovePreservingItems(String),
+    /// `self.remove_preserving_items(槽, 查询);`：把物品追加进数据槽，成功清空后再移除实体。
+    RemovePreservingSlot {
+        slot: String,
+        slot_span: Span,
+        query: String,
+        query_span: Span,
+    },
     GiveItem {
         item: String,
         count: Option<u32>,
@@ -702,6 +772,25 @@ pub enum SelfAction {
     },
     ClearItems,
     Remove,
+    /// `self.deposit(槽, 目标查询);`：把 `@s.Items` 写入目标实体的数据槽。
+    DataStore {
+        slot: String,
+        slot_span: Span,
+        query: String,
+        query_span: Span,
+    },
+    /// `self.withdraw(槽, 来源查询);`：把来源实体的数据槽读进 `@s.Items`，并清空来源槽。
+    DataLoad {
+        slot: String,
+        slot_span: Span,
+        query: String,
+        query_span: Span,
+    },
+    /// `self.remove_data(槽);`：删除 `@s` 上的数据槽。
+    DataClear {
+        slot: String,
+        slot_span: Span,
+    },
 }
 
 #[derive(Debug)]
@@ -770,6 +859,10 @@ pub enum ExprKind {
     XpQuery {
         target: String,
         kind: XpKind,
+    },
+    /// `scoreboard.get(持有者, 目标)`：读取用户计分板的值。
+    ScoreQuery {
+        target: ScoreTarget,
     },
     StopwatchQuery {
         id: String,

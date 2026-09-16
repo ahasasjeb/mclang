@@ -5,7 +5,9 @@ use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
 
 use super::Parser;
-use super::keywords::{gamerule_method, time_method, word_matches, worldborder_method, xp_kind};
+use super::keywords::{
+    gamerule_method, scoreboard_method, time_method, word_matches, worldborder_method, xp_kind,
+};
 
 impl Parser {
     pub(super) fn expression(&mut self) -> Result<Expr, Diagnostic> {
@@ -215,6 +217,14 @@ impl Parser {
                 span: start_span.merge(self.previous().span),
             });
         }
+        if word_matches(&receiver, "scoreboard") && scoreboard_method(&method) == Some("get") {
+            let target = self.score_target("scoreboard.get")?;
+            self.expect(TokenKind::RightParen, "scoreboard.get 调用缺少 `)`")?;
+            return Ok(Expr {
+                kind: ExprKind::ScoreQuery { target },
+                span: start_span.merge(self.previous().span),
+            });
+        }
         if word_matches(&receiver, "stopwatch") && word_matches(&method, "query") {
             self.expect(TokenKind::LeftParen, "stopwatch.query 后需要 `(`")?;
             let (id, _) = self.string("stopwatch.query 需要秒表资源位置")?;
@@ -231,7 +241,7 @@ impl Parser {
         }
         Err(Diagnostic::new(
             format!(
-                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`、`stopwatch.query(\"命名空间:id\"[, 缩放])`、`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(\"规则\")` 和 `worldborder.get()`"
+                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`、`scoreboard.get(持有者, 目标)`、`stopwatch.query(\"命名空间:id\"[, 缩放])`、`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(\"规则\")` 和 `worldborder.get()`"
             ),
             span,
         ))

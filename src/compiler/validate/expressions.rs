@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{BinaryOp, Condition, Expr, ExprKind, Span};
+use crate::ast::{BinaryOp, Condition, Expr, ExprKind, ScoreHolder, Span};
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, Signature};
 use crate::diagnostic::Diagnostic;
@@ -130,6 +130,18 @@ pub(super) fn validate_expr(
                 diagnostics.push(Diagnostic::new(
                     format!("xp.query 需要 limit(1) 的单个玩家查询 `{target}`"),
                     expression.span,
+                ));
+            }
+        }
+        ExprKind::ScoreQuery { target } => {
+            super::statements::validate_score_target(target, expression.span, ctx, diagnostics);
+            if let ScoreHolder::Query(name, span) = &target.holder
+                && let Some(query) = ctx.symbols.queries.get(name.as_str())
+                && query.limit != Some(1)
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("scoreboard.get 需要 limit(1) 的单个实体查询 `{name}`"),
+                    *span,
                 ));
             }
         }

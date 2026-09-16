@@ -101,6 +101,8 @@ pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut 
             | StatementKind::Schedule { .. }
             | StatementKind::ScheduleClear { .. }
             | StatementKind::Assign { .. }
+            | StatementKind::ScoreSet { .. }
+            | StatementKind::ScoreReset { .. }
             | StatementKind::Return(_) => {}
         }
     }
@@ -126,6 +128,13 @@ pub(super) fn local_holder(function: &str, local: &str) -> String {
 
 pub(super) fn objective_name(namespace: &str) -> String {
     format!("mcl_{:012x}", stable_hash(namespace) & 0xffffffffffff)
+}
+
+/// 用户计分板目标的运行期名称：`<命名空间>_<名称>`。
+///
+/// 目标名在所有数据包之间共享，加上命名空间前缀避免与其他包冲突。
+pub(super) fn user_objective_name(namespace: &str, name: &str) -> String {
+    format!("{namespace}_{name}")
 }
 
 /// FNV-1a：跨平台稳定的 64 位哈希，保证生成名称可复现。

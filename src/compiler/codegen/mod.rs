@@ -76,6 +76,12 @@ impl<'a> Compiler<'a> {
             "scoreboard objectives add {} dummy",
             self.objective
         )];
+        for objective in &self.program.objectives {
+            commands.push(format!(
+                "scoreboard objectives add {} dummy",
+                names::user_objective_name(&self.program.namespace, &objective.name)
+            ));
+        }
         for score in &self.program.scores {
             commands.push(format!(
                 "execute unless score {} {} = {} {} run scoreboard players set {} {} {}",

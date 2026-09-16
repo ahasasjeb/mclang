@@ -9,8 +9,8 @@ use crate::lexer::TokenKind;
 
 use super::Parser;
 use super::keywords::{
-    attribute_word, boolean_word, entity_sort, function_tag_property, item_property,
-    query_property, resource_kind, slot_name,
+    attribute_word, boolean_word, data_slot_kind, entity_sort, function_tag_property,
+    item_property, query_property, resource_kind, slot_name,
 };
 
 impl Parser {
@@ -42,6 +42,52 @@ impl Parser {
             name,
             name_span,
             initial,
+            span: start.merge(end),
+        })
+    }
+
+    /// `objective 名称;`：声明一个用户计分板目标。
+    pub(super) fn objective(&mut self) -> Result<ObjectiveDecl, Diagnostic> {
+        let start = self.expect_word("objective")?.span;
+        let (name, name_span) = self.ident("计分板目标名称")?;
+        let end = self
+            .expect(TokenKind::Semicolon, "计分板目标声明后需要 `;`")?
+            .span;
+        Ok(ObjectiveDecl {
+            name,
+            name_span,
+            span: start.merge(end),
+        })
+    }
+
+    /// `data_slot 名称 = item_data("键");` 或 `= entity_data("键");`
+    pub(super) fn data_slot(&mut self) -> Result<DataSlotDecl, Diagnostic> {
+        let start = self.expect_word("data_slot")?.span;
+        let (name, name_span) = self.ident("数据槽名称")?;
+        self.expect(TokenKind::Equal, "数据槽名称后需要 `=`")?;
+        let (source, source_span) = self.ident("数据槽来源 item_data 或 entity_data")?;
+        let Some(source) = data_slot_kind(&source) else {
+            return Err(Diagnostic::new(
+                "数据槽来源只能是 item_data/物品数据 或 entity_data/实体数据",
+                source_span,
+            ));
+        };
+        self.expect(TokenKind::LeftParen, "数据槽来源后需要 `(`")?;
+        let (key, key_span) = self.string("数据槽需要键字符串")?;
+        self.expect(TokenKind::RightParen, "数据槽键后需要 `)`")?;
+        let end = self
+            .expect(TokenKind::Semicolon, "数据槽声明后需要 `;`")?
+            .span;
+        Ok(DataSlotDecl {
+            name,
+            name_span,
+            kind: if source == "item_data" {
+                DataSlotKind::ItemData
+            } else {
+                DataSlotKind::EntityData
+            },
+            key,
+            key_span,
             span: start.merge(end),
         })
     }
