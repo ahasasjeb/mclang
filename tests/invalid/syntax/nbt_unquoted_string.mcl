@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：NBT 字符串值需要加引号。
+// 期望解析诊断：字符串需要加引号。
+namespace invalid_syntax_nbt_unquoted;
+
+fn f() {
+    set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt { label = plain; });
+}

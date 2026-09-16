@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：字节数组元素越界。
+// 期望解析诊断：字节元素超出 -128 到 127。
+namespace invalid_syntax_nbt_byte_array;
+
+fn f() {
+    set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt { ids = [B; 200]; });
+}

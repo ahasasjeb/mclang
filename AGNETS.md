@@ -69,14 +69,17 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
     跨子模块调用的方法标 `pub(super)`，不要扩大可见性。
 - 人类可读优先：命名表意，注释解释“为什么”而不是复述代码。
 - 生成结果必须可复现：使用 `BTreeMap`/稳定哈希，不要在输出里引入随机顺序。
-- 关键词必须存在中英版本，在任务过程中，如果发现缺少中文或英文关键词，确认后顺手补上，只读任务除外
+- 关键词必须存在中英版本，且一个中文关键词不得对应多个英文关键词（反之亦然）；在任务过程中，
+  如果发现缺少中文或英文关键词，确认后顺手补上，只读任务除外
 
-### 测试
+### 验证
 
-- 不要做非必要测试，每添加一个单元测试都要想真的有必要吗。
-- 测试针对行为：断言生成的命令、JSON 和文件结构，不测私有实现细节。
-- 改动编译器后必须运行 `cargo fmt`、`cargo clippy --all-targets`、`cargo test`，保持零警告。
-- 语言或代码生成逻辑变化导致产物变化时，同步更新 `src/compiler/tests.rs` 中的断言。
+- 不写单元测试。验证编译器的方式是实际编写 `.mcl` 源码、用真实编译器编译，并检查 `build/`
+  里生成的 mcfunction 与 JSON 产物来判断是否有问题。
+- `tests/valid/` 放必须编译成功的语料，覆盖各项语言能力；`tests/invalid/` 放必须被拒绝的语料，
+  文件头注释写明期望诊断，改代码后逐个 `mclang check` 核对。
+- 改动编译器后必须运行 `cargo fmt`、`cargo clippy --all-targets` 保持零警告，并运行
+  `bun docs/tools/build.mjs --self-test` 验证示例的双语编译与产物逐字节一致。
 
 ### 文档
 
@@ -104,12 +107,15 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 ```powershell
 cargo fmt
 cargo clippy --all-targets
-cargo test
 
 # 编译并检查示例
 cargo run -- build examples/portable_chest
 cargo run -- check examples/multi_counter --deny-raw
 cargo run -- build examples/give_reward.mcl -o build/give_reward --description "奖励示例"
+
+# 编译测试语料
+cargo run -- build tests/valid/language -o build/tests/language --deny-raw
+cargo run -- check tests/invalid/items.mcl
 ```
 
 ## 文档索引

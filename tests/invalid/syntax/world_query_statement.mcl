@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：世界查询只能出现在表达式里。
+// 期望解析诊断：时间查询只能出现在表达式里。
+namespace invalid_syntax_query_statement;
+
+fn f() {
+    time.query();
+}

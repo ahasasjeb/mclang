@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：NBT 列表缺少右方括号。
+// 期望解析诊断：缺少 `]`。
+namespace invalid_syntax_nbt_bracket;
+
+fn f() {
+    set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt { ids = [1, 2; });
+}

@@ -1,0 +1,7 @@
+// 编译测试（负向）：未知的 stopwatch 方法。
+// 期望 check 报出解析诊断：未知 stopwatch 方法。
+namespace invalid_stopwatch_method;
+
+fn f() {
+    stopwatch.list("invalid_stopwatch_method:t");
+}

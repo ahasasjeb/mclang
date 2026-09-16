@@ -1,0 +1,8 @@
+// 编译测试（负向语法）：中英别名归一化后是同一个 NBT 键，判重必须报错。
+// 期望解析诊断：NBT 键 `NoAI` 重复。
+namespace invalid_syntax_nbt_duplicate;
+
+@non_player
+fn f() {
+    nbt { NoAI = true; 无AI = false; }
+}

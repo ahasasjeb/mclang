@@ -1,0 +1,31 @@
+// 编译测试：底层逃生口 run / execute / return run。
+// 这个项目**故意**包含底层命令，不能通过 --deny-raw，用于验证严格模式确实会
+// 拒绝它，同时确认原始命令原样进入产物。
+//
+// 验证：
+//   cargo run -- build tests/valid/raw -o build/tests/raw
+//   cargo run -- build tests/valid/raw -o build/tests/raw --deny-raw   # 应当失败
+// 重点检查 build/tests/raw/data/raw_test/function/say.mcfunction
+// 与 gametime.mcfunction 的命令拼接。
+namespace raw_test;
+
+@player
+fn announce() {
+    execute "as @a at @s" {
+        run "tellraw @s {\"text\":\"hi\"}";
+    }
+}
+
+fn say() {
+    run "say raw statement";
+}
+
+fn nested_execute() {
+    execute "at @s" {
+        run "say nested";
+    }
+}
+
+fn gametime() -> score {
+    return run "time query gametime";
+}

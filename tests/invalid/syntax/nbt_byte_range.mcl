@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：NBT 字节后缀越界。
+// 期望解析诊断：字节超出 -128 到 127。
+namespace invalid_syntax_nbt_byte;
+
+fn f() {
+    set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt { level = 128b; });
+}

@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：整数数组元素越界。
+// 期望解析诊断：整数元素超出 -2147483648 到 2147483647。
+namespace invalid_syntax_nbt_int_array;
+
+fn f() {
+    set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt { ids = [I; 9999999999]; });
+}

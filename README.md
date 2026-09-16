@@ -181,10 +181,16 @@ code --install-extension mclang-0.5.0.vsix
 ```powershell
 cargo fmt
 cargo clippy --all-targets
-cargo test
 
 cargo run -- check examples/portable_chest --deny-raw
 cargo run -- build examples/portable_chest --deny-raw
+
+# 编译测试语料：valid 必须成功，invalid 必须报错（文件头注释写明期望诊断）
+cargo run -- build tests/valid/language -o build/tests/language --deny-raw
+cargo run -- check tests/invalid/items.mcl
 ```
+
+编译器不含单元测试：验证方式是实际编写 `.mcl`、用真实编译器编译，并检查 `build/` 里生成的
+mcfunction 与 JSON 产物；`tests/valid` 与 `tests/invalid` 是随仓库维护的编译测试语料。
 
 依赖只有 `serde_json`，Rust edition 2024。

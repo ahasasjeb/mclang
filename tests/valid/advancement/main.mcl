@@ -1,0 +1,90 @@
+// 编译测试：进度与 JSON 资源。
+// 覆盖进度声明的 criteria/requirements/reward/display 全部字段、根进度与子进度
+// 的显示规则、奖励引用的战利品表与配方、谓词条件，以及全部进度操作。
+//
+// 验证：
+//   cargo run -- build tests/valid/advancement -o build/tests/advancement --deny-raw
+// 重点检查 build/tests/advancement/data/advancement_test/advancement/*.json
+// 与 data/advancement_test/predicate/lucky.json。
+namespace advancement_test;
+
+item medal = item_stack("minecraft:emerald") {
+    count = 2;
+    custom_name = "通行证";
+    custom_data = nbt { serial = "advancement_test-1"; level = 2s; };
+}
+item icon = item_stack("minecraft:crying_obsidian") {}
+
+resource predicate lucky = """{"condition":"minecraft:random_chance","chance":0.5}""";
+resource loot_table trophy = """{"type":"minecraft:generic","pools":[]}""";
+resource recipe token = """{"type":"minecraft:crafting_shapeless","ingredients":[],"result":{"id":"minecraft:emerald","count":1}}""";
+
+query players = entity("minecraft:player") {}
+
+fn on_placed() {}
+
+@player
+fn on_self_placed() {
+    advancement.revoke(self, portal_frame);
+    message.self("核心已放置", gold);
+}
+
+advancement root_adv {
+    criterion placed {
+        trigger = placed_block;
+        conditions = """{"location":{"condition":"minecraft:match_block","blocks":"minecraft:obsidian"}}""";
+    }
+    reward {
+        function = on_placed;
+        experience = 5;
+        loot = trophy;
+        recipe = token;
+    }
+    display {
+        icon = icon;
+        title = "根进度";
+        description = "放下黑曜石。";
+        frame = goal;
+        background = "minecraft:textures/block/obsidian.png";
+        show_toast = true;
+        announce_to_chat = false;
+        hidden = false;
+    }
+}
+
+advancement portal_frame {
+    parent = root_adv;
+    criterion placed { trigger = placed_block; }
+    criterion ticked { trigger = tick; conditions = """{}"""; }
+    requirements = any;
+    reward { function = on_self_placed; }
+    display {
+        icon = medal;
+        title = "传送门框架";
+        description = "放下黑曜石。";
+        frame = goal;
+        show_toast = false;
+        hidden = true;
+    }
+}
+
+@tick
+fn lucky_tick() {
+    if predicate(lucky) {
+        advancement.grant(players, portal_frame);
+    }
+}
+
+fn grants() {
+    advancement.grant(players, portal_frame);
+    advancement.grant(players, "minecraft:story/root", placed);
+    advancement.grant_through(players, portal_frame);
+    advancement.grant_from(players, portal_frame);
+    advancement.grant_until(players, portal_frame);
+    advancement.grant_everything(players);
+    advancement.revoke(players, portal_frame);
+    advancement.revoke_through(players, portal_frame);
+    advancement.revoke_from(players, portal_frame);
+    advancement.revoke_until(players, portal_frame);
+    advancement.revoke_everything(players);
+}

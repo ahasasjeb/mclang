@@ -1,0 +1,104 @@
+// 编译测试：实体、物品与执行上下文。
+// 覆盖实体查询选项、物品定义全部字段、存储、给予、生成、自身操作、
+// 消息、声音与维度上下文。
+//
+// 验证：
+//   cargo run -- build tests/valid/entities -o build/tests/entities --deny-raw
+// 重点检查 tick 展开出的函数、give 的物品组件、以及 slot_source JSON。
+namespace entities;
+
+score processed = 0;
+score salvaged = 0;
+
+query triggers = entity("minecraft:item") {
+    without_tag("handled");
+    limit(1);
+    within(16);
+    sort(nearest);
+    item(contents) {
+        id = "minecraft:emerald";
+        count = 1;
+        custom_name = "A";
+    }
+}
+query players = entity("minecraft:player") { tag("ready"); }
+query mobs = entity("minecraft:zombie") {}
+
+item reward = item_stack("minecraft:diamond") {
+    count = 3;
+    custom_name = "Reward";
+    lore("First line");
+    lore("Second line");
+    enchantment("minecraft:fortune", 2);
+    stored_enchantment("minecraft:mending", 1);
+    damage = 4;
+    unbreakable = true;
+    custom_data = nbt { source = "entities"; level = 5; };
+}
+item flare = item_stack("minecraft:leather_chestplate") {
+    max_stack_size = 16;
+    item_name = "Flare";
+    rarity = rare;
+    item_model = "minecraft:leather_chestplate";
+    dyed_color = 16711680;
+    enchantment_glint_override = true;
+}
+item blade = item_stack("minecraft:diamond_sword") {
+    max_damage = 100;
+}
+
+storage saved = item_list("entities:state", "saved_items");
+
+@entity
+fn mark() {
+    self.add_tag("handled");
+}
+
+@non_player
+fn prepare() {
+    self.set_invulnerable(true);
+    self.clear_items();
+}
+
+@player
+fn reward_player() {
+    self.give_item(reward);
+    sound.self("minecraft:block.note_block.pling", master);
+}
+
+@non_player
+fn update_saved() {
+    self.save_items(saved);
+    self.restore_items(saved);
+}
+
+@tick
+fn tick() {
+    each(triggers) {
+        call mark();
+        spawn("minecraft:chest_minecart") {
+            call prepare();
+            self.set_no_gravity(true);
+            self.restore_items(saved);
+        }
+        in_dimension("minecraft:overworld") {
+            self.remove_preserving_items(saved);
+        }
+        message.nearest(16, "ready", gold);
+        give(origin, self.item);
+        self.remove();
+        processed += 1;
+    }
+    each(players) {
+        reward_player();
+        message.self("奖励已发放", aqua);
+    }
+    each(mobs) {
+        update_saved();
+        self.add_tag("salvaged");
+        salvaged += 1;
+    }
+    give(players, flare, 1600);
+    give(players, blade);
+    give(players, reward, 4);
+}

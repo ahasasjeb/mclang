@@ -1,0 +1,65 @@
+// 编译测试（负向）：物品定义与给予。
+// 期望 check 报出（按旧单测）：
+//   - `Invalid Item` 不是有效的物品资源位置
+//   - count 必须是 1 到 100
+//   - 附魔资源位置无效、附魔等级越界
+//   - damage 超出 -2147483648 到 2147483647
+//   - 重复声明附魔
+//   - max_stack_size 与 max_damage 不能同时设置
+//   - 给予数量必须是 1 到 1600（1601 与 0）
+//   - give 的查询必须匹配 minecraft:player
+//   - 需要玩家执行上下文（@player 函数被 @entity 上下文调用）
+//   - 找不到物品定义 `missing`
+//   - 不能调度需要执行上下文的函数
+//   - 投掷者目标需要实体执行上下文（无上下文函数使用 origin）
+//   - 原样给予 self.item 时不能指定数量
+namespace invalid_items;
+
+item broken = item_stack("Invalid Item") {
+    count = 101;
+    enchantment("Invalid Enchantment", 0);
+    enchantment("Invalid Enchantment", 256);
+    damage = 2147483648;
+}
+
+item bounded = item_stack("minecraft:diamond") { max_stack_size = 16; }
+
+item conflicting = item_stack("minecraft:diamond") {
+    max_stack_size = 16;
+    max_damage = 10;
+}
+
+query item_entities = entity("minecraft:item") {}
+query players = entity("minecraft:player") {}
+
+@player
+fn needs_player() {}
+
+@entity
+fn wrong_entity() {
+    needs_player();
+    self.give_item(missing);
+}
+
+@tick
+fn wrong_give() {
+    give(item_entities, bounded);
+    give(players, bounded, 1601);
+    give(players, bounded, 0);
+}
+
+fn wrong_origin() {
+    give(origin, self.item);
+}
+
+fn wrong_self_item() {
+    give(players, self.item, 3);
+}
+
+fn wrong_call() {
+    wrong_entity();
+}
+
+fn wrong_schedule() {
+    schedule needs_player() after 1 t;
+}

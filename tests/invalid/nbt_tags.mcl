@@ -1,0 +1,17 @@
+// 编译测试（负向）：实体 NBT 标签校验。
+// 期望 check 报出：
+//   - 没有名为 `NoAi` 的 NBT 标签（并提示最接近的 `NoAI`）
+//   - `Health`（中文 `生命`）需要数字
+//   - 该实体类型没有名为 `Strength` 的 NBT 标签（并提示 `驮运强度`）
+namespace invalid_nbt;
+
+@non_player
+fn bad() {
+    nbt { NoAi = true; Health = "full"; Strength = 5; }
+}
+
+fn typed() {
+    spawn("minecraft:creeper") {
+        nbt { Strength = 3; }
+    }
+}

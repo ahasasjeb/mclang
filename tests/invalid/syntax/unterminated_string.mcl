@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：字符串未闭合。
+// 期望词法诊断：字符串没有结束引号。
+namespace invalid_syntax_string;
+
+fn f() {
+    run "oops;
+}

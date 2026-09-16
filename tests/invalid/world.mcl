@@ -1,0 +1,32 @@
+// 编译测试（负向）：世界命令的语义检查。
+// 期望 check 报出 19 条诊断，覆盖：
+//   坐标超出世界范围、替换过滤器需要具体的方块资源位置、生物群系资源位置无效、
+//   方块标签不能声明方块属性、维度资源位置无效、拼图最大深度越界、模板完整度越界、
+//   未知游戏规则、游戏规则需要布尔值、随机刻速率取值越界、世界边界边长越界、
+//   世界边界中心坐标越界、伤害参数为负、定位目标资源位置无效、强制加载区块数超限、
+//   时间速率越界、方块属性含有不允许的字符、世界时钟资源位置无效。
+namespace invalid_world;
+
+score ticks = 0;
+
+fn bad() {
+    set_block(pos(40000000, 64, 0), block_state("minecraft:stone"));
+    set_block(pos(0, 5000, 0), block_state("minecraft:stone"));
+    fill(pos(0, 64, 0), pos(1, 64, 1), block_state("#minecraft:logs"));
+    fill_biome(pos(0, 0, 0), pos(1, 0, 1), "plains");
+    clone(pos(0, 64, 0), pos(1, 64, 1), pos(2, 64, 2), filtered, block_state("#minecraft:logs") { facing = "east"; });
+    clone(pos(0, 64, 0), pos(1, 64, 1), pos(2, 64, 2), from_dimension("the_nether"));
+    place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 0);
+    place.template("invalid_world:house", pos(0, 64, 0), clockwise_90, none, 1.5);
+    gamerule.set("do_daylight_cycle", true);
+    gamerule.set("keep_inventory", 1);
+    gamerule.set("random_tick_speed", -1);
+    worldborder.set(0.5);
+    worldborder.center(30000000, 0);
+    worldborder.damage_amount(-1);
+    locate.structure("village");
+    forceload.add(column(0, 0), column(4096, 0));
+    time.rate(0);
+    set_block(pos(0, 64, 0), block_state("minecraft:oak_stairs") { facing = "north west"; });
+    ticks = time.query("Bad Id");
+}

@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：绝对、相对与局部坐标不能混用。
+// 期望解析诊断：坐标不能混用 `~`/`^`。
+namespace invalid_syntax_pos;
+
+fn f() {
+    set_block(pos(~, ~, ^), block_state("minecraft:stone"));
+}

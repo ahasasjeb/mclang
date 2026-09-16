@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：set_block 需要 pos 坐标而不是列坐标。
+// 期望解析诊断：这里需要 `pos(...)`。
+namespace invalid_syntax_column;
+
+fn f() {
+    set_block(column(0, 0), block_state("minecraft:stone"));
+}

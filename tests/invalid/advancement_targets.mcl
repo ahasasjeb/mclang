@@ -1,0 +1,20 @@
+// 编译测试（负向）：进度操作的玩家目标校验。
+// 期望 check 报出：
+//   - 进度操作的目标查询必须匹配 minecraft:player
+//   - @tick 上下文调用 advancement.revoke(self, …) 需要玩家执行上下文
+namespace invalid_advancement_targets;
+
+query mobs = entity("minecraft:zombie") {}
+
+advancement a {
+    criterion c { trigger = tick; }
+}
+
+fn grant_mobs() {
+    advancement.grant(mobs, a);
+}
+
+@tick
+fn revoke_self() {
+    advancement.revoke(self, a);
+}

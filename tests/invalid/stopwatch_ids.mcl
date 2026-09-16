@@ -1,0 +1,13 @@
+// 编译测试（负向）：秒表资源位置。
+// 期望 check 报出 2 条诊断，均包含「不是有效的秒表资源位置」：
+//   - `Bad Id`
+//   - `also bad`
+namespace invalid_stopwatch;
+
+fn bad_create() {
+    stopwatch.create("Bad Id");
+}
+
+fn bad_query() -> score {
+    return stopwatch.query("also bad");
+}

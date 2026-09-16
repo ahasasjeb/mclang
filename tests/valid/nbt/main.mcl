@@ -1,0 +1,57 @@
+// 编译测试：结构化 NBT。
+// 覆盖方块实体数据的全部标签类型、实体数据合并、中文别名与空 NBT。
+//
+// 验证：
+//   cargo run -- build tests/valid/nbt -o build/tests/nbt --deny-raw
+// 重点检查 build/tests/nbt/data/nbt_test/function/block_tags.mcfunction
+// 与 __mcl/setup/0.mcfunction、__mcl/local_tags/0.mcfunction。
+namespace nbt_test;
+
+query zombies = entity("minecraft:zombie") { limit(1); }
+
+fn block_tags() {
+    set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt {
+        name = "仓库";
+        byte_value = 1b;
+        short_value = -2s;
+        int_value = 3;
+        long_value = 4L;
+        float_value = 1.5f;
+        double_value = -2.5d;
+        plain_double = 0.5;
+        truth = true;
+        nested = {
+            label = "子";
+            list = [1, "two", 3b, { deep = 4L; }];
+        };
+        bytes = [B; 1b, 2B, 3];
+        ints = [I; 1, 2s, 3b];
+        longs = [L; 1L, 9999999999, 3s, 4b];
+    });
+    set_block(pos(1, 64, 0), block_state("minecraft:sign") { rotation = "0"; }, nbt {});
+    set_block(pos(3, 64, 0), block_state("minecraft:chest"), nbt { 自定义名称 = "中文键"; });
+}
+
+@load
+fn setup() {
+    spawn("minecraft:zombie") {
+        nbt { NoAI = true; Silent = true; CustomName = "守卫"; Health = 20.0f; }
+    }
+}
+
+// 英文键与中文别名必须生成完全相同的合并结果。
+@non_player
+fn calm_english() {
+    nbt { NoAI = true; Silent = false; CustomName = "守卫"; Tags = ["calm"]; Health = 20.0f; }
+}
+
+@non_player
+fn calm_chinese() {
+    数据 { 无AI = 真; 静音 = 假; 自定义名称 = "守卫"; 标签 = ["calm"]; 生命 = 20.0f; }
+}
+
+fn local_tags() {
+    each(zombies) {
+        nbt { NoAI = true; Tags = ["calm"]; }
+    }
+}

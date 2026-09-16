@@ -1,0 +1,13 @@
+// 编译测试（负向）：进度 parent 链循环。
+// 期望 check 报出：进度 `first`/`second` 的 parent 链形成循环。
+namespace invalid_advancement_cycle;
+
+advancement first {
+    parent = second;
+    criterion c { trigger = tick; }
+}
+
+advancement second {
+    parent = first;
+    criterion c { trigger = tick; }
+}

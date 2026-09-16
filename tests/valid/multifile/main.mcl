@@ -1,0 +1,27 @@
+// 编译测试：多文件项目（中文关键词）。
+// 与 math.mcl、rewards.mcl 共享同一命名空间，验证跨文件符号解析。
+//
+// 验证：
+//   cargo run -- build tests/valid/multifile -o build/tests/multifile --deny-raw
+namespace multifile;
+
+计分 total = 0;
+查询 players = 实体("minecraft:player") {}
+
+@加载
+函数 load() {
+    消息.全部("多文件项目已加载", 绿色);
+}
+
+@每刻
+函数 tick() {
+    如果 total >= 10 {
+        total = 0;
+        调用 award();
+    }
+    total = plus_one(total);
+}
+
+函数 use_math() {
+    total = double(total) + triple(1);
+}

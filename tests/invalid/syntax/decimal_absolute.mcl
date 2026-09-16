@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：绝对坐标需要整数。
+// 期望解析诊断：绝对坐标需要整数。
+namespace invalid_syntax_decimal;
+
+fn f() {
+    set_block(pos(0.5, 64, 0), block_state("minecraft:stone"));
+}

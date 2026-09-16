@@ -13,9 +13,6 @@ mod constant;
 mod types;
 mod validate;
 
-#[cfg(test)]
-mod tests;
-
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 

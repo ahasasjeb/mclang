@@ -1,0 +1,21 @@
+// 编译测试（负向）：执行上下文与类型化引用。
+// 期望 check 报出：
+//   - @entity 函数 `entity_only` 需要实体执行上下文
+//   - 找不到实体查询 `missing_query`
+//   - 找不到物品存储 `missing_storage`
+//   - `orange` 不是有效的文本颜色
+namespace invalid_context;
+
+@entity
+fn entity_only() {
+    self.remove();
+}
+
+@tick
+fn tick() {
+    entity_only();
+    each(missing_query) {
+        self.save_items(missing_storage);
+    }
+    message.all("bad color", orange);
+}

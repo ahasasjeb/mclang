@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：return run 的命令不能以 `/` 开头。
+// 期望解析诊断：命令字符串不能以 `/` 开头。
+namespace invalid_syntax_return_run;
+
+fn bad() -> score {
+    return run "/say hi";
+}

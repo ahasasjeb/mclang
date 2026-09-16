@@ -1,0 +1,27 @@
+// 编译测试（负向）：进度显示规则。
+// 期望 check 报出 2 条诊断：
+//   - 根进度声明 display 时必须提供 background
+//   - 只有根进度可以声明 background（带 parent 的进度不能声明）
+namespace invalid_advancement_display;
+
+item icon = item_stack("minecraft:stone") {}
+
+advancement root_without_background {
+    criterion c { trigger = tick; }
+    display { icon = icon; title = "t"; description = "d"; }
+}
+
+advancement parent_adv {
+    criterion c { trigger = tick; }
+}
+
+advancement child_with_background {
+    parent = parent_adv;
+    criterion c { trigger = tick; }
+    display {
+        icon = icon;
+        title = "t";
+        description = "d";
+        background = "minecraft:textures/block/stone.png";
+    }
+}

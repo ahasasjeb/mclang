@@ -1,0 +1,15 @@
+// 编译测试（负向）：进度重名与重复声明。
+// 期望 check 报出：
+//   - 进度与资源声明重名
+//   - 重复声明进度 `a`
+namespace invalid_advancement_duplicate;
+
+resource advancement a = """{}""";
+
+advancement a {
+    criterion c { trigger = tick; }
+}
+
+advancement a {
+    criterion c { trigger = tick; }
+}

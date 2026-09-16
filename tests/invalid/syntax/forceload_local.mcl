@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：列坐标不支持局部坐标 `^`。
+// 期望解析诊断：列坐标不支持 `^`。
+namespace invalid_syntax_forceload;
+
+fn f() {
+    forceload.add(column(^, ^));
+}

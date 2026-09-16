@@ -1,0 +1,52 @@
+// 编译测试：状态效果、经验、清空物品与秒表。
+// 覆盖 effect.give/give_infinite/clear 的全部参数、xp.add/set/query、
+// clear 的数量上限写法与 stopwatch 的全部方法与缩放参数。
+//
+// 验证：
+//   cargo run -- build tests/valid/effects -o build/tests/effects --deny-raw
+// 重点检查 build/tests/effects/data/effects_test/function/effects.mcfunction
+// 与 stopwatches.mcfunction。
+namespace effects_test;
+
+score elapsed = 0;
+score total = 0;
+
+query players = entity("minecraft:player") { limit(1); }
+query mobs = entity("minecraft:zombie") {}
+
+fn effects() {
+    effect.give(mobs, "minecraft:speed", 30);
+    effect.give(mobs, "minecraft:speed", 30, 2);
+    effect.give(mobs, "minecraft:speed", 30, 0, true);
+    effect.give_infinite(players, "minecraft:night_vision");
+    effect.give_infinite(players, "minecraft:night_vision", 1, true);
+    effect.clear(mobs);
+    effect.clear(mobs, "minecraft:speed");
+}
+
+fn experience() {
+    xp.add(players, points, 10);
+    xp.set(players, levels, 3);
+    total = xp.query(players, levels) + 1;
+    if xp.query(players, levels) >= 5 {
+        message.all("veteran", gold);
+    }
+}
+
+fn inventory() {
+    clear(players);
+    clear(players, "minecraft:diamond");
+    clear(players, "minecraft:diamond", 5);
+}
+
+fn stopwatches() {
+    stopwatch.create("effects_test:timer");
+    stopwatch.restart("effects_test:timer");
+    elapsed = stopwatch.query("effects_test:timer");
+    elapsed = stopwatch.query("effects_test:timer", 1000);
+    elapsed = stopwatch.query("effects_test:timer", 0.5);
+    if stopwatch.query("effects_test:timer", -2) >= 0 {
+        message.all("wrapped", yellow);
+    }
+    stopwatch.remove("effects_test:timer");
+}

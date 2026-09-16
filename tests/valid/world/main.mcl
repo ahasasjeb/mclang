@@ -1,0 +1,72 @@
+// 编译测试：世界与方块命令。
+// 覆盖 set_block / fill / clone / fill_biome / place.* / forceload / locate /
+// time / weather / gamerule / worldborder 的全部参数组合。
+//
+// 验证：
+//   cargo run -- build tests/valid/world -o build/tests/world --deny-raw
+// 重点检查 build/tests/world/data/world_test/function/build.mcfunction
+// 与 environment.mcfunction 的命令顺序与参数。
+namespace world_test;
+
+score size = 0;
+score clock = 0;
+score ticks = 0;
+
+fn build() {
+    set_block(pos(0, 64, 0), block_state("minecraft:stone"));
+    set_block(pos(~, ~1, ~), block_state("minecraft:oak_stairs") { facing = "east"; half = "bottom"; }, keep);
+    set_block(pos(1, 2, 3), block_state("minecraft:glass"), strict);
+    set_block(pos(1, 2, 3), block_state("minecraft:stone"), destroy);
+    set_block(pos(0, 65, 0), block_state("minecraft:chest"), nbt { label = "box"; slots = [I; 0, 1, 2]; });
+    fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:glass"));
+    fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:glass"), hollow);
+    fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:oak_planks"), replace, block_state("#minecraft:planks"));
+    fill(pos(0, 64, 0), pos(4, 64, 4), block_state("minecraft:glass"), keep);
+    fill(pos(0, 66, 0), pos(1, 66, 1), block_state("minecraft:chest"), replace, block_state("minecraft:air"), nbt { count = 1; });
+    fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains");
+    fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains", replace, "#minecraft:is_forest");
+    clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0));
+    clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), masked, force, strict);
+    clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), filtered, block_state("#minecraft:logs"), move);
+    clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
+    place.feature("minecraft:oak_tree", pos(0, 64, 0));
+    place.structure("minecraft:village_plains");
+    place.structure("minecraft:village_plains", pos(32, 64, 32));
+    place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(48, 64, 48));
+    place.template("world_test:house", pos(64, 64, 64), clockwise_90, none, 0.5, 42, strict);
+    place.template("world_test:house", pos(64, 64, 64));
+    forceload.add(column(0, 0), column(15, 15));
+    forceload.remove(column(~, ~));
+    forceload.remove_all();
+    forceload.query(column(1, 2));
+    forceload.query();
+    locate.structure("minecraft:village_plains");
+    locate.biome("#minecraft:is_forest");
+    locate.poi("minecraft:home");
+}
+
+fn environment() {
+    time.set(1000, t);
+    time.set(6000, t, "minecraft:overworld");
+    time.add(1, d, "minecraft:the_end");
+    time.pause();
+    time.resume();
+    time.rate(2.5);
+    weather.rain(30, s);
+    weather.thunder();
+    weather.clear();
+    gamerule.set("keep_inventory", true);
+    gamerule.set("minecraft:random_tick_speed", 5);
+    worldborder.add(-100, 30 s);
+    worldborder.set(1000);
+    worldborder.center(~, 0.5);
+    worldborder.damage_amount(0.5);
+    worldborder.damage_buffer(5);
+    worldborder.warning_distance(10);
+    worldborder.warning_time(20 s);
+    size = worldborder.get();
+    clock = time.query();
+    ticks = time.query("minecraft:the_end");
+    clock = time.query_gametime();
+    ticks = gamerule.query("keep_inventory");
+}

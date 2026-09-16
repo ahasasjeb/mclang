@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：字节数组元素不能带短整数后缀。
+// 期望解析诊断：数组元素不能使用 `s` 后缀。
+namespace invalid_syntax_nbt_array_suffix;
+
+fn f() {
+    set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt { ids = [B; 1s]; });
+}

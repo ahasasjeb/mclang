@@ -1,0 +1,7 @@
+// 编译测试（负向语法）：小数只能使用 f 或 d 后缀。
+// 期望解析诊断：小数只能使用 f 或 d 后缀。
+namespace invalid_syntax_nbt_decimal;
+
+fn f() {
+    let a = 1.5b;
+}

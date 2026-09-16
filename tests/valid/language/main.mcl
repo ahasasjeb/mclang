@@ -1,0 +1,125 @@
+// 编译测试：语言核心。
+// 覆盖命名空间、计分声明、函数与参数、局部变量、控制流、返回值、调度、
+// 函数标签、表达式运算以及中英关键词混用。
+//
+// 验证：
+//   cargo run -- build tests/valid/language -o build/tests/language --deny-raw
+// 重点检查：
+//   build/tests/language/data/language/function/tick.mcfunction
+//   build/tests/language/data/language/function/double.mcfunction
+//   build/tests/language/data/language/tags/function/batch.json
+namespace language;
+
+score counter = 0;
+score total = 0;
+score active = 1;
+score flag = 0;
+
+@load
+fn load() {
+    message.all("language 测试已加载", green);
+}
+
+@tick
+fn tick() {
+    counter += 1;
+    if counter >= 20 {
+        counter = 0;
+        active = 0;
+        call reset();
+    }
+}
+
+// while 循环、if/else、复合赋值与算术运算符。
+fn reset() {
+    while active < 3 {
+        active += 1;
+    }
+    if active == 3 && flag == 0 {
+        flag = 1;
+    } else {
+        flag = 0;
+    }
+    total = total + 2 * 3 - 1;
+    total = total % 7;
+    total = total / 2;
+}
+
+fn add(amount) {
+    total += amount;
+}
+
+// -> score 的返回值会被调用方存进临时计分项再读回。
+fn double(value) -> score {
+    let result = value * 2;
+    return result;
+}
+
+fn nested_scopes() {
+    let base = 4;
+    if base > 2 {
+        let inner = base + 3;
+        total += inner;
+    }
+    total += base;
+}
+
+fn use_expression_calls() {
+    total = double(21) + 1;
+    add(double(10));
+    add(total + 2);
+}
+
+// return fail 只能出现在函数最外层。
+fn fail_path() {
+    return fail;
+}
+
+fn later() {
+    schedule later() after 1.5 s append;
+}
+
+fn cleanup() {}
+
+fn queue() {
+    schedule cleanup() after 2 d replace;
+    schedule cleanup() after 30 t replace;
+    schedule.clear(cleanup);
+}
+
+// 函数标签：本命名空间函数、嵌套标签、外部引用与 replace 标志。
+fn_tag batch {
+    value(cleanup);
+    value(#announcement);
+    value("minecraft:tick");
+    replace = true;
+}
+
+fn_tag announcement {
+    value(reset);
+}
+
+fn use_tags() {
+    call #batch();
+    schedule #announcement() after 1 s;
+}
+
+// 中英关键词必须可以混用。
+fn mixed_style() {
+    令 base = 3;
+    如果 total < base {
+        total = base;
+    } 否则 {
+        total -= 1;
+    }
+    当 total > base {
+        total -= 1;
+    }
+    调用 cleanup();
+}
+
+fn unreachable_guard() {
+    if flag != 0 || !(active < 3) {
+        flag = flag + 1;
+    }
+}

@@ -1,0 +1,10 @@
+// 编译测试（负向）：未知引用。
+// 期望 check 报出 2 条诊断：
+//   - 找不到函数 `missing`
+//   - 找不到计分变量 `value`
+namespace invalid_demo;
+
+fn main() {
+    missing();
+    value = 1;
+}

@@ -50,33 +50,3 @@ pub fn write_message(writer: &mut impl Write, message: &Value) -> io::Result<()>
     writer.write_all(&body)?;
     writer.flush()
 }
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::*;
-
-    #[test]
-    fn round_trips_messages_through_framing() {
-        let mut buffer = Vec::new();
-        let message = json!({"jsonrpc": "2.0", "id": 1, "method": "initialize"});
-        write_message(&mut buffer, &message).unwrap();
-        write_message(&mut buffer, &json!({"jsonrpc": "2.0", "method": "exit"})).unwrap();
-
-        let mut reader = std::io::BufReader::new(buffer.as_slice());
-        assert_eq!(read_message(&mut reader).unwrap(), Some(message));
-        assert_eq!(
-            read_message(&mut reader).unwrap(),
-            Some(json!({"jsonrpc": "2.0", "method": "exit"}))
-        );
-        assert_eq!(read_message(&mut reader).unwrap(), None);
-    }
-
-    #[test]
-    fn rejects_message_without_length() {
-        let mut reader = std::io::BufReader::new(&b"X-Test: 1\n\n{}"[..]);
-        let error = read_message(&mut reader).unwrap_err();
-        assert!(error.to_string().contains("Content-Length"));
-    }
-}

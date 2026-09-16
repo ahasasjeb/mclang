@@ -1,0 +1,7 @@
+// 编译测试（负向）：stopwatch.query 只能出现在表达式里。
+// 期望 check 报出解析诊断：stopwatch.query 只能出现在表达式里。
+namespace invalid_stopwatch_statement;
+
+fn f() {
+    stopwatch.query("invalid_stopwatch_statement:t");
+}

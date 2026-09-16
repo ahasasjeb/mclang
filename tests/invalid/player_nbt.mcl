@@ -1,0 +1,28 @@
+// 编译测试（负向）：Minecraft 不允许修改玩家数据。
+// 期望 check 报出 4 条诊断，全部包含「Minecraft 不允许修改玩家数据」：
+//   - @player 函数里的 set_invulnerable
+//   - @player 函数里的 save_items
+//   - @entity 函数里的 clear_items
+//   - @tick 里遍历玩家查询后的 remove_preserving_items
+namespace invalid_player_nbt;
+
+query players = entity("minecraft:player") {}
+storage saved = item_list("invalid_player_nbt:state", "saved_items");
+
+@player
+fn player_nbt() {
+    self.set_invulnerable(true);
+    self.save_items(saved);
+}
+
+@entity
+fn unknown_entity_nbt() {
+    self.clear_items();
+}
+
+@tick
+fn tick() {
+    each(players) {
+        self.remove_preserving_items(saved);
+    }
+}

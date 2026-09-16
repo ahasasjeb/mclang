@@ -1,0 +1,19 @@
+// 编译测试（负向）：进度引用与条件 JSON。
+// 期望 check 报出 6 条诊断：
+//   - 找不到父进度
+//   - 不是 26.3 注册的进度触发器
+//   - 进度条件 JSON 无效
+//   - 找不到奖励函数
+//   - 找不到战利品表
+//   - 找不到图标物品定义
+namespace invalid_advancement;
+
+advancement broken {
+    parent = missing_parent;
+    criterion placed {
+        trigger = no_such_trigger;
+        conditions = """{no}""";
+    }
+    reward { function = missing_function; loot = missing_loot; }
+    display { icon = missing_icon; title = "x"; description = "y"; }
+}

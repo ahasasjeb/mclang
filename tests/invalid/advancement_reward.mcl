@@ -1,0 +1,20 @@
+// 编译测试（负向）：进度奖励函数的上下文与参数。
+// 期望 check 报出：
+//   - 奖励函数不能带参数
+//   - 奖励函数必须能以玩家身份运行（@non_player 不行）
+namespace invalid_advancement_reward;
+
+fn on_placed(amount) {}
+
+@non_player
+fn reward_mob() {}
+
+advancement parameterized {
+    criterion c { trigger = tick; }
+    reward { function = on_placed; }
+}
+
+advancement mob_context {
+    criterion c { trigger = tick; }
+    reward { function = reward_mob; }
+}

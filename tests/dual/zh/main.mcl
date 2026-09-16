@@ -1,0 +1,72 @@
+// 编译测试：双语产物一致性（中文关键词版）。
+// 与 tests/dual/en/main.mcl 语义完全相同，两个项目分别构建后产物必须逐字节一致。
+命名空间 dual;
+
+计分 active = 0;
+计分 total = 0;
+计分 flag = 0;
+
+查询 players = 实体("minecraft:player") { 上限(1); }
+
+物品 reward = 物品堆("minecraft:diamond") {
+    数量 = 3;
+    自定义名称 = "Reward";
+    描述("First line");
+    附魔("minecraft:fortune", 2);
+}
+
+资源 谓词 lucky = """{"condition":"minecraft:random_chance","chance":0.5}""";
+
+@加载
+函数 load() {
+    消息.全部("loaded", 绿色);
+}
+
+@每刻
+函数 tick() {
+    如果 active == 0 && total < 10 {
+        total += 1;
+    } 否则 {
+        active = 1;
+    }
+    当 total > 0 {
+        total -= 1;
+    }
+    遍历(players) {
+        自身.给予物品(reward, 2);
+        声音.自身("minecraft:block.note_block.pling", 主音量);
+    }
+    如果 谓词(lucky) {
+        flag = double(total) + 1;
+    }
+}
+
+函数 double(value) -> 计分 {
+    令 result = value * 2;
+    返回 result;
+}
+
+函数 later() {
+    调度 later() 延后 1.5 秒 追加;
+}
+
+函数 cleanup() {}
+
+函数 queue() {
+    调度 cleanup() 延后 30 刻 替换;
+    调度.清除(cleanup);
+}
+
+函数标签 batch {
+    值(cleanup);
+    值(#announcement);
+    替换 = 真;
+}
+
+函数标签 announcement {
+    值(later);
+}
+
+函数 use_tags() {
+    调用 #batch();
+}

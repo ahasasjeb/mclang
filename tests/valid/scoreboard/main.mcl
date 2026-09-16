@@ -1,0 +1,69 @@
+// 编译测试：计分板、数据槽与传送。
+// 覆盖 objective 声明、scoreboard.get/set/reset、item_data/entity_data 数据槽的
+// deposit/withdraw/remove_data、容器安全移除与 teleport 的各种落点。
+//
+// 验证：
+//   cargo run -- build tests/valid/scoreboard -o build/tests/scoreboard --deny-raw
+// 重点检查 build/tests/scoreboard/data/scoreboard_test/function/transfer.mcfunction
+// 与 __mcl/load.mcfunction（目标创建）。
+namespace scoreboard_test;
+
+score next_key = 0;
+objective box_key;
+objective box_active;
+
+query players = entity("minecraft:player") {}
+query boxes = entity("minecraft:chest_minecart") { tag("box"); limit(1); }
+query current = entity("minecraft:item") { tag("current"); limit(1); }
+
+data_slot stash = item_data("pc_items");
+data_slot note = entity_data("pc_note");
+storage saved = item_list("scoreboard_test:state", "saved");
+
+fn main() {
+    each(players) {
+        if scoreboard.get(self, box_key) == 0 {
+            next_key += 1;
+            scoreboard.set(self, box_key, next_key);
+            scoreboard.set(players, box_active, 1);
+        }
+        let key = scoreboard.get(self, box_key);
+        each(boxes) {
+            if scoreboard.get(self, box_key) == key && scoreboard.get(origin, box_key) == key {
+                scoreboard.set(origin, box_key, 1);
+                scoreboard.reset(self, box_key);
+            }
+        }
+    }
+}
+
+@non_player
+fn transfer() {
+    self.deposit(stash, current);
+    self.withdraw(stash, current);
+    self.withdraw(note, current);
+    self.remove_data(stash);
+    self.set_no_gravity(true);
+    self.add_tag("box");
+    self.remove_preserving_items(stash, current);
+}
+
+@non_player
+fn store_to_storage() {
+    self.save_items(saved);
+    self.restore_items(saved);
+    self.remove_preserving_items(saved);
+}
+
+fn teleporting() {
+    each(boxes) {
+        teleport(self, pos(100, 64, -20));
+        teleport(current, pos(~, ~1, ~2));
+        teleport(self, current);
+    }
+}
+
+@entity
+fn send_home() {
+    teleport(origin, pos(0, 64, 0));
+}

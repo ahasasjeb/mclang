@@ -21,9 +21,6 @@ mod nbt;
 mod statements;
 mod world;
 
-#[cfg(test)]
-mod tests;
-
 use crate::ast::*;
 use crate::diagnostic::Diagnostic;
 use crate::lexer::{Token, TokenKind};

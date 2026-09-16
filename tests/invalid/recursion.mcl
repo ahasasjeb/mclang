@@ -1,0 +1,17 @@
+// 编译测试（负向）：同步递归调用与函数标签循环。
+// 期望 check 报出：
+//   - 函数 `a`、`b` 形成同步递归调用环（2 条）
+//   - 函数标签 `self_cycle` 形成循环引用
+namespace invalid_recursion;
+
+fn a() {
+    b();
+}
+
+fn b() {
+    a();
+}
+
+fn_tag self_cycle {
+    value(#self_cycle);
+}

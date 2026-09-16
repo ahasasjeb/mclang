@@ -1,0 +1,16 @@
+// 编译测试：多文件项目（英文关键词），被 main.mcl 的中文写法调用。
+namespace multifile;
+
+fn double(value) -> score {
+    let result = value * 2;
+    return result;
+}
+
+fn triple(value) -> score {
+    return value * 3;
+}
+
+fn plus_one(value) -> score {
+    let result = value + 1;
+    return result;
+}
