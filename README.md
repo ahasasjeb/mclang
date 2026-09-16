@@ -107,8 +107,8 @@ code --install-extension mclang-0.5.0.vsix
 
 ## 与原生命令的对应关系
 
-标准层是原生命令的类型化外壳，每条语句都下降为确定的命令形状。完整对照表见
-[`docs/language-reference.md`](docs/language-reference.md#与原生命令的对应关系)，常见示例：
+标准层是原生命令的类型化外壳，每条语句都下降为确定的命令形状。逐条对照表见手册的
+[语句参考](docs/index.html#statements)与[世界与方块](docs/index.html#statements-world)，常见示例：
 
 | Mclang | 生成的命令 |
 | --- | --- |
@@ -133,8 +133,7 @@ code --install-extension mclang-0.5.0.vsix
 | `schedule.clear(f)` | `schedule clear <命名空间>:f` |
 | `@load` / `@tick` | `minecraft:load` / `minecraft:tick` 函数标签 |
 
-生成的数据包结构与计分板 ABI 约定见
-[`docs/compiler-design.md`](docs/compiler-design.md)。
+生成的数据包结构与计分板 ABI 约定见手册的[编译产物与运行模型](docs/index.html#artifacts)。
 
 ## 仓库结构
 
@@ -148,18 +147,16 @@ code --install-extension mclang-0.5.0.vsix
 | `src/compiler/validate/` | 整程序语义检查（名称、资源、上下文、递归、JSON） |
 | `src/compiler/codegen/` | 函数、辅助函数、资源与函数标签的代码生成 |
 | `src/lib.rs` / `src/main.rs` | 项目编排、数据包写入与命令行入口 |
-| `docs/` | 语言参考、语言设计、编译器设计和在线手册 |
+| `docs/` | 语言手册：正文 `content/manual.md`、构建工具 `tools/`、静态页面 `index.html` 与 `assets/` |
 | `editors/vscode/` | VSCode 插件：语法高亮、语言配置与语言客户端 |
 | `examples/` | 端到端示例项目 |
 | `minecraft_client_26.3-rc-2/` | 随仓库固定的目标版本源码（用于核对注册表与命令签名） |
 
 ## 文档
 
-- [`docs/language-reference.md`](docs/language-reference.md)：完整语法、语义与原生命令对应表。
-- [`docs/language-design.md`](docs/language-design.md)：语言设计取舍与标准层边界。
-- [`docs/compiler-design.md`](docs/compiler-design.md)：编译流水线、代码生成约定与 26.3 兼容依据。
-- [`docs/quickstart.md`](docs/quickstart.md)：从零构建第一个数据包。
-- [`docs/manual.html`](docs/manual.html)：可离线打开的单页手册（带中英文关键词切换）。
+- [`docs/index.html`](docs/index.html)：可离线打开的单页语言手册，带中英文关键词一键切换、附录对照表与经验证的完整示例。
+- 手册正文在 `docs/content/manual.md`，由 `docs/tools/build.mjs` 生成：关键词表取自 `src/parser/keywords.rs`，正文里的完整示例会用真实编译器分别以英文与中文关键词编译，并要求两种写法的产物逐字节一致。
+  重新生成：`bun docs/tools/build.mjs --self-test`。
 - [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md)：已完成能力与后续路线。
 - [`AGNETS.md`](AGNETS.md)：项目开发规范。
 

@@ -200,7 +200,7 @@
 - 所有新结构必须提供中英文关键词，两种写法生成逐字节相同的产物。
 - 新语句必须下降为真实命令形状，可在 `--deny-raw` 项目中使用；字符串拼接不算完成。
 - 资源位置、注册表 id、槽位名、枚举与命令权限一律来自版本数据，不凭记忆。
-- 每个阶段结束时：`cargo fmt`、`cargo clippy --all-targets`、`cargo test` 零警告；`examples/` 至少一个项目通过 `--deny-raw`；同步 `docs/language-reference.md`、`docs/compiler-design.md`、`docs/quickstart.md` 与在线手册。
+- 每个阶段结束时：`cargo fmt`、`cargo clippy --all-targets`、`cargo test` 零警告；`examples/` 至少一个项目通过 `--deny-raw`；同步 `docs/` 下的语言手册（正文 `docs/content/manual.md`，用 `bun docs/tools/build.mjs --self-test` 重新生成并验证）。
 
 ### 第 1 阶段：类型系统与版本数据（基础设施）
 
@@ -309,7 +309,7 @@
   - [x] `mclang lsp` 语言服务器：UTF-16 位置换算、全文同步、项目级即时诊断、声明与关键词补全（`@`/`#` 上下文）、关键词与声明悬停、跨文件跳转；`analysis::analyze` 提供结构化诊断与符号表。
   - [x] VSCode 插件 `editors/vscode`：TextMate 语法高亮（中英文关键词表与解析器同步测试）、语言配置、按 `mclang.server.path`/`target/(release|debug)`/`PATH` 解析可执行文件的语言客户端。
   - [ ] 剩余：文档格式化、代码操作（快速修复）、点号成员（`self.*`、`effect.*` 等）补全与语义高亮。
-- [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收。`docs/manual.html` 的在线手册尚未同步本批次的函数标签、`effect`/`xp`/`clear`、`return fail`/`run` 与 `schedule.clear` 章节；`docs/language-reference.md` 与 `docs/compiler-design.md` 已经更新。
+- [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收。`docs/index.html` 单页手册（`docs/content/manual.md` + `docs/tools/`）已覆盖声明、语句、世界命令、表达式、编译产物、双语关键词与函数标签、`effect`/`xp`/`clear`、`return fail`/`run`、`schedule.clear` 等章节，示例由真实编译器验证；后续新增能力仍需同步该手册。
 
 ### 第 9 阶段：数据包内容与资源 schema（非命令）
 

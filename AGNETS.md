@@ -80,8 +80,9 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 
 ### 文档
 
-- 主动更新语言文档：语法、语义或运行时行为变化必须同步 `docs/language-reference.md`；编译器设计
-  变化同步 `docs/compiler-design.md`；面向用户的工作流变化同步 `docs/quickstart.md`。
+- 主动更新语言文档：语法、语义或运行时行为变化必须同步 `docs/content/manual.md`（单页手册正文），
+  并用 `bun docs/tools/build.mjs --self-test` 重新生成 `docs/index.html`；文档工具会从编译器源码
+  提取关键词表，并把正文里的完整示例分别用英文与中文关键词编译一遍。
 - 新增能力后在 `DEVELOPMENT_PLAN.md` 勾选对应条目，并在 `examples/` 提供或更新示例。
 - 不要主动创建 README.md。
 
@@ -113,8 +114,7 @@ cargo run -- build examples/give_reward.mcl -o build/give_reward --description "
 
 ## 文档索引
 
-- `docs/language-reference.md`：完整的语言语法与语义参考。
-- `docs/language-design.md`：语言设计取舍。
-- `docs/compiler-design.md`：编译流水线、代码生成约定和 26.3-rc-2 兼容依据。
-- `docs/quickstart.md`：从零构建第一个数据包。
+- `docs/index.html`：单页语言手册，带中英文关键词切换、附录对照表与经验证的完整示例。
+- `docs/content/manual.md`：手册正文；`docs/tools/` 从编译器源码提取词表并调用真实编译器验证示例。
+- `docs/assets/`：手册样式与交互脚本。
 - `DEVELOPMENT_PLAN.md`：已完成能力与后续路线，根据项目实际进展进行主动修改打勾。

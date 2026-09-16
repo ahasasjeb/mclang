@@ -1,0 +1,160 @@
+// 附录表格：全部内容直接来自 keywords.mjs 从编译器源码提取的数据。
+//
+// `:::table kind=keywords` 生成语言关键词与函数属性；
+// `:::table kind=aliases` 生成方法、属性与枚举别名；
+// `:::table kind=game-rules` 生成 26.3 GameRules 注册表；
+// `:::table kind=resource-kinds` 生成 `resource` 声明可用的资源类型。
+
+import { escapeHtml, parseAttributes, renderInline } from "./markdown.mjs";
+
+/** 附录说明文字里的行内代码与加粗同样按 Markdown 渲染。 */
+const noteHooks = {
+  codeSpan: (text) => `<code>${escapeHtml(text)}</code>`,
+};
+const renderNote = (text) => renderInline(text, noteHooks);
+
+/** 别名表的中文标题与一句话说明，键是 keywords.rs 里的函数名。 */
+const ALIAS_GROUPS = [
+  ["query_property", "实体查询属性", "写在 `query … { }` 里的过滤器；`limit(1)` 的查询才能用于 `xp.query`。"],
+  ["item_property", "item 过滤器属性", "`query` 的 `item(contents) { … }` 过滤器属性，`id` 必填。"],
+  ["item_stack_property", "物品定义属性", "`item_stack(…) { … }` 支持的全部物品组件。"],
+  ["function_tag_property", "函数标签属性", "`fn_tag` 声明体内的属性。"],
+  ["slot_name", "物品槽名", "类型化物品查询目前只支持容器内容槽。"],
+  ["resource_kind", "资源类型别名", "`resource` 声明可用的中文类型写法；其余类型写英文。"],
+  ["self_method", "self 方法", "执行上下文要求：`@entity` 任意实体、`@non_player` 非玩家实体、`@player` 玩家。"],
+  ["message_target", "消息目标", "`message.*` 的三种目标。"],
+  ["effect_method", "effect 方法", "状态效果操作。"],
+  ["xp_method", "xp 方法", "经验值操作；`query` 只能出现在表达式里。"],
+  ["xp_kind", "xp 类型", "`xp` 语句与 `xp.query` 的第二个实参。"],
+  ["stopwatch_method", "stopwatch 方法", "秒表操作；`query` 只能出现在表达式里。"],
+  ["place_method", "place 方法", "`place.*` 的四种放置方式。"],
+  ["forceload_method", "forceload 方法", "区块强制加载操作。"],
+  ["time_method", "time 方法", "世界时钟操作；`query` 与 `query_gametime` 是表达式。"],
+  ["weather_kind", "weather 方法", "天气类型。"],
+  ["gamerule_method", "gamerule 方法", "游戏规则操作；`query` 是表达式。"],
+  ["worldborder_method", "worldborder 方法", "世界边界操作；`get` 是表达式。"],
+  ["locate_kind", "locate 方法", "定位结构、生物群系或兴趣点。"],
+  ["rarity_value", "物品稀有度", "`rarity = …;` 的取值。"],
+  ["entity_sort", "实体查询排序", "`sort(…);` 的取值。"],
+  ["boolean_word", "布尔值", "所有需要 true/false 的位置都可以写 真/假。"],
+  ["time_unit", "时间单位", "写在数字之后：`20 t`、`1.5 s`、`1 d`。"],
+  ["text_color", "文本颜色", "`message.*` 的可选颜色实参。"],
+  ["sound_source", "声音分类", "`sound.self(声音, 分类)` 的第二个实参。"],
+  ["set_block_mode", "set_block 模式", "`set_block(位置, 方块, 模式)` 的第三个实参。"],
+  ["fill_mode", "fill 模式", "`fill(起点, 终点, 方块, 模式)` 的第四个实参。"],
+  ["clone_filter", "clone 过滤方式", "`clone` 的方块过滤选项；`filtered` 后还要跟方块谓词。"],
+  ["clone_mode", "clone 复制模式", "`clone` 的复制方式。"],
+  ["template_rotation", "模板旋转", "`place.template` 的旋转参数。"],
+  ["template_mirror", "模板镜像", "`place.template` 的镜像参数。"],
+  ["clone_dimension", "clone 维度选项", "`clone` 的跨维度选项，参数是维度资源位置。"],
+  ["strict_word", "strict 标志", "`clone`、`fill`、`set_block`、`place.template` 的严格模式标志。"],
+];
+
+export function renderAppendixTable(attributesText, data) {
+  const { attributes } = parseAttributes(attributesText);
+  const kind = attributes.get("kind");
+  switch (kind) {
+    case "keywords":
+      return renderKeywordTables(data);
+    case "aliases":
+      return renderAliasTables(data);
+    case "game-rules":
+      return renderGameRules(data);
+    case "resource-kinds":
+      return renderResourceKinds(data);
+    default:
+      throw new Error(`未知的附录表格 kind=${kind ?? ""}`);
+  }
+}
+
+function renderKeywordTables(data) {
+  let html = filterBar("keywords", "过滤关键词：输入英文、中文或用途");
+  html += heading4("语言关键词", `KEYWORDS · ${data.keywords.length} 项`);
+  html += pairTable(
+    data.keywords.map((pair) => ({
+      en: pair.en,
+      zh: pair.zh,
+      note: data.keywordDocs[pair.en] ?? "",
+    })),
+  );
+  html += heading4("函数属性", `ATTRIBUTES · ${data.attributes.length} 项`);
+  html += pairTable(
+    data.attributes.map((pair) => ({
+      en: `@${pair.en}`,
+      zh: `@${pair.zh}`,
+      note: data.attributeDocs[pair.en] ?? "",
+    })),
+  );
+  return html;
+}
+
+function renderAliasTables(data) {
+  let html = filterBar("aliases", "过滤方法、属性与枚举：输入英文或中文");
+  for (const [key, title, noteText] of ALIAS_GROUPS) {
+    const pairs = data.tables[key];
+    if (!pairs || pairs.length === 0) {
+      throw new Error(`别名表 ${key} 没有数据，检查 ALIAS_GROUPS`);
+    }
+    html += heading4(title, `${key} · ${pairs.length} 项`);
+    html += `<p class="table-note">${renderNote(noteText)}</p>`;
+    html += pairTable(pairs.map((pair) => ({ en: pair.en, zh: pair.zh, note: "" })));
+  }
+  return html;
+}
+
+function renderGameRules(data) {
+  let html = filterBar("game-rules", "过滤规则：输入规则名");
+  html += heading4("游戏规则", `GAME_RULES · ${data.gameRules.length} 条（26.3 注册表）`);
+  html +=
+    '<p class="table-note">' +
+    renderNote(
+      '`gamerule.set("规则", 值)` 的值类型与范围在编译期检查；`gamerule.query("规则")` 可作为表达式读取结果。`max_minecart_speed` 需要 `minecart_improvements` 特性，默认特性集下该规则的命令不可用。',
+    ) +
+    "</p>";
+  html += '<div class="table-wrap"><table class="alias-table"><thead><tr><th>规则</th><th>类型</th><th>取值范围</th></tr></thead><tbody>';
+  for (const rule of data.gameRules) {
+    const range = rule.range ? `${rule.range[0]} 到 ${rule.range[1]}` : "true / false";
+    html += `<tr><td><code>${escapeHtml(rule.name)}</code></td><td>${rule.type === "bool" ? "布尔" : "整数"}</td><td>${escapeHtml(range)}</td></tr>\n`;
+  }
+  html += "</tbody></table></div>\n";
+  return html;
+}
+
+function renderResourceKinds(data) {
+  let html = filterBar("resource-kinds", "过滤资源类型");
+  html += heading4("JSON 资源类型", `SIMPLE_KINDS · ${data.resourceKinds.length} 项`);
+  html +=
+    '<p class="table-note">' +
+    renderNote(
+      '`resource <类型> <名称> = "…";` 声明的资源会写到 `data/<命名空间>/<类型>/<名称>.json`；`worldgen/*` 这类带斜杠的类型要写成字符串名称。其中只有 `predicate` 可以在 `if predicate(名称)` 里引用；编译器按资源位置校验名称，但不检查资源是否存在。',
+    ) +
+    "</p>";
+  html += '<div class="table-wrap"><table class="alias-table"><tbody>';
+  for (const kind of data.resourceKinds) {
+    html += `<tr><td><code>${escapeHtml(kind)}</code></td></tr>\n`;
+  }
+  html += "</tbody></table></div>\n";
+  return html;
+}
+
+function heading4(title, detail) {
+  return `<h4>${escapeHtml(title)} <small>${escapeHtml(detail)}</small></h4>\n`;
+}
+
+function pairTable(pairs) {
+  let html =
+    '<div class="table-wrap"><table class="alias-table"><thead><tr><th>English</th><th>中文</th><th>说明</th></tr></thead><tbody>';
+  for (const pair of pairs) {
+    html += `<tr><td><code>${escapeHtml(pair.en)}</code></td><td><code>${escapeHtml(pair.zh)}</code></td><td>${pair.note ? renderNote(pair.note) : ""}</td></tr>\n`;
+  }
+  html += "</tbody></table></div>\n";
+  return html;
+}
+
+function filterBar(name, placeholder) {
+  return (
+    `<div class="filter-bar" data-filter-root="${escapeHtml(name)}">` +
+    `<input type="search" class="table-filter" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(placeholder)}">` +
+    `<span class="filter-count"></span></div>\n`
+  );
+}
