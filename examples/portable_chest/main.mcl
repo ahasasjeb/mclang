@@ -101,6 +101,10 @@
                 }
                 如果 found == 0 {
                     召唤("minecraft:chest_minecart") {
+                        数据 {
+                            CustomName = "便携箱子";
+                            Silent = true;
+                        }
                         prepare_box();
                         计分板.设置(自身, box_key, key);
                     }

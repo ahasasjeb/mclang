@@ -14,7 +14,8 @@
 // - 枚举值只在明确的取值位置翻译：调用实参（`sort(nearest)`、`sound.self(id, master)`）
 //   或 `属性 = 值`（`rarity = rare`）。否则 `player`、`master` 这类词表里的单词
 //   会和普通标识符冲突；
-// - `t`/`s`/`d` 只在数字旁边才是时间单位。
+// - `t`/`s`/`d` 在数字旁边是时间单位。其中 `s` 与 `d` 紧贴数字时是 NBT 后缀
+//   （`1s`、`1.5d`），与词法器一致并入数字 token；时间单位要写成 `1 s`、`5 d`。
 //
 // 文档构建会用真实编译器同时编译两种写法并比较产物，任何翻译错误都会在
 // 构建阶段以“无法编译”或“产物不一致”的形式暴露出来。
@@ -22,8 +23,9 @@
 import { fileURLToPath } from "node:url";
 
 const IDENT = /[\p{L}_][\p{L}\p{N}_]*/uy;
-const DECIMAL = /\d+\.\d+/y;
-const INTEGER = /\d+/y;
+// 数字与 NBT 后缀一起扫描：`1b`、`2s`、`3i`、`4L`、`5.5f`、`6d`。后缀之后
+// 不能紧跟标识符字符，否则按普通数字处理（`1bytes` = `1` + `bytes`）。
+const NUMBER = /\d+(?:\.\d+)?(?:[bBsSiIlLfFdD](?![\p{L}\p{N}_]))?/y;
 const WHITESPACE = /\s+/y;
 
 /** 接收者 → 方法表；键同时包含英文与中文写法。 */
@@ -321,17 +323,53 @@ export function buildTranslator(data) {
     return null;
   };
 
+  /** `nbt` / `数据`：进入 NBT 字面量的关键词。 */
+  const isNbtKeyword = (word) =>
+    keywords.some((pair) => pair.en === "nbt" && (pair.en === word || pair.zh === word));
+
+  /**
+   * NBT 字面量内部的 token 索引：`nbt { ... }` 里除开头的 `nbt` 之外全部保持原样。
+   * 键名与字符串是用户数据，恰好叫 `count`、`data` 之类的属性名时不能被翻译。
+   */
+  const nbtBodyTokens = (tokens) => {
+    const opaque = new Set();
+    let depth = 0;
+    let pending = false;
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      if (depth > 0) {
+        opaque.add(index);
+        if (token.text === "{") depth += 1;
+        else if (token.text === "}") depth -= 1;
+        continue;
+      }
+      if (token.type === "ws" || token.type === "comment") continue;
+      if (pending && token.text === "{") {
+        depth = 1;
+        opaque.add(index);
+        pending = false;
+        continue;
+      }
+      pending = token.type === "ident" && isNbtKeyword(token.text);
+    }
+    return opaque;
+  };
+
   /** 翻译一段代码；`relaxed` 供正文行内代码使用（时间单位等不要求上下文）。 */
   const translate = (code, target, options = {}) => {
     const tokens = tokenize(code);
     const frames = computeFrames(tokens);
+    const opaque = nbtBodyTokens(tokens);
     const relaxed = options.relaxed === true;
     return tokens
-      .map((token, index) =>
-        token.type === "ident"
-          ? (translateWord(tokens, frames, index, target, relaxed) ?? token.text)
-          : token.text,
-      )
+      .map((token, index) => {
+        if (token.type !== "ident") return token.text;
+        // NBT 块内部只翻译布尔字面量（`真`/`假`），键名与字符串是用户数据。
+        if (opaque.has(index)) {
+          return rewrite(token.text, "boolean_word", target) ?? token.text;
+        }
+        return translateWord(tokens, frames, index, target, relaxed) ?? token.text;
+      })
       .join("");
   };
 
@@ -410,7 +448,7 @@ export function tokenize(code) {
       index += whitespace.length;
       continue;
     }
-    const number = matchAt(DECIMAL, code, index) ?? matchAt(INTEGER, code, index);
+    const number = matchAt(NUMBER, code, index);
     if (number) {
       tokens.push({ type: "number", text: number, index: tokens.length });
       index += number.length;

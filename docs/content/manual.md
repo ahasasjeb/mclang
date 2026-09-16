@@ -126,7 +126,7 @@ build/hello/
 - 注释：`// 到行尾`，没有块注释。
 - 字符串：双引号，支持转义 `\"`、`\\`、`\n`、`\r`、`\t`，不能跨行。
 - 原始字符串：`"""` 到下一个 `"""`，可以跨行，内容不做转义——适合内嵌 JSON。
-- 数字：十进制整数（32 位范围内）与小数（`1.5`、`0.25`）。
+- 数字：十进制整数（32 位范围内）与小数（`1.5`、`0.25`）；NBT 的类型后缀见[结构化 NBT](#basics-nbt)。
 - 标识符：字母、数字与下划线，不能以数字开头。声明名（函数、计分变量、查询、物品、存储、函数标签、参数与局部变量）必须是小写 ASCII 字母、数字与下划线，不超过 32 字节，且不能是保留字。
 
 ### 程序结构与命名空间
@@ -176,6 +176,61 @@ fn tick() {
 物品 gift = 物品堆("minecraft:apple") {
     数量 = 1;
     自定义名称 = "苹果";
+}
+```
+
+### 结构化 NBT（nbt） {#basics-nbt}
+
+`nbt { 键 = 值; }`（中文 `数据 { 键 = 值; }`）是一段结构化 NBT 数据，覆盖 26.3 SNBT 的全部 12 种标签类型。键写成标识符或字符串，每个条目以 `;` 结束；值的形式如下：
+
+| 写法 | NBT 标签 | 说明 |
+| --- | --- | --- |
+| `1b` / `-2B` | TAG_Byte | 后缀 `b`，范围 -128 到 127 |
+| `1s` | TAG_Short | 后缀 `s`，范围 -32768 到 32767 |
+| `1` / `1i` | TAG_Int | 无后缀或 `i`，32 位范围 |
+| `1L` | TAG_Long | 后缀 `L`，64 位范围 |
+| `1.5f` / `1f` | TAG_Float | 后缀 `f`，必须能表示为单精度 |
+| `1.5` / `1.5d` / `1d` | TAG_Double | 无后缀小数或 `d` |
+| `"文本"` | TAG_String | 必须加引号；`true`/`false`（`真`/`假`）按 SNBT 规则是字节 1/0 |
+| `[值, 值]` | TAG_List | 元素类型可以不同，允许空列表 |
+| `{ 键 = 值; }` | TAG_Compound | 可以嵌套 |
+| `[B; 1b, 2b]` | TAG_Byte_Array | 元素用 `b` 后缀或无后缀整数 |
+| `[I; 1, 2]` | TAG_Int_Array | 元素可用 `b`/`s`/`i` 后缀 |
+| `[L; 1L, 2L]` | TAG_Long_Array | 元素可用 `b`/`s`/`i`/`L` 后缀 |
+
+后缀大小写皆可（`1b` 与 `1B` 等价，数组前缀 `B`/`I`/`L` 只接受大写）。编译期检查数值范围、单精度可表示性、数组元素后缀与数组类型是否匹配、复合键是否重复；输出按 26.3 的规范化写法生成（`1b`、`1s`、`1L`、`1.5f`、`1.5d`、`[B;1B]` 等）。
+
+`nbt` 可以用在需要 NBT 的位置：`set_block`/`fill` 的方块实体数据、物品定义的 `custom_data` 组件，以及作为语句合并到当前实体（见[实体 NBT](#statements-nbt)）。它不能在运行时拼装——形状在编译期就是确定的。
+
+```mcl title="完整示例：全部 12 种标签" verify id=nbt_tags
+namespace nbt_tags;
+
+物品 toolkit = 物品堆("minecraft:shulker_box") {
+    自定义名称 = "工具箱";
+    自定义数据 = 数据 {
+        label = "工具";
+        durability = 12.5d;
+        tiers = [I; 1, 2, 3];
+    };
+}
+
+函数 decorate() {
+    set_block(坐标(0, 64, 0), 方块状态("minecraft:chest"), 数据 {
+        name = "仓库";
+        byte_value = 1b;
+        short_value = -2s;
+        int_value = 3;
+        long_value = 4L;
+        float_value = 1.5f;
+        double_value = 2.5d;
+        text = "十二种标签";
+        enabled = 真;
+        nested = { inner = [B; 1B, 2B]; };
+        list = [1, "two", 3b, { deep = 4L; }];
+        ints = [I; 1, 2, 3];
+        longs = [L; 1L, 2L];
+    });
+    fill(坐标(0, 65, 0), 坐标(2, 65, 2), 方块状态("minecraft:chest"), 替换, 方块状态("minecraft:air"), 数据 { count = 1; });
 }
 ```
 
@@ -270,10 +325,11 @@ item <name> = item_stack("<物品类型>") {
     dyed_color = <RGB>;
     enchantment_glint_override = true | false;
     unbreakable = true | false;
+    custom_data = nbt { <键> = <值>; ... };
 }
 ```
 
-物品定义是一段可复用的物品组件文本。`count` 默认 1；`lore`、`enchantment`、`stored_enchantment` 可以写多行；组件输出顺序固定，与声明顺序无关。`max_stack_size` 大于 1 时不能再声明 `max_damage`。`give` 的数量上限是 `max_stack_size × 100`（未声明最大堆叠数时按 1 计算，因此上限 100）。
+物品定义是一段可复用的物品组件文本。`count` 默认 1；`lore`、`enchantment`、`stored_enchantment` 可以写多行；组件输出顺序固定，与声明顺序无关。`custom_data` 写入 `minecraft:custom_data` 组件，内容就是[结构化 NBT](#basics-nbt)，常与 `item_data` 数据槽配合。`max_stack_size` 大于 1 时不能再声明 `max_damage`。`give` 的数量上限是 `max_stack_size × 100`（未声明最大堆叠数时按 1 计算，因此上限 100）。
 
 ```mcl title="示例" fragment
 item reward = item_stack("minecraft:diamond_pickaxe") {
@@ -838,6 +894,58 @@ each(boxes) {
 }
 ```
 
+### 实体 NBT（nbt）{#statements-nbt}
+
+```mcl title="语法" fragment
+nbt { <具名标签> = <值>; ... }        // 合并到 @s
+数据 { ... }                          // 中文写法
+```
+
+`nbt { ... }` 作为语句时生成 `data merge entity @s {...}`，把具名标签合并到当前实体。键会对照从 26.3 客户端源码提取的实体标签表检查（`data/version/26.3-rc-2/entity_nbt.json`）：
+
+- `spawn("minecraft:zombie") { nbt { ... } }` 与知道实体类型的 `each(查询)` 按该实体类型沿继承链的全部标签检查；
+- `@non_player`、`@entity` 等不知道具体类型的上下文按 26.3 全部实体标签的并集检查；
+- 未知键报错并给出最近候选（`NoAi` → 「是否想写 `NoAI`？」）；
+- 已知键按粗类型检查值：`CustomName` 需要文本组件，`Tags` 需要字符串列表，`Pos`/`Motion`/`Rotation` 需要数字列表，`Health` 需要数字，`data`/`attributes` 需要复合/列表，`UUID` 需要整数数组；
+- 与其它 `data` 写入一样，只允许确定不是玩家的实体上下文，并且不计入 `--deny-raw`。
+
+顶层键可以写中文别名（完整清单见[附录 E](#appendix-nbt-aliases)），解析期归一化为英文键，产物与英文写法逐字节一致：
+
+```mcl title="中文别名" fragment
+@非玩家
+函数 calm() {
+    数据 {
+        无AI = 真;          // NoAI
+        静音 = 真;          // Silent
+        自定义名称 = "守卫";  // CustomName
+        标签 = ["calm"];     // Tags
+        生命 = 20.0f;        // Health
+    }
+}
+```
+
+别名只覆盖常用标签，其余标签写英文键；`set_block`/`fill` 的方块实体数据同样支持别名，而物品 `custom_data` 的键是用户数据，不做替换。
+
+```mcl title="示例：召唤一个不动的守卫" verify id=entity_nbt_demo
+namespace entity_nbt_demo;
+
+@load
+fn prepare() {
+    spawn("minecraft:zombie") {
+        nbt {
+            NoAI = true;
+            Silent = true;
+            CustomName = "守卫";
+            CustomNameVisible = true;
+            Tags = ["guard"];
+            Health = 20.0f;
+        }
+    }
+}
+```
+
+实体通用标签包括 `CustomName`、`CustomNameVisible`、`Silent`、`Glowing`、`Invulnerable`、`NoGravity`、`Tags`、`data`、`Pos`、`Motion`、`Rotation` 与 `Fire`/`Air` 等；生物额外有 `NoAI`、`Health`、`PersistenceRequired`、`LeftHanded`、`attributes`、`active_effects` 等，僵尸、爬行者、羊驼这类子类还有自己的标签（`IsBaby`、`ExplosionRadius`、`Strength`……）。升级目标版本后运行 `cargo run --bin generate-version-data` 重新生成快照。
+
 ### 返回值（return）
 
 ```mcl title="语法" fragment
@@ -890,8 +998,8 @@ $ cargo run -- check raw_escape.mcl --deny-raw
 方块写成 `block_state("<命名空间:方块>") { <属性> = "<值>"; }`（中文 `方块状态(...)`），属性块可省略；属性名只能是小写字母、数字与下划线，属性值只能是小写字母、数字与 `_ . + -`。`block_state("#标签")` 是方块谓词，只能用在 `fill` 的替换过滤器与 `clone` 的 `filtered` 选项里，也不能带属性。
 
 ```mcl title="语法" fragment
-set_block(<位置>, <方块状态>[, destroy | keep | replace | strict]);
-fill(<起点>, <终点>, <方块状态>[, replace | outline | hollow | destroy | strict | keep][, <替换过滤器>]);
+set_block(<位置>, <方块状态>[, destroy | keep | replace | strict][, nbt { ... }]);
+fill(<起点>, <终点>, <方块状态>[, replace | outline | hollow | destroy | strict | keep][, <替换过滤器>][, nbt { ... }]);
 fill_biome(<起点>, <终点>, "<生物群系>"[, replace, "<生物群系或标签>"]);
 clone(<起点>, <终点>, <目标位置>[, <选项>...]);
 place.feature("<地物>"[, <位置>]);
@@ -926,8 +1034,8 @@ locate.poi("<兴趣点或标签>");
 
 | 语句 | 生成的命令 |
 | --- | --- |
-| `set_block(pos, block[, mode])` | `setblock <x y z> <block[属性]> [mode]` |
-| `fill(from, to, block[, mode][, filter])` | `fill <x y z> <x y z> <block[属性]> [mode] [replace <过滤器>]` |
+| `set_block(pos, block[, mode][, nbt])` | `setblock <x y z> <block[属性]>{nbt} [mode]` |
+| `fill(from, to, block[, mode][, filter][, nbt])` | `fill <x y z> <x y z> <block[属性]>{nbt} [mode] [replace <过滤器>]` |
 | `fill_biome(from, to, "biome"[, replace, "filter"])` | `fillbiome … [replace <过滤器>]` |
 | `clone(...)` | `clone [from <维度>] <起点> <终点> <目标> [to <维度>] [filtered <谓词> 或 masked] [force 或 move] [strict]` |
 | `place.feature/structure/jigsaw/template` | `place feature/structure/jigsaw/template …` |
@@ -942,8 +1050,9 @@ locate.poi("<兴趣点或标签>");
 
 - `clone` 的选项可以任意顺序书写，但每类最多一次：过滤方式是 `replace`（默认）、`masked` 或 `filtered <方块谓词>`；复制模式是 `normal`（默认）、`force` 或 `move`；`strict` 是一个标志；跨维度写成 `from_dimension("<维度>")` 与 `to_dimension("<维度>")`（中文 `起始维度`/`目标维度`）。输出顺序固定为 `from`、坐标、`to`、过滤、模式、`strict`。
 - `fill` 的替换过滤器只能与 `replace` 模式一起使用。
+- `set_block` 与 `fill` 的 `nbt { ... }` 是方块实体数据（见[结构化 NBT](#basics-nbt)），写在方块状态之后、模式与过滤器之前；可选参数可以任意顺序书写，但模式、过滤器和 `nbt` 各自最多一次。
 - `place.jigsaw` 的最大深度是 1 到 20；`place.template` 的完整度是 0.0 到 1.0，旋转是 `none`、`clockwise_90`、`180`、`counterclockwise_90`，镜像是 `none`、`left_right`、`front_back`；要写后面的可选参数必须按顺序补齐前面的。
-- 时间参数是“数字 + 单位”，单位 `t`/`s`/`d`（刻/秒/天），括号里可写逗号：`time.set(6000, t)`、`worldborder.set(1000, 5 s)`、`after 1.5 s`。`time.set` 的最小值是 0，`time.add` 允许负数，`weather` 持续时间至少 1 刻。
+- 时间参数是“数字 + 单位”，单位 `t`/`s`/`d`（刻/秒/天），括号里可写逗号：`time.set(6000, t)`、`worldborder.set(1000, 5 s)`、`after 1.5 s`。`time.set` 的最小值是 0，`time.add` 允许负数，`weather` 持续时间至少 1 刻。注意 `s` 与 `d` 紧贴数字时是 NBT 后缀（`1s` 是短整数，`1d` 是双精度），时间单位要用空格或逗号分开。
 - `forceload` 用列坐标 `column(<x>, <z>)`（中文 `列坐标(...)`），不支持 `^`；一次 `add`/`remove` 影响的范围最多 256 个区块。
 - 范围检查：`forceload.add`/`remove` 的列坐标、`worldborder` 的数值都会在编译期检查（`worldborder.set` 是 1 到 59999968，`center` 绝对值不超过 29999984，伤害参数非负）。
 - `locate` 只产生命令反馈，不返回值；`gamerule.query`、`time.query`、`time.query_gametime`、`worldborder.get` 是表达式，可以赋值给计分变量。
@@ -1423,4 +1532,11 @@ cargo run -- check examples/multi_counter --deny-raw
 触发器名来自 26.3 的 `CriteriaTriggers` 注册表；`criterion` 的 `trigger` 只接受这里的名字（可省略 `minecraft:` 前缀），`conditions` 写该触发器条件的原始 JSON。
 
 :::table kind=advancement-triggers
+:::
+
+## 附录 E：实体 NBT 中文别名 {#appendix-nbt-aliases}
+
+实体 `nbt { … }` 语句与 `set_block`/`fill` 方块实体数据的顶层键支持中文别名，解析期归一化为规范英文键；英文键始终可用，别名只覆盖数据包作者常用的标签，其余写英文键。完整标签表由 `cargo run --bin generate-version-data` 从 26.3 源码生成到 `data/version/26.3-rc-2/entity_nbt.json`。
+
+:::table kind=nbt-aliases
 :::

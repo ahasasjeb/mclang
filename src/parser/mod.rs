@@ -17,6 +17,7 @@ mod declarations;
 mod expressions;
 mod items;
 pub(crate) mod keywords;
+mod nbt;
 mod statements;
 mod world;
 
@@ -159,6 +160,13 @@ impl Parser {
 
     fn current(&self) -> &Token {
         &self.tokens[self.cursor]
+    }
+
+    /// 向前看 `offset` 个词法单元；越界时返回文件末尾的 `Eof`。
+    fn peek_kind(&self, offset: usize) -> &Token {
+        self.tokens
+            .get(self.cursor + offset)
+            .unwrap_or_else(|| self.tokens.last().expect("词法单元列表一定以 Eof 结尾"))
     }
 
     fn previous(&self) -> &Token {

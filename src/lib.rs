@@ -5,6 +5,7 @@ mod diagnostic;
 mod lexer;
 mod lsp;
 mod parser;
+pub mod version;
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -137,6 +138,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::ScoreSet { .. }
             | ast::StatementKind::ScoreReset { .. }
             | ast::StatementKind::Teleport { .. }
+            | ast::StatementKind::NbtMerge { .. }
             | ast::StatementKind::AdvancementAction { .. }
             | ast::StatementKind::Return(_) => 0,
         })

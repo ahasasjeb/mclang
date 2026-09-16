@@ -5,9 +5,11 @@
 
 use crate::ast::{
     BlockPosition, BlockStateValue, CloneFilter, CloneMode, ColumnPosition, FillMode,
-    ForceLoadOperation, GameRuleValue, SetBlockMode, TemplateMirror, TemplateRotation,
+    ForceLoadOperation, GameRuleValue, NbtValue, SetBlockMode, TemplateMirror, TemplateRotation,
     TimeOperation, WeatherKind, WorldBorderOperation,
 };
+
+use super::emit::nbt_text;
 
 /// `place.template` 的完整参数，避免格式化函数接收一长串松散参数。
 pub(super) struct PlaceTemplateOptions<'a> {
@@ -61,12 +63,21 @@ pub(super) fn block_state_text(block: &BlockStateValue) -> String {
     format!("{}[{properties}]", block.id)
 }
 
+/// 方块参数：方块状态文本后紧跟方块实体 NBT（`<block>{<nbt>}`）。
+pub(super) fn block_argument_text(block: &BlockStateValue, nbt: Option<&NbtValue>) -> String {
+    match nbt {
+        Some(nbt) => format!("{}{}", block_state_text(block), nbt_text(nbt)),
+        None => block_state_text(block),
+    }
+}
+
 pub(super) fn set_block_command(
     pos: &BlockPosition,
     block: &BlockStateValue,
     mode: SetBlockMode,
+    nbt: Option<&NbtValue>,
 ) -> String {
-    let block = block_state_text(block);
+    let block = block_argument_text(block, nbt);
     match mode.as_str() {
         Some(mode) => format!("setblock {} {block} {mode}", position_text(pos)),
         None => format!("setblock {} {block}", position_text(pos)),
@@ -79,12 +90,13 @@ pub(super) fn fill_command(
     block: &BlockStateValue,
     mode: FillMode,
     filter: Option<&BlockStateValue>,
+    nbt: Option<&NbtValue>,
 ) -> String {
     let mut command = format!(
         "fill {} {} {}",
         position_text(from),
         position_text(to),
-        block_state_text(block)
+        block_argument_text(block, nbt)
     );
     if let Some(filter) = filter {
         command.push_str(&format!(" replace {}", block_state_text(filter)));

@@ -223,8 +223,34 @@ fn item_stack_template_json(item: &ItemStackDecl) -> Value {
     if item.unbreakable {
         components.insert("minecraft:unbreakable".to_owned(), json!({}));
     }
+    if let Some(custom_data) = &item.custom_data {
+        components.insert("minecraft:custom_data".to_owned(), nbt_json(custom_data));
+    }
     if !components.is_empty() {
         object.insert("components".to_owned(), Value::Object(components));
     }
     Value::Object(object)
+}
+
+/// NBT 值到 JSON 的转换：数据包 JSON 里的 `custom_data` 直接写成 JSON 结构。
+fn nbt_json(value: &NbtValue) -> Value {
+    match &value.kind {
+        NbtValueKind::Byte(value) => json!(value),
+        NbtValueKind::Short(value) => json!(value),
+        NbtValueKind::Int(value) => json!(value),
+        NbtValueKind::Long(value) => json!(value),
+        NbtValueKind::Float(value) => json!(value),
+        NbtValueKind::Double(value) => json!(value),
+        NbtValueKind::String(value) => Value::String(value.clone()),
+        NbtValueKind::List(values) => Value::Array(values.iter().map(nbt_json).collect()),
+        NbtValueKind::Compound(entries) => Value::Object(
+            entries
+                .iter()
+                .map(|entry| (entry.key.clone(), nbt_json(&entry.value)))
+                .collect(),
+        ),
+        NbtValueKind::ByteArray(values) => json!(values),
+        NbtValueKind::IntArray(values) => json!(values),
+        NbtValueKind::LongArray(values) => json!(values),
+    }
 }

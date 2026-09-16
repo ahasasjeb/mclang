@@ -135,7 +135,7 @@
     "keywords": {
       "patterns": [
         {
-          "match": "\\b(namespace|命名空间|score|计分|objective|目标|scoreboard|计分板|query|查询|item_stack|物品堆|item_list|物品列表|item_data|物品数据|entity_data|实体数据|data_slot|数据槽|item|物品|storage|存储|resource|资源|advancement|进度|predicate|谓词|fn_tag|函数标签|fn|函数|let|令|pos|坐标|column|列坐标|block_state|方块状态|teleport|传送)\\b",
+          "match": "\\b(namespace|命名空间|score|计分|objective|目标|scoreboard|计分板|query|查询|item_stack|物品堆|item_list|物品列表|item_data|物品数据|entity_data|实体数据|data_slot|数据槽|item|物品|storage|存储|resource|资源|advancement|进度|predicate|谓词|fn_tag|函数标签|fn|函数|let|令|pos|坐标|column|列坐标|block_state|方块状态|nbt|数据|teleport|传送)\\b",
           "name": "storage.type.mclang"
         },
         {
@@ -190,7 +190,7 @@
     "numbers": {
       "patterns": [
         {
-          "match": "\\b\\d+(?:\\.\\d+)?\\b",
+          "match": "\\b\\d+(?:\\.\\d+)?[bBsSiIlLfFdD]?\\b",
           "name": "constant.numeric.mclang"
         }
       ]
@@ -206,7 +206,7 @@
     "punctuation": {
       "patterns": [
         {
-          "match": "[{}()]",
+          "match": "[{}()\\[\\]]",
           "name": "punctuation.section.mclang"
         },
         {

@@ -25,29 +25,57 @@ struct TemplateOptions {
 }
 
 impl Parser {
-    /// `set_block(pos, block_state[, mode])`。
+    /// `set_block(pos, block_state[, mode][, nbt { ... }])`。
+    ///
+    /// 模式与方块实体数据都是可选参数，可以任意顺序书写，但各自最多一次。
     pub(super) fn set_block_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::LeftParen, "set_block 后需要 `(`")?;
         let pos = self.block_position("set_block 的位置参数")?;
         self.expect(TokenKind::Comma, "set_block 位置后需要 `,`")?;
         let block = self.block_state_value("set_block 的方块参数")?;
-        let mode = if self.take(&TokenKind::Comma).is_some() {
-            let (value, span) = self.ident("setblock 模式 destroy/keep/replace/strict")?;
-            set_block_mode(&value).ok_or_else(|| {
+        let mut mode = SetBlockMode::Replace;
+        let mut has_mode = false;
+        let mut nbt = None;
+        while self.take(&TokenKind::Comma).is_some() {
+            if self.check_word("nbt") {
+                if nbt.is_some() {
+                    return Err(Diagnostic::new(
+                        "set_block 的方块实体数据只能声明一次",
+                        self.current().span,
+                    ));
+                }
+                nbt = Some(self.nbt_compound_with_aliases("set_block 的方块实体数据")?);
+                continue;
+            }
+            if has_mode {
+                return Err(Diagnostic::new(
+                    "set_block 的方块放置模式只能声明一次",
+                    self.current().span,
+                ));
+            }
+            let (value, span) =
+                self.ident("setblock 模式 destroy/keep/replace/strict，或 nbt { ... }")?;
+            mode = set_block_mode(&value).ok_or_else(|| {
                 Diagnostic::new(
                     format!("未知 setblock 模式 `{value}`，可用 destroy、keep、replace、strict"),
                     span,
                 )
-            })?
-        } else {
-            SetBlockMode::Replace
-        };
+            })?;
+            has_mode = true;
+        }
         self.expect(TokenKind::RightParen, "set_block 调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "set_block 调用后需要 `;`")?;
-        Ok(StatementKind::SetBlock { pos, block, mode })
+        Ok(StatementKind::SetBlock {
+            pos,
+            block,
+            mode,
+            nbt,
+        })
     }
 
-    /// `fill(from, to, block_state[, mode][, replace filter])`。
+    /// `fill(from, to, block_state[, mode][, replace filter][, nbt { ... }])`。
+    ///
+    /// `nbt { ... }` 可以出现在任意可选参数位置；模式与过滤器保持原版顺序。
     pub(super) fn fill_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::LeftParen, "fill 后需要 `(`")?;
         let from = self.block_position("fill 的起点")?;
@@ -56,29 +84,48 @@ impl Parser {
         self.expect(TokenKind::Comma, "fill 终点后需要 `,`")?;
         let block = self.block_state_value("fill 的方块参数")?;
         let mut mode = FillMode::Replace;
-        if self.take(&TokenKind::Comma).is_some() {
-            let (value, span) = self.ident("fill 模式")?;
-            mode = fill_mode(&value).ok_or_else(|| {
-                Diagnostic::new(
-                    format!(
-                        "未知 fill 模式 `{value}`，可用 replace、outline、hollow、destroy、strict、keep；\
-                         替换过滤器写成 `fill(起点, 终点, 方块, replace, block_state(\"#标签\"))`"
-                    ),
-                    span,
-                )
-            })?;
-        }
-        let filter = if self.take(&TokenKind::Comma).is_some() {
+        let mut has_mode = false;
+        let mut filter = None;
+        let mut nbt = None;
+        while self.take(&TokenKind::Comma).is_some() {
+            if self.check_word("nbt") {
+                if nbt.is_some() {
+                    return Err(Diagnostic::new(
+                        "fill 的方块实体数据只能声明一次",
+                        self.current().span,
+                    ));
+                }
+                nbt = Some(self.nbt_compound_with_aliases("fill 的方块实体数据")?);
+                continue;
+            }
+            if !has_mode {
+                let (value, span) = self.ident("fill 模式")?;
+                mode = fill_mode(&value).ok_or_else(|| {
+                    Diagnostic::new(
+                        format!(
+                            "未知 fill 模式 `{value}`，可用 replace、outline、hollow、destroy、strict、keep；\
+                             替换过滤器写成 `fill(起点, 终点, 方块, replace, block_state(\"#标签\"))`"
+                        ),
+                        span,
+                    )
+                })?;
+                has_mode = true;
+                continue;
+            }
+            if filter.is_some() {
+                return Err(Diagnostic::new(
+                    "fill 的可选参数已经结束，只允许再写 nbt { ... }",
+                    self.current().span,
+                ));
+            }
             if mode != FillMode::Replace {
                 return Err(Diagnostic::new(
                     "fill 的替换过滤器只与 replace 模式一起使用",
                     self.previous().span,
                 ));
             }
-            Some(self.block_state_value("fill 的替换过滤器")?)
-        } else {
-            None
-        };
+            filter = Some(self.block_state_value("fill 的替换过滤器")?);
+        }
         self.expect(TokenKind::RightParen, "fill 调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "fill 调用后需要 `;`")?;
         Ok(StatementKind::Fill {
@@ -87,6 +134,7 @@ impl Parser {
             block,
             mode,
             filter,
+            nbt,
         })
     }
 

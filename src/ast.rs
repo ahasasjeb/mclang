@@ -148,6 +148,8 @@ pub struct ItemStackDecl {
     pub dyed_color: Option<u32>,
     pub enchantment_glint_override: Option<bool>,
     pub unbreakable: bool,
+    /// `custom_data = nbt { ... };`：物品堆的 `minecraft:custom_data` 组件。
+    pub custom_data: Option<NbtValue>,
     pub span: Span,
 }
 
@@ -388,6 +390,86 @@ pub struct BlockProperty {
     pub span: Span,
 }
 
+/// 结构化 NBT 值，覆盖 26.3 SNBT 的全部 12 种标签类型。
+///
+/// 语法统一写成 `nbt { 键 = 值; }`，值可以是带后缀的数值、字符串、列表、
+/// 嵌套复合、字节/整数/长整数数组；解析期已经检查数值范围、数组元素类型与
+/// 重复键，因此这里保存的都是合法值，代码生成只负责序列化。
+#[derive(Debug)]
+pub struct NbtValue {
+    pub kind: NbtValueKind,
+    pub span: Span,
+}
+
+#[derive(Debug)]
+pub enum NbtValueKind {
+    /// `1b`：TAG_Byte。
+    Byte(i8),
+    /// `1s`：TAG_Short。
+    Short(i16),
+    /// `1`：TAG_Int。
+    Int(i32),
+    /// `1L`：TAG_Long。
+    Long(i64),
+    /// `1.0f` 或 `1f`：TAG_Float。
+    Float(f32),
+    /// `1.0`、`1.0d` 或 `1d`：TAG_Double。
+    Double(f64),
+    /// `"文本"`：TAG_String。
+    String(String),
+    /// `[值, 值]`：TAG_List，元素类型可以不同。
+    List(Vec<NbtValue>),
+    /// `{ 键 = 值; }`：TAG_Compound。
+    Compound(Vec<NbtEntry>),
+    /// `[B; 1b, 2b]`：TAG_Byte_Array。
+    ByteArray(Vec<i8>),
+    /// `[I; 1, 2]`：TAG_Int_Array。
+    IntArray(Vec<i32>),
+    /// `[L; 1L, 2L]`：TAG_Long_Array。
+    LongArray(Vec<i64>),
+}
+
+impl NbtValue {
+    pub fn category(&self) -> NbtCategory {
+        match self.kind {
+            NbtValueKind::Byte(_)
+            | NbtValueKind::Short(_)
+            | NbtValueKind::Int(_)
+            | NbtValueKind::Long(_)
+            | NbtValueKind::Float(_)
+            | NbtValueKind::Double(_) => NbtCategory::Numeric,
+            NbtValueKind::String(_) => NbtCategory::String,
+            NbtValueKind::List(_) => NbtCategory::List,
+            NbtValueKind::Compound(_) => NbtCategory::Compound,
+            NbtValueKind::ByteArray(_) | NbtValueKind::IntArray(_) | NbtValueKind::LongArray(_) => {
+                NbtCategory::NumericArray
+            }
+        }
+    }
+}
+
+/// NBT 值的粗分类，用于比对具名标签的期望类型。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NbtCategory {
+    /// 字节、短整数、整数、长整数、单精度、双精度与布尔。
+    Numeric,
+    /// 字符串。
+    String,
+    /// 列表；元素类型可以不同。
+    List,
+    /// 复合。
+    Compound,
+    /// 字节/整数/长整数数组。
+    NumericArray,
+}
+
+#[derive(Debug)]
+pub struct NbtEntry {
+    pub key: String,
+    pub key_span: Span,
+    pub value: NbtValue,
+}
+
 #[derive(Debug)]
 pub struct Statement {
     pub kind: StatementKind,
@@ -445,6 +527,8 @@ pub enum StatementKind {
         pos: BlockPosition,
         block: BlockStateValue,
         mode: SetBlockMode,
+        /// 方块实体数据，写在方块状态之后：`<block>{<nbt>}`。
+        nbt: Option<NbtValue>,
     },
     Fill {
         from: BlockPosition,
@@ -452,6 +536,8 @@ pub enum StatementKind {
         block: BlockStateValue,
         mode: FillMode,
         filter: Option<BlockStateValue>,
+        /// 方块实体数据，写在方块状态之后、模式与过滤器之前。
+        nbt: Option<NbtValue>,
     },
     FillBiome {
         from: BlockPosition,
@@ -555,6 +641,13 @@ pub enum StatementKind {
     Teleport {
         targets: Holder,
         destination: TeleportDestination,
+    },
+    /// `nbt { ... };`（中文 `数据 { ... };`）：把结构化 NBT 合并到当前实体。
+    ///
+    /// 生成 `data merge entity @s {...}`；键会对照 26.3 源码提取的实体标签表
+    /// 检查（见 `version::entity_nbt`）。
+    NbtMerge {
+        nbt: NbtValue,
     },
     /// `advancement.grant/revoke(...)`：给玩家授予或撤销进度。
     AdvancementAction {

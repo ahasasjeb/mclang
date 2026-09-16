@@ -8,7 +8,7 @@ use crate::ast::*;
 
 use super::Compiler;
 use super::Value;
-use super::emit::{compile_message, entity_query_clause};
+use super::emit::{compile_message, entity_query_clause, nbt_text};
 use super::names::parameter_holder;
 use super::world;
 
@@ -81,8 +81,13 @@ impl Compiler<'_> {
                 item,
                 max_count,
             } => self.compile_clear_inventory(target, item.as_deref(), *max_count, commands),
-            StatementKind::SetBlock { pos, block, mode } => {
-                commands.push(world::set_block_command(pos, block, *mode));
+            StatementKind::SetBlock {
+                pos,
+                block,
+                mode,
+                nbt,
+            } => {
+                commands.push(world::set_block_command(pos, block, *mode, nbt.as_ref()));
             }
             StatementKind::Fill {
                 from,
@@ -90,7 +95,15 @@ impl Compiler<'_> {
                 block,
                 mode,
                 filter,
-            } => commands.push(world::fill_command(from, to, block, *mode, filter.as_ref())),
+                nbt,
+            } => commands.push(world::fill_command(
+                from,
+                to,
+                block,
+                *mode,
+                filter.as_ref(),
+                nbt.as_ref(),
+            )),
             StatementKind::FillBiome {
                 from,
                 to,
@@ -216,6 +229,9 @@ impl Compiler<'_> {
                 destination,
             } => {
                 self.compile_teleport(targets, destination, commands);
+            }
+            StatementKind::NbtMerge { nbt } => {
+                commands.push(format!("data merge entity @s {}", nbt_text(nbt)));
             }
             StatementKind::AdvancementAction {
                 operation,

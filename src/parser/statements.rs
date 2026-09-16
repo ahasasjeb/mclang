@@ -158,6 +158,11 @@ impl Parser {
             self.locate_statement()?
         } else if self.take_word("advancement").is_some() {
             self.advancement_statement()?
+        } else if self.check_word("nbt") {
+            let nbt = self.nbt_compound_with_aliases("nbt 语句")?;
+            // 块风格语句，结尾分号可选；物品属性里的 `custom_data = nbt {...};` 仍需要分号。
+            self.take(&TokenKind::Semicolon);
+            StatementKind::NbtMerge { nbt }
         } else {
             let (name, _) = self.ident("语句")?;
             if self.check(&TokenKind::LeftParen) {
@@ -230,6 +235,12 @@ impl Parser {
     fn self_action(&mut self) -> Result<SelfAction, Diagnostic> {
         self.expect(TokenKind::Dot, "self 后需要 `.`")?;
         let (method, span) = self.ident("self 方法名称")?;
+        if word_matches(&method, "nbt") {
+            return Err(Diagnostic::new(
+                "实体 NBT 合并直接写成 `nbt { ... }`（中文 `数据 { ... }`），不需要 self 前缀",
+                span,
+            ));
+        }
         let Some(method_kind) = self_method(&method) else {
             return Err(Diagnostic::new(format!("未知 self 方法 `{method}`"), span));
         };

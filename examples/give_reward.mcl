@@ -9,6 +9,7 @@
     附魔("minecraft:unbreaking", 2);
     稀有度 = 稀有;
     无法破坏 = 真;
+    自定义数据 = 数据 { source = "welcome_gift"; version = 1; };
 }
 
 查询 new_players = 实体("minecraft:player") {

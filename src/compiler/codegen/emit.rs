@@ -1,7 +1,8 @@
 //! 把结构化 AST 片段格式化为 Minecraft 命令参数、SNBT 和 JSON 文本。
 
 use crate::ast::{
-    AdvancementReference, EntityQueryDecl, ItemEnchantment, ItemStackDecl, MessageTarget,
+    AdvancementReference, EntityQueryDecl, ItemEnchantment, ItemStackDecl, MessageTarget, NbtValue,
+    NbtValueKind,
 };
 
 /// 资源引用文本：本命名空间声明补上命名空间前缀，外部字符串原样保留。
@@ -112,6 +113,9 @@ pub(super) fn item_stack_argument(item: &ItemStackDecl) -> String {
     if item.unbreakable {
         components.push("minecraft:unbreakable={}".to_owned());
     }
+    if let Some(custom_data) = &item.custom_data {
+        components.push(format!("minecraft:custom_data={}", nbt_text(custom_data)));
+    }
     if components.is_empty() {
         item.item_id.clone()
     } else {
@@ -141,12 +145,84 @@ fn append_enchantments_component(
     components.push(format!("{component_id}={{{entries}}}"));
 }
 
+/// 结构化 NBT 值的 SNBT 文本。
+///
+/// 输出遵循 26.3 `StringTagVisitor` 的规范化写法：字节/短整数/长整数带 `b`/`s`/`L`
+/// 后缀，单精度与双精度带 `f`/`d` 后缀，列表与复合用逗号分隔，整数数组写成
+/// `[B;1B,2B]`。字符串与不安全的键加引号并转义。
+pub(super) fn nbt_text(value: &NbtValue) -> String {
+    match &value.kind {
+        NbtValueKind::Byte(value) => format!("{value}b"),
+        NbtValueKind::Short(value) => format!("{value}s"),
+        NbtValueKind::Int(value) => value.to_string(),
+        NbtValueKind::Long(value) => format!("{value}L"),
+        NbtValueKind::Float(value) => format!("{value:?}f"),
+        NbtValueKind::Double(value) => format!("{value:?}d"),
+        NbtValueKind::String(value) => snbt_string(value),
+        NbtValueKind::List(values) => {
+            let values = values.iter().map(nbt_text).collect::<Vec<_>>().join(",");
+            format!("[{values}]")
+        }
+        NbtValueKind::Compound(entries) => {
+            let entries = entries
+                .iter()
+                .map(|entry| format!("{}:{}", snbt_key(&entry.key), nbt_text(&entry.value)))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{{{entries}}}")
+        }
+        NbtValueKind::ByteArray(values) => {
+            let values = values
+                .iter()
+                .map(|value| format!("{value}B"))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("[B;{values}]")
+        }
+        NbtValueKind::IntArray(values) => {
+            let values = values
+                .iter()
+                .map(i32::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("[I;{values}]")
+        }
+        NbtValueKind::LongArray(values) => {
+            let values = values
+                .iter()
+                .map(|value| format!("{value}L"))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("[L;{values}]")
+        }
+    }
+}
+
+/// NBT 键：安全的键直接输出，其余加引号，与 `CompoundTag.writeString` 一致。
+fn snbt_key(key: &str) -> String {
+    let simple = !key.is_empty()
+        && key
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || "._+-".contains(character));
+    if simple {
+        key.to_owned()
+    } else {
+        snbt_string(key)
+    }
+}
+
 fn snbt_string(value: &str) -> String {
     let mut escaped = String::from("\"");
     for character in value.chars() {
         match character {
-            '\"' => escaped.push_str("\\\""),
+            '"' => escaped.push_str("\\\""),
             '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            character if character < ' ' => {
+                escaped.push_str(&format!("\\u{:04x}", character as u32))
+            }
             character => escaped.push(character),
         }
     }

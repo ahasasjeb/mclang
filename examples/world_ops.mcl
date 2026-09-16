@@ -26,6 +26,20 @@ fn prepare() {
     place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
     place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);
 
+    // 方块实体数据：箱子带名字与初始内容，信标记录坐标。
+    set_block(pos(0, 65, 0), block_state("minecraft:chest") { facing = "north"; }, nbt {
+        CustomName = "广场仓库";
+        Items = [
+            { Slot = 0b; id = "minecraft:oak_planks"; count = 64; },
+            { Slot = 1b; id = "minecraft:glass"; count = 32; }
+        ];
+    });
+    set_block(pos(8, 65, 8), block_state("minecraft:beacon"), nbt {
+        marker = true;
+        home = [I; 0, 64, 0];
+        bounds = [B; 8B, 8B, 1B];
+    });
+
     // 区块加载、天气与边界。
     forceload.add(column(0, 0), column(31, 31));
     weather.clear();

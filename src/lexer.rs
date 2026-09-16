@@ -6,6 +6,16 @@ pub enum TokenKind {
     Ident(String),
     Number(i64),
     Decimal(f64),
+    /// `1b`：TAG_Byte 字面量，解析期检查 -128 到 127。
+    Byte(i64),
+    /// `1s`：TAG_Short 字面量，解析期检查 -32768 到 32767。
+    Short(i64),
+    /// `1L`：TAG_Long 字面量。
+    Long(i64),
+    /// `1f` 或 `1.5f`：TAG_Float 字面量。
+    Float(f64),
+    /// `1d` 或 `1.5d`：TAG_Double 字面量。
+    Double(f64),
     String(String),
     At,
     Hash,
@@ -15,6 +25,8 @@ pub enum TokenKind {
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
     Semicolon,
     Comma,
     Dot,
@@ -97,6 +109,8 @@ impl Lexer<'_> {
                 ')' => self.single(TokenKind::RightParen),
                 '{' => self.single(TokenKind::LeftBrace),
                 '}' => self.single(TokenKind::RightBrace),
+                '[' => self.single(TokenKind::LeftBracket),
+                ']' => self.single(TokenKind::RightBracket),
                 ';' => self.single(TokenKind::Semicolon),
                 ',' => self.single(TokenKind::Comma),
                 '.' => self.single(TokenKind::Dot),
@@ -161,12 +175,75 @@ impl Lexer<'_> {
             self.advance();
         }
         // 小数只在点号后紧跟数字时成立，`self.remove()` 之类的成员访问不受影响。
+        let mut decimal = false;
         if self.peek() == Some('.') && self.peek_second().is_some_and(|c| c.is_ascii_digit()) {
             self.advance();
             while matches!(self.peek(), Some('0'..='9')) {
                 self.advance();
             }
-            let text = &self.source[start..self.cursor];
+            decimal = true;
+        }
+        // NBT 数值后缀：`1b`、`1s`、`1i`、`1L`、`1.5f`、`1d` 等。只有紧贴数字、
+        // 且后面不再跟标识符字符时才成立，因此 `1bytes` 会照常拆成数字与标识符。
+        if let Some(suffix) = self.number_suffix() {
+            self.advance();
+            let span = Span {
+                source: self.source_id,
+                start,
+                end: self.cursor,
+            };
+            let digits = &self.source[start..self.cursor - suffix.len_utf8()];
+            match suffix.to_ascii_lowercase() {
+                suffix @ ('b' | 's' | 'i' | 'l') => {
+                    if decimal {
+                        self.diagnostics
+                            .push(Diagnostic::new("小数只能使用 f 或 d 后缀", span));
+                        return;
+                    }
+                    match digits.parse::<i64>() {
+                        Ok(value) => {
+                            let kind = match suffix {
+                                'b' => TokenKind::Byte(value),
+                                's' => TokenKind::Short(value),
+                                'i' => TokenKind::Number(value),
+                                _ => TokenKind::Long(value),
+                            };
+                            self.tokens.push(Token { kind, span });
+                        }
+                        Err(_) => self
+                            .diagnostics
+                            .push(Diagnostic::new("数字超出支持范围", span)),
+                    }
+                }
+                suffix @ ('f' | 'd') => {
+                    let single = suffix == 'f';
+                    match digits.parse::<f64>() {
+                        Ok(value)
+                            if value.is_finite() && (!single || (value as f32).is_finite()) =>
+                        {
+                            let kind = if single {
+                                TokenKind::Float(value)
+                            } else {
+                                TokenKind::Double(value)
+                            };
+                            self.tokens.push(Token { kind, span });
+                        }
+                        _ => {
+                            let message = if single {
+                                "单精度浮点超出范围"
+                            } else {
+                                "小数超出支持范围"
+                            };
+                            self.diagnostics.push(Diagnostic::new(message, span));
+                        }
+                    }
+                }
+                _ => unreachable!("number_suffix 只返回 b、s、i、l、f、d"),
+            }
+            return;
+        }
+        let text = &self.source[start..self.cursor];
+        if decimal {
             return match text.parse::<f64>() {
                 Ok(value) if value.is_finite() => self.tokens.push(Token {
                     kind: TokenKind::Decimal(value),
@@ -186,7 +263,6 @@ impl Lexer<'_> {
                 )),
             };
         }
-        let text = &self.source[start..self.cursor];
         match text.parse::<i64>() {
             Ok(value) => self.tokens.push(Token {
                 kind: TokenKind::Number(value),
@@ -205,6 +281,23 @@ impl Lexer<'_> {
                 },
             )),
         }
+    }
+
+    /// 紧跟数字的单个 NBT 后缀字母；后面还有标识符字符时返回 `None`。
+    fn number_suffix(&self) -> Option<char> {
+        let suffix = self.peek()?;
+        if !matches!(
+            suffix,
+            'b' | 'B' | 's' | 'S' | 'i' | 'I' | 'l' | 'L' | 'f' | 'F' | 'd' | 'D'
+        ) {
+            return None;
+        }
+        let mut following = self.source[self.cursor..].chars();
+        following.next();
+        if following.next().is_some_and(identifier_continue) {
+            return None;
+        }
+        Some(suffix)
     }
 
     fn string(&mut self, start: usize) {
@@ -399,5 +492,33 @@ mod tests {
         assert_eq!(tokens[6].kind, TokenKind::Minus);
         assert!(matches!(tokens[7].kind, TokenKind::Decimal(value) if value == 2.5));
         assert_eq!(tokens[9].kind, TokenKind::Caret);
+    }
+
+    #[test]
+    fn lexes_nbt_number_suffixes() {
+        let tokens = lex("1b 2s 3i 4L 5.5f 6d 7 8.5", 0).unwrap();
+        assert!(matches!(tokens[0].kind, TokenKind::Byte(1)));
+        assert!(matches!(tokens[1].kind, TokenKind::Short(2)));
+        assert!(matches!(tokens[2].kind, TokenKind::Number(3)));
+        assert!(matches!(tokens[3].kind, TokenKind::Long(4)));
+        assert!(matches!(tokens[4].kind, TokenKind::Float(value) if value == 5.5));
+        assert!(matches!(tokens[5].kind, TokenKind::Double(value) if value == 6.0));
+        assert!(matches!(tokens[6].kind, TokenKind::Number(7)));
+        assert!(matches!(tokens[7].kind, TokenKind::Decimal(value) if value == 8.5));
+    }
+
+    #[test]
+    fn suffixes_only_apply_to_bare_numbers() {
+        // `1bytes` 是数字后跟标识符，不是字节字面量。
+        let tokens = lex("1bytes", 0).unwrap();
+        assert!(matches!(tokens[0].kind, TokenKind::Number(1)));
+        assert!(matches!(&tokens[1].kind, TokenKind::Ident(value) if value == "bytes"));
+
+        assert!(lex("1.5b", 0).unwrap_err()[0].message.contains("f 或 d"));
+        assert!(
+            lex("400000000000000000000000000000000000000f", 0).unwrap_err()[0]
+                .message
+                .contains("单精度浮点超出范围")
+        );
     }
 }

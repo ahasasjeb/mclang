@@ -121,7 +121,8 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::ScheduleClear { .. }
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
-            | StatementKind::Teleport { .. } => {}
+            | StatementKind::Teleport { .. }
+            | StatementKind::NbtMerge { .. } => {}
         }
     }
 }

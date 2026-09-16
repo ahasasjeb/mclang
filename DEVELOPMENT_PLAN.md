@@ -34,7 +34,7 @@
 | `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call`、表达式调用与 `#tag` 已支持，标签成员在编译期检查执行上下文与参数；缺 `<fn> <nbt>` 宏参数与 `with` |
 | `return` | `<int>`；`fail`；`run <命令>` | 完成 | 计分返回值、store ABI、`return fail`、`return run` 全覆盖；`return run` 的命令文本计入 `--deny-raw` |
 | `schedule` | `function <fn> <time> [replace\|append]`；`clear <fn>` | 完成 | 整数与浮点时间（按原版 `TimeArgument` 换算为游戏刻）、`replace`/`append`、`schedule.clear`、`#tag` 调度 |
-| `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 部分 | 已声明数据槽上的实体/物品搬运（`自身.存入/取出/移除数据`）；无通用路径与 get 表达式 |
+| `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 部分 | 已有实体具名 NBT 合并（`nbt { ... }` → `data merge entity @s`，键对照源码快照校验）与已声明数据槽上的实体/物品搬运（`自身.存入/取出/移除数据`）；缺通用路径与 get 表达式 |
 | `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 部分 | 已有 `objective` 声明与 `scoreboard.set/reset/get`（支持自身/投掷者/查询持有者，可用作表达式）；无显示槽、enable、operation、displayname 与数字格式 |
 | `item` | replace/fill/override/modify（entity/block 目标、槽位集合、from/with/loot_modifier） | 部分 | 只有 `give(..., self.item)` 用的 `replace ... from entity ... contents` |
 | `loot` | loot/fish/kill/mine + give/insert/replace/spawn | 缺失 | 战利品表资源可声明，但没有取用命令 |
@@ -52,7 +52,7 @@
 
 | 命令 | 原版形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `summon` | `<entity> [pos] [nbt]` | 部分 | `spawn("id") {}` 可进入新实体上下文；缺坐标与初始 NBT |
+| `summon` | `<entity> [pos] [nbt]` | 部分 | `spawn("id") {}` 可进入新实体上下文；缺坐标；初始 NBT 可用（spawn 体内的 `nbt { ... }` 语句） |
 | `give` | `<players> <item> [count]` | 部分 | 目标必须是已声明玩家查询，物品必须是 `item_stack` 定义；无内联任意组件 |
 | `kill` | `[targets]` | 部分 | 只有 `self.remove()` |
 | `tag` | `add`/`remove`/`list` | 部分 | 只有 `self.add_tag`/`self.remove_tag`；无多目标与 `list` |
@@ -203,6 +203,28 @@
 - [x] 查询表达式：`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(规则)`、`worldborder.get()`。
 - [x] `examples/world_ops.mcl`：覆盖上述能力并通过 `--deny-raw`。
 
+结构化 NBT（本次批次）：
+
+- [x] `nbt { ... }`（中文 `数据`）复合字面量覆盖 26.3 SNBT 的全部 12 种标签类型：字节/短整数/整数/长整数/单精度/双精度（`1b`/`1s`/`1`/`1L`/`1.5f`/`1.5d` 及大小写变体）、字符串、列表、嵌套复合，以及 `[B; 1b]`/`[I; 1]`/`[L; 1L]` 三种整数数组；`true`/`false`（`真`/`假`）按 SNBT 规则是字节 1/0。
+- [x] 解析期静态检查：8/16/32/64 位数值范围、单精度可表示性、数组元素后缀与数组类型匹配（对照 26.3 `SnbtGrammar.ArrayPrefix` 的允许集合）、复合键重复；字符串必须加引号。
+- [x] SNBT 序列化集中在 `codegen/emit::nbt_text`：输出规范化写法（`1b`、`1s`、`1L`、`1.5f`、`1.5d`、`[B;1B]`），字符串与不安全键加引号并转义控制字符。
+- [x] `set_block`/`fill` 支持可选 `nbt { ... }` 方块实体数据，生成 `<block>{<nbt>}` 并位于模式与过滤器之前；可选参数可以任意顺序书写，但模式、过滤器和 `nbt` 各自最多一次。
+- [x] 物品定义新增 `custom_data = nbt { ... };`：`give` 与物品组件文本输出 `minecraft:custom_data`，进度图标的 `ItemStackTemplate` JSON 同步转换。
+- [x] 关键词 `nbt`/`数据` 进入单一关键词表；LSP 悬停说明与 VSCode TextMate 语法同步（新增 `[`/`]` 与数值后缀高亮）。
+- [x] `examples/world_ops.mcl`（箱子/信标方块实体）与 `examples/give_reward.mcl`（物品自定义数据）通过 `--deny-raw`；手册新增 `nbt_tags` 验证示例覆盖全部 12 种标签。
+- [x] 文档构建工具同步：`docs/tools/translate.mjs` 把 NBT 后缀并入数字 token，`nbt { ... }` 块内部按用户数据原样保留（只翻译布尔字面量）。
+- [x] 注意：`s`/`d` 紧贴数字时按 NBT 后缀解析（`1s` 是短整数、`1d` 是双精度），时间单位需要空格或逗号（`1 s`、`time.set(6000, t)`）；手写 `1s` 时间参数现在是编译错误并给出引导。
+
+实体 NBT 与具名标签目录（本次批次）：
+
+- [x] `nbt { ... }` 现在也是语句：生成 `data merge entity @s {...}`，把具名标签（`NoAI`、`Silent`、`CustomName`、`Tags`、`Health`……）合并到当前实体；只允许确定不是玩家的实体上下文，结尾分号可选（物品属性里的 `custom_data = nbt {...};` 仍需要分号）。
+- [x] `spawn("minecraft:zombie") { nbt { ... } ... }`：召唤后的第一条命令就是实体数据合并，借助 `execute summon` 的 `@s` 精确定位新实体，无需选择器。
+- [x] 版本数据生成器雏形：`cargo run --bin generate-version-data` 扫描 `minecraft_client_26.3-rc-2/net/minecraft/world/entity/**`，提取每个类（含 `Display.BlockDisplay` 嵌套类）的 `putX`/`store`/`read` 键与编解码器粗类型，沿 `extends` 求并集，并按 `EntityTypes`/`EntityTypeIds` 映射到 `minecraft:<id>`；当前快照 161 个实体类型、277 个标签，测试自动比对生成物与随附源码。
+- [x] 编译期校验：知道实体类型的上下文（`spawn`、具名查询的 `each`）按该类型的全部标签检查；`@non_player`/`@entity` 等按全体并集检查；未知键报错并给出编辑距离 ≤ 2 的最近候选（`NoAi` → `NoAI`，`无ai` → `` `无AI`（英文 `NoAI`） ``）；已知键按粗类型检查值（数字/布尔、字符串、文本组件、列表、数字列表、字符串列表、复合、整数数组）。
+- [x] 中文别名：`version::entity_nbt::CHINESE_ALIASES` 覆盖 125 个常用标签（`无AI`、`静音`、`自定义名称`、`标签`、`生命`、`无敌`、`发光`、`年龄`……），与关键词表一样保持中英双向一对一（每个英文键只有一个中文别名，测试保证），在实体 `nbt { ... }` 语句与 `set_block`/`fill` 方块实体数据的顶层键生效，解析期归一化为英文键，与英文写法产物逐字节一致；同键的中英两种写法会按归一化后的键判重。物品 `custom_data` 的键是用户数据，不做替换。手册附录 E 的别名表由 `docs/tools/keywords.mjs` 从编译器源码提取，不会手抄脱节。
+- [x] `examples/portable_chest/main.mcl` 的矿车召唤使用 `数据 { CustomName = "便携箱子"; Silent = true; }`，通过 `--deny-raw` 与双语自检；手册新增 `entity_nbt_demo` 验证示例与「实体 NBT（nbt）」章节。
+- [ ] 尚未覆盖：`ConversionTracker` 这类通过构造参数动态命名的键（`DrowningTracker`/`FreezingTracker`/Player 的 `foodData`）、方块实体 NBT 的键校验、`data` 的 get/remove/modify 与 storage/block 目标；提取器并入 1.1 的 xtask 时补齐。
+
 进度与事件（本次批次）：
 
 - [x] `advancement` 声明：`parent`、`criterion`（`trigger` + `conditions` 原始 JSON）、`requirements = all|any`、`reward`（`function`/`experience`/`loot`/`recipe`）与 `display`（图标、标题、描述、`frame`、`background`、三个展示开关），输出到 `data/<命名空间>/advancement/<名称>.json`，默认值省略、`requirements` 显式生成，产物稳定。
@@ -231,7 +253,12 @@
   - 编译器加载快照：资源位置校验从“语法合法”升级为“注册表存在”，未知 id 报错并给出最近候选；`resource` 支持类型改为读取快照。
 - [ ] 1.2 坐标与向量类型：`pos`（绝对、`~`、`^`）、`block_pos`、`vec3`、`vec2`、`rotation`、`xyz` 对齐值；校验相对坐标与 `^` 所需的执行位置/朝向上下文。
 - [ ] 1.3 文本组件类型：`text("...") { color/bold/italic/underlined/strikethrough/obfuscated }`，以及 `translate`、`keybind`、`score`、`selector`、`nbt`、click/hover 事件；统一 JSON 序列化。
-- [ ] 1.4 结构化 NBT 与路径：`nbt { ... }` 复合字面量（数值后缀、字符串、list、compound、array）；绑定访问器的类型化路径（`entity_data`、`block_data`、`storage_data`）；SNBT 输出集中到 `emit`。
+- [ ] 1.4 结构化 NBT 与路径
+  - [x] `nbt { ... }` 复合字面量：全部 12 种标签类型（数值后缀、字符串、list、嵌套 compound、`[B;]`/`[I;]`/`[L;]` 数组）；解析期范围、数组元素类型与重复键检查；SNBT 输出集中在 `emit::nbt_text`；已接入 `set_block`/`fill` 的方块实体数据与 `item_stack` 的 `custom_data`。
+  - [x] 实体具名标签：`nbt { ... }` 语句生成 `data merge entity @s {...}`；`data/version/26.3-rc-2/entity_nbt.json` 快照（`cargo run --bin generate-version-data` 生成，测试比对源码）提供按实体类型/并集的键存在性与粗类型检查，未知键给出最近候选；常用标签支持中文别名（135 个，手动附录 E）。方块实体键校验、`ConversionTracker` 这类动态键与 `data` 的 get/remove/modify 仍待补。
+  - [ ] 绑定访问器的类型化路径：`entity_data`、`block_data`、`storage_data` 的类型化读写（当前数据槽只支持单键路径）。
+  - [ ] 原版 SNBT 的其余字面量记法未建模，除表现力无损失：十六进制 `0x`/二进制 `0b` 与下划线分隔（等值十进制可表达）、无符号前缀 `ub`/`us`/`ui`/`ul`（等价于补码负数）、无引号字符串（语言要求引号，输出统一加引号）。
+  - [ ] `data` 命令的 get/merge/remove/modify 与 storage/block 目标依赖 2.4；当前只有实体合并与声明式数据槽搬运。
 - [ ] 1.5 命令结果表达式：`count(q)`、`data.get(...)`、`random(1, 6)`、`xp.query(...)`、`stopwatch.query(...)`、`compute(...)` 等经 `execute store result score` 落入计分，参与现有算术与条件系统。
 - [ ] 1.6 函数权限模型：语句与条件记录最低权限等级，默认按 `GAMEMASTER` 校验，越级给出解释 `function-permission-level` 的诊断；预留 `--function-permission-level <2..4>`。
 
@@ -248,14 +275,14 @@
 - [ ] 2.6 用户计分板：`objective` 声明（criteria、显示名、渲染类型、数字格式、显示槽）与 `players.enable/operation/display`；与内部 ABI objective 隔离。
 - [ ] 2.7 消息组件化：`message.all/self/nearest/player` 接受 1.3 的文本组件。
 - [ ] 2.8 声音完整参数：`sound.play(sound, source, targets, pos, volume, pitch, min_volume)`，保留 `sound.self` 简写。
-- [ ] 2.9 `spawn` 完整化：`spawn("id", pos) { nbt { ... } ... }`；继续拒绝 `noSummon` 类型。
+- [ ] 2.9 `spawn` 完整化：`spawn("id", pos) { nbt { ... } ... }`；继续拒绝 `noSummon` 类型。初始 NBT 已落地（spawn 体内 `nbt { ... }` → `data merge entity @s`），还缺坐标参数。
 - [x] 2.10 `function`/`schedule`/`return` 收尾：`#tag` 调用与函数标签声明（9.2）、浮点时间、`schedule.clear`、`return fail`、`return run`；宏参数进阶见 8.3。
 
 ### 第 3 阶段：世界与方块命令族
 
-- [x] 3.1 方块状态值：`block_state("minecraft:oak_stairs") { facing = "east"; }`，属性值在编译期检查字符集并拒绝重复声明；`#` 标签谓词用于过滤器。方块实体 `nbt { ... }` 依赖 1.4，未实现。
-- [x] 3.2 `set_block(pos, block_state, mode)`，mode 为 `destroy`/`keep`/`replace`/`strict`。
-- [x] 3.3 `fill(from, to, block_state [, mode] [, replace filter] [, keep])`，模式含 `outline`/`hollow`/`destroy`/`strict`。
+- [x] 3.1 方块状态值：`block_state("minecraft:oak_stairs") { facing = "east"; }`，属性值在编译期检查字符集并拒绝重复声明；`#` 标签谓词用于过滤器。方块实体 `nbt { ... }` 已随 1.4 落地。
+- [x] 3.2 `set_block(pos, block_state[, mode][, nbt { ... }])`，mode 为 `destroy`/`keep`/`replace`/`strict`；方块实体数据写在方块状态之后。
+- [x] 3.3 `fill(from, to, block_state[, mode][, replace filter][, nbt { ... }])`，模式含 `outline`/`hollow`/`destroy`/`strict`；`nbt` 可出现在任意可选参数位置。
 - [x] 3.4 `clone(...)`：同维度与跨维度、`masked`/`filtered`、`force`/`move`/`normal`、`strict`；选项顺序无关，重复报错。
 - [x] 3.5 `fill_biome(from, to, biome [, replace filter])`；过滤器接受 `#` 生物群系标签。
 - [x] 3.6 `place.feature/jigsaw/structure/template(...)`，含 rotation、mirror、integrity、seed、strict；feature 的内联 JSON 未建模。
@@ -327,7 +354,7 @@
 - [ ] 8.6 语言服务器与编辑器集成：补全、悬停、跳转、格式化、即时诊断。
   - [x] `mclang lsp` 语言服务器：UTF-16 位置换算、全文同步、项目级即时诊断、声明与关键词补全（`@`/`#` 上下文）、关键词与声明悬停、跨文件跳转；`analysis::analyze` 提供结构化诊断与符号表。
   - [x] VSCode 插件 `editors/vscode`：TextMate 语法高亮（中英文关键词表与解析器同步测试）、语言配置、按 `mclang.server.path`/`target/(release|debug)`/`PATH` 解析可执行文件的语言客户端。
-  - [ ] 剩余：文档格式化、代码操作（快速修复）、点号成员（`self.*`、`effect.*` 等）补全与语义高亮。
+  - [ ] 剩余：文档格式化、代码操作（快速修复）、点号成员（`self.*`、`effect.*` 等）补全与语义高亮；实体 NBT 键按上下文补全/悬停（依赖 `version::entity_nbt` 快照）。
 - [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收。`docs/index.html` 单页手册（`docs/content/manual.md` + `docs/tools/`）已覆盖声明、语句、世界命令、表达式、编译产物、双语关键词与函数标签、`effect`/`xp`/`clear`、`return fail`/`run`、`schedule.clear` 等章节，示例由真实编译器验证；后续新增能力仍需同步该手册。
 
 ### 第 9 阶段：数据包内容与资源 schema（非命令）
@@ -351,7 +378,7 @@
 ### 依赖关系与验收
 
 - 1.1 是全部注册表校验与补全数据的前提；1.2/1.4 是第 3、4、5 阶段的参数类型前提；1.3 支撑 2.7 与第 6 阶段；1.5 支撑 2.2、4.3、7.1–7.3。
-- 第 3 阶段已按上述形式落地：坐标与方块状态内联在语句参数中，资源位置只做语法检查；游戏规则使用对照 26.3 `GameRules` 的静态表。1.1 快照落地后应把方块、生物群系、结构、时钟与规则表升级为注册表校验；方块实体 NBT 与 `place.feature` 内联 JSON 等待 1.4。
+- 第 3 阶段已按上述形式落地：坐标与方块状态内联在语句参数中，资源位置只做语法检查；游戏规则使用对照 26.3 `GameRules` 的静态表。1.1 快照落地后应把方块、生物群系、结构、时钟与规则表升级为注册表校验；方块实体 NBT 与实体具名标签已随 1.4 落地（实体表由 `generate-version-data` 生成），`place.feature` 内联 JSON 仍等待 1.4 的值类型扩展。
 - 2.1/2.2 的 `execute` 与条件模型是第 3、4、5 阶段的世界/实体命令在非默认上下文中执行的前提。
 - 9.1/9.2 依赖 1.1 的版本元数据与注册表快照；函数标签部分已经落地，不依赖注册表数据；9.3–9.6 依赖 1.4 的结构化 NBT 与值类型；9.7/9.8 依赖输出层与 1.1 的版本数据。函数标签（9.2）是 2.10 的 `#tag` 调用前提。
 - 每个阶段的验收：编译器零警告；`examples/` 项目通过 `--deny-raw`；`src/compiler/tests.rs` 断言生成命令与资源文件；中英文关键词产物逐字节一致；文档与手册同步。

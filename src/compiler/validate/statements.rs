@@ -11,8 +11,8 @@ use std::collections::HashSet;
 
 use crate::ast::{
     AdvancementReference, AssignOp, CallTarget, Condition, DataSlotKind, EffectDuration,
-    EntityQueryDecl, Expr, GiveItem, GiveTarget, Holder, MessageTarget, ReturnKind, ScoreTarget,
-    SelfAction, Span, Statement, StatementKind, TeleportDestination, XpOperation,
+    EntityQueryDecl, Expr, GiveItem, GiveTarget, Holder, MessageTarget, NbtValue, ReturnKind,
+    ScoreTarget, SelfAction, Span, Statement, StatementKind, TeleportDestination, XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
@@ -33,6 +33,8 @@ use super::tags::reachable_functions;
 pub(super) struct ValidationContext<'a, 'b> {
     pub(super) symbols: &'a StatementSymbols<'b>,
     pub(super) context: ExecutionContext,
+    /// `each`/`spawn` 已知的实体类型，用于具名 NBT 标签检查；未知时为 `None`。
+    pub(super) entity_type: Option<&'a str>,
     pub(super) return_rules: ReturnRules,
 }
 
@@ -113,6 +115,7 @@ pub(super) fn collect_local_declarations<'a>(
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
             | StatementKind::Teleport { .. }
+            | StatementKind::NbtMerge { .. }
             | StatementKind::AdvancementAction { .. }
             | StatementKind::Return(_) => {}
         }
@@ -124,12 +127,14 @@ pub(super) fn validate_statements<'a>(
     locals: &mut HashSet<&'a str>,
     symbols: &StatementSymbols<'_>,
     context: ExecutionContext,
+    entity_type: Option<&'a str>,
     return_rules: ReturnRules,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let ctx = ValidationContext {
         symbols,
         context,
+        entity_type,
         return_rules,
     };
     for statement in statements {
@@ -279,6 +284,9 @@ fn validate_statement<'a>(
             destination,
         } => {
             validate_teleport(targets, destination, statement.span, ctx, diagnostics);
+        }
+        StatementKind::NbtMerge { nbt } => {
+            validate_nbt_merge(nbt, statement.span, ctx, diagnostics);
         }
         StatementKind::AdvancementAction {
             targets,
@@ -630,6 +638,23 @@ fn validate_teleport(
             }
         }
     }
+}
+
+/// `nbt { ... }`：把具名 NBT 合并到当前实体，键对照 26.3 源码标签表检查。
+fn validate_nbt_merge(
+    nbt: &NbtValue,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if ctx.context != ExecutionContext::Mob {
+        diagnostics.push(Diagnostic::new(
+            "nbt/数据 通过 data 命令合并实体 NBT，Minecraft 不允许修改玩家数据；只能在确定不是玩家的实体上下文中使用（非玩家查询的 each、非玩家 spawn，或 @non_player 函数）",
+            span,
+        ));
+        return;
+    }
+    super::entity_nbt::validate_entity_nbt(nbt, ctx.entity_type, span, diagnostics);
 }
 
 /// `advancement.grant/revoke`：目标是玩家，进度引用必须可解析。
@@ -989,6 +1014,7 @@ fn validate_each<'a>(
         &mut body_locals,
         ctx.symbols,
         body_context,
+        query_decl.map(|query| query.entity_type.as_str()),
         ctx.return_rules.nested(),
         diagnostics,
     );
@@ -1014,6 +1040,7 @@ fn validate_in_dimension<'a>(
         &mut body_locals,
         ctx.symbols,
         ctx.context,
+        ctx.entity_type,
         ctx.return_rules.nested(),
         diagnostics,
     );
@@ -1044,6 +1071,7 @@ fn validate_spawn<'a>(
         &mut body_locals,
         ctx.symbols,
         ExecutionContext::Mob,
+        Some(entity_type),
         ctx.return_rules.nested(),
         diagnostics,
     );
@@ -1182,6 +1210,7 @@ fn validate_if<'a>(
         &mut then_locals,
         ctx.symbols,
         ctx.context,
+        ctx.entity_type,
         ctx.return_rules.nested(),
         diagnostics,
     );
@@ -1191,6 +1220,7 @@ fn validate_if<'a>(
         &mut else_locals,
         ctx.symbols,
         ctx.context,
+        ctx.entity_type,
         ctx.return_rules.nested(),
         diagnostics,
     );
@@ -1210,6 +1240,7 @@ fn validate_while<'a>(
         &mut body_locals,
         ctx.symbols,
         ctx.context,
+        ctx.entity_type,
         ctx.return_rules.nested(),
         diagnostics,
     );
@@ -1227,6 +1258,7 @@ fn validate_execute<'a>(
         &mut body_locals,
         ctx.symbols,
         ctx.context,
+        ctx.entity_type,
         ctx.return_rules.nested(),
         diagnostics,
     );

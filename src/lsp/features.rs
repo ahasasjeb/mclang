@@ -154,6 +154,10 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "方块状态构造器：`block_state(\"命名空间:方块\") { 属性 = \"值\"; }`。",
     ),
     (
+        "nbt",
+        "结构化 NBT 数据：`nbt { 键 = 值; }`，支持全部 12 种标签类型；可作 set_block/fill 的方块实体数据、物品的 custom_data，或作为语句合并到当前实体的具名标签。",
+    ),
+    (
         "advancement",
         "声明进度或用 `advancement.grant/revoke(...)` 授予、撤销玩家进度。",
     ),

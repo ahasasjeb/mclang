@@ -35,6 +35,10 @@ export async function loadKeywordTables(repoRoot) {
     path.join(repoRoot, "src/compiler/validate/advancement.rs"),
     "utf8",
   );
+  const entityNbtSource = await readFile(
+    path.join(repoRoot, "src/version/entity_nbt.rs"),
+    "utf8",
+  );
 
   const keywords = parseConstantBlock(keywordsSource, "KEYWORDS");
   const attributes = parseConstantBlock(keywordsSource, "ATTRIBUTES");
@@ -48,6 +52,7 @@ export async function loadKeywordTables(repoRoot) {
     gameRules: parseGameRules(worldSource),
     resourceKinds: parseSimpleKinds(rulesSource),
     advancementTriggers: parseAdvancementTriggers(advancementSource),
+    nbtAliases: parseNbtAliases(entityNbtSource),
   };
 }
 
@@ -145,8 +150,7 @@ function parseSimpleKinds(source) {
   return kinds;
 }
 
-/** 解析 26.3 进度触发器清单（`const TRIGGERS`，来自 CriteriaTriggers）。 */
-function parseAdvancementTriggers(source) {
+/** 解析 26.3 进度触发器清单（`const TRIGGERS`，来自 CriteriaTriggers）。 */function parseAdvancementTriggers(source) {
   const start = source.indexOf("const TRIGGERS");
   const end = source.indexOf("\n];", start);
   if (start < 0 || end < 0) throw new Error("advancement.rs 中找不到 TRIGGERS");
@@ -156,4 +160,17 @@ function parseAdvancementTriggers(source) {
   }
   if (triggers.length === 0) throw new Error("TRIGGERS 没有解析出任何触发器");
   return triggers;
+}
+
+/** 解析 `src/version/entity_nbt.rs` 的 `CHINESE_ALIASES`（中文别名 → 英文键）。 */
+function parseNbtAliases(source) {
+  const start = source.indexOf("const CHINESE_ALIASES");
+  const end = source.indexOf("\n];", start);
+  if (start < 0 || end < 0) throw new Error("entity_nbt.rs 中找不到 CHINESE_ALIASES");
+  const pairs = [];
+  for (const match of source.slice(start, end).matchAll(/\("([^"]+)",\s*"([^"]+)"\)/g)) {
+    pairs.push({ en: match[2], zh: match[1] });
+  }
+  if (pairs.length === 0) throw new Error("CHINESE_ALIASES 没有解析出任何条目");
+  return pairs;
 }

@@ -202,6 +202,7 @@ fn chinese_and_english_keywords_compile_identically() {
                 stored_enchantment("minecraft:mending", 1);
                 damage = 4;
                 unbreakable = true;
+                custom_data = nbt { source = "bilingual"; level = 5; };
             }
             item flare = item_stack("minecraft:leather_chestplate") {
                 max_stack_size = 16;
@@ -271,6 +272,7 @@ fn chinese_and_english_keywords_compile_identically() {
                 存储附魔("minecraft:mending", 1);
                 损伤 = 4;
                 无法破坏 = 真;
+                自定义数据 = 数据 { source = "bilingual"; level = 5; };
             }
             物品 flare = 物品堆("minecraft:leather_chestplate") {
                 最大堆叠 = 16;
@@ -1154,6 +1156,291 @@ clone from minecraft:the_nether 0 64 0 4 64 4 10 64 0 to minecraft:overworld\n";
 }
 
 #[test]
+fn lowers_all_nbt_tag_types_in_block_entities() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            fn build() {
+                set_block(pos(0, 64, 0), block_state("minecraft:chest"), nbt {
+                    name = "仓库";
+                    byte_value = 1b;
+                    short_value = -2s;
+                    int_value = 3;
+                    long_value = 4L;
+                    float_value = 1.5f;
+                    double_value = -2.5d;
+                    plain_double = 0.5;
+                    truth = true;
+                    nested = {
+                        label = "子";
+                        list = [1, "two", 3b, { deep = 4L; }];
+                    };
+                    bytes = [B; 1b, 2B, 3];
+                    ints = [I; 1, 2s, 3b];
+                    longs = [L; 1L, 9999999999, 3s, 4b];
+                });
+                set_block(pos(1, 64, 0), block_state("minecraft:sign") { rotation = "0"; }, nbt {});
+                set_block(pos(3, 64, 0), block_state("minecraft:chest"), nbt { 自定义名称 = "中文键"; });
+                fill(pos(0, 65, 0), pos(2, 65, 2), block_state("minecraft:chest"), replace, block_state("minecraft:air"), nbt { count = 1; });
+            }
+            "##,
+    );
+    let build = &pack.files[&PathBuf::from("data/demo/function/build.mcfunction")];
+    let expected = "\
+setblock 0 64 0 minecraft:chest{name:\"仓库\",byte_value:1b,short_value:-2s,int_value:3,long_value:4L,float_value:1.5f,double_value:-2.5d,plain_double:0.5d,truth:1b,nested:{label:\"子\",list:[1,\"two\",3b,{deep:4L}]},bytes:[B;1B,2B,3B],ints:[I;1,2,3],longs:[L;1L,9999999999L,3L,4L]}
+setblock 1 64 0 minecraft:sign[rotation=0]{}
+setblock 3 64 0 minecraft:chest{CustomName:\"中文键\"}
+fill 0 65 0 2 65 2 minecraft:chest{count:1} replace minecraft:air\n";
+    assert!(build.ends_with(expected), "{build}");
+}
+
+#[test]
+fn rejects_invalid_nbt_literals() {
+    let byte_range = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0, 64, 0), block_state(\"minecraft:chest\"), nbt { level = 128b; }); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        byte_range.unwrap_err()[0]
+            .message
+            .contains("字节超出 -128 到 127")
+    );
+
+    let duplicate = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0, 64, 0), block_state(\"minecraft:chest\"), nbt { key = 1; key = 2; }); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        duplicate.unwrap_err()[0]
+            .message
+            .contains("NBT 键 `key` 重复")
+    );
+
+    let array_element = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0, 64, 0), block_state(\"minecraft:chest\"), nbt { ids = [B; 1s]; }); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        array_element.unwrap_err()[0]
+            .message
+            .contains("元素不能使用 `s` 后缀")
+    );
+
+    let byte_array_range = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0, 64, 0), block_state(\"minecraft:chest\"), nbt { ids = [B; 200]; }); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        byte_array_range.unwrap_err()[0]
+            .message
+            .contains("字节元素超出 -128 到 127")
+    );
+
+    let int_array_range = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0, 64, 0), block_state(\"minecraft:chest\"), nbt { ids = [I; 9999999999]; }); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        int_array_range.unwrap_err()[0]
+            .message
+            .contains("整数元素超出 -2147483648 到 2147483647")
+    );
+
+    let missing_bracket = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0, 64, 0), block_state(\"minecraft:chest\"), nbt { ids = [1, 2; }); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(missing_bracket.unwrap_err()[0].message.contains("缺少 `]`"));
+
+    let bad_suffix = lex("namespace demo; fn f() { let a = 1.5b; }", 0);
+    assert!(
+        bad_suffix.unwrap_err()[0]
+            .message
+            .contains("小数只能使用 f 或 d 后缀")
+    );
+
+    let spelled = parse(
+        lex(
+            "namespace demo; fn f() { set_block(pos(0, 64, 0), block_state(\"minecraft:chest\"), nbt { label = plain; }); }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(spelled.unwrap_err()[0].message.contains("字符串需要加引号"));
+
+    let statement = parse(lex("namespace demo; fn f() { nbt { a = 1; } }", 0).unwrap());
+    assert!(statement.is_ok(), "nbt 语句本身应当是合法语法");
+}
+
+#[test]
+fn lowers_entity_nbt_merge_and_checks_named_tags() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            query zombies = entity("minecraft:zombie") { limit(1); }
+            @load fn setup() {
+                spawn("minecraft:zombie") {
+                    nbt { NoAI = true; Silent = true; CustomName = "守卫"; Health = 20.0f; }
+                }
+            }
+            fn calm() {
+                each(zombies) {
+                    nbt { NoAI = true; Tags = ["calm"]; }
+                }
+            }
+            "##,
+    );
+    let setup = &pack.files[&PathBuf::from("data/demo/function/__mcl/setup/0.mcfunction")];
+    assert!(
+        setup.contains("data merge entity @s {NoAI:1b,Silent:1b,CustomName:\"守卫\",Health:20.0f}"),
+        "{setup}"
+    );
+    let calm = &pack.files[&PathBuf::from("data/demo/function/__mcl/calm/0.mcfunction")];
+    assert!(
+        calm.contains("data merge entity @s {NoAI:1b,Tags:[\"calm\"]}"),
+        "{calm}"
+    );
+
+    let program = parse(
+        lex(
+            r##"
+            namespace demo;
+            fn wrong() {
+                nbt { NoAi = true; }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("不允许修改玩家数据")),
+        "{errors:#?}"
+    );
+
+    let program = parse(
+        lex(
+            r##"
+            namespace demo;
+            @non_player fn bad() {
+                nbt { NoAi = true; Health = "full"; Strength = 5; }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    assert!(
+        errors.iter().any(
+            |error| error.message.contains("没有名为 `NoAi` 的 NBT 标签")
+                && error.message.contains("NoAI")
+        ),
+        "{errors:#?}"
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("`Health`（中文 `生命`） 需要数字")),
+        "{errors:#?}"
+    );
+
+    let program = parse(
+        lex(
+            r##"
+            namespace demo;
+            fn typed() {
+                spawn("minecraft:creeper") {
+                    nbt { Strength = 3; }
+                }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    assert!(
+        errors.iter().any(
+            |error| error.message.contains("该实体类型没有名为 `Strength`")
+                && error.message.contains("驮运强度")
+        ),
+        "{errors:#?}"
+    );
+
+    let english = compile_text(
+        r##"
+        namespace demo;
+        @non_player fn calm() { nbt { NoAI = true; Silent = false; CustomName = "守卫"; } }
+        "##,
+    );
+    let chinese = compile_text(
+        r##"
+        命名空间 demo;
+        @非玩家 函数 calm() { 数据 { NoAI = 真; Silent = 假; CustomName = "守卫"; } }
+        "##,
+    );
+    assert_eq!(english.files, chinese.files);
+
+    // 顶层中文别名与英文键指向同一标签，产物逐字节一致。
+    let english = compile_text(
+        r##"
+        namespace demo;
+        @non_player fn calm() {
+            nbt { NoAI = true; Silent = true; CustomName = "守卫"; Tags = ["calm"]; Health = 20.0f; }
+        }
+        "##,
+    );
+    let chinese = compile_text(
+        r##"
+        命名空间 demo;
+        @非玩家 函数 calm() {
+            数据 { 无AI = 真; 静音 = 真; 自定义名称 = "守卫"; 标签 = ["calm"]; 生命 = 20.0f; }
+        }
+        "##,
+    );
+    assert_eq!(english.files, chinese.files);
+
+    // 别名与英文键归一化后是同一个键，重复声明要报错。
+    let duplicate = parse(
+        lex(
+            "namespace demo; @non_player fn f() { nbt { NoAI = true; 无AI = false; } }",
+            0,
+        )
+        .unwrap(),
+    );
+    assert!(
+        duplicate.unwrap_err()[0]
+            .message
+            .contains("NBT 键 `NoAI` 重复")
+    );
+}
+
+#[test]
 fn lowers_biome_place_forceload_and_queries() {
     let pack = compile_text(
         r##"
@@ -1399,8 +1686,10 @@ fn world_commands_are_keyword_symmetric() {
             fn build() {
                 set_block(pos(0, 64, 0), block_state("minecraft:stone"));
                 set_block(pos(~, ~1, ~), block_state("minecraft:oak_stairs") { facing = "east"; }, keep);
+                set_block(pos(0, 65, 0), block_state("minecraft:chest"), nbt { label = "box"; slots = [I; 0, 1, 2]; });
                 fill(pos(0, 64, 1), pos(4, 64, 5), block_state("minecraft:glass"), outline);
                 fill(pos(0, 64, 1), pos(4, 64, 5), block_state("minecraft:oak_planks"), replace, block_state("#minecraft:planks"));
+                fill(pos(0, 66, 0), pos(1, 66, 1), block_state("minecraft:chest"), replace, block_state("minecraft:air"), nbt { label = "row"; flag = true; });
                 fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains", replace, "#minecraft:is_forest");
                 clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), filtered, block_state("#minecraft:logs"), move, strict);
                 clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"), masked, force);
@@ -1446,8 +1735,10 @@ fn world_commands_are_keyword_symmetric() {
             函数 build() {
                 设置方块(坐标(0, 64, 0), 方块状态("minecraft:stone"));
                 设置方块(坐标(~, ~1, ~), 方块状态("minecraft:oak_stairs") { facing = "east"; }, 保留);
+                设置方块(坐标(0, 65, 0), 方块状态("minecraft:chest"), 数据 { label = "box"; slots = [I; 0, 1, 2]; });
                 填充(坐标(0, 64, 1), 坐标(4, 64, 5), 方块状态("minecraft:glass"), 轮廓);
                 填充(坐标(0, 64, 1), 坐标(4, 64, 5), 方块状态("minecraft:oak_planks"), 替换, 方块状态("#minecraft:planks"));
+                填充(坐标(0, 66, 0), 坐标(1, 66, 1), 方块状态("minecraft:chest"), 替换, 方块状态("minecraft:air"), 数据 { label = "row"; flag = 真; });
                 填充生物群系(坐标(0, 0, 0), 坐标(15, 0, 15), "minecraft:plains", 替换, "#minecraft:is_forest");
                 复制(坐标(0, 64, 0), 坐标(4, 64, 4), 坐标(10, 64, 0), 过滤, 方块状态("#minecraft:logs"), 移动, 严格);
                 复制(坐标(0, 64, 0), 坐标(4, 64, 4), 坐标(10, 64, 0), 起始维度("minecraft:the_nether"), 目标维度("minecraft:overworld"), 遮罩, 强制);
@@ -1929,7 +2220,7 @@ fn lowers_advancement_declarations_to_json() {
     let pack = compile_text(
         r##"
             namespace demo;
-            item medal = item_stack("minecraft:emerald") { count = 2; custom_name = "通行证"; }
+            item medal = item_stack("minecraft:emerald") { count = 2; custom_name = "通行证"; custom_data = nbt { serial = "demo-1"; level = 2s; }; }
             fn on_placed() {}
             advancement portal_frame {
                 parent = "minecraft:story/root";
@@ -1969,6 +2260,10 @@ fn lowers_advancement_declarations_to_json() {
     assert!(json.contains("\"id\": \"minecraft:emerald\""), "{json}");
     assert!(json.contains("\"count\": 2"), "{json}");
     assert!(json.contains("\"minecraft:custom_name\""), "{json}");
+    assert!(
+        json.contains("\"minecraft:custom_data\": {") && json.contains("\"serial\": \"demo-1\""),
+        "{json}"
+    );
     assert!(
         json.contains("\"parent\": \"minecraft:story/root\""),
         "{json}"

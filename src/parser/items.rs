@@ -34,6 +34,7 @@ impl Parser {
         let mut enchantment_glint_override = None;
         let mut unbreakable = false;
         let mut has_unbreakable = false;
+        let mut custom_data = None;
         while !self.check(&TokenKind::RightBrace) {
             if self.check(&TokenKind::Eof) {
                 return Err(Diagnostic::new("物品定义缺少 `}`", self.current().span));
@@ -178,6 +179,14 @@ impl Parser {
                     };
                     self.expect(TokenKind::Semicolon, "unbreakable 后需要 `;`")?;
                 }
+                "custom_data" => {
+                    if custom_data.is_some() {
+                        return Err(Diagnostic::new("物品自定义数据只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "custom_data 后需要 `=`")?;
+                    custom_data = Some(self.nbt_compound("物品自定义数据")?);
+                    self.expect(TokenKind::Semicolon, "物品自定义数据后需要 `;`")?;
+                }
                 _ => unreachable!(),
             }
         }
@@ -201,6 +210,7 @@ impl Parser {
             dyed_color,
             enchantment_glint_override,
             unbreakable,
+            custom_data,
             span: start.merge(end),
         })
     }

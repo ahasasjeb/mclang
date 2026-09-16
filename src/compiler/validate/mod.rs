@@ -4,6 +4,7 @@
 //! 最后分析同步调用图。所有诊断都会返回，不提前退出，方便用户一次修完。
 
 mod advancement;
+mod entity_nbt;
 mod expressions;
 mod items;
 mod recursion;
@@ -437,6 +438,7 @@ fn validate_function_bodies(
             &mut visible_locals,
             &symbols,
             function_context(function),
+            None,
             ReturnRules {
                 returns_score: function.returns_score,
                 allowed_here: true,

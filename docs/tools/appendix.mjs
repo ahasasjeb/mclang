@@ -4,7 +4,8 @@
 // `:::table kind=aliases` 生成方法、属性与枚举别名；
 // `:::table kind=game-rules` 生成 26.3 GameRules 注册表；
 // `:::table kind=resource-kinds` 生成 `resource` 声明可用的资源类型；
-// `:::table kind=advancement-triggers` 生成 26.3 进度触发器清单。
+// `:::table kind=advancement-triggers` 生成 26.3 进度触发器清单；
+// `:::table kind=nbt-aliases` 生成实体 NBT 标签的中文别名。
 
 import { escapeHtml, parseAttributes, renderInline } from "./markdown.mjs";
 
@@ -76,6 +77,8 @@ export function renderAppendixTable(attributesText, data) {
       return renderResourceKinds(data);
     case "advancement-triggers":
       return renderAdvancementTriggers(data);
+    case "nbt-aliases":
+      return renderNbtAliases(data);
     default:
       throw new Error(`未知的附录表格 kind=${kind ?? ""}`);
   }
@@ -171,8 +174,28 @@ function renderAdvancementTriggers(data) {
   return html;
 }
 
-function heading4(title, detail) {
-  return `<h4>${escapeHtml(title)} <small>${escapeHtml(detail)}</small></h4>\n`;
+function renderNbtAliases(data) {
+  let html = filterBar("nbt-aliases", "过滤标签：输入英文键或中文别名");
+  html += heading4(
+    "实体 NBT 中文别名",
+    `CHINESE_ALIASES · ${data.nbtAliases.length} 项`,
+  );
+  html +=
+    '<p class="table-note">' +
+    renderNote(
+      '实体 `nbt { … }` 语句与 `set_block`/`fill` 方块实体数据的顶层键可以用中文别名，解析期归一化为英文键，产物与英文写法逐字节一致；实体语句在 `spawn`/`each` 里还会按实体类型检查键是否存在与值类型。别名只覆盖常用标签，其余写英文键；物品 `custom_data` 的键是用户数据，不做替换。',
+    ) +
+    "</p>";
+  html +=
+    '<div class="table-wrap"><table class="alias-table"><thead><tr><th>中文</th><th>English</th></tr></thead><tbody>';
+  for (const pair of data.nbtAliases) {
+    html += `<tr><td><code>${escapeHtml(pair.zh)}</code></td><td><code>${escapeHtml(pair.en)}</code></td></tr>\n`;
+  }
+  html += "</tbody></table></div>\n";
+  return html;
+}
+
+function heading4(title, detail) {  return `<h4>${escapeHtml(title)} <small>${escapeHtml(detail)}</small></h4>\n`;
 }
 
 function pairTable(pairs) {

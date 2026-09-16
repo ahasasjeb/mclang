@@ -254,6 +254,10 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         english: "block_state",
         chinese: "方块状态",
     },
+    Keyword {
+        english: "nbt",
+        chinese: "数据",
+    },
 ];
 
 /// 函数属性的规范英文写法与中文别名，`@` 之后使用。
@@ -360,6 +364,7 @@ pub(super) fn item_stack_property(value: &str) -> Option<&'static str> {
         "dyed_color" | "染色" => Some("dyed_color"),
         "enchantment_glint_override" | "附魔光效" => Some("enchantment_glint_override"),
         "unbreakable" | "无法破坏" => Some("unbreakable"),
+        "custom_data" | "自定义数据" => Some("custom_data"),
         _ => None,
     }
 }
