@@ -104,6 +104,7 @@ pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut 
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
             | StatementKind::Teleport { .. }
+            | StatementKind::AdvancementAction { .. }
             | StatementKind::Return(_) => {}
         }
     }

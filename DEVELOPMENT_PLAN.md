@@ -24,7 +24,7 @@
 | 不可达 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 不建模 | 可由其他结构化语句等价表达，或对数据包无意义 |
 
-当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **14 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`、`clone`、`fillbiome`、`forceload`、`time`、`weather`、`gamerule`、`worldborder`、`locate`），14 个有部分结构化入口；33 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
+当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **15 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`、`clone`、`fillbiome`、`forceload`、`time`、`weather`、`gamerule`、`worldborder`、`locate`、`advancement`），14 个有部分结构化入口；32 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
 
 ### 1.1 执行、函数与数据核心
 
@@ -38,7 +38,7 @@
 | `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 部分 | 已有 `objective` 声明与 `scoreboard.set/reset/get`（支持自身/投掷者/查询持有者，可用作表达式）；无显示槽、enable、operation、displayname 与数字格式 |
 | `item` | replace/fill/override/modify（entity/block 目标、槽位集合、from/with/loot_modifier） | 部分 | 只有 `give(..., self.item)` 用的 `replace ... from entity ... contents` |
 | `loot` | loot/fish/kill/mine + give/insert/replace/spawn | 缺失 | 战利品表资源可声明，但没有取用命令 |
-| `advancement` | grant/revoke × only/from/until/through/everything | 缺失 | — |
+| `advancement` | grant/revoke × only/from/until/through/everything | 完成 | `advancement.grant/revoke[_through|_from|_until|_everything]`，目标是玩家（self/投掷者/玩家查询）；进度引用本命名空间声明或字符串资源位置，`only` 可带准则名 |
 | `recipe` | give/take `<recipe\|*>` | 缺失 | — |
 | `reload` | — | 缺失 | — |
 | `datapack` | enable/disable/list；create（不可达，需 OWNER） | 缺失 | — |
@@ -138,7 +138,7 @@
 | predicate | JSON | 部分 | 原始 JSON；只检查同命名空间引用 |
 | loot_table | JSON | 部分 | 原始 JSON |
 | item_modifier | JSON | 部分 | 原始 JSON |
-| advancement | JSON | 部分 | 原始 JSON |
+| advancement | JSON | 部分 | 结构化 `advancement` 声明（准则/触发器/奖励/展示/父级）已落地；准则的 `conditions` 仍是原始 JSON |
 | recipe | JSON | 部分 | 原始 JSON |
 | 动态注册表 JSON | damage_type、enchantment、enchantment_provider、dialog、timeline、world_clock、trade_set、villager_trade、trial_spawner、trim_material/pattern、jukebox_song、instrument、painting_variant、banner_pattern、装饰陶片、各类变体与声音变体、test_environment/test_instance 等 41 类 | 部分 | 原始 JSON，无字段 schema |
 | worldgen | 17 类 JSON：biome、feature、placed_feature、structure、structure_set、template_pool、processor_list、noise、noise_settings、density_function、carver、material_rule、material_condition、block_state_provider、multi_noise_biome_source_parameter_list、flat_level_generator_preset、world_preset | 部分 | 原始 JSON，无 schema 与引用校验 |
@@ -202,6 +202,15 @@
 - [x] 游戏规则与边界：`gamerule.set`/`gamerule.query`（26.3 `GameRules` 表），`worldborder.*` 与表达式 `worldborder.get()`。
 - [x] 查询表达式：`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(规则)`、`worldborder.get()`。
 - [x] `examples/world_ops.mcl`：覆盖上述能力并通过 `--deny-raw`。
+
+进度与事件（本次批次）：
+
+- [x] `advancement` 声明：`parent`、`criterion`（`trigger` + `conditions` 原始 JSON）、`requirements = all|any`、`reward`（`function`/`experience`/`loot`/`recipe`）与 `display`（图标、标题、描述、`frame`、`background`、三个展示开关），输出到 `data/<命名空间>/advancement/<名称>.json`，默认值省略、`requirements` 显式生成，产物稳定。
+- [x] 编译期检查：触发器名对照 26.3 `CriteriaTriggers` 注册表的 58 个条目（可省略 `minecraft:` 前缀）、准则重名、`conditions` JSON 语法、根进度的 `background` 规则；`parent`、`reward.function`、`reward.loot`、`reward.recipe` 引用本命名空间声明时要求存在，字符串按外部资源位置处理；`display.icon` 引用 `item` 定义，图标组件完整输出。
+- [x] `advancement.grant/revoke[_through|_from|_until|_everything]`：目标是玩家（`self`/`自身` 要求玩家上下文，查询必须匹配 `minecraft:player`），进度引用本命名空间声明或字符串资源位置，`only` 可带准则名；不计入 `--deny-raw`。
+- [x] 进度声明与 `resource advancement` 同类型同名冲突检查。
+- [x] `examples/portal.mcl`：放置方块（`placed_block`）与进入方块（`enter_block`）两个事件入口，奖励函数用 `advancement.revoke(self, …)` 撤销进度实现可重复触发，并通过 `--deny-raw` 与双语翻译自检。
+- [x] 文档：手册新增进度声明与进度操作章节、附录 D 触发器总表（从编译器源码提取）、`portal.mcl` 示例条目。
 
 ## 三、路线图
 
@@ -282,7 +291,7 @@
 
 - [ ] 5.1 `loot` 全形态：上下文来源（loot table、fish、kill、mine）与投放目标（`give`、`insert`、`replace`、`spawn`）。
 - [ ] 5.2 `slot_source` 声明与 `item` 联动，替代 `give(..., self.item)` 中的内建空槽来源。
-- [ ] 5.3 `advancement.grant/revoke`：`only`（含 criterion）、`from`、`until`、`through`、`everything`。
+- [x] 5.3 `advancement.grant/revoke`：`only`（含 criterion）、`from`、`until`、`through`、`everything`。
 - [ ] 5.4 `recipe.give/take`（含 `*`）。
 - [ ] 5.5 `clear` 与 `give` 使用 2.3 的完整物品谓词。
 
@@ -330,6 +339,7 @@
   - 校验：注册表与条目 id 存在、嵌套标签可解析；默认拒绝写入 `minecraft:` 命名空间，需要时显式放开。
 - [ ] 9.3 资源 schema 化：把 raw JSON 升级为结构化声明，检查字段类型、枚举与未知字段；结构与原始 JSON 可共存，同类型同名称重复声明报错。
   - 第一批：predicate 条件树、loot_table（pool/entry/condition/function）、item_modifier、advancement（criteria/requirements/display/rewards/parent）。
+    - advancement 已落地：`advancement` 声明含 `parent`/`criterion`（`trigger` + 原始 JSON `conditions`）/`requirements`/`reward`/`display`，触发器名与 26.3 `CriteriaTriggers` 对照，引用（父进度、奖励函数/战利品表/配方、图标）编译期检查；准则的条件树与原始 JSON 共存待做。
   - 第二批：recipe（配方类型、展示、解锁）、enchantment、damage_type、dialog。
   - 第三批：其余动态注册表（timeline、world_clock、trade_set、villager_trade、trial_spawner、trim_material/pattern、变体与声音变体、test_environment/test_instance 等）。
 - [ ] 9.4 资源引用图：advancement 父级、loot table 与 entry、predicate、item modifier、dialog、tag、function、配方解锁等跨文件与跨命名空间引用解析，未解析引用在编译期报错；已建模类型之间不再依赖字符串。

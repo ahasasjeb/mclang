@@ -1923,3 +1923,438 @@ fn objectives_and_data_slots_are_keyword_symmetric() {
     );
     assert_eq!(english.files, chinese.files);
 }
+
+#[test]
+fn lowers_advancement_declarations_to_json() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            item medal = item_stack("minecraft:emerald") { count = 2; custom_name = "通行证"; }
+            fn on_placed() {}
+            advancement portal_frame {
+                parent = "minecraft:story/root";
+                criterion placed {
+                    trigger = placed_block;
+                    conditions = """{"location":{"condition":"minecraft:match_block","blocks":"minecraft:obsidian"}}""";
+                }
+                requirements = any;
+                reward {
+                    function = on_placed;
+                    experience = 5;
+                }
+                display {
+                    icon = medal;
+                    title = "传送门框架";
+                    description = "放下黑曜石。";
+                    frame = goal;
+                    show_toast = 假;
+                    hidden = 真;
+                }
+            }
+            "##,
+    );
+    let json = &pack.files[&PathBuf::from("data/demo/advancement/portal_frame.json")];
+    assert!(
+        json.contains("\"trigger\": \"minecraft:placed_block\""),
+        "{json}"
+    );
+    assert!(
+        json.contains("\"condition\": \"minecraft:match_block\""),
+        "{json}"
+    );
+    assert!(json.contains("\"function\": \"demo:on_placed\""), "{json}");
+    assert!(json.contains("\"frame\": \"goal\""), "{json}");
+    assert!(json.contains("\"show_toast\": false"), "{json}");
+    assert!(json.contains("\"hidden\": true"), "{json}");
+    assert!(json.contains("\"id\": \"minecraft:emerald\""), "{json}");
+    assert!(json.contains("\"count\": 2"), "{json}");
+    assert!(json.contains("\"minecraft:custom_name\""), "{json}");
+    assert!(
+        json.contains("\"parent\": \"minecraft:story/root\""),
+        "{json}"
+    );
+}
+
+#[test]
+fn rejects_broken_advancement_references() {
+    let program = parse(
+        lex(
+            r##"
+            namespace demo;
+            advancement broken {
+                parent = missing_parent;
+                criterion placed {
+                    trigger = no_such_trigger;
+                    conditions = """{no}""";
+                }
+                reward { function = missing_function; loot = missing_loot; }
+                display { icon = missing_icon; title = "x"; description = "y"; }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    assert_eq!(errors.len(), 6, "{errors:#?}");
+    let messages = errors
+        .iter()
+        .map(|error| &error.message)
+        .collect::<Vec<_>>();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("找不到父进度"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("不是 26.3 注册的进度触发器"))
+    );
+    assert!(messages.iter().any(|message| message.contains("JSON 无效")));
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("找不到奖励函数"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("找不到战利品表"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("找不到图标物品定义"))
+    );
+}
+
+#[test]
+fn validates_root_advancement_background_rules() {
+    let root_without_background = parse(
+        lex(
+            r##"
+            namespace demo;
+            item icon = item_stack("minecraft:stone") {}
+            advancement root_adv {
+                criterion c { trigger = tick; }
+                display { icon = icon; title = "t"; description = "d"; }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&root_without_background, "test").unwrap_err();
+    assert!(errors.iter().any(|error| error.message.contains("根进度")));
+
+    let child_with_background = parse(
+        lex(
+            r##"
+            namespace demo;
+            item icon = item_stack("minecraft:stone") {}
+            advancement parent_adv { criterion c { trigger = tick; } }
+            advancement child_adv {
+                parent = parent_adv;
+                criterion c { trigger = tick; }
+                display {
+                    icon = icon;
+                    title = "t";
+                    description = "d";
+                    background = "minecraft:textures/block/stone.png";
+                }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&child_with_background, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("只有根进度"))
+    );
+}
+
+#[test]
+fn rejects_duplicate_advancement_declarations() {
+    let duplicated = parse(
+        lex(
+            "namespace demo; advancement a { criterion c { trigger = tick; } } advancement a { criterion c { trigger = tick; } }",
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&duplicated, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("重复声明进度"))
+    );
+
+    let conflicts_with_resource = parse(
+        lex(
+            r##"namespace demo; resource advancement a = """{}"""; advancement a { criterion c { trigger = tick; } }"##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&conflicts_with_resource, "test").unwrap_err();
+    assert!(errors.iter().any(|error| error.message.contains("重名")));
+}
+
+#[test]
+fn lowers_advancement_grant_and_revoke() {
+    let pack = compile_text(
+        r##"
+            namespace demo;
+            query players = entity("minecraft:player") {}
+            advancement portal_frame { criterion placed { trigger = placed_block; } }
+            fn grant_all() {
+                advancement.grant(players, portal_frame);
+                advancement.grant(players, "minecraft:story/root", placed);
+                advancement.grant_through(players, portal_frame);
+                advancement.grant_from(players, portal_frame);
+                advancement.grant_until(players, portal_frame);
+                advancement.grant_everything(players);
+            }
+            @player fn revoke_self() {
+                advancement.revoke(self, portal_frame);
+                advancement.revoke_everything(self);
+            }
+            "##,
+    );
+    let grants = &pack.files[&PathBuf::from("data/demo/function/grant_all.mcfunction")];
+    assert!(
+        grants.contains(
+            "execute as @e[type=minecraft:player] at @s run advancement grant @s only demo:portal_frame"
+        ),
+        "{grants}"
+    );
+    assert!(
+        grants.contains("advancement grant @s only minecraft:story/root placed"),
+        "{grants}"
+    );
+    assert!(
+        grants.contains("advancement grant @s through demo:portal_frame"),
+        "{grants}"
+    );
+    assert!(
+        grants.contains("advancement grant @s from demo:portal_frame"),
+        "{grants}"
+    );
+    assert!(
+        grants.contains("advancement grant @s until demo:portal_frame"),
+        "{grants}"
+    );
+    assert!(
+        grants.contains("advancement grant @s everything"),
+        "{grants}"
+    );
+    let revokes = &pack.files[&PathBuf::from("data/demo/function/revoke_self.mcfunction")];
+    assert!(
+        revokes.contains("advancement revoke @s only demo:portal_frame"),
+        "{revokes}"
+    );
+    assert!(
+        revokes.contains("advancement revoke @s everything"),
+        "{revokes}"
+    );
+}
+
+#[test]
+fn rejects_advancement_targets_that_are_not_players() {
+    let mob_query = parse(
+        lex(
+            r##"
+            namespace demo;
+            query mobs = entity("minecraft:zombie") {}
+            advancement a { criterion c { trigger = tick; } }
+            fn main() { advancement.grant(mobs, a); }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&mob_query, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("必须匹配 minecraft:player")),
+        "{errors:#?}"
+    );
+
+    let non_player_context = parse(
+        lex(
+            r##"
+            namespace demo;
+            advancement a { criterion c { trigger = tick; } }
+            @tick fn main() { advancement.revoke(self, a); }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&non_player_context, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("需要玩家执行上下文")),
+        "{errors:#?}"
+    );
+}
+
+#[test]
+fn validates_advancement_reward_functions() {
+    let parameterized = parse(
+        lex(
+            r##"
+            namespace demo;
+            fn on_placed(amount) { }
+            advancement a {
+                criterion c { trigger = tick; }
+                reward { function = on_placed; }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&parameterized, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("不能带参数")),
+        "{errors:#?}"
+    );
+
+    let mob_context = parse(
+        lex(
+            r##"
+            namespace demo;
+            @non_player fn on_placed() { }
+            advancement a {
+                criterion c { trigger = tick; }
+                reward { function = on_placed; }
+            }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&mob_context, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("以玩家身份运行")),
+        "{errors:#?}"
+    );
+
+    let player_context = compile_text(
+        r##"
+        namespace demo;
+        @player fn on_placed() { }
+        advancement a {
+            criterion c { trigger = tick; }
+            reward { function = on_placed; }
+        }
+        "##,
+    );
+    assert!(
+        player_context
+            .files
+            .contains_key(&PathBuf::from("data/demo/advancement/a.json"))
+    );
+}
+
+#[test]
+fn rejects_advancement_parent_cycles() {
+    let program = parse(
+        lex(
+            r##"
+            namespace demo;
+            advancement first { parent = second; criterion c { trigger = tick; } }
+            advancement second { parent = first; criterion c { trigger = tick; } }
+            "##,
+            0,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let errors = compile(&program, "test").unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message.contains("parent 链形成循环")),
+        "{errors:#?}"
+    );
+}
+
+#[test]
+fn advancements_are_keyword_symmetric() {
+    let english = compile_text(
+        r##"
+            namespace demo;
+            item icon = item_stack("minecraft:emerald") {}
+            fn on_placed() {}
+            advancement portal {
+                criterion placed { trigger = placed_block; conditions = """{}"""; }
+                requirements = any;
+                reward { function = on_placed; experience = 3; }
+                display {
+                    icon = icon;
+                    title = "T";
+                    description = "D";
+                    frame = goal;
+                    background = "minecraft:textures/block/stone.png";
+                    show_toast = false;
+                    announce_to_chat = false;
+                    hidden = true;
+                }
+            }
+            fn main() {
+                advancement.grant(players, portal, placed);
+                advancement.revoke_everything(players);
+            }
+            query players = entity("minecraft:player") {}
+            "##,
+    );
+    let chinese = compile_text(
+        r##"
+            命名空间 demo;
+            物品 icon = 物品堆("minecraft:emerald") {}
+            函数 on_placed() {}
+            进度 portal {
+                准则 placed { 触发器 = placed_block; 条件 = """{}"""; }
+                要求 = 任意;
+                奖励 { 函数 = on_placed; 经验 = 3; }
+                展示 {
+                    图标 = icon;
+                    标题 = "T";
+                    描述 = "D";
+                    框架 = 目标;
+                    背景 = "minecraft:textures/block/stone.png";
+                    显示提示 = 假;
+                    聊天公告 = 假;
+                    隐藏 = 真;
+                }
+            }
+            函数 main() {
+                进度.授予(players, portal, placed);
+                进度.撤销全部(players);
+            }
+            查询 players = 实体("minecraft:player") {}
+            "##,
+    );
+    assert_eq!(english.files, chinese.files);
+}

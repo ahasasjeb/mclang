@@ -347,6 +347,70 @@ resource predicate coin_flip = """
 """;
 ```
 
+### 进度（advancement）
+
+```mcl title="语法" fragment
+advancement <名称> {
+    parent = <父进度>;                              // 可选；省略即根进度
+    criterion <准则名> {
+        trigger = <26.3 触发器名>;
+        conditions = """<触发器条件的原始 JSON>""";   // 可选
+    }
+    requirements = all | any;                       // 可选，默认 all
+    reward {
+        function = <本命名空间函数或 "外部资源位置">;   // 可选
+        experience = <整数>;                         // 可选，默认 0
+        loot = <战利品表引用>;                        // 可重复
+        recipe = <配方引用>;                          // 可重复
+    }
+    display {
+        icon = <item 定义名称>;
+        title = "标题";
+        description = "描述";
+        frame = task | goal | challenge;            // 可选，默认 task
+        background = "<纹理资源位置>";               // 根进度必填
+        show_toast = true | false;                  // 可选，默认 true
+        announce_to_chat = true | false;            // 可选，默认 true
+        hidden = true | false;                      // 可选，默认 false
+    }
+}
+```
+
+进度是数据包唯一的事件入口：`criterion` 监听原版触发器（26.3 `CriteriaTriggers` 注册表，名字可以省略 `minecraft:` 前缀，完整清单见[附录 D](#appendix-triggers)），事件命中时运行 `reward.function` 指向的函数。**进度完成一次后不再触发**；需要持续响应时，在奖励函数里用 `advancement.revoke(自身, 进度)` 撤销自己。
+
+`conditions` 保持触发器的原始 JSON（`location`、`blocks` 等字段由原版定义）；编译期检查 JSON 语法、触发器名与准则重名。`parent`、`reward.function`、`reward.loot`、`reward.recipe` 引用本命名空间声明时要求存在，字符串形式按外部资源位置处理；`reward.loot` 与 `reward.recipe` 引用 `resource loot_table` / `resource recipe` 声明。`display.icon` 引用已声明的 `item` 定义，图标会带上它的组件。显示规则与原版一致：**根进度的 `display` 必须声明 `background`，带 `parent` 的进度不能声明 `background`**。
+
+`reward` 与 `display` 都可以省略：只有触发逻辑的隐形进度是数据包的常规用法。
+
+```mcl title="示例：放置方块时触发" verify id=advancement_demo
+namespace advancement_demo;
+
+item core_icon = item_stack("minecraft:crying_obsidian") {}
+
+advancement core_placed {
+    criterion placed {
+        trigger = placed_block;
+        conditions = """{"location":{"condition":"minecraft:match_block","blocks":"minecraft:crying_obsidian"}}""";
+    }
+    reward {
+        function = on_core_placed;
+    }
+    display {
+        icon = core_icon;
+        title = "传送门核心";
+        description = "放下哭泣的黑曜石。";
+        background = "minecraft:textures/block/crying_obsidian.png";
+        frame = goal;
+    }
+}
+
+@player
+fn on_core_placed() {
+    advancement.revoke(self, core_placed);
+    message.self("核心已放置。", gold);
+}
+```
+
 ### 函数标签（fn_tag）
 
 ```mcl title="语法" fragment
@@ -486,6 +550,33 @@ teleport(<持有者>, <单个实体查询>);
 each(boxes) {
     teleport(self, pos(29999970, -60, 29999970));   // 送进主世界仓库
     teleport(self, current_trigger);                // 从仓库取回触发物身边
+}
+```
+
+### 进度操作（advancement）
+
+```mcl title="语法" fragment
+advancement.grant(<持有者>, <进度>[, <准则名>]);
+advancement.grant_through(<持有者>, <进度>);
+advancement.grant_from(<持有者>, <进度>);
+advancement.grant_until(<持有者>, <进度>);
+advancement.grant_everything(<持有者>);
+advancement.revoke(<持有者>, <进度>[, <准则名>]);
+advancement.revoke_through(<持有者>, <进度>);
+advancement.revoke_from(<持有者>, <进度>);
+advancement.revoke_until(<持有者>, <进度>);
+advancement.revoke_everything(<持有者>);
+```
+
+授予或撤销玩家的进度。持有者支持 `self`/`自身`（要求玩家执行上下文）、`origin`/`投掷者` 和玩家查询（查询必须匹配 `minecraft:player`）。进度写本命名空间内的声明名，或用字符串引用外部资源位置。
+
+作用范围与原生命令一一对应：`grant`/`revoke` 是 `only`，只处理这一个进度，后面可以再跟一个准则名只操作单条准则；`_through` 处理从根到目标的整条路径；`_from` 处理目标及其子进度；`_until` 处理目标之前的父级链条；`_everything` 处理全部已加载进度，不需要进度参数。
+
+```mcl title="示例：可重复触发的事件" fragment
+@player
+fn on_core_placed() {
+    advancement.revoke(self, core_placed);   // 撤销后下一次放置才会再次触发
+    message.self("核心已放置。", gold);
 }
 ```
 
@@ -1287,6 +1378,7 @@ cargo run -- check examples/chinese_counter.mcl --deny-raw
 cargo run -- check examples/give_reward.mcl --deny-raw
 cargo run -- check examples/potion_lab.mcl --deny-raw
 cargo run -- check examples/world_ops.mcl --deny-raw
+cargo run -- check examples/portal.mcl --deny-raw
 cargo run -- check examples/portable_chest --deny-raw
 cargo run -- check examples/multi_counter --deny-raw
 ```
@@ -1298,6 +1390,7 @@ cargo run -- check examples/multi_counter --deny-raw
 | `give_reward.mcl` | 查询标签排除、类型化 `give` 与物品组件 |
 | `potion_lab.mcl` | 效果、经验、清空、秒表、函数标签与小数调度 |
 | `world_ops.mcl` | 方块、生物群系、复制、放置、区块加载、时间、天气、规则与边界 |
+| `portal.mcl` | 进度声明、`placed_block` / `enter_block` 触发器与可重复触发的 `advancement.revoke` |
 | `portable_chest/` | 多文件项目、用户计分板、`teleport` 仓库、屏障盒与按玩家绑定的箱子 |
 | `multi_counter/` | 多文件项目、带返回值函数、资源 predicate 与调度心跳 |
 
@@ -1323,4 +1416,11 @@ cargo run -- check examples/multi_counter --deny-raw
 :::
 
 :::table kind=resource-kinds
+:::
+
+## 附录 D：进度触发器 {#appendix-triggers}
+
+触发器名来自 26.3 的 `CriteriaTriggers` 注册表；`criterion` 的 `trigger` 只接受这里的名字（可省略 `minecraft:` 前缀），`conditions` 写该触发器条件的原始 JSON。
+
+:::table kind=advancement-triggers
 :::

@@ -31,6 +31,10 @@ export async function loadKeywordTables(repoRoot) {
     path.join(repoRoot, "src/lsp/features.rs"),
     "utf8",
   );
+  const advancementSource = await readFile(
+    path.join(repoRoot, "src/compiler/validate/advancement.rs"),
+    "utf8",
+  );
 
   const keywords = parseConstantBlock(keywordsSource, "KEYWORDS");
   const attributes = parseConstantBlock(keywordsSource, "ATTRIBUTES");
@@ -43,6 +47,7 @@ export async function loadKeywordTables(repoRoot) {
     attributeDocs: parseDocTable(lspSource, "ATTRIBUTE_DOCS"),
     gameRules: parseGameRules(worldSource),
     resourceKinds: parseSimpleKinds(rulesSource),
+    advancementTriggers: parseAdvancementTriggers(advancementSource),
   };
 }
 
@@ -138,4 +143,17 @@ function parseSimpleKinds(source) {
   }
   kinds.sort();
   return kinds;
+}
+
+/** 解析 26.3 进度触发器清单（`const TRIGGERS`，来自 CriteriaTriggers）。 */
+function parseAdvancementTriggers(source) {
+  const start = source.indexOf("const TRIGGERS");
+  const end = source.indexOf("\n];", start);
+  if (start < 0 || end < 0) throw new Error("advancement.rs 中找不到 TRIGGERS");
+  const triggers = [];
+  for (const match of source.slice(start, end).matchAll(/"([a-z0-9_]+)"/g)) {
+    triggers.push(match[1]);
+  }
+  if (triggers.length === 0) throw new Error("TRIGGERS 没有解析出任何触发器");
+  return triggers;
 }

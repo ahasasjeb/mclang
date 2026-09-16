@@ -36,6 +36,7 @@ pub struct CheckSummary {
     pub storages: usize,
     pub data_slots: usize,
     pub resources: usize,
+    pub advancements: usize,
     pub function_tags: usize,
     pub raw_statements: usize,
 }
@@ -54,6 +55,7 @@ pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
         storages: program.storages.len(),
         data_slots: program.data_slots.len(),
         resources: program.resources.len(),
+        advancements: program.advancements.len(),
         function_tags: program.function_tags.len(),
         raw_statements: raw_statement_count(&program.functions),
     })
@@ -135,6 +137,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::ScoreSet { .. }
             | ast::StatementKind::ScoreReset { .. }
             | ast::StatementKind::Teleport { .. }
+            | ast::StatementKind::AdvancementAction { .. }
             | ast::StatementKind::Return(_) => 0,
         })
         .sum()

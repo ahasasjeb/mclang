@@ -56,6 +56,8 @@ const RECEIVER_FAMILIES = {
   天气: "weather_kind",
   schedule: "schedule_method",
   调度: "schedule_method",
+  advancement: "advancement_method",
+  进度: "advancement_method",
 };
 
 /** 方法表反查出的规范接收者，用于把中文接收者还原成英文。 */
@@ -74,6 +76,7 @@ const CANONICAL_RECEIVERS = {
   locate_kind: "locate",
   weather_kind: "weather",
   schedule_method: "schedule",
+  advancement_method: "advancement",
 };
 
 /** 后面跟 `=` 或 `(` 时按属性表翻译的函数。 */
@@ -85,6 +88,10 @@ const PROPERTY_FAMILIES = [
   "slot_name",
   "resource_kind",
   "clone_dimension",
+  "advancement_property",
+  "criterion_property",
+  "reward_property",
+  "display_property",
 ];
 
 /** 调用实参里允许出现的枚举值表，键是规范化的“接收者.方法”或裸函数名。 */
@@ -107,6 +114,8 @@ const CALL_VALUE_CONTEXTS = {
 /** `属性 = 值` 形式下的枚举值表。 */
 const PROPERTY_VALUE_CONTEXTS = {
   rarity: ["rarity_value"],
+  frame: ["advancement_frame"],
+  requirements: ["advancement_requirements"],
 };
 
 /** 其余可以独立出现、但只在行内代码里放心的值表。 */
@@ -273,6 +282,16 @@ export function buildTranslator(data) {
       }
     }
 
+    // `属性 = 值` 里的枚举值优先于关键词表：`frame = 目标` 的“目标”是
+    // 进度框样式，不是 objective 关键词。
+    if (previous?.text === "=") {
+      const property = canonicalWord(previousSignificant(tokens, previous.index)?.text);
+      for (const family of PROPERTY_VALUE_CONTEXTS[property] ?? []) {
+        const rewritten = rewrite(word, family, target);
+        if (rewritten) return rewritten;
+      }
+    }
+
     // 属性只在 `@` 之后成立：`load`、`tick` 作为函数名时必须保持原样。
     const keyword = lookupKeywords(word, target);
     if (keyword) return keyword;
@@ -287,13 +306,6 @@ export function buildTranslator(data) {
     const frame = frames[index];
     if (frame && frame !== "{") {
       for (const family of CALL_VALUE_CONTEXTS[frame] ?? []) {
-        const rewritten = rewrite(word, family, target);
-        if (rewritten) return rewritten;
-      }
-    }
-    if (previous?.text === "=") {
-      const property = canonicalWord(previousSignificant(tokens, previous.index)?.text);
-      for (const family of PROPERTY_VALUE_CONTEXTS[property] ?? []) {
         const rewritten = rewrite(word, family, target);
         if (rewritten) return rewritten;
       }

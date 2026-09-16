@@ -116,6 +116,7 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
+            | StatementKind::AdvancementAction { .. }
             | StatementKind::Schedule { .. }
             | StatementKind::ScheduleClear { .. }
             | StatementKind::ScoreSet { .. }

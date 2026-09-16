@@ -1,6 +1,17 @@
 //! 把结构化 AST 片段格式化为 Minecraft 命令参数、SNBT 和 JSON 文本。
 
-use crate::ast::{EntityQueryDecl, ItemEnchantment, ItemStackDecl, MessageTarget};
+use crate::ast::{
+    AdvancementReference, EntityQueryDecl, ItemEnchantment, ItemStackDecl, MessageTarget,
+};
+
+/// 资源引用文本：本命名空间声明补上命名空间前缀，外部字符串原样保留。
+pub(super) fn reference_id(namespace: &str, reference: &AdvancementReference) -> String {
+    if reference.external {
+        reference.name.clone()
+    } else {
+        format!("{namespace}:{}", reference.name)
+    }
+}
 
 pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
     let mut selector = vec![format!("type={}", query.entity_type)];

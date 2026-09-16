@@ -153,6 +153,10 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "block_state",
         "方块状态构造器：`block_state(\"命名空间:方块\") { 属性 = \"值\"; }`。",
     ),
+    (
+        "advancement",
+        "声明进度或用 `advancement.grant/revoke(...)` 授予、撤销玩家进度。",
+    ),
 ];
 
 /// 函数属性的说明，与 `ATTRIBUTES` 逐项对应。
@@ -382,6 +386,7 @@ fn completion_kind(kind: SymbolKind) -> u8 {
         SymbolKind::Storage => 9,
         SymbolKind::DataSlot => 9,
         SymbolKind::Resource => 17,
+        SymbolKind::Advancement => 17,
         SymbolKind::FunctionTag => 18,
     }
 }

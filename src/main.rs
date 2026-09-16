@@ -87,7 +87,7 @@ fn run() -> Result<(), String> {
                 ));
             }
             println!(
-                "检查通过：{} 个函数，{} 个计分变量，{} 个计分板目标，{} 个实体查询，{} 个物品定义，{} 个物品存储，{} 个数据槽，{} 个函数标签，{} 个 JSON 资源，{} 条底层语句",
+                "检查通过：{} 个函数，{} 个计分变量，{} 个计分板目标，{} 个实体查询，{} 个物品定义，{} 个物品存储，{} 个数据槽，{} 个函数标签，{} 个 JSON 资源，{} 个进度，{} 条底层语句",
                 summary.functions,
                 summary.scores,
                 summary.objectives,
@@ -97,6 +97,7 @@ fn run() -> Result<(), String> {
                 summary.data_slots,
                 summary.function_tags,
                 summary.resources,
+                summary.advancements,
                 summary.raw_statements
             );
             Ok(())

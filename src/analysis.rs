@@ -41,6 +41,7 @@ pub enum SymbolKind {
     Storage,
     DataSlot,
     Resource,
+    Advancement,
     FunctionTag,
     Parameter,
     Local,
@@ -57,6 +58,7 @@ impl SymbolKind {
             Self::Storage => "物品存储",
             Self::DataSlot => "数据槽",
             Self::Resource => "JSON 资源",
+            Self::Advancement => "进度",
             Self::FunctionTag => "函数标签",
             Self::Parameter => "参数",
             Self::Local => "局部变量",
@@ -259,6 +261,20 @@ fn collect_symbols(sources: &[SourceFile], programs: &[(usize, ast::Program)]) -
                 name_span: resource.name_span,
                 scope: None,
                 detail: format!("resource {} {}", resource.kind, resource.name),
+            });
+        }
+        for advancement in &program.advancements {
+            symbols.push(Symbol {
+                name: advancement.name.clone(),
+                kind: SymbolKind::Advancement,
+                path: path.clone(),
+                name_span: advancement.name_span,
+                scope: None,
+                detail: format!(
+                    "advancement {}（{} 条准则）",
+                    advancement.name,
+                    advancement.criteria.len()
+                ),
             });
         }
         for tag in &program.function_tags {

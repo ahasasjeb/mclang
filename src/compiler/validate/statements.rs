@@ -10,9 +10,9 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    AssignOp, CallTarget, Condition, DataSlotKind, EffectDuration, EntityQueryDecl, Expr, GiveItem,
-    GiveTarget, Holder, MessageTarget, ReturnKind, ScoreTarget, SelfAction, Span, Statement,
-    StatementKind, TeleportDestination, XpOperation,
+    AdvancementReference, AssignOp, CallTarget, Condition, DataSlotKind, EffectDuration,
+    EntityQueryDecl, Expr, GiveItem, GiveTarget, Holder, MessageTarget, ReturnKind, ScoreTarget,
+    SelfAction, Span, Statement, StatementKind, TeleportDestination, XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
@@ -113,6 +113,7 @@ pub(super) fn collect_local_declarations<'a>(
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
             | StatementKind::Teleport { .. }
+            | StatementKind::AdvancementAction { .. }
             | StatementKind::Return(_) => {}
         }
     }
@@ -278,6 +279,23 @@ fn validate_statement<'a>(
             destination,
         } => {
             validate_teleport(targets, destination, statement.span, ctx, diagnostics);
+        }
+        StatementKind::AdvancementAction {
+            targets,
+            advancement,
+            criterion,
+            criterion_span,
+            ..
+        } => {
+            validate_advancement_action(
+                targets,
+                advancement.as_ref(),
+                criterion.as_deref(),
+                *criterion_span,
+                statement.span,
+                ctx,
+                diagnostics,
+            );
         }
         StatementKind::Let { name, value, .. } => {
             validate_let(name, value, locals, ctx, diagnostics);
@@ -611,6 +629,70 @@ fn validate_teleport(
                 ));
             }
         }
+    }
+}
+
+/// `advancement.grant/revoke`：目标是玩家，进度引用必须可解析。
+fn validate_advancement_action(
+    targets: &Holder,
+    advancement: Option<&AdvancementReference>,
+    criterion: Option<&str>,
+    criterion_span: Option<Span>,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match targets {
+        Holder::SelfEntity => {
+            if ctx.context != ExecutionContext::Player {
+                diagnostics.push(Diagnostic::new(
+                    "advancement 目标 self/自身 需要玩家执行上下文；请放入玩家查询的 each 块，或给函数添加 @player",
+                    span,
+                ));
+            }
+        }
+        Holder::Origin => {
+            if !ctx.context.is_entity() {
+                diagnostics.push(Diagnostic::new(
+                    "advancement 目标 origin/投掷者 需要实体执行上下文",
+                    span,
+                ));
+            }
+        }
+        Holder::Query(name, query_span) => {
+            require_player_query(name, *query_span, ctx, diagnostics);
+        }
+    }
+    if let Some(advancement) = advancement {
+        if advancement.external {
+            if !valid_resource_location(&advancement.name) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{}` 不是有效的进度资源位置", advancement.name),
+                    advancement.span,
+                ));
+            }
+        } else if !ctx
+            .symbols
+            .advancements
+            .contains_key(advancement.name.as_str())
+            && !ctx
+                .symbols
+                .advancement_resources
+                .contains(advancement.name.as_str())
+        {
+            diagnostics.push(Diagnostic::new(
+                format!("找不到进度 `{}`", advancement.name),
+                advancement.span,
+            ));
+        }
+    }
+    if let Some(criterion) = criterion {
+        validate_identifier(
+            "准则",
+            criterion,
+            criterion_span.unwrap_or(span),
+            diagnostics,
+        );
     }
 }
 

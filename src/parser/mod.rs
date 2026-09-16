@@ -53,6 +53,7 @@ impl Parser {
         let mut storages = Vec::new();
         let mut data_slots = Vec::new();
         let mut resources = Vec::new();
+        let mut advancements = Vec::new();
         let mut function_tags = Vec::new();
         let mut functions = Vec::new();
         while !self.check(&TokenKind::Eof) {
@@ -70,6 +71,8 @@ impl Parser {
                 data_slots.push(self.data_slot()?);
             } else if self.check_word("resource") {
                 resources.push(self.resource()?);
+            } else if self.check_word("advancement") {
+                advancements.push(self.advancement()?);
             } else if self.check_word("fn_tag") {
                 function_tags.push(self.function_tag()?);
             } else {
@@ -86,6 +89,7 @@ impl Parser {
             storages,
             data_slots,
             resources,
+            advancements,
             function_tags,
             functions,
         })

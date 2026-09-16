@@ -1,0 +1,71 @@
+namespace portal;
+
+// 传送门示例：放置「哭泣的黑曜石」激活传送核心，踩上「海晶灯」传送到下界。
+//
+// 进度是数据包唯一的事件入口：criteria 监听原版触发器，rewards.function
+// 指向的函数在事件命中时运行。进度完成一次后就不再触发，所以奖励函数
+// 先撤销自己，下一次事件才会再次进入。
+
+item core_icon = item_stack("minecraft:crying_obsidian") {
+    custom_name = "传送门核心";
+}
+
+// 玩家放置哭泣的黑曜石时触发。
+advancement core_placed {
+    criterion placed {
+        trigger = placed_block;
+        conditions = """{
+            "location": {
+                "condition": "minecraft:match_block",
+                "blocks": "minecraft:crying_obsidian"
+            }
+        }""";
+    }
+    reward {
+        function = on_core_placed;
+        experience = 1;
+    }
+    display {
+        icon = core_icon;
+        title = "传送门核心";
+        description = "放下哭泣的黑曜石，激活一座传送门。";
+        background = "minecraft:textures/block/crying_obsidian.png";
+        frame = goal;
+    }
+}
+
+// 玩家踩进海晶灯时触发。
+advancement portal_entered {
+    criterion entered {
+        trigger = enter_block;
+        conditions = """{"blocks":"minecraft:sea_lantern"}""";
+    }
+    reward {
+        function = on_portal_entered;
+    }
+}
+
+query players = entity("minecraft:player") {}
+
+@load
+fn load() {
+    message.all("传送门示例已加载：放下哭泣的黑曜石，再踩上海晶灯。", green);
+}
+
+// 进度一生只完成一次；先撤销，下一次放置才会再次触发。
+@player
+fn on_core_placed() {
+    advancement.revoke(self, core_placed);
+    message.self("传送门核心已放置，踩上海晶灯即可传送。", gold);
+    sound.self("minecraft:block.end_portal.spawn", master);
+}
+
+@player
+fn on_portal_entered() {
+    advancement.revoke(self, portal_entered);
+    message.self("正在传送……", aqua);
+    sound.self("minecraft:entity.enderman.teleport", player);
+    in_dimension("minecraft:the_nether") {
+        teleport(self, pos(0, 64, 0));
+    }
+}

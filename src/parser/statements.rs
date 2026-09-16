@@ -6,8 +6,9 @@ use crate::lexer::TokenKind;
 
 use super::Parser;
 use super::keywords::{
-    boolean_word, effect_method, message_target, scoreboard_method, self_method, sound_source,
-    stopwatch_method, text_color, time_unit, word_matches, xp_kind, xp_method,
+    advancement_method, boolean_word, effect_method, message_target, scoreboard_method,
+    self_method, sound_source, stopwatch_method, text_color, time_unit, word_matches, xp_kind,
+    xp_method,
 };
 
 impl Parser {
@@ -155,6 +156,8 @@ impl Parser {
             self.worldborder_statement()?
         } else if self.take_word("locate").is_some() {
             self.locate_statement()?
+        } else if self.take_word("advancement").is_some() {
+            self.advancement_statement()?
         } else {
             let (name, _) = self.ident("语句")?;
             if self.check(&TokenKind::LeftParen) {
@@ -675,15 +678,69 @@ impl Parser {
         })
     }
 
+    /// `advancement.grant(目标, 进度[, 准则]);` 及其余四种作用范围的方法。
+    ///
+    /// `everything` 不需要进度参数；只有 `only` 可以带准则名。
+    fn advancement_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::Dot, "advancement 后需要 `.`")?;
+        let (method, method_span) = self.ident("advancement 方法")?;
+        let Some((operation, scope)) = advancement_method(&method) else {
+            return Err(Diagnostic::new(
+                format!("未知 advancement 方法 `{method}`"),
+                method_span,
+            ));
+        };
+        self.expect(TokenKind::LeftParen, "advancement 方法后需要 `(`")?;
+        let targets = self.holder("advancement 目标")?;
+        let mut advancement = None;
+        let mut criterion = None;
+        let mut criterion_span = None;
+        if scope != "everything" {
+            self.expect(TokenKind::Comma, "advancement 目标后需要 `,`")?;
+            advancement = Some(self.advancement_reference("进度")?);
+        }
+        if scope == "only" && self.take(&TokenKind::Comma).is_some() {
+            let (value, span) = self.ident("准则名称")?;
+            criterion = Some(value);
+            criterion_span = Some(span);
+        }
+        self.expect(TokenKind::RightParen, "advancement 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "advancement 调用后需要 `;`")?;
+        Ok(StatementKind::AdvancementAction {
+            operation: if operation == "grant" {
+                AdvancementOperation::Grant
+            } else {
+                AdvancementOperation::Revoke
+            },
+            scope: match scope {
+                "only" => AdvancementScope::Only,
+                "through" => AdvancementScope::Through,
+                "from" => AdvancementScope::From,
+                "until" => AdvancementScope::Until,
+                _ => AdvancementScope::Everything,
+            },
+            targets,
+            advancement,
+            criterion,
+            criterion_span,
+        })
+    }
+
     /// 读取计分持有者：`self`/`自身`、`origin`/`投掷者` 或实体查询名称。
     pub(super) fn score_holder(&mut self) -> Result<Holder, Diagnostic> {
+        self.holder("计分持有者")
+    }
+
+    /// 读取实体持有者：`self`/`自身`、`origin`/`投掷者` 或实体查询名称。
+    pub(super) fn holder(&mut self, label: &str) -> Result<Holder, Diagnostic> {
         if self.take_word("self").is_some() {
             return Ok(Holder::SelfEntity);
         }
         if self.take_word("origin").is_some() {
             return Ok(Holder::Origin);
         }
-        let (name, span) = self.ident("计分持有者 self/自身、origin/投掷者 或实体查询名称")?;
+        let (name, span) =
+            self.ident(&format!("{label} self/自身、origin/投掷者 或实体查询名称"))?;
         Ok(Holder::Query(name, span))
     }
 

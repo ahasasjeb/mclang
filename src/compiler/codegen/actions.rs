@@ -5,13 +5,14 @@
 //! [`super::statements`]。
 
 use crate::ast::{
-    DataSlotDecl, DataSlotKind, EffectDuration, Expr, GiveItem, GiveTarget, Holder, ScoreTarget,
-    SelfAction, TeleportDestination, XpKind, XpOperation,
+    AdvancementOperation, AdvancementReference, AdvancementScope, DataSlotDecl, DataSlotKind,
+    EffectDuration, Expr, GiveItem, GiveTarget, Holder, ScoreTarget, SelfAction,
+    TeleportDestination, XpKind, XpOperation,
 };
 
 use super::Compiler;
 use super::Value;
-use super::emit::{entity_query_clause, entity_query_selector, item_stack_argument};
+use super::emit::{entity_query_clause, entity_query_selector, item_stack_argument, reference_id};
 use super::names::user_objective_name;
 use super::world;
 
@@ -277,6 +278,29 @@ impl Compiler<'_> {
                 format!("execute {} run ", entity_query_clause(self.query(name)))
             }
         }
+    }
+
+    /// `advancement.grant/revoke(...)`：目标继承持有者前缀，进度引用补命名空间。
+    pub(super) fn compile_advancement_action(
+        &self,
+        operation: AdvancementOperation,
+        scope: AdvancementScope,
+        targets: &Holder,
+        advancement: Option<&AdvancementReference>,
+        criterion: Option<&str>,
+        commands: &mut Vec<String>,
+    ) {
+        let prefix = self.score_holder_prefix(targets);
+        let mut command = format!("advancement {} @s {}", operation.as_str(), scope.as_str());
+        if let Some(advancement) = advancement {
+            command.push(' ');
+            command.push_str(&reference_id(&self.program.namespace, advancement));
+            if let Some(criterion) = criterion {
+                command.push(' ');
+                command.push_str(criterion);
+            }
+        }
+        commands.push(format!("{prefix}{command}"));
     }
 
     /// `effect.give`/`effect.give_infinite`：持续时间为整秒或 `infinite`。

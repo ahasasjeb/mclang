@@ -3,7 +3,8 @@
 // `:::table kind=keywords` 生成语言关键词与函数属性；
 // `:::table kind=aliases` 生成方法、属性与枚举别名；
 // `:::table kind=game-rules` 生成 26.3 GameRules 注册表；
-// `:::table kind=resource-kinds` 生成 `resource` 声明可用的资源类型。
+// `:::table kind=resource-kinds` 生成 `resource` 声明可用的资源类型；
+// `:::table kind=advancement-triggers` 生成 26.3 进度触发器清单。
 
 import { escapeHtml, parseAttributes, renderInline } from "./markdown.mjs";
 
@@ -34,6 +35,17 @@ const ALIAS_GROUPS = [
   ["gamerule_method", "gamerule 方法", "游戏规则操作；`query` 是表达式。"],
   ["worldborder_method", "worldborder 方法", "世界边界操作；`get` 是表达式。"],
   ["locate_kind", "locate 方法", "定位结构、生物群系或兴趣点。"],
+  [
+    "advancement_method",
+    "advancement 方法",
+    "`advancement.grant/revoke(…)` 的五种作用范围；只有 `grant`/`授予` 可以带准则名。",
+  ],
+  ["advancement_property", "进度声明属性", "`advancement … { … }` 声明体里的属性。"],
+  ["criterion_property", "进度准则属性", "`criterion … { … }` 里的触发器与条件。"],
+  ["reward_property", "进度奖励属性", "`reward { … }` 里的函数、经验与资源引用。"],
+  ["display_property", "进度展示属性", "`display { … }` 里的图标、标题与展示开关。"],
+  ["advancement_frame", "进度框样式", "`frame = …;` 的取值。"],
+  ["advancement_requirements", "进度完成策略", "`requirements = …;` 的取值。"],
   ["rarity_value", "物品稀有度", "`rarity = …;` 的取值。"],
   ["entity_sort", "实体查询排序", "`sort(…);` 的取值。"],
   ["boolean_word", "布尔值", "所有需要 true/false 的位置都可以写 真/假。"],
@@ -62,6 +74,8 @@ export function renderAppendixTable(attributesText, data) {
       return renderGameRules(data);
     case "resource-kinds":
       return renderResourceKinds(data);
+    case "advancement-triggers":
+      return renderAdvancementTriggers(data);
     default:
       throw new Error(`未知的附录表格 kind=${kind ?? ""}`);
   }
@@ -132,6 +146,26 @@ function renderResourceKinds(data) {
   html += '<div class="table-wrap"><table class="alias-table"><tbody>';
   for (const kind of data.resourceKinds) {
     html += `<tr><td><code>${escapeHtml(kind)}</code></td></tr>\n`;
+  }
+  html += "</tbody></table></div>\n";
+  return html;
+}
+
+function renderAdvancementTriggers(data) {
+  let html = filterBar("advancement-triggers", "过滤触发器：输入名称");
+  html += heading4(
+    "进度触发器",
+    `TRIGGERS · ${data.advancementTriggers.length} 项（26.3 CriteriaTriggers）`,
+  );
+  html +=
+    '<p class="table-note">' +
+    renderNote(
+      "`criterion … { trigger = 名称; }` 可用的触发器，名字可以省略 `minecraft:` 前缀；`conditions` 的字段结构由各触发器定义，写触发器条件的原始 JSON。",
+    ) +
+    "</p>";
+  html += '<div class="table-wrap"><table class="alias-table"><tbody>';
+  for (const trigger of data.advancementTriggers) {
+    html += `<tr><td><code>minecraft:${escapeHtml(trigger)}</code></td></tr>\n`;
   }
   html += "</tbody></table></div>\n";
   return html;

@@ -3,6 +3,7 @@
 //! [`validate`] 按源码顺序检查顶层声明，收集符号表，再逐函数校验函数体，
 //! 最后分析同步调用图。所有诊断都会返回，不提前退出，方便用户一次修完。
 
+mod advancement;
 mod expressions;
 mod items;
 mod recursion;
@@ -17,6 +18,7 @@ use crate::ast::*;
 use crate::diagnostic::Diagnostic;
 
 use super::types::{ExecutionContext, ReturnRules, Signature, StatementSymbols};
+use advancement::collect_advancements;
 use items::{validate_entity_query, validate_item_stack};
 use recursion::validate_synchronous_recursion;
 use rules::{
@@ -25,6 +27,15 @@ use rules::{
 };
 use statements::{collect_local_declarations, validate_statements};
 use tags::{collect_function_tags, validate_function_tags};
+
+/// `resource` 声明按资源类型分组的名称集合，供进度声明与语句校验引用。
+#[derive(Default)]
+pub(super) struct ResourceSymbols<'a> {
+    pub(super) predicates: HashSet<&'a str>,
+    pub(super) loot_tables: HashSet<&'a str>,
+    pub(super) recipes: HashSet<&'a str>,
+    pub(super) advancements: HashSet<&'a str>,
+}
 
 pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
@@ -35,12 +46,23 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
     let function_tags = collect_function_tags(program, &mut diagnostics);
     let signatures = collect_signatures(program, &scores, &mut diagnostics);
     validate_function_tags(&function_tags, &signatures, &mut diagnostics);
+    let resources = validate_resources(program, &mut diagnostics);
+    let item_stacks = collect_item_stacks(program, &mut diagnostics);
+    let advancements = collect_advancements(
+        program,
+        &resources,
+        &item_stacks,
+        &signatures,
+        &mut diagnostics,
+    );
     let declarations = Declarations {
         queries: collect_queries(program, &mut diagnostics),
-        item_stacks: collect_item_stacks(program, &mut diagnostics),
+        item_stacks,
         storages: collect_storages(program, &mut diagnostics),
         data_slots: collect_data_slots(program, &mut diagnostics),
-        predicates: validate_resources(program, &mut diagnostics),
+        predicates: resources.predicates.clone(),
+        advancement_resources: resources.advancements.clone(),
+        advancements,
         function_tags,
         signatures,
         scores,
@@ -61,6 +83,9 @@ struct Declarations<'a> {
     storages: HashSet<&'a str>,
     data_slots: HashMap<&'a str, &'a DataSlotDecl>,
     predicates: HashSet<&'a str>,
+    /// `resource advancement` 声明的进度名，与结构化进度一起构成引用目标。
+    advancement_resources: HashSet<&'a str>,
+    advancements: HashMap<&'a str, &'a AdvancementDecl>,
     function_tags: HashMap<&'a str, &'a FunctionTagDecl>,
     signatures: HashMap<&'a str, Signature>,
 }
@@ -206,12 +231,13 @@ fn collect_data_slots<'a>(
     data_slots
 }
 
-/// 校验 JSON 资源声明，并返回可作为谓词条件引用的资源名集合。
+/// 校验 JSON 资源声明，并返回按类型归类的资源名集合。
 fn validate_resources<'a>(
     program: &'a Program,
     diagnostics: &mut Vec<Diagnostic>,
-) -> HashSet<&'a str> {
+) -> ResourceSymbols<'a> {
     let mut resources = HashSet::new();
+    let mut symbols = ResourceSymbols::default();
     for resource in &program.resources {
         if !supported_resource_kind(&resource.kind) {
             diagnostics.push(Diagnostic::new(
@@ -244,13 +270,16 @@ fn validate_resources<'a>(
                 resource.span,
             ));
         }
+        let bucket = match resource.kind.as_str() {
+            "predicate" => &mut symbols.predicates,
+            "loot_table" => &mut symbols.loot_tables,
+            "recipe" => &mut symbols.recipes,
+            "advancement" => &mut symbols.advancements,
+            _ => continue,
+        };
+        bucket.insert(resource.name.as_str());
     }
-    program
-        .resources
-        .iter()
-        .filter(|resource| resource.kind == "predicate")
-        .map(|resource| resource.name.as_str())
-        .collect()
+    symbols
 }
 
 /// 校验函数声明本身（名称、签名、属性和返回约定），并建立签名表。
@@ -399,6 +428,8 @@ fn validate_function_bodies(
             storages: &declarations.storages,
             data_slots: &declarations.data_slots,
             predicates: &declarations.predicates,
+            advancements: &declarations.advancements,
+            advancement_resources: &declarations.advancement_resources,
             function_tags: &declarations.function_tags,
         };
         validate_statements(

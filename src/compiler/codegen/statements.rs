@@ -217,6 +217,21 @@ impl Compiler<'_> {
             } => {
                 self.compile_teleport(targets, destination, commands);
             }
+            StatementKind::AdvancementAction {
+                operation,
+                scope,
+                targets,
+                advancement,
+                criterion,
+                ..
+            } => self.compile_advancement_action(
+                *operation,
+                *scope,
+                targets,
+                advancement.as_ref(),
+                criterion.as_deref(),
+                commands,
+            ),
             StatementKind::Let { name, value, .. } => {
                 self.compile_assignment(name, AssignOp::Set, value, owner, commands);
             }

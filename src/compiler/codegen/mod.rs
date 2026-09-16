@@ -11,6 +11,7 @@
 //! - [`emit`]：Minecraft 命令片段与 JSON 文本的格式化。
 
 mod actions;
+mod advancement;
 mod emit;
 mod expressions;
 mod names;
@@ -146,6 +147,19 @@ impl<'a> Compiler<'a> {
                     .join(&resource.kind)
                     .join(format!("{}.json", resource.name)),
                 contents,
+            );
+        }
+        for advancement in &self.program.advancements {
+            files.insert(
+                PathBuf::from("data")
+                    .join(&self.program.namespace)
+                    .join("advancement")
+                    .join(format!("{}.json", advancement.name)),
+                advancement::advancement_json(
+                    &self.program.namespace,
+                    advancement,
+                    &self.program.item_stacks,
+                ),
             );
         }
         for tag in &self.program.function_tags {

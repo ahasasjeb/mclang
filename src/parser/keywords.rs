@@ -6,8 +6,8 @@
 //! 出现，进入 AST 后所有阶段只处理英文规范值。
 
 use crate::ast::{
-    Attribute, CloneMode, FillMode, ItemRarity, LocateKind, SetBlockMode, TemplateMirror,
-    TemplateRotation, WeatherKind, XpKind,
+    AdvancementFrame, AdvancementRequirements, Attribute, CloneMode, FillMode, ItemRarity,
+    LocateKind, SetBlockMode, TemplateMirror, TemplateRotation, WeatherKind, XpKind,
 };
 
 /// 语言关键词的规范英文写法与中文别名。
@@ -73,6 +73,10 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
     Keyword {
         english: "resource",
         chinese: "资源",
+    },
+    Keyword {
+        english: "advancement",
+        chinese: "进度",
     },
     Keyword {
         english: "predicate",
@@ -372,6 +376,89 @@ pub(super) fn slot_name(value: &str) -> Option<&'static str> {
 pub(super) fn resource_kind(value: &str) -> Option<&'static str> {
     match value {
         "predicate" | "谓词" => Some("predicate"),
+        _ => None,
+    }
+}
+
+/// `advancement.grant/revoke` 的方法名，返回操作与作用范围。
+pub(super) fn advancement_method(value: &str) -> Option<(&'static str, &'static str)> {
+    match value {
+        "grant" | "授予" => Some(("grant", "only")),
+        "grant_through" | "授予至" => Some(("grant", "through")),
+        "grant_from" | "授予从" => Some(("grant", "from")),
+        "grant_until" | "授予直到" => Some(("grant", "until")),
+        "grant_everything" | "授予全部" => Some(("grant", "everything")),
+        "revoke" | "撤销" => Some(("revoke", "only")),
+        "revoke_through" | "撤销至" => Some(("revoke", "through")),
+        "revoke_from" | "撤销从" => Some(("revoke", "from")),
+        "revoke_until" | "撤销直到" => Some(("revoke", "until")),
+        "revoke_everything" | "撤销全部" => Some(("revoke", "everything")),
+        _ => None,
+    }
+}
+
+/// `advancement` 声明块的顶层属性。
+pub(super) fn advancement_property(value: &str) -> Option<&'static str> {
+    match value {
+        "parent" | "父进度" => Some("parent"),
+        "criterion" | "准则" => Some("criterion"),
+        "requirements" | "要求" => Some("requirements"),
+        "reward" | "奖励" => Some("reward"),
+        "display" | "展示" => Some("display"),
+        _ => None,
+    }
+}
+
+/// `criterion` 块内的属性。
+pub(super) fn criterion_property(value: &str) -> Option<&'static str> {
+    match value {
+        "trigger" | "触发器" => Some("trigger"),
+        "conditions" | "条件" => Some("conditions"),
+        _ => None,
+    }
+}
+
+/// `reward` 块内的属性。
+pub(super) fn reward_property(value: &str) -> Option<&'static str> {
+    match value {
+        "function" | "函数" => Some("function"),
+        "experience" | "经验" => Some("experience"),
+        "loot" | "战利品" => Some("loot"),
+        "recipe" | "配方" => Some("recipe"),
+        _ => None,
+    }
+}
+
+/// `display` 块内的属性。
+pub(super) fn display_property(value: &str) -> Option<&'static str> {
+    match value {
+        "icon" | "图标" => Some("icon"),
+        "title" | "标题" => Some("title"),
+        "description" | "描述" => Some("description"),
+        "frame" | "框架" => Some("frame"),
+        "background" | "背景" => Some("background"),
+        "show_toast" | "显示提示" => Some("show_toast"),
+        "announce_to_chat" | "聊天公告" => Some("announce_to_chat"),
+        "hidden" | "隐藏" => Some("hidden"),
+        _ => None,
+    }
+}
+
+/// `display.frame` 的三种进度框样式。
+pub(super) fn advancement_frame(value: &str) -> Option<AdvancementFrame> {
+    match value {
+        "task" | "任务" => Some(AdvancementFrame::Task),
+        "goal" | "目标" => Some(AdvancementFrame::Goal),
+        "challenge" | "挑战" => Some(AdvancementFrame::Challenge),
+        _ => None,
+    }
+}
+
+/// `requirements` 的两种完成策略。
+pub(super) fn advancement_requirements(value: &str) -> Option<AdvancementRequirements> {
+    match value {
+        "all" | "全部" => Some(AdvancementRequirements::All),
+        "any" | "任意" => Some(AdvancementRequirements::Any),
         _ => None,
     }
 }

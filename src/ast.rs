@@ -26,6 +26,7 @@ pub struct Program {
     pub storages: Vec<StorageDecl>,
     pub data_slots: Vec<DataSlotDecl>,
     pub resources: Vec<ResourceDecl>,
+    pub advancements: Vec<AdvancementDecl>,
     pub function_tags: Vec<FunctionTagDecl>,
     pub functions: Vec<Function>,
 }
@@ -192,6 +193,101 @@ pub struct ResourceDecl {
     pub name_span: Span,
     pub json: String,
     pub span: Span,
+}
+
+/// 资源引用：标识符指本命名空间内的声明，字符串是完整的外部资源位置。
+///
+/// 进度声明的 `parent`、奖励的 `function`/`loot`/`recipe` 和
+/// `advancement.grant/revoke` 的进度参数共用这套引用规则；外部引用只校验
+/// 资源位置语法，本命名空间引用要求声明存在。
+#[derive(Debug)]
+pub struct AdvancementReference {
+    pub name: String,
+    pub span: Span,
+    pub external: bool,
+}
+
+/// `advancement 名称 { ... }` 声明的结构化进度，输出到
+/// `data/<命名空间>/advancement/<名称>.json`。
+///
+/// 进度是数据包唯一的事件入口：`criteria` 描述要监听的原版触发器，
+/// 运行时命中后由 `rewards.function` 触发的函数接管后续逻辑。
+#[derive(Debug)]
+pub struct AdvancementDecl {
+    pub name: String,
+    pub name_span: Span,
+    pub parent: Option<AdvancementReference>,
+    pub criteria: Vec<AdvancementCriterion>,
+    pub requirements: AdvancementRequirements,
+    pub reward: Option<AdvancementReward>,
+    pub display: Option<AdvancementDisplay>,
+    pub span: Span,
+}
+
+/// 单条准则：`trigger` 是 26.3 注册的触发器名，`conditions` 是触发条件的原始 JSON。
+#[derive(Debug)]
+pub struct AdvancementCriterion {
+    pub name: String,
+    pub name_span: Span,
+    pub trigger: String,
+    pub trigger_span: Span,
+    pub conditions: Option<String>,
+    pub conditions_span: Option<Span>,
+    pub span: Span,
+}
+
+/// `requirements` 的两种策略，对应 `AdvancementRequirements.Strategy`。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AdvancementRequirements {
+    /// 全部准则都完成才算完成（默认）。
+    All,
+    /// 任意一条准则完成即算完成。
+    Any,
+}
+
+/// 进度奖励：函数、经验、战利品表与配方。
+#[derive(Debug)]
+pub struct AdvancementReward {
+    pub function: Option<AdvancementReference>,
+    pub experience: Option<i32>,
+    pub loot: Vec<AdvancementReference>,
+    pub recipes: Vec<AdvancementReference>,
+}
+
+/// 进度展示信息，对应 26.3 的 `DisplayInfo`。
+///
+/// 布尔字段为 `None` 表示没有声明，生成时省略以保留原版默认值。
+#[derive(Debug)]
+pub struct AdvancementDisplay {
+    pub icon: String,
+    pub icon_span: Span,
+    pub title: String,
+    pub description: String,
+    pub frame: AdvancementFrame,
+    pub background: Option<String>,
+    pub background_span: Option<Span>,
+    pub show_toast: Option<bool>,
+    pub announce_to_chat: Option<bool>,
+    pub hidden: Option<bool>,
+    pub span: Span,
+}
+
+/// `display.frame` 的三种进度框样式。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AdvancementFrame {
+    Task,
+    Goal,
+    Challenge,
+}
+
+impl AdvancementFrame {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Task => "task",
+            Self::Goal => "goal",
+            Self::Challenge => "challenge",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -460,6 +556,15 @@ pub enum StatementKind {
         targets: Holder,
         destination: TeleportDestination,
     },
+    /// `advancement.grant/revoke(...)`：给玩家授予或撤销进度。
+    AdvancementAction {
+        operation: AdvancementOperation,
+        scope: AdvancementScope,
+        targets: Holder,
+        advancement: Option<AdvancementReference>,
+        criterion: Option<String>,
+        criterion_span: Option<Span>,
+    },
     If {
         condition: Condition,
         then_body: Vec<Statement>,
@@ -724,6 +829,44 @@ pub enum ReturnKind {
     Value(Expr),
     Fail,
     Run(String),
+}
+
+/// `advancement grant/revoke` 的操作。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AdvancementOperation {
+    Grant,
+    Revoke,
+}
+
+impl AdvancementOperation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Grant => "grant",
+            Self::Revoke => "revoke",
+        }
+    }
+}
+
+/// 进度操作的作用范围，对应原生命令 `only`/`through`/`from`/`until`/`everything`。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AdvancementScope {
+    Only,
+    Through,
+    From,
+    Until,
+    Everything,
+}
+
+impl AdvancementScope {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Only => "only",
+            Self::Through => "through",
+            Self::From => "from",
+            Self::Until => "until",
+            Self::Everything => "everything",
+        }
+    }
 }
 
 #[derive(Debug)]
