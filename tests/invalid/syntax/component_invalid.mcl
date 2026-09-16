@@ -1,0 +1,11 @@
+// 编译测试（负向语义）：文本组件的颜色、目标与 NBT 路径都要合法。
+// 期望诊断：颜色、score 目标、NBT 路径与 nbt 开关各一条。
+namespace invalid_component;
+
+@entity
+fn f() {
+    message.all(text("坏颜色") { color = "not_a_color"; });
+    message.all(score(self, ""));
+    message.all(nbt(entity, self, "bad..path"));
+    message.all(nbt(block, pos(0, 64, 0), "Items[") { interpret = true; plain = true; });
+}

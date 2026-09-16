@@ -73,3 +73,13 @@ fn_tag announcement {
 fn use_tags() {
     call #batch();
 }
+
+@player
+fn rich() {
+    message.self(text("你好") { color = "red"; bold = true; click = run_command("/say hi"); hover = text("提示"); });
+    message.all(translate("chat.type.text", [text("甲"), text("乙")]) { color = "gold"; });
+    message.all(keybind("key.jump"));
+    message.all(selector("@a"));
+    message.nearest(16, text("附近") { italic = true; }, aqua);
+    message.player(players, score(self, "runtime_objective"));
+}

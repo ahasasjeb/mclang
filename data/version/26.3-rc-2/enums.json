@@ -1,0 +1,92 @@
+{
+  "digest": "fnv1a64:4bb2d25e1991ae62",
+  "enums": {
+    "anchor": [
+      "feet",
+      "eyes"
+    ],
+    "difficulty": [
+      "peaceful",
+      "easy",
+      "normal",
+      "hard"
+    ],
+    "display_slot": [
+      "list",
+      "sidebar",
+      "below_name",
+      "sidebar.team.black",
+      "sidebar.team.dark_blue",
+      "sidebar.team.dark_green",
+      "sidebar.team.dark_aqua",
+      "sidebar.team.dark_red",
+      "sidebar.team.dark_purple",
+      "sidebar.team.gold",
+      "sidebar.team.gray",
+      "sidebar.team.dark_gray",
+      "sidebar.team.blue",
+      "sidebar.team.green",
+      "sidebar.team.aqua",
+      "sidebar.team.red",
+      "sidebar.team.light_purple",
+      "sidebar.team.yellow",
+      "sidebar.team.white"
+    ],
+    "gamemode": [
+      "survival",
+      "creative",
+      "adventure",
+      "spectator"
+    ],
+    "heightmap": [
+      "WORLD_SURFACE_WG",
+      "WORLD_SURFACE",
+      "OCEAN_FLOOR_WG",
+      "OCEAN_FLOOR",
+      "MOTION_BLOCKING",
+      "MOTION_BLOCKING_NO_LEAVES"
+    ],
+    "sound_source": [
+      "master",
+      "music",
+      "record",
+      "weather",
+      "block",
+      "hostile",
+      "neutral",
+      "player",
+      "ambient",
+      "voice",
+      "ui"
+    ],
+    "swizzle": [
+      "x",
+      "y",
+      "z"
+    ],
+    "team_color": [
+      "black",
+      "dark_blue",
+      "dark_green",
+      "dark_aqua",
+      "dark_red",
+      "dark_purple",
+      "gold",
+      "gray",
+      "dark_gray",
+      "blue",
+      "green",
+      "aqua",
+      "red",
+      "light_purple",
+      "yellow",
+      "white"
+    ],
+    "time_unit": [
+      "d",
+      "s",
+      "t"
+    ]
+  },
+  "source": "minecraft_client_26.3-rc-2"
+}

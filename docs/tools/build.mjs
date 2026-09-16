@@ -63,7 +63,7 @@ async function main() {
   const vocabulary = buildVocabulary(data);
 
   for (const example of examples) {
-    assertNormalized(example, vocabulary);
+    assertNormalized(example, vocabulary, translator);
     const pack = verifyExample(compiler, example);
     packs.set(example.id, pack);
     stats.examples += 1;
@@ -179,12 +179,15 @@ function buildVocabulary(data) {
 }
 
 /** 检查示例的两种版本都不再残留另一种语言的关键词。 */
-function assertNormalized(example, vocabulary) {
+function assertNormalized(example, vocabulary, translator) {
   const check = (text, label, keywords, attributes) => {
     const tokens = tokenize(text);
+    // NBT 字面量内部是用户数据：键名恰好与关键词同名时不做归一化要求。
+    const opaque = translator.nbtBodyTokens(tokens);
     const leftovers = new Set();
     tokens.forEach((token, index) => {
       if (token.type !== "ident") return;
+      if (opaque.has(index)) return;
       const previous = previousSignificant(tokens, index);
       if (previous?.text === "@") {
         if (attributes.has(token.text)) leftovers.add(`@${token.text}`);

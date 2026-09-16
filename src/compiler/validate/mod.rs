@@ -4,10 +4,12 @@
 //! 最后分析同步调用图。所有诊断都会返回，不提前退出，方便用户一次修完。
 
 mod advancement;
+mod components;
 mod entity_nbt;
 mod expressions;
 mod items;
 mod recursion;
+mod registry;
 mod rules;
 mod statements;
 mod tags;
@@ -23,8 +25,8 @@ use advancement::collect_advancements;
 use items::{validate_entity_query, validate_item_stack};
 use recursion::validate_synchronous_recursion;
 use rules::{
-    function_context, supported_resource_kind, valid_name, valid_nbt_path, valid_resource_location,
-    valid_resource_path, validate_identifier, windows_reserved_name,
+    function_context, valid_name, valid_nbt_path, valid_resource_location, valid_resource_path,
+    validate_identifier, windows_reserved_name,
 };
 use statements::{collect_local_declarations, validate_statements};
 use tags::{collect_function_tags, validate_function_tags};
@@ -38,7 +40,7 @@ pub(super) struct ResourceSymbols<'a> {
     pub(super) advancements: HashSet<&'a str>,
 }
 
-pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
+pub(super) fn validate(program: &Program, function_permission_level: u8) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     validate_namespace(program, &mut diagnostics);
@@ -70,7 +72,12 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
         objectives,
     };
 
-    validate_function_bodies(program, &declarations, &mut diagnostics);
+    validate_function_bodies(
+        program,
+        &declarations,
+        function_permission_level,
+        &mut diagnostics,
+    );
     validate_synchronous_recursion(program, &mut diagnostics);
     diagnostics
 }
@@ -133,8 +140,93 @@ fn collect_objectives<'a>(
                 objective.span,
             ));
         }
+        if let Some(criteria) = &objective.criteria
+            && !valid_score_criteria(criteria)
+        {
+            diagnostics.push(Diagnostic::new(
+                format!("`{criteria}` 不是有效的计分板准则（dummy、trigger 或 `命名空间:统计`）"),
+                objective.span,
+            ));
+        }
+        if let Some(render_type) = &objective.render_type
+            && !matches!(render_type.as_str(), "integer" | "hearts")
+        {
+            diagnostics.push(Diagnostic::new(
+                format!("渲染类型只能是 integer 或 hearts，实际为 `{render_type}`"),
+                objective.span,
+            ));
+        }
+        if let Some(slot) = &objective.display_slot {
+            crate::compiler::validate::registry::validate_enum(
+                "display_slot",
+                "显示槽",
+                slot,
+                objective.display_slot_span.unwrap_or(objective.span),
+                diagnostics,
+            );
+        }
+        if let Some(display_name) = &objective.display_name {
+            validate_objective_component(display_name, diagnostics);
+        }
+        if let Some(NumberFormat::Fixed(component)) = &objective.number_format {
+            validate_objective_component(component, diagnostics);
+        }
     }
     objectives
+}
+
+/// 计分板准则：简单准则名或 `命名空间:统计` 形式。
+fn valid_score_criteria(criteria: &str) -> bool {
+    if let Some((namespace, path)) = criteria.split_once(':') {
+        return valid_name(namespace) && valid_resource_path(path);
+    }
+    matches!(
+        criteria,
+        "dummy"
+            | "trigger"
+            | "deathCount"
+            | "playerKillCount"
+            | "totalKillCount"
+            | "health"
+            | "food"
+            | "air"
+            | "armor"
+            | "xp"
+            | "level"
+            | "teamkill.red"
+            | "teamkill.blue"
+            | "teamkill.green"
+            | "teamkill.yellow"
+            | "killedByTeam.red"
+            | "killedByTeam.blue"
+            | "killedByTeam.green"
+            | "killedByTeam.yellow"
+    )
+}
+
+/// 显示名与数字格式组件的轻量检查：颜色与结构（不需要符号表）。
+fn validate_objective_component(component: &TextComponent, diagnostics: &mut Vec<Diagnostic>) {
+    if let Some(color) = &component.style.color
+        && !components::valid_component_color(color)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("`{color}` 不是有效的文本颜色（16 个颜色名或 `#rrggbb`）"),
+            component.span,
+        ));
+    }
+    for (value, span) in [
+        component.style.click.is_some().then_some(component.span),
+        component.style.hover.is_some().then_some(component.span),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let _ = value;
+        let _ = span;
+    }
+    if let Some(hover) = &component.style.hover {
+        validate_objective_component(hover, diagnostics);
+    }
 }
 
 fn collect_queries<'a>(
@@ -240,7 +332,7 @@ fn validate_resources<'a>(
     let mut resources = HashSet::new();
     let mut symbols = ResourceSymbols::default();
     for resource in &program.resources {
-        if !supported_resource_kind(&resource.kind) {
+        if !crate::version::snapshot::snapshot().resource_kind_supported(&resource.kind) {
             diagnostics.push(Diagnostic::new(
                 format!("Minecraft 26.3 不支持 JSON 资源类型 `{}`", resource.kind),
                 resource.span,
@@ -402,6 +494,7 @@ fn validate_function_declaration(
 fn validate_function_bodies(
     program: &Program,
     declarations: &Declarations<'_>,
+    function_permission_level: u8,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for function in &program.functions {
@@ -432,6 +525,7 @@ fn validate_function_bodies(
             advancements: &declarations.advancements,
             advancement_resources: &declarations.advancement_resources,
             function_tags: &declarations.function_tags,
+            function_permission_level,
         };
         validate_statements(
             &function.body,

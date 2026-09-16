@@ -265,30 +265,58 @@ score penalty = -5;
 ### 实体查询（query）
 
 ```mcl title="语法" fragment
-query <name> = entity("<实体类型>") {
+query <name> = entity("<实体类型或 #标签>") {
+    type("<实体类型或 #标签>");
+    without_type("<实体类型或 #标签>");
     tag("<实体标签>");
     without_tag("<实体标签>");
     limit(<数量>);
     within(<距离>);
     sort(nearest | furthest | random | arbitrary);
-    item(contents) {
-        id = "<物品类型>";
+    name("<名称>");
+    without_name("<名称>");
+    scores("<计分目标>", "<整数区间>");
+    nbt("<SNBT 谓词或路径>");
+    without_nbt("<SNBT 谓词或路径>");
+    box(<x>, <y>, <z>, <dx>, <dy>, <dz>);
+    distance("<距离区间>");
+    level("<等级区间>");
+    gamemode("survival" | "creative" | "adventure" | "spectator");
+    team("<队伍>");
+    without_team("<队伍>");
+    rotate("<偏航区间>", "<俯仰区间>");
+    predicate("<谓词资源位置>");
+    advancements("<SNBT 谓词>");
+    item(<槽位>) {
+        id = "<物品谓词>";
         count = <数量>;
         custom_name = "<文本>";
     }
 }
 ```
 
-查询是一段可复用的选择器。`limit`、`within`、`sort`、`item` 各只能出现一次；`item` 过滤器里的 `id` 必填，槽位目前只支持 `contents`。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear` 里被引用。
+查询是一段可复用的选择器。除 `tag`/`type`/`scores` 可以出现多次外，其余属性各只能出现一次；`distance` 与 `within` 会合并成同一个 `distance` 区间。`item` 过滤器的槽位是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0` …）或 `slot_source` 资源位置，`id` 可以是物品 id、`#标签` 或带 `[组件过滤器]` 的谓词。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear`、`count` 与条件里被引用。
 
 | 属性 | 生成的参数 | 中文写法 |
 | --- | --- | --- |
-| `tag("t")` | `!tag=t` | `标签("t")` |
-| `without_tag("t")` | `!tag=!t` | `排除标签("t")` |
-| `limit(3)` | `!limit=3` | `上限(3)` |
+| `type("#tag")` / `without_type("id")` | `type=#tag` / `type=!id` | `类型(...)` / `排除类型(...)` |
+| `tag("t")` | `tag=t` | `标签("t")` |
+| `without_tag("t")` | `tag=!t` | `排除标签("t")` |
+| `limit(3)` | `limit=3` | `上限(3)` |
 | `within(16)` | `distance=..16` | `范围(16)` |
-| `sort(nearest)` | `!sort=nearest` | `排序(最近)` |
-| `item(contents) { id = … }` | `if items entity @s contents …` | `物品(内容) { 类型 = …; }` |
+| `sort(nearest)` | `sort=nearest` | `排序(最近)` |
+| `name("Bob")` / `without_name(...)` | `name=Bob` / `name=!Bob` | `名称(...)` / `排除名称(...)` |
+| `scores("obj", "1..5")` | `scores={obj=1..5}` | `分数(...)` |
+| `nbt(...)` / `without_nbt(...)` | `nbt=…` / `nbt=!…` | `数据谓词(...)` / `排除数据(...)` |
+| `box(0, 60, 0, 16, 8, 16)` | `x=…,y=…,z=…,dx=…,dy=…,dz=…` | `坐标盒(...)` |
+| `distance("3..10")` | `distance=3..10` | `距离(...)` |
+| `level("5..")` | `level=5..` | `等级(...)` |
+| `gamemode("creative")` | `gamemode=creative` | `游戏模式(...)` |
+| `team("red")` / `without_team(...)` | `team=red` / `team=!red` | `队伍(...)` / `排除队伍(...)` |
+| `rotate("0..90", "..45")` | `y_rotation=0..90,x_rotation=..45` | `旋转(...)` |
+| `predicate("ns:id")` | `predicate=ns:id` | `谓词过滤(...)` |
+| `advancements("{…}")` | `advancements={…}` | `进度过滤(...)` |
+| `item(<槽位>) { id = … }` | `if items entity @s <槽位> …` | `物品(...) { 类型 = …; }` |
 
 `xp.query` 要求目标查询带 `limit(1)`，否则编译期报错。
 
@@ -596,16 +624,21 @@ in_dimension("<维度资源位置>") {
 ### 传送（teleport）
 
 ```mcl title="语法" fragment
-teleport(<持有者>, <坐标>);
+teleport(<持有者>, <坐标>[, rotation(<朝向偏航>, <俯仰>)]);   // 中文 朝向(...)
 teleport(<持有者>, <单个实体查询>);
 ```
 
-把持有者的实体移动到目标位置。持有者支持 `self`/`自身`（当前实体）、`origin`/`投掷者` 和实体查询（查询命中多个实体时逐个传送）；两者都要求实体执行上下文。落点写 `pos(...)` 时传送到该坐标，支持绝对、`~` 相对与 `^` 局部坐标；写成查询名称时跟随该**单个**实体（查询必须 `limit(1)`），会一并使用目标实体的位置、朝向和维度。
+把持有者的实体移动到目标位置。持有者支持 `self`/`自身`（当前实体）、`origin`/`投掷者` 和实体查询（查询命中多个实体时逐个传送）；两者都要求实体执行上下文。
+
+落点有三种写法：`pos(...)`（中文 `坐标(...)`，别名 `block_pos(...)`）是方块坐标，绝对分量必须是整数；`vec3(<x>, <y>, <z>)` 是精确坐标，绝对分量允许小数；写成查询名称时跟随该**单个**实体（查询必须 `limit(1)`），会一并使用目标实体的位置、朝向和维度。`vec3` 与 `pos` 都支持 `~` 相对坐标与 `^` 局部坐标，`^` 三个分量必须同时使用。
+
+可选参数 `rotation(yaw, pitch)` 设置传送后的朝向（单位是度）；跟随实体时不能再指定朝向，因为实体的朝向会一并跟随。
 
 ```mcl title="示例：跨维度仓库" fragment
 each(boxes) {
-    teleport(self, pos(29999970, -60, 29999970));   // 送进主世界仓库
-    teleport(self, current_trigger);                // 从仓库取回触发物身边
+    teleport(self, pos(29999970, -60, 29999970));          // 送进主世界仓库
+    teleport(self, vec3(0.5, 64, 0.5), rotation(90, 0));   // 精确落点并面向 +X
+    teleport(self, current_trigger);                       // 从仓库取回触发物身边
 }
 ```
 
@@ -700,17 +733,56 @@ schedule.clear(heartbeat);
 ### 消息（message）
 
 ```mcl title="语法" fragment
-message.all("<文本>"[, <颜色>]);
-message.self("<文本>"[, <颜色>]);
-message.nearest(<距离>, "<文本>"[, <颜色>]);
+message.all(<组件> | "<文本>"[, <颜色>]);
+message.self(<组件> | "<文本>"[, <颜色>]);
+message.nearest(<距离>, <组件> | "<文本>"[, <颜色>]);
+message.player(<玩家查询>, <组件> | "<文本>"[, <颜色>]);
 ```
 
-分别生成 `tellraw @a`、`tellraw @s`、`tellraw @a[sort=nearest,limit=1,distance=..<距离>]` 加文本组件 JSON。文本里的引号与反斜杠会自动转义。`message.self` 要求玩家上下文；`message.nearest` 的距离必须在 1 到 30000000 之间。
+分别生成 `tellraw @a`、`tellraw @s`、`tellraw @a[sort=nearest,limit=1,distance=..<距离>]`、`tellraw <查询选择器>` 加文本组件 JSON。字符串是 `text("...")` 的简写，末尾可选的颜色参数是旧写法；结构化组件请在样式块里写 `color`。`message.self` 要求玩家上下文；`message.nearest` 的距离必须在 1 到 30000000 之间。
 
 ```mcl title="示例" fragment
 message.all("服务器已加载", green);
-message.self("任务完成", gold);
+message.self(text("任务完成") { color = "gold"; bold = true; });
 message.nearest(16, "你附近有动静", yellow);
+message.player(everyone, translate("chat.type.text", [selector("@s"), text("加入了游戏")]));
+```
+
+### 文本组件
+
+`tellraw` 与后续界面命令共用一套结构化文本组件，构造器后可以跟一个样式块：
+
+```mcl title="语法" fragment
+text("<文本>") { <样式> }
+translate("<本地化键>"[, [<组件>, ...]]) { <样式> }
+keybind("<按键名>") { <样式> }
+score(<持有者>, <已声明目标> | "<运行期目标>") { <样式> }
+selector("<选择器>" | <查询>) { <样式> }
+nbt(entity, <持有者>, "<路径>") { <样式> }
+nbt(block, <方块坐标>, "<路径>") { <样式> }
+nbt(storage, "<存储资源位置>", "<路径>") { <样式> }
+```
+
+样式块可选，用 `;` 或 `,` 分隔，每项最多出现一次：
+
+| 属性 | 取值 | 生成的 JSON |
+| --- | --- | --- |
+| `color`/`颜色` | 16 个颜色名、中文颜色名或 `"#rrggbb"` | `"color"` |
+| `bold`/`粗体`、`italic`/`斜体`、`underlined`/`下划线`、`strikethrough`/`删除线`、`obfuscated`/`混淆` | `true`/`false`（`真`/`假`） | 对应的布尔字段 |
+| `click`/`点击` | `open_url("https://…")`、`run_command("/…")`、`suggest_command("/…")`、`copy_to_clipboard("…")`、`change_page(<页号>)` | `"click_event"` |
+| `hover`/`悬停` | 任意文本组件 | `"hover_event": {"action":"show_text","value":…}`；悬停内容里不能再写 `hover` |
+| `interpret`/`解释`、`plain`/`纯文本`、`separator`/`分隔符` | 仅 `nbt` 组件 | `"interpret"`、`"plain"`、`"separator"`，`interpret` 与 `plain` 不能同时为真 |
+
+`score` 的目标写已声明的 `objective` 名称时生成 `<命名空间>_<名称>`，写字符串时原样使用。`nbt` 路径支持 `.` 分段、`[0]` 下标与引号键。`selector` 的字符串必须是 `@a`、`@e[...]` 这类选择器。
+
+```mcl title="示例" fragment
+message.all(text("你好") {
+    color = "red";
+    bold = true;
+    click = run_command("/say hi");
+    hover = text("提示") { color = "gray"; };
+});
+message.all(nbt(entity, self, "CustomName") { separator = text("、"); });
 ```
 
 ### 声音（sound.self）
@@ -755,7 +827,7 @@ let <name> = xp.query(<limit(1) 玩家查询>, points | levels);
 ```mcl title="示例" fragment
 xp.add(player, points, 25);
 xp.set(player, levels, 5);
-let level = xp.query(player, levels);
+let player_level = xp.query(player, levels);
 ```
 
 ### 清空物品（clear）
@@ -993,7 +1065,9 @@ $ cargo run -- check raw_escape.mcl --deny-raw
 
 ### 世界与方块 {#statements-world}
 
-世界命令的参数也由编译器检查：坐标范围、方块资源位置、方块属性字符、枚举值、时间单位与数值范围都在编译期验证。位置统一写成 `pos(<x>, <y>, <z>)`（中文 `坐标(...)`）：分量可以是整数绝对坐标、`~[±偏移]` 相对坐标或 `^[±偏移]` 局部坐标；`^` 三个分量必须同时使用，不能与另外两种混用。绝对坐标的水平范围是 -30000000 到 29999999，垂直范围是 -2032 到 2031。
+世界命令的参数也由编译器检查：坐标范围、方块资源位置、方块属性字符、枚举值、时间单位与数值范围都在编译期验证。位置统一写成 `pos(<x>, <y>, <z>)`（中文 `坐标(...)`，别名 `block_pos(...)`）：分量可以是整数绝对坐标、`~[±偏移]` 相对坐标或 `^[±偏移]` 局部坐标；`^` 三个分量必须同时使用，不能与另外两种混用。绝对坐标的水平范围是 -30000000 到 29999999，垂直范围是 -2032 到 2031。
+
+需要小数坐标时写 `vec3(<x>, <y>, <z>)`（精确坐标，如传送落点），水平两分量用 `vec2(<x>, <z>)`（如 `worldborder.center` 的另一种写法）；两者的绝对分量允许小数，范围与方块坐标一致。`vec2` 不支持 `^`。
 
 方块写成 `block_state("<命名空间:方块>") { <属性> = "<值>"; }`（中文 `方块状态(...)`），属性块可省略；属性名只能是小写字母、数字与下划线，属性值只能是小写字母、数字与 `_ . + -`。`block_state("#标签")` 是方块谓词，只能用在 `fill` 的替换过滤器与 `clone` 的 `filtered` 选项里，也不能带属性。
 
@@ -1021,7 +1095,7 @@ gamerule.set("<规则>", true | false | <整数>);
 let <name> = gamerule.query("<规则>");
 worldborder.add(<边长增量>[, <过渡时间>]);
 worldborder.set(<边长>[, <过渡时间>]);
-worldborder.center(<x>, <z>);
+worldborder.center(<x>, <z> | vec2(<x>, <z>));
 worldborder.damage_amount(<每块伤害>);
 worldborder.damage_buffer(<缓冲距离>);
 worldborder.warning_distance(<距离>);
@@ -1079,7 +1153,7 @@ fn prepare() {
     clone(pos(0, 64, 0), pos(8, 64, 8), pos(60, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
 
     // 地物、结构、拼图与模板。
-    place.feature("minecraft:oak_tree", pos(0, 64, 20));
+    place.feature("minecraft:oak", pos(0, 64, 20));
     place.structure("minecraft:village_plains", pos(32, 64, 20));
     place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
     place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);
@@ -1154,10 +1228,33 @@ fn release() {
 | `time.query_gametime()` | 世界的游戏时间 |
 | `gamerule.query("<规则>")` | 规则当前值 |
 | `worldborder.get()` | 世界边界边长 |
+| `count(<查询>)` | 查询命中的实体数量（无命中为 0） |
+| `random(<最小值>, <最大值>)` | 闭区间随机整数，如 `random(1, 6)` |
+| `data.get(entity, <持有者>, "<路径>")` 等 | 读取 NBT 数值；`block <坐标>`、`storage "<资源位置>"` 三种来源 |
+| `compute(<来源>, float 或 integer, "<provider>"[, <缩放>])` | 按上下文 provider 计算数值；来源是 `default`、`block, <坐标>` 或 `entity, <持有者>` |
+
+`count`、`random`、`data.get`、`compute` 都通过 `execute store result score` 落入临时计分项，可以参与后续算术与条件；`data.get` 读取失败或非数值时为 0，`compute` 的 provider 必须是 26.3 注册表里的 `context_float_provider`/`context_int_provider`。
 
 运算符：一元 `-`，二元 `+`、`-`、`*`、`/`、`%`，括号分组；优先级与常见语言一致（`* / %` 高于 `+ -`）。除以常量 0 在编译期拒绝。
 
-条件是表达式之间的比较：`==`、`!=`、`<`、`<=`、`>`、`>=`，配合 `!`、`&&`、`||`、括号与谓词检查：
+条件是表达式之间的比较：`==`、`!=`、`<`、`<=`、`>`、`>=`，配合 `!`、`&&`、`||`、括号与谓词检查；此外还有一组直接对应原版 `execute if/unless` 的条件：
+
+| 条件 | 生成的判定 | 说明 |
+| --- | --- | --- |
+| `predicate(<本命名空间谓词>)` | `if predicate ns:name` | 谓词资源 |
+| `block(<方块坐标>, <方块状态或 #标签>)` | `if block <pos> <block>` | 方块谓词，可带属性 |
+| `blocks(<起点>, <终点>, <目标>[, masked])` | `if blocks … [masked]` | 区域方块比较，默认 `all` |
+| `biome(<方块坐标>, "<生物群系或 #标签>")` | `if biome <pos> <biome>` | |
+| `loaded(<方块坐标>)` | `if loaded <pos>` | 区块已加载 |
+| `dimension("<维度>")` | `if dimension <id>` | 当前维度 |
+| `entity(<查询>)` | `if entity <选择器>` | 查询是否命中 |
+| `data(entity, <持有者> \| block, <坐标> \| storage, "<id>", "<路径>")` | `if data …` | NBT 路径存在 |
+| `items(entity, <持有者> \| block, <坐标>, "<槽位>", "<物品谓词>")` | `if items …` | 槽位里有匹配物品 |
+| `slots(entity, <持有者> \| block, <坐标>, "<槽位>")` | `if slots …` | 槽位里有物品 |
+| `function(<函数或 #标签>)` | `if function ns:name` | 函数返回成功 |
+| `stopwatch("<id>")` | `if stopwatch <id>` | 秒表在运行 |
+
+槽位来源是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0`、`hotbar.3` …）或 `slot_source` 资源位置；物品谓词是物品 id、`#标签`，可以带 `[组件过滤器]`。
 
 ```mcl title="语法" fragment
 if predicate(<本命名空间谓词>) && ticks % 20 == 0 {
@@ -1247,7 +1344,7 @@ resource predicate lucky = """
 
 fn_tag rounding {
     value(announce);
-    value(compute);
+    value(calculate);
 }
 
 @load
@@ -1263,7 +1360,7 @@ fn divide(left, right) -> score {
     return left / right;
 }
 
-fn compute() -> score {
+fn calculate() -> score {
     let base = divide(100, 5);
     let remainder = 100 % 7;
     total = base + remainder;
@@ -1321,7 +1418,7 @@ fn cleanup() {
 
 `compute` 生成的计分板操作（局部变量是内部槽位，`#t<序号>` 是临时值）：
 
-:::generated example=tour_core file=data/tour_core/function/compute.mcfunction title="data/tour_core/function/compute.mcfunction"
+:::generated example=tour_core file=data/tour_core/function/calculate.mcfunction title="data/tour_core/function/compute.mcfunction"
 :::
 
 `__mcl/load.mcfunction` 展示编译器合成的初始化：创建 objective、给缺少的计分变量补初始值（项目里有 `storage` 声明时还会初始化存储），最后调用全部 `@load` 函数：
@@ -1400,8 +1497,8 @@ fn adjust_xp() {
     xp.add(one_player, points, 25);
     xp.set(one_player, levels, 5);
     xp.add(one_player, points, -10);
-    let level = xp.query(one_player, levels);
-    if level >= 5 {
+    let player_level = xp.query(one_player, levels);
+    if player_level >= 5 {
         message.all("等级已达标", aqua);
     }
 }

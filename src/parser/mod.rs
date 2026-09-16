@@ -12,6 +12,7 @@
 //! 本模块只保留 [`Parser`] 的游标导航和顶层声明分派。子模块定义的语法产生式
 //! 若需要跨模块调用，统一使用 `pub(super)`。
 
+mod components;
 mod conditions;
 mod declarations;
 mod expressions;

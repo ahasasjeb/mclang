@@ -29,7 +29,7 @@ fn build() {
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), masked, force, strict);
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), filtered, block_state("#minecraft:logs"), move);
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
-    place.feature("minecraft:oak_tree", pos(0, 64, 0));
+    place.feature("minecraft:oak", pos(0, 64, 0));
     place.structure("minecraft:village_plains");
     place.structure("minecraft:village_plains", pos(32, 64, 32));
     place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(48, 64, 48));
@@ -60,6 +60,7 @@ fn environment() {
     worldborder.add(-100, 30 s);
     worldborder.set(1000);
     worldborder.center(~, 0.5);
+    worldborder.center(vec2(1.5, ~2));
     worldborder.damage_amount(0.5);
     worldborder.damage_buffer(5);
     worldborder.warning_distance(10);
@@ -69,4 +70,12 @@ fn environment() {
     ticks = time.query("minecraft:the_end");
     clock = time.query_gametime();
     ticks = gamerule.query("keep_inventory");
+}
+
+// 1.2 坐标与向量类型：`block_pos` 别名、`vec3` 精确坐标与 `rotation` 朝向。
+@entity
+fn journey() {
+    teleport(self, vec3(1.5, 64, -3.25), rotation(90, -45));
+    teleport(自身, block_pos(~1, ~, ~));
+    teleport(self, vec3(~, ~1.5, ~-2.25));
 }

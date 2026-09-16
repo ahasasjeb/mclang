@@ -247,6 +247,22 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "坐标",
     },
     Keyword {
+        english: "block_pos",
+        chinese: "方块坐标",
+    },
+    Keyword {
+        english: "vec3",
+        chinese: "精确坐标",
+    },
+    Keyword {
+        english: "vec2",
+        chinese: "平面坐标",
+    },
+    Keyword {
+        english: "rotation",
+        chinese: "朝向",
+    },
+    Keyword {
         english: "column",
         chinese: "列坐标",
     },
@@ -257,6 +273,70 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
     Keyword {
         english: "nbt",
         chinese: "数据",
+    },
+    Keyword {
+        english: "text",
+        chinese: "文本",
+    },
+    Keyword {
+        english: "translate",
+        chinese: "翻译",
+    },
+    Keyword {
+        english: "keybind",
+        chinese: "按键",
+    },
+    Keyword {
+        english: "selector",
+        chinese: "选择器",
+    },
+    Keyword {
+        english: "count",
+        chinese: "计数",
+    },
+    Keyword {
+        english: "random",
+        chinese: "随机",
+    },
+    Keyword {
+        english: "compute",
+        chinese: "计算",
+    },
+    Keyword {
+        english: "data",
+        chinese: "数据操作",
+    },
+    Keyword {
+        english: "block",
+        chinese: "方块",
+    },
+    Keyword {
+        english: "blocks",
+        chinese: "区域方块",
+    },
+    Keyword {
+        english: "biome",
+        chinese: "生物群系",
+    },
+    Keyword {
+        english: "loaded",
+        chinese: "已加载",
+    },
+    Keyword {
+        english: "dimension",
+        chinese: "维度",
+    },
+    Keyword {
+        english: "items",
+        chinese: "物品条件",
+    },
+    Keyword {
+        english: "slots",
+        chinese: "槽位条件",
+    },
+    Keyword {
+        english: "function",
+        chinese: "函数条件",
     },
 ];
 
@@ -322,10 +402,37 @@ pub(super) fn query_property(value: &str) -> Option<&'static str> {
     match value {
         "tag" | "标签" => Some("tag"),
         "without_tag" | "排除标签" => Some("without_tag"),
+        "type" | "类型" => Some("type"),
+        "without_type" | "排除类型" => Some("without_type"),
         "limit" | "上限" => Some("limit"),
         "within" | "范围" => Some("within"),
         "sort" | "排序" => Some("sort"),
+        "name" | "名称" => Some("name"),
+        "without_name" | "排除名称" => Some("without_name"),
+        "scores" | "分数" => Some("scores"),
+        "nbt" | "数据" => Some("nbt"),
+        "without_nbt" | "排除数据" => Some("without_nbt"),
+        "box" | "坐标盒" => Some("box"),
+        "distance" | "距离" => Some("distance"),
+        "level" | "等级" => Some("level"),
+        "gamemode" | "游戏模式" => Some("gamemode"),
+        "team" | "队伍" => Some("team"),
+        "without_team" | "排除队伍" => Some("without_team"),
+        "rotate" | "旋转" => Some("rotate"),
+        "predicate" | "谓词" => Some("predicate"),
+        "advancements" | "进度过滤" => Some("advancements"),
         "item" | "物品" => Some("item"),
+        _ => None,
+    }
+}
+
+/// 游戏模式取值（选择器 `gamemode=` 与 `gamemode` 命令共用）。
+pub(super) fn gamemode_value(value: &str) -> Option<&'static str> {
+    match value {
+        "survival" | "生存" => Some("survival"),
+        "creative" | "创造" => Some("creative"),
+        "adventure" | "冒险" => Some("adventure"),
+        "spectator" | "旁观" => Some("spectator"),
         _ => None,
     }
 }
@@ -513,6 +620,56 @@ pub(super) fn scoreboard_method(value: &str) -> Option<&'static str> {
         "set" | "设置" => Some("set"),
         "reset" | "重置" => Some("reset"),
         "get" | "取" => Some("get"),
+        "enable" | "启用" => Some("enable"),
+        "operation" | "运算" => Some("operation"),
+        "display" | "显示" => Some("display"),
+        _ => None,
+    }
+}
+
+/// `scoreboard players operation` 的运算名。
+pub(super) fn score_operation(value: &str) -> Option<&'static str> {
+    match value {
+        "set" | "赋值" => Some("set"),
+        "add" | "加上" => Some("add"),
+        "subtract" | "减去" => Some("subtract"),
+        "multiply" | "乘以" => Some("multiply"),
+        "divide" | "除以" => Some("divide"),
+        "modulo" | "取余" => Some("modulo"),
+        "min" | "最小值" => Some("min"),
+        "max" | "最大值" => Some("max"),
+        "swap" | "交换" => Some("swap"),
+        _ => None,
+    }
+}
+
+/// `objective` 声明块里的属性名。
+pub(super) fn objective_property(value: &str) -> Option<&'static str> {
+    match value {
+        "criteria" | "准则" => Some("criteria"),
+        "display_name" | "显示名" => Some("display_name"),
+        "render_type" | "渲染类型" => Some("render_type"),
+        "number_format" | "数字格式" => Some("number_format"),
+        "display_slot" | "显示槽" => Some("display_slot"),
+        _ => None,
+    }
+}
+
+/// 目标渲染类型。
+pub(super) fn render_type(value: &str) -> Option<&'static str> {
+    match value {
+        "integer" | "整数" => Some("integer"),
+        "hearts" | "爱心" => Some("hearts"),
+        _ => None,
+    }
+}
+
+/// 数字格式构造器：`blank`、`fixed(...)`、`styled`。
+pub(super) fn number_format_kind(value: &str) -> Option<&'static str> {
+    match value {
+        "blank" | "空白" => Some("blank"),
+        "fixed" | "固定" => Some("fixed"),
+        "styled" | "样式" => Some("styled"),
         _ => None,
     }
 }
@@ -531,6 +688,77 @@ pub(super) fn message_target(value: &str) -> Option<&'static str> {
         "all" | "全部" => Some("all"),
         "self" | "自身" => Some("self"),
         "nearest" | "最近" => Some("nearest"),
+        "player" | "玩家" => Some("player"),
+        _ => None,
+    }
+}
+
+/// 文本组件的样式属性名。
+pub(super) fn text_style_property(value: &str) -> Option<&'static str> {
+    match value {
+        "color" | "颜色" => Some("color"),
+        "bold" | "粗体" => Some("bold"),
+        "italic" | "斜体" => Some("italic"),
+        "underlined" | "下划线" => Some("underlined"),
+        "strikethrough" | "删除线" => Some("strikethrough"),
+        "obfuscated" | "混淆" => Some("obfuscated"),
+        "click" | "点击" => Some("click"),
+        "hover" | "悬停" => Some("hover"),
+        "interpret" | "解释" => Some("interpret"),
+        "plain" | "纯文本" => Some("plain"),
+        "separator" | "分隔符" => Some("separator"),
+        _ => None,
+    }
+}
+
+/// 点击事件的动作名。
+pub(super) fn click_action(value: &str) -> Option<&'static str> {
+    match value {
+        "open_url" | "打开链接" => Some("open_url"),
+        "run_command" | "运行命令" => Some("run_command"),
+        "suggest_command" | "建议命令" => Some("suggest_command"),
+        "copy_to_clipboard" | "复制到剪贴板" => Some("copy_to_clipboard"),
+        "change_page" | "翻页" => Some("change_page"),
+        _ => None,
+    }
+}
+
+/// `nbt` 组件的来源类型。
+pub(super) fn nbt_source(value: &str) -> Option<&'static str> {
+    match value {
+        "entity" | "实体" => Some("entity"),
+        "block" | "方块" => Some("block"),
+        "storage" | "存储" => Some("storage"),
+        _ => None,
+    }
+}
+
+/// `compute` 的上下文来源。
+pub(super) fn compute_source(value: &str) -> Option<&'static str> {
+    match value {
+        "default" | "默认" => Some("default"),
+        "block" | "方块" => Some("block"),
+        "entity" | "实体" => Some("entity"),
+        _ => None,
+    }
+}
+
+/// `compute` 的数值类型。
+pub(super) fn compute_kind(value: &str) -> Option<&'static str> {
+    match value {
+        "float" | "浮点" => Some("float"),
+        "integer" | "整数" => Some("integer"),
+        _ => None,
+    }
+}
+
+/// `data` 命令的方法名。
+pub(super) fn data_method(value: &str) -> Option<&'static str> {
+    match value {
+        "get" | "取" => Some("get"),
+        "merge" | "合并" => Some("merge"),
+        "remove" | "移除" => Some("remove"),
+        "modify" | "修改" => Some("modify"),
         _ => None,
     }
 }

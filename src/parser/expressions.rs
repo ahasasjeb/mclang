@@ -6,7 +6,8 @@ use crate::lexer::TokenKind;
 
 use super::Parser;
 use super::keywords::{
-    gamerule_method, scoreboard_method, time_method, word_matches, worldborder_method, xp_kind,
+    compute_kind, compute_source, data_method, gamerule_method, scoreboard_method, time_method,
+    word_matches, worldborder_method, xp_kind,
 };
 
 impl Parser {
@@ -103,6 +104,16 @@ impl Parser {
             }
             TokenKind::Ident(name) => {
                 if self.check(&TokenKind::LeftParen) {
+                    // 命令结果表达式使用独立语法，先于普通函数调用识别。
+                    if word_matches(&name, "count") {
+                        return self.count_expression(token.span);
+                    }
+                    if word_matches(&name, "random") {
+                        return self.random_expression(token.span);
+                    }
+                    if word_matches(&name, "compute") {
+                        return self.compute_expression(token.span);
+                    }
                     let arguments = self.call_arguments()?;
                     let span = token.span.merge(self.previous().span);
                     Ok(Expr {
@@ -239,11 +250,106 @@ impl Parser {
                 span: start_span.merge(self.previous().span),
             });
         }
+        if word_matches(&receiver, "data") && data_method(&method) == Some("get") {
+            self.expect(TokenKind::LeftParen, "data.get 后需要 `(`")?;
+            let source = self.nbt_source_value("data.get 来源")?;
+            self.expect(TokenKind::Comma, "data.get 来源后需要 `,`")?;
+            let (path, path_span) = self.string("data.get 需要 NBT 路径字符串")?;
+            self.expect(TokenKind::RightParen, "data.get 调用缺少 `)`")?;
+            return Ok(Expr {
+                kind: ExprKind::DataGet {
+                    source,
+                    path,
+                    path_span,
+                },
+                span: start_span.merge(self.previous().span),
+            });
+        }
         Err(Diagnostic::new(
             format!(
-                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`、`scoreboard.get(持有者, 目标)`、`stopwatch.query(\"命名空间:id\"[, 缩放])`、`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(\"规则\")` 和 `worldborder.get()`"
+                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`、`scoreboard.get(持有者, 目标)`、`stopwatch.query(\"命名空间:id\"[, 缩放])`、`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(\"规则\")`、`worldborder.get()` 和 `data.get(来源, 路径)`"
             ),
             span,
         ))
+    }
+
+    /// `count(查询)`：查询命中的实体数量。
+    fn count_expression(&mut self, start_span: Span) -> Result<Expr, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "count 后需要 `(`")?;
+        let (query, query_span) = self.ident("count 需要已声明的实体查询名称")?;
+        self.expect(TokenKind::RightParen, "count 调用缺少 `)`")?;
+        Ok(Expr {
+            kind: ExprKind::Count { query, query_span },
+            span: start_span.merge(self.previous().span),
+        })
+    }
+
+    /// `random(最小值, 最大值)`：闭区间随机整数。
+    fn random_expression(&mut self, start_span: Span) -> Result<Expr, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "random 后需要 `(`")?;
+        let min = self.signed("random 最小值")?;
+        self.expect(TokenKind::Comma, "random 最小值后需要 `,`")?;
+        let max = self.signed("random 最大值")?;
+        self.expect(TokenKind::RightParen, "random 调用缺少 `)`")?;
+        Ok(Expr {
+            kind: ExprKind::Random { min, max },
+            span: start_span.merge(self.previous().span),
+        })
+    }
+
+    /// `compute(来源, float|integer, "provider"[, 缩放])`。
+    fn compute_expression(&mut self, start_span: Span) -> Result<Expr, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "compute 后需要 `(`")?;
+        let (source_name, source_span) = self.ident("compute 来源 default/block/entity")?;
+        let Some(source_kind) = compute_source(&source_name) else {
+            return Err(Diagnostic::new(
+                format!(
+                    "未知 compute 来源 `{source_name}`，可用 default（默认）、block（方块）或 entity（实体）"
+                ),
+                source_span,
+            ));
+        };
+        let source = match source_kind {
+            "default" => ComputeSource::Default,
+            "block" => {
+                self.expect(TokenKind::Comma, "compute block 来源后需要 `,`")?;
+                ComputeSource::Block(self.block_position("compute 方块坐标")?)
+            }
+            _ => {
+                self.expect(TokenKind::Comma, "compute entity 来源后需要 `,`")?;
+                ComputeSource::Entity(self.score_holder()?)
+            }
+        };
+        self.expect(TokenKind::Comma, "compute 来源后需要 `,`")?;
+        let (kind_name, kind_span) = self.ident("compute 类型 float 或 integer")?;
+        let Some(kind) = compute_kind(&kind_name) else {
+            return Err(Diagnostic::new(
+                format!("compute 类型只能是 float/浮点 或 integer/整数，实际为 `{kind_name}`"),
+                kind_span,
+            ));
+        };
+        let kind = if kind == "float" {
+            ComputeKind::Float
+        } else {
+            ComputeKind::Integer
+        };
+        self.expect(TokenKind::Comma, "compute 类型后需要 `,`")?;
+        let (provider, provider_span) = self.string("compute 需要 provider 资源位置字符串")?;
+        let scale = if self.take(&TokenKind::Comma).is_some() {
+            Some(self.signed_number_text("compute 缩放")?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::RightParen, "compute 调用缺少 `)`")?;
+        Ok(Expr {
+            kind: ExprKind::Compute {
+                source,
+                kind,
+                provider,
+                provider_span,
+                scale,
+            },
+            span: start_span.merge(self.previous().span),
+        })
     }
 }

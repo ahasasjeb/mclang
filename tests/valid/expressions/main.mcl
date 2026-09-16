@@ -1,0 +1,32 @@
+// 编译测试（1.5）：命令结果表达式 count / random / data.get / compute。
+namespace expressions_test;
+
+score total = 0;
+score dice = 0;
+score health = 0;
+score cooked = 0;
+
+query zombies = entity("minecraft:zombie") { within(32); };
+objective points;
+
+@load
+fn roll() {
+    total = count(zombies);
+    dice = random(1, 6) + random(10, 20) * 2;
+    if count(zombies) == 3 {
+        total = 1;
+    }
+}
+
+@entity
+fn read_data() {
+    health = data.get(entity, self, "Health");
+    total = data.get(block, pos(0, 64, 0), "Items[0].count");
+    total = data.get(storage, "expressions_test:data", "value");
+}
+
+@load
+fn compute_values() {
+    cooked = compute(default, integer, "minecraft:cooking/time_coal");
+    cooked = compute(block, pos(1, 2, 3), float, "minecraft:cooking/speed_default", 2.5);
+}

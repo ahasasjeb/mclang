@@ -44,9 +44,18 @@ impl Parser {
         } else if self.take_word("spawn").is_some() {
             self.expect(TokenKind::LeftParen, "spawn 后需要 `(`")?;
             let (entity_type, _) = self.string("spawn 需要实体类型资源位置")?;
+            let position = if self.take(&TokenKind::Comma).is_some() {
+                Some(self.position_value("spawn 召唤坐标")?)
+            } else {
+                None
+            };
             self.expect(TokenKind::RightParen, "实体类型后需要 `)`")?;
             let (body, _) = self.block()?;
-            StatementKind::Spawn { entity_type, body }
+            StatementKind::Spawn {
+                entity_type,
+                position,
+                body,
+            }
         } else if self.take_word("self").is_some() {
             StatementKind::SelfAction(self.self_action()?)
         } else if self.take_word("message").is_some() {
@@ -335,56 +344,126 @@ impl Parser {
         self.expect(TokenKind::Dot, "message 后需要 `.`")?;
         let (method, span) = self.ident("消息目标")?;
         let Some(method_kind) = message_target(&method) else {
-            return Err(Diagnostic::new("消息目标只能是 all、self 或 nearest", span));
+            return Err(Diagnostic::new(
+                "消息目标只能是 all、self、nearest 或 player",
+                span,
+            ));
         };
         self.expect(TokenKind::LeftParen, "消息目标后需要 `(`")?;
-        let (target, text) = match method_kind {
+        let (target, component) = match method_kind {
             "all" | "self" => {
-                let (text, _) = self.string("消息需要文本字符串")?;
                 let target = if method_kind == "all" {
                     MessageTarget::All
                 } else {
                     MessageTarget::SelfEntity
                 };
-                (target, text)
+                (target, self.text_component_or_string("消息内容")?)
             }
             "nearest" => {
                 let within = self.unsigned("message.nearest 范围")?;
                 self.expect(TokenKind::Comma, "范围后需要 `,`")?;
-                let (text, _) = self.string("message.nearest 需要文本字符串")?;
-                (MessageTarget::Nearest { within }, text)
+                let component = self.text_component_or_string("消息内容")?;
+                (MessageTarget::Nearest { within }, component)
+            }
+            "player" => {
+                let (name, name_span) = self.ident("message.player 需要实体查询名称")?;
+                self.expect(TokenKind::Comma, "查询后需要 `,`")?;
+                let component = self.text_component_or_string("消息内容")?;
+                (MessageTarget::Query { name, name_span }, component)
             }
             _ => unreachable!(),
         };
-        let color = if self.take(&TokenKind::Comma).is_some() {
-            let (color, _) = self.ident("消息颜色")?;
-            Some(text_color(&color).unwrap_or(&color).to_owned())
+        // 兼容旧写法：纯文本消息后面可以再跟一个颜色标识符。
+        let component = if self.take(&TokenKind::Comma).is_some() {
+            let (color, color_span) = self.ident("消息颜色")?;
+            if !matches!(component.kind, TextComponentKind::Text(_)) {
+                return Err(Diagnostic::new(
+                    "结构化文本组件请在样式块里写 color，例如 text(\"你好\") { color = \"red\"; }",
+                    color_span,
+                ));
+            }
+            let color = text_color(&color).unwrap_or(&color).to_owned();
+            TextComponent {
+                style: TextStyle {
+                    color: Some(color),
+                    ..component.style
+                },
+                ..component
+            }
         } else {
-            None
+            component
         };
         self.expect(TokenKind::RightParen, "消息调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "消息调用后需要 `;`")?;
-        Ok(StatementKind::Message {
-            target,
-            text,
-            color,
-        })
+        Ok(StatementKind::Message { target, component })
     }
 
     fn sound_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::Dot, "sound 后需要 `.`")?;
-        let (target, span) = self.ident("声音目标")?;
-        if !word_matches(&target, "self") {
-            return Err(Diagnostic::new("声音目标目前只能是 self", span));
+        let (method, span) = self.ident("声音方法")?;
+        if word_matches(&method, "self") {
+            self.expect(TokenKind::LeftParen, "sound.self 后需要 `(`")?;
+            let (sound, _) = self.string("sound.self 需要声音资源位置")?;
+            self.expect(TokenKind::Comma, "声音资源位置后需要 `,`")?;
+            let (source, _) = self.ident("声音分类")?;
+            let source = sound_source(&source).unwrap_or(&source).to_owned();
+            self.expect(TokenKind::RightParen, "声音调用缺少 `)`")?;
+            self.expect(TokenKind::Semicolon, "声音调用后需要 `;`")?;
+            return Ok(StatementKind::PlaySound {
+                sound,
+                source,
+                targets: None,
+                position: None,
+                volume: None,
+                pitch: None,
+                min_volume: None,
+            });
         }
-        self.expect(TokenKind::LeftParen, "sound.self 后需要 `(`")?;
-        let (sound, _) = self.string("sound.self 需要声音资源位置")?;
+        if !word_matches(&method, "play") {
+            return Err(Diagnostic::new(
+                "声音方法只能是 self（中文 自身）或 play（中文 播放）",
+                span,
+            ));
+        }
+        self.expect(TokenKind::LeftParen, "sound.play 后需要 `(`")?;
+        let (sound, _) = self.string("sound.play 需要声音资源位置")?;
         self.expect(TokenKind::Comma, "声音资源位置后需要 `,`")?;
         let (source, _) = self.ident("声音分类")?;
         let source = sound_source(&source).unwrap_or(&source).to_owned();
-        self.expect(TokenKind::RightParen, "声音调用缺少 `)`")?;
+        self.expect(TokenKind::Comma, "声音分类后需要 `,`")?;
+        let (targets, _) = self.ident("sound.play 需要玩家查询名称")?;
+        let mut position = None;
+        let mut volume = None;
+        let mut pitch = None;
+        let mut min_volume = None;
+        if self.take(&TokenKind::Comma).is_some() {
+            if self.check_word("pos") || self.check_word("block_pos") || self.check_word("vec3") {
+                position = Some(self.position_value("声音播放坐标")?);
+                if self.take(&TokenKind::Comma).is_some() {
+                    volume = Some(self.signed_number_text("声音音量")?);
+                }
+            } else {
+                // 省略坐标时可以直接写音量。
+                volume = Some(self.signed_number_text("声音音量")?);
+            }
+        }
+        if volume.is_some() && self.take(&TokenKind::Comma).is_some() {
+            pitch = Some(self.signed_number_text("声音音调")?);
+        }
+        if pitch.is_some() && self.take(&TokenKind::Comma).is_some() {
+            min_volume = Some(self.signed_number_text("声音最小音量")?);
+        }
+        self.expect(TokenKind::RightParen, "sound.play 调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "声音调用后需要 `;`")?;
-        Ok(StatementKind::PlaySound { sound, source })
+        Ok(StatementKind::PlaySound {
+            sound,
+            source,
+            targets: Some(targets),
+            position,
+            volume,
+            pitch,
+            min_volume,
+        })
     }
 
     fn schedule_statement(&mut self) -> Result<StatementKind, Diagnostic> {
@@ -498,7 +577,7 @@ impl Parser {
         Ok(format!("{text}{unit}"))
     }
 
-    fn call_target(&mut self, label: &str) -> Result<CallTarget, Diagnostic> {
+    pub(super) fn call_target(&mut self, label: &str) -> Result<CallTarget, Diagnostic> {
         if self.take(&TokenKind::Hash).is_some() {
             let (name, _) = self.ident("函数标签名称")?;
             Ok(CallTarget::Tag(name))
@@ -670,22 +749,30 @@ impl Parser {
 
     /// `teleport(持有者, 坐标或实体查询);`
     ///
-    /// 落点写成 `pos(...)` 时传送到该坐标；写成查询名称时跟随该单个实体的位置与朝向。
+    /// 落点写成 `pos`/`block_pos`/`vec3` 时传送到该坐标（可选 `rotation(...)`），
+    /// 写成查询名称时跟随该单个实体的位置与朝向。
     fn teleport_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::LeftParen, "teleport 后需要 `(`")?;
         let targets = self.score_holder()?;
         self.expect(TokenKind::Comma, "teleport 目标后需要 `,`")?;
-        let destination = if self.check_word("pos") {
-            TeleportDestination::Position(self.block_position("传送坐标")?)
+        let destination =
+            if self.check_word("pos") || self.check_word("block_pos") || self.check_word("vec3") {
+                TeleportDestination::Position(self.position_value("传送坐标")?)
+            } else {
+                let (query, query_span) = self.ident("实体查询名称")?;
+                TeleportDestination::Entity { query, query_span }
+            };
+        let rotation = if self.take(&TokenKind::Comma).is_some() {
+            Some(self.rotation_value("传送朝向")?)
         } else {
-            let (query, query_span) = self.ident("实体查询名称")?;
-            TeleportDestination::Entity { query, query_span }
+            None
         };
         self.expect(TokenKind::RightParen, "teleport 调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "teleport 调用后需要 `;`")?;
         Ok(StatementKind::Teleport {
             targets,
             destination,
+            rotation,
         })
     }
 

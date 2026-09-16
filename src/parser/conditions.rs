@@ -44,6 +44,174 @@ impl Parser {
                 span: start.span.merge(end),
             });
         }
+        if let Some(start) = self.take_word_call("block") {
+            self.expect(TokenKind::LeftParen, "block 条件后需要 `(`")?;
+            let pos = self.block_position("if block 坐标")?;
+            self.expect(TokenKind::Comma, "if block 坐标后需要 `,`")?;
+            let block = self.block_state_value("if block 方块谓词")?;
+            let end = self
+                .expect(TokenKind::RightParen, "block 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Block {
+                pos,
+                block,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("blocks") {
+            self.expect(TokenKind::LeftParen, "blocks 条件后需要 `(`")?;
+            let first = self.block_position("if blocks 起点")?;
+            self.expect(TokenKind::Comma, "if blocks 起点后需要 `,`")?;
+            let second = self.block_position("if blocks 终点")?;
+            self.expect(TokenKind::Comma, "if blocks 终点后需要 `,`")?;
+            let destination = self.block_position("if blocks 目标位置")?;
+            let masked = if self.take(&TokenKind::Comma).is_some() {
+                let (mode, mode_span) = self.ident("if blocks 模式 all 或 masked")?;
+                match mode.as_str() {
+                    "masked" | "遮罩" => true,
+                    "all" | "全部" => false,
+                    _ => {
+                        return Err(Diagnostic::new(
+                            format!("if blocks 模式只能是 all 或 masked，实际为 `{mode}`"),
+                            mode_span,
+                        ));
+                    }
+                }
+            } else {
+                false
+            };
+            let end = self
+                .expect(TokenKind::RightParen, "blocks 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Blocks {
+                start: first,
+                end: second,
+                destination,
+                masked,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("biome") {
+            self.expect(TokenKind::LeftParen, "biome 条件后需要 `(`")?;
+            let pos = self.block_position("if biome 坐标")?;
+            self.expect(TokenKind::Comma, "if biome 坐标后需要 `,`")?;
+            let (biome, biome_span) = self.string("if biome 需要生物群系或 #标签字符串")?;
+            let end = self
+                .expect(TokenKind::RightParen, "biome 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Biome {
+                pos,
+                biome,
+                biome_span,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("loaded") {
+            self.expect(TokenKind::LeftParen, "loaded 条件后需要 `(`")?;
+            let pos = self.block_position("if loaded 坐标")?;
+            let end = self
+                .expect(TokenKind::RightParen, "loaded 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Loaded {
+                pos,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("dimension") {
+            self.expect(TokenKind::LeftParen, "dimension 条件后需要 `(`")?;
+            let (dimension, dimension_span) = self.string("if dimension 需要维度资源位置字符串")?;
+            let end = self
+                .expect(TokenKind::RightParen, "dimension 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Dimension {
+                dimension,
+                dimension_span,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("entity") {
+            self.expect(TokenKind::LeftParen, "entity 条件后需要 `(`")?;
+            let (query, query_span) = self.ident("if entity 需要实体查询名称")?;
+            let end = self
+                .expect(TokenKind::RightParen, "entity 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Entity {
+                query,
+                query_span,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("data") {
+            self.expect(TokenKind::LeftParen, "data 条件后需要 `(`")?;
+            let source = self.nbt_source_value("if data 来源")?;
+            self.expect(TokenKind::Comma, "if data 来源后需要 `,`")?;
+            let (path, path_span) = self.string("if data 需要 NBT 路径字符串")?;
+            let end = self
+                .expect(TokenKind::RightParen, "data 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Data {
+                source,
+                path,
+                path_span,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("items") {
+            self.expect(TokenKind::LeftParen, "items 条件后需要 `(`")?;
+            let source = self.item_condition_source("if items 来源")?;
+            self.expect(TokenKind::Comma, "物品条件来源后需要 `,`")?;
+            let (slots, slots_span) = self.string("if items 需要槽位字符串")?;
+            self.expect(TokenKind::Comma, "if items 槽位后需要 `,`")?;
+            let (item, item_span) = self.string("if items 需要物品谓词字符串")?;
+            let end = self
+                .expect(TokenKind::RightParen, "items 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Items {
+                source,
+                slots,
+                slots_span,
+                item,
+                item_span,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("slots") {
+            self.expect(TokenKind::LeftParen, "slots 条件后需要 `(`")?;
+            let source = self.item_condition_source("if slots 来源")?;
+            self.expect(TokenKind::Comma, "物品条件来源后需要 `,`")?;
+            let (slots, slots_span) = self.string("if slots 需要槽位字符串")?;
+            let end = self
+                .expect(TokenKind::RightParen, "slots 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Slots {
+                source,
+                slots,
+                slots_span,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("function") {
+            self.expect(TokenKind::LeftParen, "function 条件后需要 `(`")?;
+            let target = self.call_target("if function 函数名称或 #标签")?;
+            let end = self
+                .expect(TokenKind::RightParen, "function 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Function {
+                target,
+                span: start.span.merge(end),
+            });
+        }
+        if let Some(start) = self.take_word_call("stopwatch") {
+            self.expect(TokenKind::LeftParen, "stopwatch 条件后需要 `(`")?;
+            let (id, _) = self.string("if stopwatch 需要秒表资源位置字符串")?;
+            let end = self
+                .expect(TokenKind::RightParen, "stopwatch 条件缺少 `)`")?
+                .span;
+            return Ok(Condition::Stopwatch {
+                id,
+                span: start.span.merge(end),
+            });
+        }
         if self.condition_group_starts() {
             self.expect(TokenKind::LeftParen, "这里需要 `(`")?;
             let condition = self.condition()?;
@@ -51,6 +219,16 @@ impl Parser {
             return Ok(condition);
         }
         self.comparison_condition()
+    }
+
+    /// 条件关键字：只有紧跟 `(` 时才按条件解析；`stopwatch.query(...)`、
+    /// `data.get(...)` 这类属于表达式，交给比较条件。
+    fn take_word_call(&mut self, word: &str) -> Option<crate::lexer::Token> {
+        if self.check_word(word) && matches!(self.peek_kind(1).kind, TokenKind::LeftParen) {
+            Some(self.advance().clone())
+        } else {
+            None
+        }
     }
 
     /// 判断 `(` 是条件分组还是带括号的算术表达式。
@@ -112,9 +290,9 @@ impl Parser {
         };
         let right = self.expression()?;
         Ok(Condition::Compare {
-            left,
+            left: Box::new(left),
             comparison,
-            right,
+            right: Box::new(right),
         })
     }
 }

@@ -1,0 +1,3692 @@
+{
+  "commands": {
+    "advancement": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "children": [
+                        {
+                          "argument": "StringArgumentType.greedyString()",
+                          "executable": true,
+                          "name": "criterion"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "only"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "from"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "until"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "through"
+                },
+                {
+                  "executable": true,
+                  "name": "everything"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "grant"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "children": [
+                        {
+                          "argument": "StringArgumentType.greedyString()",
+                          "executable": true,
+                          "name": "criterion"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "only"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "from"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "until"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ResourceKeyArgument.key(Registries.ADVANCEMENT)",
+                      "executable": true,
+                      "name": "advancement"
+                    }
+                  ],
+                  "name": "through"
+                },
+                {
+                  "executable": true,
+                  "name": "everything"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "revoke"
+        }
+      ],
+      "level": 2,
+      "name": "advancement"
+    },
+    "attribute": {
+      "children": [
+        {
+          "argument": "EntityArgument.entity()",
+          "children": [
+            {
+              "argument": "ResourceArgument.resource(context, Registries.ATTRIBUTE)",
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "DoubleArgumentType.doubleArg()",
+                      "executable": true,
+                      "name": "scale"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "get"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "argument": "DoubleArgumentType.doubleArg()",
+                          "executable": true,
+                          "name": "value"
+                        }
+                      ],
+                      "name": "set"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "DoubleArgumentType.doubleArg()",
+                          "executable": true,
+                          "name": "scale"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "get"
+                    },
+                    {
+                      "executable": true,
+                      "name": "reset"
+                    }
+                  ],
+                  "name": "base"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "argument": "IdentifierArgument.id()",
+                          "children": [
+                            {
+                              "argument": "DoubleArgumentType.doubleArg()",
+                              "children": [
+                                {
+                                  "executable": true,
+                                  "name": "add_value"
+                                },
+                                {
+                                  "executable": true,
+                                  "name": "add_multiplied_base"
+                                },
+                                {
+                                  "executable": true,
+                                  "name": "add_multiplied_total"
+                                }
+                              ],
+                              "name": "value"
+                            }
+                          ],
+                          "name": "id"
+                        }
+                      ],
+                      "name": "add"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "IdentifierArgument.id()",
+                          "executable": true,
+                          "name": "id"
+                        }
+                      ],
+                      "name": "remove"
+                    },
+                    {
+                      "children": [
+                        {
+                          "children": [
+                            {
+                              "argument": "IdentifierArgument.id()",
+                              "children": [
+                                {
+                                  "argument": "DoubleArgumentType.doubleArg()",
+                                  "executable": true,
+                                  "name": "scale"
+                                }
+                              ],
+                              "executable": true,
+                              "name": "id"
+                            }
+                          ],
+                          "name": "get"
+                        }
+                      ],
+                      "name": "value"
+                    }
+                  ],
+                  "name": "modifier"
+                }
+              ],
+              "name": "attribute"
+            }
+          ],
+          "name": "target"
+        }
+      ],
+      "level": 2,
+      "name": "attribute"
+    },
+    "ban": {
+      "children": [
+        {
+          "argument": "GameProfileArgument.gameProfile()",
+          "children": [
+            {
+              "argument": "MessageArgument.message()",
+              "executable": true,
+              "name": "reason"
+            }
+          ],
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "level": 3,
+      "name": "ban"
+    },
+    "ban-ip": {
+      "children": [
+        {
+          "argument": "StringArgumentType.word()",
+          "children": [
+            {
+              "argument": "MessageArgument.message()",
+              "executable": true,
+              "name": "reason"
+            }
+          ],
+          "executable": true,
+          "name": "target"
+        }
+      ],
+      "level": 3,
+      "name": "ban-ip"
+    },
+    "banlist": {
+      "children": [
+        {
+          "executable": true,
+          "name": "ips"
+        },
+        {
+          "executable": true,
+          "name": "players"
+        }
+      ],
+      "executable": true,
+      "level": 3,
+      "name": "banlist"
+    },
+    "bossbar": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "children": [
+                {
+                  "argument": "ComponentArgument.textComponent(context)",
+                  "executable": true,
+                  "name": "name"
+                }
+              ],
+              "name": "id"
+            }
+          ],
+          "name": "add"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "executable": true,
+              "name": "id"
+            }
+          ],
+          "name": "remove"
+        },
+        {
+          "executable": true,
+          "name": "list"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "ComponentArgument.textComponent(context)",
+                      "executable": true,
+                      "name": "name"
+                    }
+                  ],
+                  "name": "name"
+                },
+                {
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "pink"
+                    },
+                    {
+                      "executable": true,
+                      "name": "blue"
+                    },
+                    {
+                      "executable": true,
+                      "name": "red"
+                    },
+                    {
+                      "executable": true,
+                      "name": "green"
+                    },
+                    {
+                      "executable": true,
+                      "name": "yellow"
+                    },
+                    {
+                      "executable": true,
+                      "name": "purple"
+                    },
+                    {
+                      "executable": true,
+                      "name": "white"
+                    }
+                  ],
+                  "name": "color"
+                },
+                {
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "progress"
+                    },
+                    {
+                      "executable": true,
+                      "name": "notched_6"
+                    },
+                    {
+                      "executable": true,
+                      "name": "notched_10"
+                    },
+                    {
+                      "executable": true,
+                      "name": "notched_12"
+                    },
+                    {
+                      "executable": true,
+                      "name": "notched_20"
+                    }
+                  ],
+                  "name": "style"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "IntegerArgumentType.integer(0)",
+                      "executable": true,
+                      "name": "value"
+                    }
+                  ],
+                  "name": "value"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "IntegerArgumentType.integer(1)",
+                      "executable": true,
+                      "name": "max"
+                    }
+                  ],
+                  "name": "max"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "BoolArgumentType.bool()",
+                      "executable": true,
+                      "name": "visible"
+                    }
+                  ],
+                  "name": "visible"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "EntityArgument.players()",
+                      "executable": true,
+                      "name": "targets"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "players"
+                }
+              ],
+              "name": "id"
+            }
+          ],
+          "name": "set"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "children": [
+                {
+                  "executable": true,
+                  "name": "value"
+                },
+                {
+                  "executable": true,
+                  "name": "max"
+                },
+                {
+                  "executable": true,
+                  "name": "visible"
+                },
+                {
+                  "executable": true,
+                  "name": "players"
+                }
+              ],
+              "name": "id"
+            }
+          ],
+          "name": "get"
+        }
+      ],
+      "level": 2,
+      "name": "bossbar"
+    },
+    "chase": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.string()",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer(1, 65535)",
+                  "executable": true,
+                  "name": "port"
+                }
+              ],
+              "executable": true,
+              "name": "host"
+            }
+          ],
+          "executable": true,
+          "name": "follow"
+        },
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.string()",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer(1024, 65535)",
+                  "executable": true,
+                  "name": "port"
+                }
+              ],
+              "executable": true,
+              "name": "bind_address"
+            }
+          ],
+          "executable": true,
+          "name": "lead"
+        },
+        {
+          "executable": true,
+          "name": "stop"
+        }
+      ],
+      "name": "chase"
+    },
+    "clear": {
+      "children": [
+        {
+          "argument": "EntityArgument.players()",
+          "children": [
+            {
+              "argument": "ItemPredicateArgument.itemPredicate(context)",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer(0)",
+                  "executable": true,
+                  "name": "maxCount"
+                }
+              ],
+              "executable": true,
+              "name": "item"
+            }
+          ],
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "executable": true,
+      "level": 2,
+      "name": "clear"
+    },
+    "clone": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "DimensionArgument.dimension()",
+              "name": "sourceDimension"
+            }
+          ],
+          "name": "from"
+        }
+      ],
+      "level": 2,
+      "name": "clone"
+    },
+    "compute": {
+      "level": 2,
+      "name": "compute"
+    },
+    "damage": {
+      "children": [
+        {
+          "argument": "EntityArgument.entity()",
+          "children": [
+            {
+              "argument": "FloatArgumentType.floatArg(0.0F)",
+              "children": [
+                {
+                  "argument": "ResourceArgument.resource(context, Registries.DAMAGE_TYPE)",
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "argument": "Vec3Argument.vec3()",
+                          "executable": true,
+                          "name": "location"
+                        }
+                      ],
+                      "name": "at"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "EntityArgument.entity()",
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "argument": "EntityArgument.entity()",
+                                  "executable": true,
+                                  "name": "cause"
+                                }
+                              ],
+                              "name": "from"
+                            }
+                          ],
+                          "executable": true,
+                          "name": "entity"
+                        }
+                      ],
+                      "name": "by"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "damageType"
+                }
+              ],
+              "executable": true,
+              "name": "amount"
+            }
+          ],
+          "name": "target"
+        }
+      ],
+      "level": 2,
+      "name": "damage"
+    },
+    "data": {
+      "level": 2,
+      "name": "data"
+    },
+    "datapack": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.string()",
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "StringArgumentType.string()",
+                      "executable": true,
+                      "name": "existing"
+                    }
+                  ],
+                  "name": "after"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "StringArgumentType.string()",
+                      "executable": true,
+                      "name": "existing"
+                    }
+                  ],
+                  "name": "before"
+                },
+                {
+                  "executable": true,
+                  "name": "last"
+                },
+                {
+                  "executable": true,
+                  "name": "first"
+                }
+              ],
+              "executable": true,
+              "name": "name"
+            }
+          ],
+          "name": "enable"
+        },
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.string()",
+              "executable": true,
+              "name": "name"
+            }
+          ],
+          "name": "disable"
+        },
+        {
+          "children": [
+            {
+              "executable": true,
+              "name": "available"
+            },
+            {
+              "executable": true,
+              "name": "enabled"
+            }
+          ],
+          "executable": true,
+          "name": "list"
+        },
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.string()",
+              "children": [
+                {
+                  "argument": "ComponentArgument.textComponent(context)",
+                  "executable": true,
+                  "name": "description"
+                }
+              ],
+              "name": "id"
+            }
+          ],
+          "level": 4,
+          "name": "create"
+        }
+      ],
+      "level": 2,
+      "name": "datapack"
+    },
+    "debug": {
+      "children": [
+        {
+          "executable": true,
+          "name": "start"
+        },
+        {
+          "executable": true,
+          "name": "stop"
+        },
+        {
+          "children": [
+            {
+              "argument": "FunctionArgument.functions()",
+              "executable": true,
+              "name": "name"
+            }
+          ],
+          "level": 3,
+          "name": "function"
+        }
+      ],
+      "level": 3,
+      "name": "debug"
+    },
+    "debugconfig": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.player()",
+              "executable": true,
+              "name": "target"
+            }
+          ],
+          "name": "config"
+        },
+        {
+          "children": [
+            {
+              "argument": "UuidArgument.uuid()",
+              "executable": true,
+              "name": "target"
+            }
+          ],
+          "name": "unconfig"
+        },
+        {
+          "children": [
+            {
+              "argument": "UuidArgument.uuid()",
+              "children": [
+                {
+                  "argument": "ResourceOrIdArgument.dialog(context)",
+                  "executable": true,
+                  "name": "dialog"
+                }
+              ],
+              "name": "target"
+            }
+          ],
+          "name": "dialog"
+        }
+      ],
+      "level": 3,
+      "name": "debugconfig"
+    },
+    "debugmobspawning": {
+      "level": 2,
+      "name": "debugmobspawning"
+    },
+    "debugpath": {
+      "children": [
+        {
+          "argument": "BlockPosArgument.blockPos()",
+          "executable": true,
+          "name": "to"
+        }
+      ],
+      "level": 2,
+      "name": "debugpath"
+    },
+    "defaultgamemode": {
+      "children": [
+        {
+          "argument": "GameModeArgument.gameMode()",
+          "executable": true,
+          "name": "gamemode"
+        }
+      ],
+      "level": 2,
+      "name": "defaultgamemode"
+    },
+    "deop": {
+      "children": [
+        {
+          "argument": "GameProfileArgument.gameProfile()",
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "level": 3,
+      "name": "deop"
+    },
+    "dialog": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "argument": "ResourceOrIdArgument.dialog(context)",
+                  "executable": true,
+                  "name": "dialog"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "show"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "executable": true,
+              "name": "targets"
+            }
+          ],
+          "name": "clear"
+        }
+      ],
+      "level": 2,
+      "name": "dialog"
+    },
+    "difficulty": {
+      "executable": true,
+      "level": 2,
+      "name": "difficulty"
+    },
+    "effect": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.entities()",
+              "children": [
+                {
+                  "argument": "ResourceArgument.resource(context, Registries.MOB_EFFECT)",
+                  "executable": true,
+                  "name": "effect"
+                }
+              ],
+              "executable": true,
+              "name": "targets"
+            }
+          ],
+          "executable": true,
+          "name": "clear"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.entities()",
+              "children": [
+                {
+                  "argument": "ResourceArgument.resource(context, Registries.MOB_EFFECT)",
+                  "children": [
+                    {
+                      "argument": "IntegerArgumentType.integer(1, 1000000)",
+                      "children": [
+                        {
+                          "argument": "IntegerArgumentType.integer(0, 255)",
+                          "children": [
+                            {
+                              "argument": "BoolArgumentType.bool()",
+                              "executable": true,
+                              "name": "hideParticles"
+                            }
+                          ],
+                          "executable": true,
+                          "name": "amplifier"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "seconds"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "IntegerArgumentType.integer(0, 255)",
+                          "children": [
+                            {
+                              "argument": "BoolArgumentType.bool()",
+                              "executable": true,
+                              "name": "hideParticles"
+                            }
+                          ],
+                          "executable": true,
+                          "name": "amplifier"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "infinite"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "effect"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "give"
+        }
+      ],
+      "level": 2,
+      "name": "effect"
+    },
+    "enchant": {
+      "children": [
+        {
+          "argument": "EntityArgument.entities()",
+          "children": [
+            {
+              "argument": "ResourceArgument.resource(context, Registries.ENCHANTMENT)",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer(0)",
+                  "executable": true,
+                  "name": "level"
+                }
+              ],
+              "executable": true,
+              "name": "enchantment"
+            }
+          ],
+          "name": "targets"
+        }
+      ],
+      "level": 2,
+      "name": "enchant"
+    },
+    "execute": {
+      "children": [
+        {
+          "name": "run",
+          "redirect": true
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.entities()",
+              "name": "targets"
+            }
+          ],
+          "name": "as"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.entities()",
+              "name": "targets"
+            }
+          ],
+          "name": "at"
+        },
+        {
+          "name": "store"
+        },
+        {
+          "children": [
+            {
+              "argument": "Vec3Argument.vec3()",
+              "name": "pos",
+              "redirect": true
+            },
+            {
+              "children": [
+                {
+                  "argument": "EntityArgument.entities()",
+                  "name": "targets"
+                }
+              ],
+              "name": "as"
+            },
+            {
+              "children": [
+                {
+                  "argument": "HeightmapTypeArgument.heightmap()",
+                  "name": "heightmap",
+                  "redirect": true
+                }
+              ],
+              "name": "over"
+            }
+          ],
+          "name": "positioned"
+        },
+        {
+          "children": [
+            {
+              "argument": "RotationArgument.rotation()",
+              "name": "rot",
+              "redirect": true
+            },
+            {
+              "children": [
+                {
+                  "argument": "EntityArgument.entities()",
+                  "name": "targets"
+                }
+              ],
+              "name": "as"
+            }
+          ],
+          "name": "rotated"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "EntityArgument.entities()",
+                  "children": [
+                    {
+                      "argument": "EntityAnchorArgument.anchor()",
+                      "name": "anchor"
+                    }
+                  ],
+                  "name": "targets"
+                }
+              ],
+              "name": "entity"
+            },
+            {
+              "argument": "Vec3Argument.vec3()",
+              "name": "pos",
+              "redirect": true
+            }
+          ],
+          "name": "facing"
+        },
+        {
+          "children": [
+            {
+              "argument": "SwizzleArgument.swizzle()",
+              "name": "axes",
+              "redirect": true
+            }
+          ],
+          "name": "align"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityAnchorArgument.anchor()",
+              "name": "anchor",
+              "redirect": true
+            }
+          ],
+          "name": "anchored"
+        },
+        {
+          "children": [
+            {
+              "argument": "DimensionArgument.dimension()",
+              "name": "dimension",
+              "redirect": true
+            }
+          ],
+          "name": "in"
+        },
+        {
+          "children": [
+            {
+              "argument": "ResourceArgument.resource(context, Registries.ENTITY_TYPE)",
+              "name": "entity",
+              "redirect": true
+            }
+          ],
+          "name": "summon"
+        }
+      ],
+      "level": 2,
+      "name": "execute"
+    },
+    "experience": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer()",
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "points"
+                    },
+                    {
+                      "executable": true,
+                      "name": "levels"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "amount"
+                }
+              ],
+              "name": "target"
+            }
+          ],
+          "name": "add"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer(0)",
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "points"
+                    },
+                    {
+                      "executable": true,
+                      "name": "levels"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "amount"
+                }
+              ],
+              "name": "target"
+            }
+          ],
+          "name": "set"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.player()",
+              "children": [
+                {
+                  "executable": true,
+                  "name": "points"
+                },
+                {
+                  "executable": true,
+                  "name": "levels"
+                }
+              ],
+              "name": "target"
+            }
+          ],
+          "name": "query"
+        }
+      ],
+      "level": 2,
+      "name": "experience"
+    },
+    "fetchprofile": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.greedyString()",
+              "executable": true,
+              "name": "name"
+            }
+          ],
+          "name": "name"
+        },
+        {
+          "children": [
+            {
+              "argument": "UuidArgument.uuid()",
+              "executable": true,
+              "name": "id"
+            }
+          ],
+          "name": "id"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.entity()",
+              "executable": true,
+              "name": "entity"
+            }
+          ],
+          "name": "entity"
+        }
+      ],
+      "level": 2,
+      "name": "fetchprofile"
+    },
+    "fill": {
+      "children": [
+        {
+          "argument": "BlockPosArgument.blockPos()",
+          "children": [
+            {
+              "argument": "BlockPosArgument.blockPos()",
+              "name": "to"
+            }
+          ],
+          "name": "from"
+        }
+      ],
+      "level": 2,
+      "name": "fill"
+    },
+    "fillbiome": {
+      "children": [
+        {
+          "argument": "BlockPosArgument.blockPos()",
+          "children": [
+            {
+              "argument": "BlockPosArgument.blockPos()",
+              "children": [
+                {
+                  "argument": "ResourceArgument.resource(context, Registries.BIOME)",
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "argument": "ResourceOrTagArgument.resourceOrTag(context, Registries.BIOME)",
+                          "executable": true,
+                          "name": "filter"
+                        }
+                      ],
+                      "name": "replace"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "biome"
+                }
+              ],
+              "name": "to"
+            }
+          ],
+          "name": "from"
+        }
+      ],
+      "level": 2,
+      "name": "fillbiome"
+    },
+    "forceload": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "ColumnPosArgument.columnPos()",
+              "children": [
+                {
+                  "argument": "ColumnPosArgument.columnPos()",
+                  "executable": true,
+                  "name": "to"
+                }
+              ],
+              "executable": true,
+              "name": "from"
+            }
+          ],
+          "name": "add"
+        },
+        {
+          "children": [
+            {
+              "argument": "ColumnPosArgument.columnPos()",
+              "children": [
+                {
+                  "argument": "ColumnPosArgument.columnPos()",
+                  "executable": true,
+                  "name": "to"
+                }
+              ],
+              "executable": true,
+              "name": "from"
+            },
+            {
+              "executable": true,
+              "name": "all"
+            }
+          ],
+          "name": "remove"
+        },
+        {
+          "children": [
+            {
+              "argument": "ColumnPosArgument.columnPos()",
+              "executable": true,
+              "name": "pos"
+            }
+          ],
+          "executable": true,
+          "name": "query"
+        }
+      ],
+      "level": 2,
+      "name": "forceload"
+    },
+    "function": {
+      "children": [
+        {
+          "argument": "FunctionArgument.functions()",
+          "children": [
+            {
+              "argument": "CompoundTagArgument.compoundTag()",
+              "executable": true,
+              "name": "arguments"
+            }
+          ],
+          "executable": true,
+          "name": "name"
+        }
+      ],
+      "level": 2,
+      "name": "function"
+    },
+    "gamemode": {
+      "children": [
+        {
+          "argument": "GameModeArgument.gameMode()",
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "executable": true,
+              "name": "target"
+            }
+          ],
+          "executable": true,
+          "name": "gamemode"
+        }
+      ],
+      "name": "gamemode"
+    },
+    "gamerule": {
+      "level": 2,
+      "name": "gamerule"
+    },
+    "give": {
+      "children": [
+        {
+          "argument": "EntityArgument.players()",
+          "children": [
+            {
+              "argument": "ItemArgument.item(context)",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer(1)",
+                  "executable": true,
+                  "name": "count"
+                }
+              ],
+              "executable": true,
+              "name": "item"
+            }
+          ],
+          "name": "targets"
+        }
+      ],
+      "level": 2,
+      "name": "give"
+    },
+    "help": {
+      "children": [
+        {
+          "argument": "StringArgumentType.greedyString()",
+          "executable": true,
+          "name": "command"
+        }
+      ],
+      "executable": true,
+      "name": "help"
+    },
+    "item": {
+      "level": 2,
+      "name": "item"
+    },
+    "jfr": {
+      "children": [
+        {
+          "executable": true,
+          "name": "start"
+        },
+        {
+          "executable": true,
+          "name": "stop"
+        }
+      ],
+      "level": 4,
+      "name": "jfr"
+    },
+    "kick": {
+      "children": [
+        {
+          "argument": "EntityArgument.players()",
+          "children": [
+            {
+              "argument": "MessageArgument.message()",
+              "executable": true,
+              "name": "reason"
+            }
+          ],
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "level": 3,
+      "name": "kick"
+    },
+    "kill": {
+      "children": [
+        {
+          "argument": "EntityArgument.entities()",
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "executable": true,
+      "level": 2,
+      "name": "kill"
+    },
+    "list": {
+      "children": [
+        {
+          "executable": true,
+          "name": "uuids"
+        }
+      ],
+      "executable": true,
+      "name": "list"
+    },
+    "locate": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "ResourceOrTagKeyArgument.resourceOrTagKey(Registries.STRUCTURE)",
+              "executable": true,
+              "name": "structure"
+            }
+          ],
+          "name": "structure"
+        },
+        {
+          "children": [
+            {
+              "argument": "ResourceOrTagArgument.resourceOrTag(context, Registries.BIOME)",
+              "executable": true,
+              "name": "biome"
+            }
+          ],
+          "name": "biome"
+        },
+        {
+          "children": [
+            {
+              "argument": "ResourceOrTagArgument.resourceOrTag(context, Registries.POINT_OF_INTEREST_TYPE)",
+              "executable": true,
+              "name": "poi"
+            }
+          ],
+          "name": "poi"
+        }
+      ],
+      "level": 2,
+      "name": "locate"
+    },
+    "loot": {
+      "level": 2,
+      "name": "loot"
+    },
+    "me": {
+      "children": [
+        {
+          "argument": "MessageArgument.message()",
+          "executable": true,
+          "name": "action"
+        }
+      ],
+      "name": "me"
+    },
+    "msg": {
+      "children": [
+        {
+          "argument": "EntityArgument.players()",
+          "children": [
+            {
+              "argument": "MessageArgument.message()",
+              "executable": true,
+              "name": "message"
+            }
+          ],
+          "name": "targets"
+        }
+      ],
+      "name": "msg"
+    },
+    "op": {
+      "children": [
+        {
+          "argument": "GameProfileArgument.gameProfile()",
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "level": 3,
+      "name": "op"
+    },
+    "pardon": {
+      "children": [
+        {
+          "argument": "GameProfileArgument.gameProfile()",
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "level": 3,
+      "name": "pardon"
+    },
+    "pardon-ip": {
+      "children": [
+        {
+          "argument": "StringArgumentType.word()",
+          "executable": true,
+          "name": "target"
+        }
+      ],
+      "level": 3,
+      "name": "pardon-ip"
+    },
+    "particle": {
+      "children": [
+        {
+          "argument": "ParticleArgument.particle(context)",
+          "children": [
+            {
+              "argument": "Vec3Argument.vec3()",
+              "children": [
+                {
+                  "argument": "Vec3Argument.vec3(false)",
+                  "children": [
+                    {
+                      "argument": "FloatArgumentType.floatArg(0.0F)",
+                      "children": [
+                        {
+                          "argument": "IntegerArgumentType.integer(0)",
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "argument": "EntityArgument.players()",
+                                  "executable": true,
+                                  "name": "viewers"
+                                }
+                              ],
+                              "executable": true,
+                              "name": "force"
+                            },
+                            {
+                              "children": [
+                                {
+                                  "argument": "EntityArgument.players()",
+                                  "executable": true,
+                                  "name": "viewers"
+                                }
+                              ],
+                              "executable": true,
+                              "name": "normal"
+                            }
+                          ],
+                          "executable": true,
+                          "name": "count"
+                        }
+                      ],
+                      "name": "speed"
+                    }
+                  ],
+                  "name": "delta"
+                }
+              ],
+              "executable": true,
+              "name": "pos"
+            }
+          ],
+          "executable": true,
+          "name": "name"
+        }
+      ],
+      "level": 2,
+      "name": "particle"
+    },
+    "perf": {
+      "children": [
+        {
+          "executable": true,
+          "name": "start"
+        },
+        {
+          "executable": true,
+          "name": "stop"
+        }
+      ],
+      "level": 4,
+      "name": "perf"
+    },
+    "place": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "ResourceOrIdArgument.feature(context)",
+              "children": [
+                {
+                  "argument": "BlockPosArgument.blockPos()",
+                  "executable": true,
+                  "name": "pos"
+                }
+              ],
+              "executable": true,
+              "name": "feature"
+            }
+          ],
+          "name": "feature"
+        },
+        {
+          "children": [
+            {
+              "argument": "ResourceKeyArgument.key(Registries.TEMPLATE_POOL)",
+              "children": [
+                {
+                  "argument": "IdentifierArgument.id()",
+                  "children": [
+                    {
+                      "argument": "IntegerArgumentType.integer(1, 20)",
+                      "children": [
+                        {
+                          "argument": "BlockPosArgument.blockPos()",
+                          "executable": true,
+                          "name": "position"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "max_depth"
+                    }
+                  ],
+                  "name": "target"
+                }
+              ],
+              "name": "pool"
+            }
+          ],
+          "name": "jigsaw"
+        },
+        {
+          "children": [
+            {
+              "argument": "ResourceKeyArgument.key(Registries.STRUCTURE)",
+              "children": [
+                {
+                  "argument": "BlockPosArgument.blockPos()",
+                  "executable": true,
+                  "name": "pos"
+                }
+              ],
+              "executable": true,
+              "name": "structure"
+            }
+          ],
+          "name": "structure"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "children": [
+                {
+                  "argument": "BlockPosArgument.blockPos()",
+                  "children": [
+                    {
+                      "argument": "TemplateRotationArgument.templateRotation()",
+                      "children": [
+                        {
+                          "argument": "TemplateMirrorArgument.templateMirror()",
+                          "children": [
+                            {
+                              "argument": "FloatArgumentType.floatArg(0.0F, 1.0F)",
+                              "children": [
+                                {
+                                  "argument": "IntegerArgumentType.integer()",
+                                  "children": [
+                                    {
+                                      "executable": true,
+                                      "name": "strict"
+                                    }
+                                  ],
+                                  "executable": true,
+                                  "name": "seed"
+                                }
+                              ],
+                              "executable": true,
+                              "name": "integrity"
+                            }
+                          ],
+                          "executable": true,
+                          "name": "mirror"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "rotation"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "pos"
+                }
+              ],
+              "executable": true,
+              "name": "template"
+            }
+          ],
+          "name": "template"
+        }
+      ],
+      "level": 2,
+      "name": "place"
+    },
+    "playsound": {
+      "level": 2,
+      "name": "playsound"
+    },
+    "posteffect": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "argument": "IdentifierArgument.id()",
+                  "executable": true,
+                  "name": "posteffect"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "add"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "executable": true,
+              "name": "targets"
+            }
+          ],
+          "name": "clear"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.player()",
+              "executable": true,
+              "name": "target"
+            }
+          ],
+          "name": "list"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "argument": "IdentifierArgument.id()",
+                  "executable": true,
+                  "name": "posteffect"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "remove"
+        }
+      ],
+      "level": 2,
+      "name": "posteffect"
+    },
+    "publish": {
+      "children": [
+        {
+          "argument": "BoolArgumentType.bool()",
+          "children": [
+            {
+              "argument": "IntegerArgumentType.integer(0, 65535)",
+              "executable": true,
+              "name": "port"
+            }
+          ],
+          "executable": true,
+          "name": "allowCommands"
+        }
+      ],
+      "executable": true,
+      "level": 4,
+      "name": "publish"
+    },
+    "raid": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "IntegerArgumentType.integer(0)",
+              "executable": true,
+              "name": "omenlvl"
+            }
+          ],
+          "name": "start"
+        },
+        {
+          "executable": true,
+          "name": "stop"
+        },
+        {
+          "executable": true,
+          "name": "check"
+        },
+        {
+          "children": [
+            {
+              "argument": "ComponentArgument.textComponent(context)",
+              "executable": true,
+              "name": "type"
+            }
+          ],
+          "name": "sound"
+        },
+        {
+          "executable": true,
+          "name": "spawnleader"
+        },
+        {
+          "children": [
+            {
+              "argument": "IntegerArgumentType.integer(0)",
+              "executable": true,
+              "name": "level"
+            }
+          ],
+          "name": "setomen"
+        },
+        {
+          "executable": true,
+          "name": "glow"
+        }
+      ],
+      "level": 3,
+      "name": "raid"
+    },
+    "random": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer()",
+                  "children": [
+                    {
+                      "argument": "BoolArgumentType.bool()",
+                      "children": [
+                        {
+                          "argument": "BoolArgumentType.bool()",
+                          "executable": true,
+                          "name": "includeSequenceId"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "includeWorldSeed"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "seed"
+                }
+              ],
+              "executable": true,
+              "name": "*"
+            },
+            {
+              "argument": "IdentifierArgument.id()",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer()",
+                  "children": [
+                    {
+                      "argument": "BoolArgumentType.bool()",
+                      "children": [
+                        {
+                          "argument": "BoolArgumentType.bool()",
+                          "executable": true,
+                          "name": "includeSequenceId"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "includeWorldSeed"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "seed"
+                }
+              ],
+              "executable": true,
+              "name": "sequence"
+            }
+          ],
+          "level": 2,
+          "name": "reset"
+        }
+      ],
+      "name": "random"
+    },
+    "recipe": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "argument": "ResourceKeyArgument.key(Registries.RECIPE, RecipeCommand.LEARNABLE_RECIPE)",
+                  "executable": true,
+                  "name": "recipe"
+                },
+                {
+                  "executable": true,
+                  "name": "*"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "give"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.players()",
+              "children": [
+                {
+                  "argument": "ResourceKeyArgument.key(Registries.RECIPE, RecipeCommand.LEARNABLE_RECIPE)",
+                  "executable": true,
+                  "name": "recipe"
+                },
+                {
+                  "executable": true,
+                  "name": "*"
+                }
+              ],
+              "name": "targets"
+            }
+          ],
+          "name": "take"
+        }
+      ],
+      "level": 2,
+      "name": "recipe"
+    },
+    "reload": {
+      "executable": true,
+      "level": 2,
+      "name": "reload"
+    },
+    "return": {
+      "children": [
+        {
+          "argument": "IntegerArgumentType.integer()",
+          "executable": true,
+          "name": "value"
+        },
+        {
+          "executable": true,
+          "name": "fail"
+        },
+        {
+          "name": "run"
+        }
+      ],
+      "level": 2,
+      "name": "return"
+    },
+    "ride": {
+      "children": [
+        {
+          "argument": "EntityArgument.entity()",
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "EntityArgument.entity()",
+                  "executable": true,
+                  "name": "vehicle"
+                }
+              ],
+              "name": "mount"
+            },
+            {
+              "executable": true,
+              "name": "dismount"
+            }
+          ],
+          "name": "target"
+        }
+      ],
+      "level": 2,
+      "name": "ride"
+    },
+    "rotate": {
+      "children": [
+        {
+          "argument": "EntityArgument.entity()",
+          "children": [
+            {
+              "argument": "RotationArgument.rotation()",
+              "executable": true,
+              "name": "rotation"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "EntityArgument.entity()",
+                      "children": [
+                        {
+                          "argument": "EntityAnchorArgument.anchor()",
+                          "executable": true,
+                          "name": "facingAnchor"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "facingEntity"
+                    }
+                  ],
+                  "name": "entity"
+                },
+                {
+                  "argument": "Vec3Argument.vec3()",
+                  "executable": true,
+                  "name": "facingLocation"
+                }
+              ],
+              "name": "facing"
+            }
+          ],
+          "name": "target"
+        }
+      ],
+      "level": 2,
+      "name": "rotate"
+    },
+    "save-all": {
+      "children": [
+        {
+          "executable": true,
+          "name": "flush"
+        }
+      ],
+      "executable": true,
+      "level": 4,
+      "name": "save-all"
+    },
+    "save-off": {
+      "executable": true,
+      "level": 4,
+      "name": "save-off"
+    },
+    "save-on": {
+      "executable": true,
+      "level": 4,
+      "name": "save-on"
+    },
+    "say": {
+      "children": [
+        {
+          "argument": "MessageArgument.message()",
+          "executable": true,
+          "name": "message"
+        }
+      ],
+      "level": 2,
+      "name": "say"
+    },
+    "schedule": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "FunctionArgument.functions()",
+              "children": [
+                {
+                  "argument": "TimeArgument.time()",
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "append"
+                    },
+                    {
+                      "executable": true,
+                      "name": "replace"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "time"
+                }
+              ],
+              "name": "function"
+            }
+          ],
+          "name": "function"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "executable": true,
+              "name": "function"
+            }
+          ],
+          "name": "clear"
+        }
+      ],
+      "level": 2,
+      "name": "schedule"
+    },
+    "scoreboard": {
+      "children": [
+        {
+          "children": [
+            {
+              "executable": true,
+              "name": "list"
+            },
+            {
+              "children": [
+                {
+                  "argument": "StringArgumentType.word()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveCriteriaArgument.criteria()",
+                      "children": [
+                        {
+                          "argument": "ComponentArgument.textComponent(context)",
+                          "executable": true,
+                          "name": "displayName"
+                        }
+                      ],
+                      "executable": true,
+                      "name": "criteria"
+                    }
+                  ],
+                  "name": "objective"
+                }
+              ],
+              "name": "add"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ObjectiveArgument.objective()",
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "argument": "ComponentArgument.textComponent(context)",
+                          "executable": true,
+                          "name": "displayName"
+                        }
+                      ],
+                      "name": "displayname"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "BoolArgumentType.bool()",
+                          "executable": true,
+                          "name": "value"
+                        }
+                      ],
+                      "name": "displayautoupdate"
+                    }
+                  ],
+                  "name": "objective"
+                }
+              ],
+              "name": "modify"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ObjectiveArgument.objective()",
+                  "executable": true,
+                  "name": "objective"
+                }
+              ],
+              "name": "remove"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreboardSlotArgument.displaySlot()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "executable": true,
+                      "name": "objective"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "slot"
+                }
+              ],
+              "name": "setdisplay"
+            }
+          ],
+          "name": "objectives"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolder()",
+                  "executable": true,
+                  "name": "target"
+                }
+              ],
+              "executable": true,
+              "name": "list"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolders()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "children": [
+                        {
+                          "argument": "IntegerArgumentType.integer()",
+                          "executable": true,
+                          "name": "score"
+                        }
+                      ],
+                      "name": "objective"
+                    }
+                  ],
+                  "name": "targets"
+                }
+              ],
+              "name": "set"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolder()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "executable": true,
+                      "name": "objective"
+                    }
+                  ],
+                  "name": "target"
+                }
+              ],
+              "name": "get"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolders()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "children": [
+                        {
+                          "argument": "IntegerArgumentType.integer(0)",
+                          "executable": true,
+                          "name": "score"
+                        }
+                      ],
+                      "name": "objective"
+                    }
+                  ],
+                  "name": "targets"
+                }
+              ],
+              "name": "add"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolders()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "children": [
+                        {
+                          "argument": "IntegerArgumentType.integer(0)",
+                          "executable": true,
+                          "name": "score"
+                        }
+                      ],
+                      "name": "objective"
+                    }
+                  ],
+                  "name": "targets"
+                }
+              ],
+              "name": "remove"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolders()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "executable": true,
+                      "name": "objective"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "targets"
+                }
+              ],
+              "name": "reset"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolders()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "executable": true,
+                      "name": "objective"
+                    }
+                  ],
+                  "name": "targets"
+                }
+              ],
+              "name": "enable"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "ScoreHolderArgument.scoreHolders()",
+                      "children": [
+                        {
+                          "argument": "ObjectiveArgument.objective()",
+                          "children": [
+                            {
+                              "argument": "ComponentArgument.textComponent(context)",
+                              "executable": true,
+                              "name": "name"
+                            }
+                          ],
+                          "executable": true,
+                          "name": "objective"
+                        }
+                      ],
+                      "name": "targets"
+                    }
+                  ],
+                  "name": "name"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ScoreHolderArgument.scoreHolders()",
+                      "name": "targets"
+                    }
+                  ],
+                  "name": "numberformat"
+                }
+              ],
+              "name": "display"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolders()",
+                  "children": [
+                    {
+                      "argument": "ObjectiveArgument.objective()",
+                      "children": [
+                        {
+                          "argument": "OperationArgument.operation()",
+                          "children": [
+                            {
+                              "argument": "ScoreHolderArgument.scoreHolders()",
+                              "children": [
+                                {
+                                  "argument": "ObjectiveArgument.objective()",
+                                  "executable": true,
+                                  "name": "sourceObjective"
+                                }
+                              ],
+                              "name": "source"
+                            }
+                          ],
+                          "name": "operation"
+                        }
+                      ],
+                      "name": "targetObjective"
+                    }
+                  ],
+                  "name": "targets"
+                }
+              ],
+              "name": "operation"
+            }
+          ],
+          "name": "players"
+        }
+      ],
+      "level": 2,
+      "name": "scoreboard"
+    },
+    "seed": {
+      "executable": true,
+      "level": 2,
+      "name": "seed"
+    },
+    "serverpack": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.string()",
+              "children": [
+                {
+                  "argument": "UuidArgument.uuid()",
+                  "children": [
+                    {
+                      "argument": "StringArgumentType.word()",
+                      "executable": true,
+                      "name": "hash"
+                    }
+                  ],
+                  "executable": true,
+                  "name": "uuid"
+                }
+              ],
+              "executable": true,
+              "name": "url"
+            }
+          ],
+          "name": "push"
+        },
+        {
+          "children": [
+            {
+              "argument": "UuidArgument.uuid()",
+              "executable": true,
+              "name": "uuid"
+            }
+          ],
+          "name": "pop"
+        }
+      ],
+      "level": 2,
+      "name": "serverpack"
+    },
+    "setblock": {
+      "children": [
+        {
+          "argument": "BlockPosArgument.blockPos()",
+          "children": [
+            {
+              "argument": "BlockStateArgument.block(context)",
+              "children": [
+                {
+                  "executable": true,
+                  "name": "destroy"
+                },
+                {
+                  "executable": true,
+                  "name": "keep"
+                },
+                {
+                  "executable": true,
+                  "name": "replace"
+                },
+                {
+                  "executable": true,
+                  "name": "strict"
+                }
+              ],
+              "executable": true,
+              "name": "block"
+            }
+          ],
+          "name": "pos"
+        }
+      ],
+      "level": 2,
+      "name": "setblock"
+    },
+    "setidletimeout": {
+      "children": [
+        {
+          "argument": "IntegerArgumentType.integer(0)",
+          "executable": true,
+          "name": "minutes"
+        }
+      ],
+      "level": 3,
+      "name": "setidletimeout"
+    },
+    "setworldspawn": {
+      "children": [
+        {
+          "argument": "BlockPosArgument.blockPos()",
+          "children": [
+            {
+              "argument": "RotationArgument.rotation()",
+              "executable": true,
+              "name": "rotation"
+            }
+          ],
+          "executable": true,
+          "name": "pos"
+        }
+      ],
+      "executable": true,
+      "level": 2,
+      "name": "setworldspawn"
+    },
+    "spawn_armor_trims": {
+      "children": [
+        {
+          "executable": true,
+          "name": "*_lag_my_game"
+        },
+        {
+          "argument": "ResourceKeyArgument.key(Registries.TRIM_PATTERN)",
+          "executable": true,
+          "name": "pattern"
+        }
+      ],
+      "level": 2,
+      "name": "spawn_armor_trims"
+    },
+    "spawnpoint": {
+      "children": [
+        {
+          "argument": "EntityArgument.players()",
+          "children": [
+            {
+              "argument": "BlockPosArgument.blockPos()",
+              "children": [
+                {
+                  "argument": "RotationArgument.rotation()",
+                  "executable": true,
+                  "name": "rotation"
+                }
+              ],
+              "executable": true,
+              "name": "pos"
+            }
+          ],
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "executable": true,
+      "level": 2,
+      "name": "spawnpoint"
+    },
+    "spectate": {
+      "children": [
+        {
+          "argument": "EntityArgument.entity()",
+          "children": [
+            {
+              "argument": "EntityArgument.player()",
+              "executable": true,
+              "name": "player"
+            }
+          ],
+          "executable": true,
+          "name": "target"
+        }
+      ],
+      "executable": true,
+      "level": 2,
+      "name": "spectate"
+    },
+    "spreadplayers": {
+      "children": [
+        {
+          "argument": "Vec2Argument.vec2()",
+          "children": [
+            {
+              "argument": "FloatArgumentType.floatArg(0.0F)",
+              "children": [
+                {
+                  "argument": "FloatArgumentType.floatArg(1.0F)",
+                  "children": [
+                    {
+                      "argument": "BoolArgumentType.bool()",
+                      "children": [
+                        {
+                          "argument": "EntityArgument.entities()",
+                          "executable": true,
+                          "name": "targets"
+                        }
+                      ],
+                      "name": "respectTeams"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "IntegerArgumentType.integer()",
+                          "children": [
+                            {
+                              "argument": "BoolArgumentType.bool()",
+                              "children": [
+                                {
+                                  "argument": "EntityArgument.entities()",
+                                  "executable": true,
+                                  "name": "targets"
+                                }
+                              ],
+                              "name": "respectTeams"
+                            }
+                          ],
+                          "name": "maxHeight"
+                        }
+                      ],
+                      "name": "under"
+                    }
+                  ],
+                  "name": "maxRange"
+                }
+              ],
+              "name": "spreadDistance"
+            }
+          ],
+          "name": "center"
+        }
+      ],
+      "level": 2,
+      "name": "spreadplayers"
+    },
+    "stop": {
+      "executable": true,
+      "level": 4,
+      "name": "stop"
+    },
+    "stopsound": {
+      "level": 2,
+      "name": "stopsound"
+    },
+    "stopwatch": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "executable": true,
+              "name": "id"
+            }
+          ],
+          "name": "create"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "children": [
+                {
+                  "argument": "DoubleArgumentType.doubleArg()",
+                  "executable": true,
+                  "name": "scale"
+                }
+              ],
+              "executable": true,
+              "name": "id"
+            }
+          ],
+          "name": "query"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "executable": true,
+              "name": "id"
+            }
+          ],
+          "name": "restart"
+        },
+        {
+          "children": [
+            {
+              "argument": "IdentifierArgument.id()",
+              "executable": true,
+              "name": "id"
+            }
+          ],
+          "name": "remove"
+        }
+      ],
+      "level": 2,
+      "name": "stopwatch"
+    },
+    "summon": {
+      "children": [
+        {
+          "argument": "ResourceArgument.resource(context, Registries.ENTITY_TYPE)",
+          "children": [
+            {
+              "argument": "Vec3Argument.vec3()",
+              "children": [
+                {
+                  "argument": "CompoundTagArgument.compoundTag()",
+                  "executable": true,
+                  "name": "nbt"
+                }
+              ],
+              "executable": true,
+              "name": "pos"
+            }
+          ],
+          "executable": true,
+          "name": "entity"
+        }
+      ],
+      "level": 2,
+      "name": "summon"
+    },
+    "swing": {
+      "children": [
+        {
+          "argument": "EntityArgument.entities()",
+          "executable": true,
+          "name": "targets"
+        }
+      ],
+      "executable": true,
+      "level": 2,
+      "name": "swing"
+    },
+    "tag": {
+      "children": [
+        {
+          "argument": "EntityArgument.entities()",
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "StringArgumentType.word()",
+                  "executable": true,
+                  "name": "name"
+                }
+              ],
+              "name": "add"
+            },
+            {
+              "children": [
+                {
+                  "argument": "StringArgumentType.word()",
+                  "executable": true,
+                  "name": "name"
+                }
+              ],
+              "name": "remove"
+            },
+            {
+              "executable": true,
+              "name": "list"
+            }
+          ],
+          "name": "targets"
+        }
+      ],
+      "level": 2,
+      "name": "tag"
+    },
+    "team": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "TeamArgument.team()",
+              "executable": true,
+              "name": "team"
+            }
+          ],
+          "executable": true,
+          "name": "list"
+        },
+        {
+          "children": [
+            {
+              "argument": "StringArgumentType.word()",
+              "children": [
+                {
+                  "argument": "ComponentArgument.textComponent(context)",
+                  "executable": true,
+                  "name": "displayName"
+                }
+              ],
+              "executable": true,
+              "name": "team"
+            }
+          ],
+          "name": "add"
+        },
+        {
+          "children": [
+            {
+              "argument": "TeamArgument.team()",
+              "executable": true,
+              "name": "team"
+            }
+          ],
+          "name": "remove"
+        },
+        {
+          "children": [
+            {
+              "argument": "TeamArgument.team()",
+              "executable": true,
+              "name": "team"
+            }
+          ],
+          "name": "empty"
+        },
+        {
+          "children": [
+            {
+              "argument": "TeamArgument.team()",
+              "children": [
+                {
+                  "argument": "ScoreHolderArgument.scoreHolders()",
+                  "executable": true,
+                  "name": "members"
+                }
+              ],
+              "executable": true,
+              "name": "team"
+            }
+          ],
+          "name": "join"
+        },
+        {
+          "children": [
+            {
+              "argument": "ScoreHolderArgument.scoreHolders()",
+              "executable": true,
+              "name": "members"
+            }
+          ],
+          "name": "leave"
+        },
+        {
+          "children": [
+            {
+              "argument": "TeamArgument.team()",
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "ComponentArgument.textComponent(context)",
+                      "executable": true,
+                      "name": "displayName"
+                    }
+                  ],
+                  "name": "displayName"
+                },
+                {
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "reset"
+                    },
+                    {
+                      "argument": "TeamColorArgument.teamColor()",
+                      "executable": true,
+                      "name": "value"
+                    }
+                  ],
+                  "name": "color"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "BoolArgumentType.bool()",
+                      "executable": true,
+                      "name": "allowed"
+                    }
+                  ],
+                  "name": "friendlyFire"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "BoolArgumentType.bool()",
+                      "executable": true,
+                      "name": "allowed"
+                    }
+                  ],
+                  "name": "seeFriendlyInvisibles"
+                },
+                {
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "never"
+                    },
+                    {
+                      "executable": true,
+                      "name": "hideForOtherTeams"
+                    },
+                    {
+                      "executable": true,
+                      "name": "hideForOwnTeam"
+                    },
+                    {
+                      "executable": true,
+                      "name": "always"
+                    }
+                  ],
+                  "name": "nametagVisibility"
+                },
+                {
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "never"
+                    },
+                    {
+                      "executable": true,
+                      "name": "hideForOtherTeams"
+                    },
+                    {
+                      "executable": true,
+                      "name": "hideForOwnTeam"
+                    },
+                    {
+                      "executable": true,
+                      "name": "always"
+                    }
+                  ],
+                  "name": "deathMessageVisibility"
+                },
+                {
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "never"
+                    },
+                    {
+                      "executable": true,
+                      "name": "pushOwnTeam"
+                    },
+                    {
+                      "executable": true,
+                      "name": "pushOtherTeams"
+                    },
+                    {
+                      "executable": true,
+                      "name": "always"
+                    }
+                  ],
+                  "name": "collisionRule"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ComponentArgument.textComponent(context)",
+                      "executable": true,
+                      "name": "prefix"
+                    }
+                  ],
+                  "name": "prefix"
+                },
+                {
+                  "children": [
+                    {
+                      "argument": "ComponentArgument.textComponent(context)",
+                      "executable": true,
+                      "name": "suffix"
+                    }
+                  ],
+                  "name": "suffix"
+                }
+              ],
+              "name": "team"
+            }
+          ],
+          "name": "modify"
+        }
+      ],
+      "level": 2,
+      "name": "team"
+    },
+    "teammsg": {
+      "children": [
+        {
+          "argument": "MessageArgument.message()",
+          "executable": true,
+          "name": "message"
+        }
+      ],
+      "name": "teammsg"
+    },
+    "teleport": {
+      "children": [
+        {
+          "argument": "Vec3Argument.vec3()",
+          "executable": true,
+          "name": "location"
+        },
+        {
+          "argument": "EntityArgument.entity()",
+          "executable": true,
+          "name": "destination"
+        },
+        {
+          "argument": "EntityArgument.entities()",
+          "children": [
+            {
+              "argument": "Vec3Argument.vec3()",
+              "children": [
+                {
+                  "argument": "RotationArgument.rotation()",
+                  "executable": true,
+                  "name": "rotation"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "argument": "EntityArgument.entity()",
+                          "children": [
+                            {
+                              "argument": "EntityAnchorArgument.anchor()",
+                              "executable": true,
+                              "name": "facingAnchor"
+                            }
+                          ],
+                          "executable": true,
+                          "name": "facingEntity"
+                        }
+                      ],
+                      "name": "entity"
+                    },
+                    {
+                      "argument": "Vec3Argument.vec3()",
+                      "executable": true,
+                      "name": "facingLocation"
+                    }
+                  ],
+                  "name": "facing"
+                }
+              ],
+              "executable": true,
+              "name": "location"
+            },
+            {
+              "argument": "EntityArgument.entity()",
+              "executable": true,
+              "name": "destination"
+            }
+          ],
+          "name": "targets"
+        }
+      ],
+      "level": 2,
+      "name": "teleport"
+    },
+    "tell": {
+      "name": "tell",
+      "redirect": true
+    },
+    "tellraw": {
+      "children": [
+        {
+          "argument": "EntityArgument.players()",
+          "children": [
+            {
+              "argument": "ComponentArgument.textComponent(context)",
+              "executable": true,
+              "name": "message"
+            }
+          ],
+          "name": "targets"
+        }
+      ],
+      "level": 2,
+      "name": "tellraw"
+    },
+    "test": {
+      "children": [
+        {
+          "name": "run"
+        },
+        {
+          "children": [
+            {
+              "argument": "ResourceSelectorArgument.resourceSelector(context, Registries.TEST_INSTANCE)",
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer()",
+                  "executable": true,
+                  "name": "amount"
+                }
+              ],
+              "executable": true,
+              "name": "tests"
+            }
+          ],
+          "name": "runmultiple"
+        }
+      ],
+      "level": 2,
+      "name": "test"
+    },
+    "tick": {
+      "children": [
+        {
+          "executable": true,
+          "name": "query"
+        },
+        {
+          "children": [
+            {
+              "argument": "FloatArgumentType.floatArg(1.0F, 10000.0F)",
+              "executable": true,
+              "name": "rate"
+            }
+          ],
+          "name": "rate"
+        },
+        {
+          "children": [
+            {
+              "executable": true,
+              "name": "stop"
+            },
+            {
+              "argument": "TimeArgument.time(1)",
+              "executable": true,
+              "name": "time"
+            }
+          ],
+          "executable": true,
+          "name": "step"
+        },
+        {
+          "children": [
+            {
+              "executable": true,
+              "name": "stop"
+            },
+            {
+              "argument": "TimeArgument.time(1)",
+              "executable": true,
+              "name": "time"
+            }
+          ],
+          "name": "sprint"
+        },
+        {
+          "executable": true,
+          "name": "unfreeze"
+        },
+        {
+          "executable": true,
+          "name": "freeze"
+        }
+      ],
+      "level": 3,
+      "name": "tick"
+    },
+    "time": {
+      "children": [
+        {
+          "children": [
+            {
+              "executable": true,
+              "name": "gametime"
+            },
+            {
+              "name": "of"
+            }
+          ],
+          "name": "query"
+        },
+        {
+          "children": [
+            {
+              "name": "of"
+            }
+          ],
+          "executable": true,
+          "name": "gametime"
+        },
+        {
+          "name": "of"
+        }
+      ],
+      "executable": true,
+      "level": 2,
+      "name": "time"
+    },
+    "title": {
+      "children": [
+        {
+          "argument": "EntityArgument.players()",
+          "children": [
+            {
+              "executable": true,
+              "name": "clear"
+            },
+            {
+              "executable": true,
+              "name": "reset"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ComponentArgument.textComponent(context)",
+                  "executable": true,
+                  "name": "title"
+                }
+              ],
+              "name": "title"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ComponentArgument.textComponent(context)",
+                  "executable": true,
+                  "name": "title"
+                }
+              ],
+              "name": "subtitle"
+            },
+            {
+              "children": [
+                {
+                  "argument": "ComponentArgument.textComponent(context)",
+                  "executable": true,
+                  "name": "title"
+                }
+              ],
+              "name": "actionbar"
+            },
+            {
+              "children": [
+                {
+                  "argument": "TimeArgument.time()",
+                  "children": [
+                    {
+                      "argument": "TimeArgument.time()",
+                      "children": [
+                        {
+                          "argument": "TimeArgument.time()",
+                          "executable": true,
+                          "name": "fadeOut"
+                        }
+                      ],
+                      "name": "stay"
+                    }
+                  ],
+                  "name": "fadeIn"
+                }
+              ],
+              "name": "times"
+            }
+          ],
+          "name": "targets"
+        }
+      ],
+      "level": 2,
+      "name": "title"
+    },
+    "tm": {
+      "name": "tm",
+      "redirect": true
+    },
+    "tp": {
+      "level": 2,
+      "name": "tp",
+      "redirect": true
+    },
+    "transfer": {
+      "children": [
+        {
+          "argument": "StringArgumentType.string()",
+          "children": [
+            {
+              "argument": "IntegerArgumentType.integer(1, 65535)",
+              "children": [
+                {
+                  "argument": "EntityArgument.players()",
+                  "executable": true,
+                  "name": "players"
+                }
+              ],
+              "executable": true,
+              "name": "port"
+            }
+          ],
+          "executable": true,
+          "name": "hostname"
+        }
+      ],
+      "level": 3,
+      "name": "transfer"
+    },
+    "trigger": {
+      "children": [
+        {
+          "argument": "ObjectiveArgument.objective()",
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer()",
+                  "executable": true,
+                  "name": "value"
+                }
+              ],
+              "name": "add"
+            },
+            {
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer()",
+                  "executable": true,
+                  "name": "value"
+                }
+              ],
+              "name": "set"
+            }
+          ],
+          "executable": true,
+          "name": "objective"
+        }
+      ],
+      "name": "trigger"
+    },
+    "unpublish": {
+      "executable": true,
+      "level": 4,
+      "name": "unpublish"
+    },
+    "version": {
+      "executable": true,
+      "level": 2,
+      "name": "version"
+    },
+    "w": {
+      "name": "w",
+      "redirect": true
+    },
+    "warden_spawn_tracker": {
+      "children": [
+        {
+          "executable": true,
+          "name": "clear"
+        },
+        {
+          "children": [
+            {
+              "argument": "IntegerArgumentType.integer(0, 4)",
+              "executable": true,
+              "name": "warning_level"
+            }
+          ],
+          "name": "set"
+        }
+      ],
+      "level": 2,
+      "name": "warden_spawn_tracker"
+    },
+    "waypoint": {
+      "children": [
+        {
+          "executable": true,
+          "name": "list"
+        },
+        {
+          "children": [
+            {
+              "argument": "EntityArgument.entity()",
+              "children": [
+                {
+                  "children": [
+                    {
+                      "argument": "TeamColorArgument.teamColor()",
+                      "executable": true,
+                      "name": "color"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "HexColorArgument.hexColor()",
+                          "executable": true,
+                          "name": "color"
+                        }
+                      ],
+                      "name": "hex"
+                    },
+                    {
+                      "executable": true,
+                      "name": "reset"
+                    }
+                  ],
+                  "name": "color"
+                },
+                {
+                  "children": [
+                    {
+                      "executable": true,
+                      "name": "reset"
+                    },
+                    {
+                      "children": [
+                        {
+                          "argument": "IdentifierArgument.id()",
+                          "executable": true,
+                          "name": "style"
+                        }
+                      ],
+                      "name": "set"
+                    }
+                  ],
+                  "name": "style"
+                }
+              ],
+              "name": "waypoint"
+            }
+          ],
+          "name": "modify"
+        }
+      ],
+      "level": 2,
+      "name": "waypoint"
+    },
+    "weather": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "TimeArgument.time(1)",
+              "executable": true,
+              "name": "duration"
+            }
+          ],
+          "executable": true,
+          "name": "clear"
+        },
+        {
+          "children": [
+            {
+              "argument": "TimeArgument.time(1)",
+              "executable": true,
+              "name": "duration"
+            }
+          ],
+          "executable": true,
+          "name": "rain"
+        },
+        {
+          "children": [
+            {
+              "argument": "TimeArgument.time(1)",
+              "executable": true,
+              "name": "duration"
+            }
+          ],
+          "executable": true,
+          "name": "thunder"
+        }
+      ],
+      "level": 2,
+      "name": "weather"
+    },
+    "whitelist": {
+      "children": [
+        {
+          "executable": true,
+          "name": "on"
+        },
+        {
+          "executable": true,
+          "name": "off"
+        },
+        {
+          "executable": true,
+          "name": "list"
+        },
+        {
+          "children": [
+            {
+              "argument": "GameProfileArgument.gameProfile()",
+              "executable": true,
+              "name": "targets"
+            }
+          ],
+          "name": "add"
+        },
+        {
+          "children": [
+            {
+              "argument": "GameProfileArgument.gameProfile()",
+              "executable": true,
+              "name": "targets"
+            }
+          ],
+          "name": "remove"
+        },
+        {
+          "executable": true,
+          "name": "reload"
+        }
+      ],
+      "level": 3,
+      "name": "whitelist"
+    },
+    "worldborder": {
+      "children": [
+        {
+          "children": [
+            {
+              "argument": "DoubleArgumentType.doubleArg(-5.9999968E7D, 5.9999968E7D)",
+              "children": [
+                {
+                  "argument": "TimeArgument.time(0)",
+                  "executable": true,
+                  "name": "time"
+                }
+              ],
+              "executable": true,
+              "name": "distance"
+            }
+          ],
+          "name": "add"
+        },
+        {
+          "children": [
+            {
+              "argument": "DoubleArgumentType.doubleArg(-5.9999968E7D, 5.9999968E7D)",
+              "children": [
+                {
+                  "argument": "TimeArgument.time(0)",
+                  "executable": true,
+                  "name": "time"
+                }
+              ],
+              "executable": true,
+              "name": "distance"
+            }
+          ],
+          "name": "set"
+        },
+        {
+          "children": [
+            {
+              "argument": "Vec2Argument.vec2()",
+              "executable": true,
+              "name": "pos"
+            }
+          ],
+          "name": "center"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "FloatArgumentType.floatArg(0.0F)",
+                  "executable": true,
+                  "name": "damagePerBlock"
+                }
+              ],
+              "name": "amount"
+            },
+            {
+              "children": [
+                {
+                  "argument": "FloatArgumentType.floatArg(0.0F)",
+                  "executable": true,
+                  "name": "distance"
+                }
+              ],
+              "name": "buffer"
+            }
+          ],
+          "name": "damage"
+        },
+        {
+          "executable": true,
+          "name": "get"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "argument": "IntegerArgumentType.integer(0)",
+                  "executable": true,
+                  "name": "distance"
+                }
+              ],
+              "name": "distance"
+            },
+            {
+              "children": [
+                {
+                  "argument": "TimeArgument.time(0)",
+                  "executable": true,
+                  "name": "time"
+                }
+              ],
+              "name": "time"
+            }
+          ],
+          "name": "warning"
+        }
+      ],
+      "level": 2,
+      "name": "worldborder"
+    },
+    "xp": {
+      "level": 2,
+      "name": "xp",
+      "redirect": true
+    }
+  },
+  "digest": "fnv1a64:e0a95bd05bb69c0e",
+  "root_count": 104,
+  "source": "minecraft_client_26.3-rc-2"
+}

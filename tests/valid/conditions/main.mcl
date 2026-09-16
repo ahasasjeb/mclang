@@ -1,0 +1,54 @@
+// 编译测试（2.2）：条件族扩展。
+//
+// 覆盖 if block/blocks/biome/loaded/dimension/entity/data/items/slots/
+// function/stopwatch，以及与既有比较、predicate、逻辑组合的混用。
+namespace conditions_test;
+
+score ready = 0;
+objective points;
+
+query zombies = entity("minecraft:zombie") { limit(1); };
+
+resource predicate conditions_predicate = """{"condition":"minecraft:random_chance","chance":0.5}""";
+
+fn check_ready() -> score {
+    return 1;
+}
+
+fn_tag group {
+    value(check_ready);
+}
+
+@entity
+fn checks() {
+    if block(pos(0, 64, 0), block_state("minecraft:oak_stairs") { facing = "east"; }) {
+        ready = 1;
+    }
+    if blocks(pos(0, 64, 0), pos(2, 64, 2), pos(10, 64, 0), masked) || !loaded(pos(0, 0, 0)) {
+        ready = 1;
+    }
+    if biome(pos(0, 64, 0), "#minecraft:is_forest") && dimension("minecraft:overworld") {
+        ready = 1;
+    }
+    if entity(zombies) && data(entity, self, "Health") {
+        ready = 1;
+    }
+    if data(block, pos(0, 64, 0), "Items[0].count") || data(storage, "conditions_test:data", "value") {
+        ready = 1;
+    }
+    if items(entity, self, "weapon.mainhand", "minecraft:diamond_sword[damage=0]") {
+        ready = 1;
+    }
+    if slots(entity, self, "armor.*") || items(block, pos(0, 64, 0), "container.0", "#minecraft:planks") {
+        ready = 1;
+    }
+    if function(check_ready) || function(#group) || stopwatch("conditions_test:timer") {
+        ready = 1;
+    }
+    if predicate(conditions_predicate) && ready > 0 {
+        ready = 0;
+    }
+    while loaded(pos(0, 0, 0)) {
+        ready = 0;
+    }
+}

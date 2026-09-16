@@ -81,7 +81,10 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ("in_dimension", "在指定维度的上下文中执行。"),
     ("spawn", "召唤实体并进入新的实体上下文。"),
     ("self", "当前实体上下文；`self.*` 是实体操作。"),
-    ("message", "向玩家发送文本消息。"),
+    (
+        "message",
+        "向玩家发送文本消息：`message.all/self/nearest/player` 接受文本组件或字符串。",
+    ),
     ("sound", "播放声音。"),
     ("effect", "状态效果操作。"),
     ("xp", "经验值操作。"),
@@ -146,6 +149,22 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "方块坐标构造器：`pos(x, y, z)`，支持 `~` 相对与 `^` 局部坐标。",
     ),
     (
+        "block_pos",
+        "`pos` 的别名，强调方块坐标（绝对分量是整数）。",
+    ),
+    (
+        "vec3",
+        "精确坐标构造器：`vec3(x, y, z)`，绝对分量允许小数，支持 `~` 与 `^`。",
+    ),
+    (
+        "vec2",
+        "水平精确坐标构造器：`vec2(x, z)`，绝对分量允许小数，不支持 `^`。",
+    ),
+    (
+        "rotation",
+        "朝向构造器：`rotation(yaw, pitch)`，单位是度，用于 `teleport` 的可选朝向。",
+    ),
+    (
         "column",
         "列坐标构造器：`column(x, z)`，供 forceload 使用。",
     ),
@@ -156,6 +175,19 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     (
         "nbt",
         "结构化 NBT 数据：`nbt { 键 = 值; }`，支持全部 12 种标签类型；可作 set_block/fill 的方块实体数据、物品的 custom_data，或作为语句合并到当前实体的具名标签。",
+    ),
+    (
+        "text",
+        "文本组件：`text(\"...\") { color = \"red\"; }`，样式块支持颜色、五个开关、点击与悬停事件。",
+    ),
+    (
+        "translate",
+        "翻译组件：`translate(\"chat.type.text\", [参数组件...])`。",
+    ),
+    ("keybind", "按键组件：`keybind(\"key.jump\")`。"),
+    (
+        "selector",
+        "选择器组件：`selector(\"@a\")` 或 `selector(查询)`。",
     ),
     (
         "advancement",

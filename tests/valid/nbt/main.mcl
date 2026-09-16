@@ -28,7 +28,7 @@ fn block_tags() {
         ints = [I; 1, 2s, 3b];
         longs = [L; 1L, 9999999999, 3s, 4b];
     });
-    set_block(pos(1, 64, 0), block_state("minecraft:sign") { rotation = "0"; }, nbt {});
+    set_block(pos(1, 64, 0), block_state("minecraft:oak_sign") { rotation = "0"; }, nbt {});
     set_block(pos(3, 64, 0), block_state("minecraft:chest"), nbt { 自定义名称 = "中文键"; });
 }
 

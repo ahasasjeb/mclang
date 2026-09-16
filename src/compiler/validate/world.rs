@@ -6,11 +6,13 @@
 //! 游戏规则名与取值类型来自 `GameRules` 的注册表引导代码。
 
 use crate::ast::{
-    BlockPosition, BlockStateValue, CloneFilter, ColumnPosition, ForceLoadOperation, GameRuleValue,
-    Span, Statement, StatementKind, TimeOperation, WorldBorderOperation,
+    BlockPosition, BlockStateValue, CloneFilter, ColumnPosition, Coordinate, ForceLoadOperation,
+    GameRuleValue, LocateKind, PositionValue, Span, Statement, StatementKind, TimeOperation,
+    Vec2Value, Vec3Value, WorldBorderOperation,
 };
 use crate::diagnostic::Diagnostic;
 
+use super::registry::{validate_id, validate_id_or_tag};
 use super::rules::valid_resource_location;
 
 /// 水平坐标范围，对应 `Level.isInWorldBoundsHorizontal` 的半开区间。
@@ -141,9 +143,9 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
         } => {
             validate_block_position(from, diagnostics);
             validate_block_position(to, diagnostics);
-            validate_resource(biome, "生物群系", statement.span, diagnostics);
+            validate_id("biome", "生物群系", biome, statement.span, diagnostics);
             if let Some(filter) = filter {
-                validate_resource_or_tag(filter, "生物群系过滤", statement.span, diagnostics);
+                validate_id_or_tag("biome", "生物群系过滤", filter, statement.span, diagnostics);
             }
         }
         StatementKind::Clone {
@@ -159,14 +161,20 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
             validate_block_position(end, diagnostics);
             validate_block_position(destination, diagnostics);
             for dimension in [from_dimension, to_dimension].into_iter().flatten() {
-                validate_resource(dimension, "维度", statement.span, diagnostics);
+                validate_id("dimension", "维度", dimension, statement.span, diagnostics);
             }
             if let CloneFilter::Filtered(filter) = filter {
                 validate_block_state(filter, true, diagnostics);
             }
         }
         StatementKind::PlaceFeature { feature, pos } => {
-            validate_resource(feature, "地物", statement.span, diagnostics);
+            validate_id_or_tag(
+                "worldgen/feature",
+                "地物",
+                feature,
+                statement.span,
+                diagnostics,
+            );
             if let Some(pos) = pos {
                 validate_block_position(pos, diagnostics);
             }
@@ -177,7 +185,15 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
             max_depth,
             pos,
         } => {
-            validate_resource(pool, "模板池", statement.span, diagnostics);
+            validate_id(
+                "worldgen/template_pool",
+                "模板池",
+                pool,
+                statement.span,
+                diagnostics,
+            );
+            // 拼图目标是 `IdentifierArgument`：结构 id 或 `minecraft:empty`，
+            // 不受模板池注册表约束，只做资源位置语法检查。
             validate_resource(target, "拼图目标", statement.span, diagnostics);
             if !(1..=20).contains(max_depth) {
                 diagnostics.push(Diagnostic::new(
@@ -190,7 +206,13 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
             }
         }
         StatementKind::PlaceStructure { structure, pos } => {
-            validate_resource(structure, "结构", statement.span, diagnostics);
+            validate_id(
+                "worldgen/structure",
+                "结构",
+                structure,
+                statement.span,
+                diagnostics,
+            );
             if let Some(pos) = pos {
                 validate_block_position(pos, diagnostics);
             }
@@ -201,7 +223,13 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
             integrity,
             ..
         } => {
-            validate_resource(template, "结构模板", statement.span, diagnostics);
+            validate_id(
+                "structure",
+                "结构模板",
+                template,
+                statement.span,
+                diagnostics,
+            );
             validate_block_position(pos, diagnostics);
             if let Some(integrity) = integrity
                 && !integrity
@@ -219,7 +247,13 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
         }
         StatementKind::TimeAction { operation, clock } => {
             if let Some(clock) = clock {
-                validate_resource(clock, "世界时钟", statement.span, diagnostics);
+                validate_id(
+                    "world_clock",
+                    "世界时钟",
+                    clock,
+                    statement.span,
+                    diagnostics,
+                );
             }
             if let TimeOperation::Rate(rate) = operation
                 && !rate
@@ -239,8 +273,13 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
         StatementKind::WorldBorder(operation) => {
             validate_world_border(operation, statement.span, diagnostics);
         }
-        StatementKind::Locate { target, .. } => {
-            validate_resource_or_tag(target, "定位目标", statement.span, diagnostics);
+        StatementKind::Locate { kind, target } => {
+            let (registry, label) = match kind {
+                LocateKind::Structure => ("worldgen/structure", "结构"),
+                LocateKind::Biome => ("biome", "生物群系"),
+                LocateKind::Poi => ("point_of_interest_type", "兴趣点"),
+            };
+            validate_id_or_tag(registry, label, target, statement.span, diagnostics);
         }
         _ => unreachable!("validate_world_statement 只处理世界与方块语句"),
     }
@@ -270,6 +309,85 @@ pub(super) fn validate_block_position(position: &BlockPosition, diagnostics: &mu
     }
 }
 
+/// 校验精确坐标（`vec3`）的绝对分量；小数允许，范围与方块坐标一致。
+pub(super) fn validate_vec3(position: &Vec3Value, diagnostics: &mut Vec<Diagnostic>) {
+    validate_fractional_axis(
+        "X",
+        &position.x,
+        HORIZONTAL_MIN as f64,
+        HORIZONTAL_MAX as f64,
+        position.span,
+        diagnostics,
+    );
+    validate_fractional_axis(
+        "Y",
+        &position.y,
+        VERTICAL_MIN as f64,
+        VERTICAL_MAX as f64,
+        position.span,
+        diagnostics,
+    );
+    validate_fractional_axis(
+        "Z",
+        &position.z,
+        HORIZONTAL_MIN as f64,
+        HORIZONTAL_MAX as f64,
+        position.span,
+        diagnostics,
+    );
+}
+
+/// 校验水平精确坐标（`vec2`）的绝对分量。
+pub(super) fn validate_vec2(position: &Vec2Value, diagnostics: &mut Vec<Diagnostic>) {
+    validate_fractional_axis(
+        "X",
+        &position.x,
+        HORIZONTAL_MIN as f64,
+        HORIZONTAL_MAX as f64,
+        position.span,
+        diagnostics,
+    );
+    validate_fractional_axis(
+        "Z",
+        &position.z,
+        HORIZONTAL_MIN as f64,
+        HORIZONTAL_MAX as f64,
+        position.span,
+        diagnostics,
+    );
+}
+
+/// 任意位置值：方块坐标或精确坐标。
+pub(super) fn validate_position_value(position: &PositionValue, diagnostics: &mut Vec<Diagnostic>) {
+    match position {
+        PositionValue::Block(position) => validate_block_position(position, diagnostics),
+        PositionValue::Exact(position) => validate_vec3(position, diagnostics),
+    }
+}
+
+/// 精确坐标的绝对分量范围；原版在运行期规范化朝向，编译器不限制取值。
+fn validate_fractional_axis(
+    axis: &str,
+    coordinate: &Coordinate,
+    min: f64,
+    max: f64,
+    span: Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Coordinate::Absolute(text) = coordinate else {
+        return;
+    };
+    let Ok(value) = text.parse::<f64>() else {
+        return;
+    };
+    if !(min..=max).contains(&value) {
+        diagnostics.push(Diagnostic::new(
+            format!("{axis} 坐标 {text} 超出世界范围（{min} 到 {max}）"),
+            span,
+        ));
+    }
+}
+
 fn validate_column_position(position: &ColumnPosition, diagnostics: &mut Vec<Diagnostic>) {
     for (axis, coordinate) in [("X", &position.x), ("Z", &position.z)] {
         let Some(value) = coordinate.absolute_integer() else {
@@ -287,7 +405,7 @@ fn validate_column_position(position: &ColumnPosition, diagnostics: &mut Vec<Dia
 }
 
 /// 方块状态或方块谓词：`#` 标签只在过滤器里合法，属性名与值限制为 SNBT 安全字符。
-fn validate_block_state(
+pub(super) fn validate_block_state(
     block: &BlockStateValue,
     allow_tag: bool,
     diagnostics: &mut Vec<Diagnostic>,
@@ -308,11 +426,8 @@ fn validate_block_state(
         if !block.properties.is_empty() {
             diagnostics.push(Diagnostic::new("方块标签不能声明方块属性", block.span));
         }
-    } else if !valid_resource_location(&block.id) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{}` 不是有效的方块资源位置", block.id),
-            block.span,
-        ));
+    } else {
+        validate_id("block", "方块", &block.id, block.span, diagnostics);
     }
     for property in &block.properties {
         if !valid_block_property_name(&property.name) {
@@ -470,12 +585,13 @@ fn validate_world_border(
                 ));
             }
         }
-        WorldBorderOperation::Center { x, z } => {
-            for component in [x, z] {
-                if component.starts_with('~') {
+        WorldBorderOperation::Center(value) => {
+            validate_vec2(value, diagnostics);
+            for component in [&value.x, &value.z] {
+                let Coordinate::Absolute(text) = component else {
                     continue;
-                }
-                if !component
+                };
+                if !text
                     .parse::<f64>()
                     .is_ok_and(|value| value.abs() <= BORDER_MAX_CENTER)
                 {
@@ -507,21 +623,6 @@ fn validate_resource(value: &str, label: &str, span: Span, diagnostics: &mut Vec
     if !valid_resource_location(value) {
         diagnostics.push(Diagnostic::new(
             format!("`{value}` 不是有效的{label}资源位置"),
-            span,
-        ));
-    }
-}
-
-fn validate_resource_or_tag(
-    value: &str,
-    label: &str,
-    span: Span,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    let path = value.strip_prefix('#').unwrap_or(value);
-    if !valid_resource_location(path) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{value}` 不是有效的{label}资源位置或 `#` 标签"),
             span,
         ));
     }

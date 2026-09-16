@@ -5,7 +5,10 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{BinaryOp, Condition, Expr, ExprKind, Holder, Span};
+use crate::ast::{
+    BinaryOp, CallTarget, ComputeKind, ComputeSource, Condition, Expr, ExprKind, Holder,
+    ItemConditionSource, Span,
+};
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, Signature};
 use crate::diagnostic::Diagnostic;
@@ -62,12 +65,186 @@ pub(super) fn validate_condition(
             validate_expr(left, locals, ctx, diagnostics);
             validate_expr(right, locals, ctx, diagnostics);
         }
+        Condition::Block { pos, block, .. } => {
+            super::world::validate_block_position(pos, diagnostics);
+            super::world::validate_block_state(block, true, diagnostics);
+        }
+        Condition::Blocks {
+            start,
+            end,
+            destination,
+            ..
+        } => {
+            super::world::validate_block_position(start, diagnostics);
+            super::world::validate_block_position(end, diagnostics);
+            super::world::validate_block_position(destination, diagnostics);
+        }
+        Condition::Biome {
+            pos,
+            biome,
+            biome_span,
+            ..
+        } => {
+            super::world::validate_block_position(pos, diagnostics);
+            super::registry::validate_id_or_tag(
+                "biome",
+                "生物群系",
+                biome,
+                *biome_span,
+                diagnostics,
+            );
+        }
+        Condition::Loaded { pos, .. } => {
+            super::world::validate_block_position(pos, diagnostics);
+        }
+        Condition::Dimension {
+            dimension,
+            dimension_span,
+            ..
+        } => {
+            super::registry::validate_id(
+                "dimension",
+                "维度",
+                dimension,
+                *dimension_span,
+                diagnostics,
+            );
+        }
+        Condition::Entity {
+            query, query_span, ..
+        } => {
+            if !ctx.symbols.queries.contains_key(query.as_str()) {
+                diagnostics.push(Diagnostic::new(
+                    format!("找不到实体查询 `{query}`"),
+                    *query_span,
+                ));
+            }
+        }
+        Condition::Data {
+            source,
+            path,
+            path_span,
+            ..
+        } => {
+            super::components::validate_nbt_source(
+                source,
+                condition_span(condition),
+                ctx,
+                diagnostics,
+            );
+            if !super::components::valid_nbt_component_path(path) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{path}` 不是有效的 NBT 路径"),
+                    *path_span,
+                ));
+            }
+        }
+        Condition::Items {
+            source,
+            slots,
+            slots_span,
+            item,
+            item_span,
+            ..
+        } => {
+            validate_item_condition_source(source, condition_span(condition), ctx, diagnostics);
+            validate_slot_source(slots, *slots_span, diagnostics);
+            if !valid_item_predicate(item) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{item}` 不是有效的物品谓词（物品 id、`#标签` 或带组件过滤器的 id）"),
+                    *item_span,
+                ));
+            }
+        }
+        Condition::Slots {
+            source,
+            slots,
+            slots_span,
+            ..
+        } => {
+            validate_item_condition_source(source, condition_span(condition), ctx, diagnostics);
+            validate_slot_source(slots, *slots_span, diagnostics);
+        }
+        Condition::Function { target, span } => match target {
+            CallTarget::Function(name) => match ctx.symbols.functions.get(name.as_str()) {
+                None => diagnostics.push(Diagnostic::new(format!("找不到函数 `{name}`"), *span)),
+                Some(signature) => {
+                    validate_call_context(name, *signature, *span, ctx, diagnostics);
+                }
+            },
+            CallTarget::Tag(tag) => {
+                if !ctx.symbols.function_tags.contains_key(tag.as_str()) {
+                    diagnostics.push(Diagnostic::new(format!("找不到函数标签 `#{tag}`"), *span));
+                }
+            }
+        },
+        Condition::Stopwatch { id, span } => {
+            super::statements::validate_stopwatch_id(id, *span, diagnostics);
+        }
         Condition::Not(condition) => validate_condition(condition, locals, ctx, diagnostics),
         Condition::And(left, right) | Condition::Or(left, right) => {
             validate_condition(left, locals, ctx, diagnostics);
             validate_condition(right, locals, ctx, diagnostics);
         }
     }
+}
+
+/// 条件整体的源位置：用于没有独立 span 的子节点诊断。
+fn condition_span(condition: &Condition) -> Span {
+    match condition {
+        Condition::Predicate { span, .. }
+        | Condition::Block { span, .. }
+        | Condition::Blocks { span, .. }
+        | Condition::Biome { span, .. }
+        | Condition::Loaded { span, .. }
+        | Condition::Dimension { span, .. }
+        | Condition::Entity { span, .. }
+        | Condition::Data { span, .. }
+        | Condition::Items { span, .. }
+        | Condition::Slots { span, .. }
+        | Condition::Function { span, .. }
+        | Condition::Stopwatch { span, .. } => *span,
+        Condition::Not(inner) => condition_span(inner),
+        Condition::And(left, _) | Condition::Or(left, _) => condition_span(left),
+        Condition::Compare { left, .. } => left.span,
+    }
+}
+
+fn validate_item_condition_source(
+    source: &ItemConditionSource,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match source {
+        ItemConditionSource::Entity(holder) => {
+            super::statements::validate_holder(holder, span, ctx, diagnostics);
+        }
+        ItemConditionSource::Block(position) => {
+            super::world::validate_block_position(position, diagnostics);
+        }
+    }
+}
+
+/// 槽位来源：槽位名（含 `prefix.N` 与通配）或 `slot_source` 资源位置。
+fn validate_slot_source(slots: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
+    let snapshot = crate::version::snapshot::snapshot();
+    if !snapshot.slots().accepts(slots) && !super::rules::valid_resource_location(slots) {
+        diagnostics.push(Diagnostic::new(
+            format!("`{slots}` 不是有效的槽位来源（槽位名或 slot_source 资源位置）"),
+            span,
+        ));
+    }
+}
+
+/// 物品谓词：物品 id、`#标签`，可带 `[组件过滤器]`。
+fn valid_item_predicate(text: &str) -> bool {
+    if text.is_empty() || text.contains(char::is_whitespace) {
+        return false;
+    }
+    let base = text.strip_prefix('#').unwrap_or(text);
+    let location = base.split('[').next().unwrap_or(base);
+    super::rules::valid_resource_location(location)
 }
 
 pub(super) fn validate_expr(
@@ -149,13 +326,14 @@ pub(super) fn validate_expr(
             super::statements::validate_stopwatch_id(id, expression.span, diagnostics);
         }
         ExprKind::TimeQuery { clock } => {
-            if let Some(clock) = clock
-                && !super::rules::valid_resource_location(clock)
-            {
-                diagnostics.push(Diagnostic::new(
-                    format!("`{clock}` 不是有效的世界时钟资源位置"),
+            if let Some(clock) = clock {
+                super::registry::validate_id(
+                    "world_clock",
+                    "世界时钟",
+                    clock,
                     expression.span,
-                ));
+                    diagnostics,
+                );
             }
         }
         ExprKind::GameTimeQuery | ExprKind::WorldBorderSize => {}
@@ -163,6 +341,83 @@ pub(super) fn validate_expr(
             if !super::world::game_rule_exists(name) {
                 diagnostics.push(Diagnostic::new(
                     format!("未知游戏规则 `{name}`；规则名来自 26.3 的 GameRules 注册表"),
+                    expression.span,
+                ));
+            }
+        }
+        ExprKind::Count { query, query_span } => {
+            if !ctx.symbols.queries.contains_key(query.as_str()) {
+                diagnostics.push(Diagnostic::new(
+                    format!("找不到实体查询 `{query}`"),
+                    *query_span,
+                ));
+            }
+        }
+        ExprKind::Random { min, max } => {
+            if min > max {
+                diagnostics.push(Diagnostic::new(
+                    format!("random 的最小值 {min} 不能大于最大值 {max}"),
+                    expression.span,
+                ));
+            }
+        }
+        ExprKind::DataGet {
+            source,
+            path,
+            path_span,
+        } => {
+            super::components::validate_nbt_source(source, expression.span, ctx, diagnostics);
+            if !super::components::valid_nbt_component_path(path) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{path}` 不是有效的 NBT 路径"),
+                    *path_span,
+                ));
+            }
+        }
+        ExprKind::Compute {
+            source,
+            kind,
+            provider,
+            provider_span,
+            scale,
+        } => {
+            match source {
+                ComputeSource::Default => {}
+                ComputeSource::Block(position) => {
+                    super::world::validate_block_position(position, diagnostics);
+                }
+                ComputeSource::Entity(holder) => {
+                    if matches!(holder, Holder::Origin) {
+                        diagnostics.push(Diagnostic::new(
+                            "compute 的 entity 来源不能是投掷者；请用 self/自身 或实体查询",
+                            expression.span,
+                        ));
+                    } else {
+                        super::statements::validate_holder(
+                            holder,
+                            expression.span,
+                            ctx,
+                            diagnostics,
+                        );
+                    }
+                }
+            }
+            let registry = match kind {
+                ComputeKind::Float => "context_float_provider",
+                ComputeKind::Integer => "context_int_provider",
+            };
+            let label = match kind {
+                ComputeKind::Float => "浮点 provider",
+                ComputeKind::Integer => "整数 provider",
+            };
+            super::registry::validate_id(registry, label, provider, *provider_span, diagnostics);
+            if let Some(scale) = scale
+                && !scale
+                    .parse::<f64>()
+                    .is_ok_and(|value| value.is_finite() && value != 0.0)
+            {
+                diagnostics.push(Diagnostic::new(
+                    "compute 的缩放必须是非零数字",
                     expression.span,
                 ));
             }

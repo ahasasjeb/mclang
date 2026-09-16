@@ -6,7 +6,7 @@
 
 use crate::ast::{
     AdvancementOperation, AdvancementReference, AdvancementScope, DataSlotDecl, DataSlotKind,
-    EffectDuration, Expr, GiveItem, GiveTarget, Holder, ScoreTarget, SelfAction,
+    EffectDuration, Expr, GiveItem, GiveTarget, Holder, RotationValue, ScoreTarget, SelfAction,
     TeleportDestination, XpKind, XpOperation,
 };
 
@@ -254,19 +254,23 @@ impl Compiler<'_> {
         commands.push(format!("{prefix}scoreboard players reset @s {objective}"));
     }
 
-    /// `teleport(持有者, 坐标或实体查询)`：`tp @s` 到坐标或单个实体。
+    /// `teleport(持有者, 坐标或实体查询[, rotation(朝向)])`：`tp @s` 到坐标或单个实体。
     pub(super) fn compile_teleport(
         &self,
         targets: &Holder,
         destination: &TeleportDestination,
+        rotation: Option<&RotationValue>,
         commands: &mut Vec<String>,
     ) {
         let prefix = self.score_holder_prefix(targets);
         let destination = match destination {
-            TeleportDestination::Position(position) => world::position_text(position),
+            TeleportDestination::Position(position) => world::position_value_text(position),
             TeleportDestination::Entity { query, .. } => entity_query_selector(self.query(query)),
         };
-        commands.push(format!("{prefix}tp @s {destination}"));
+        let rotation = rotation
+            .map(|rotation| format!(" {}", world::rotation_text(rotation)))
+            .unwrap_or_default();
+        commands.push(format!("{prefix}tp @s {destination}{rotation}"));
     }
 
     /// 计分操作的上下文前缀：`@s` 是当前实体、投掷者还是查询命中的实体。
@@ -393,7 +397,7 @@ impl Compiler<'_> {
         ));
     }
 
-    fn query(&self, name: &str) -> &crate::ast::EntityQueryDecl {
+    pub(super) fn query(&self, name: &str) -> &crate::ast::EntityQueryDecl {
         self.program
             .queries
             .iter()

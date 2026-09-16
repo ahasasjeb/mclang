@@ -74,23 +74,6 @@ pub(super) fn valid_text_color(color: &str) -> bool {
     )
 }
 
-pub(super) fn valid_sound_source(source: &str) -> bool {
-    matches!(
-        source,
-        "master"
-            | "music"
-            | "record"
-            | "weather"
-            | "block"
-            | "hostile"
-            | "neutral"
-            | "player"
-            | "ambient"
-            | "voice"
-            | "ui"
-    )
-}
-
 pub(super) fn windows_reserved_name(name: &str) -> bool {
     let stem = name.split('.').next().unwrap_or(name).to_ascii_uppercase();
     matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
@@ -100,53 +83,6 @@ pub(super) fn windows_reserved_name(name: &str) -> bool {
             .is_some_and(|number| {
                 matches!(number, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
             })
-}
-
-pub(super) fn supported_resource_kind(kind: &str) -> bool {
-    const SIMPLE_KINDS: &[&str] = &[
-        "advancement",
-        "banner_pattern",
-        "block_transformer",
-        "cat_sound_variant",
-        "cat_variant",
-        "chat_type",
-        "chicken_sound_variant",
-        "chicken_variant",
-        "context_float_provider",
-        "context_int_provider",
-        "cow_sound_variant",
-        "cow_variant",
-        "damage_type",
-        "decorated_pot_pattern",
-        "dialog",
-        "dimension_type",
-        "enchantment",
-        "enchantment_provider",
-        "frog_variant",
-        "instrument",
-        "item_modifier",
-        "jukebox_song",
-        "loot_table",
-        "painting_variant",
-        "pig_sound_variant",
-        "pig_variant",
-        "predicate",
-        "recipe",
-        "sulfur_cube_archetype",
-        "test_environment",
-        "test_instance",
-        "timeline",
-        "trade_set",
-        "trial_spawner",
-        "trim_material",
-        "trim_pattern",
-        "villager_trade",
-        "wolf_sound_variant",
-        "wolf_variant",
-        "world_clock",
-        "zombie_nautilus_variant",
-    ];
-    SIMPLE_KINDS.contains(&kind) || kind.starts_with("worldgen/") && valid_resource_path(kind)
 }
 
 pub(super) fn validate_identifier(

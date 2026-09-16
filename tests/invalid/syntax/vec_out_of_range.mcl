@@ -1,0 +1,8 @@
+// 编译测试（负向语义）：精确坐标的绝对分量也要在世界范围内。
+// 期望语义诊断：Y 坐标 5000 超出世界范围（-2032 到 2031）。
+namespace invalid_semantics_vec_range;
+
+@entity
+fn f() {
+    teleport(self, vec3(0, 5000, 0));
+}

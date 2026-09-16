@@ -2,9 +2,10 @@
 
 use std::collections::HashSet;
 
-use crate::ast::{EntityQueryDecl, ItemEnchantment, ItemStackDecl, Span};
+use crate::ast::{EntityQueryDecl, EntityTypeFilter, ItemEnchantment, ItemStackDecl, Span};
 use crate::diagnostic::Diagnostic;
 
+use super::registry::validate_id;
 use super::rules::{valid_entity_tag, valid_resource_location};
 
 /// `GiveCommand` 允许的数量上限是物品最大堆叠数乘以 100。
@@ -37,12 +38,7 @@ pub(super) fn validate_give_count(
 }
 
 pub(super) fn validate_item_stack(item: &ItemStackDecl, diagnostics: &mut Vec<Diagnostic>) {
-    if !valid_resource_location(&item.item_id) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{}` 不是有效的物品资源位置", item.item_id),
-            item.span,
-        ));
-    }
+    validate_id("item", "物品", &item.item_id, item.span, diagnostics);
     let count_limit = max_give_count(item);
     if item.count == 0 || item.count > count_limit {
         diagnostics.push(Diagnostic::new(
@@ -125,12 +121,13 @@ fn validate_item_enchantments(
 ) {
     let mut ids = HashSet::new();
     for enchantment in enchantments {
-        if !valid_resource_location(&enchantment.enchantment_id) {
-            diagnostics.push(Diagnostic::new(
-                format!("`{}` 不是有效的附魔资源位置", enchantment.enchantment_id),
-                enchantment.span,
-            ));
-        }
+        validate_id(
+            "enchantment",
+            "附魔",
+            &enchantment.enchantment_id,
+            enchantment.span,
+            diagnostics,
+        );
         if enchantment.level == 0 || enchantment.level > 255 {
             diagnostics.push(Diagnostic::new("附魔等级必须是 1 到 255", enchantment.span));
         }
@@ -147,11 +144,14 @@ fn validate_item_enchantments(
 }
 
 pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut Vec<Diagnostic>) {
-    if !valid_resource_location(&query.entity_type) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{}` 不是有效的实体类型资源位置", query.entity_type),
-            query.span,
-        ));
+    validate_entity_type(&query.entity_type, query.span, diagnostics);
+    for filter in &query.type_filters {
+        let (value, span) = match filter {
+            EntityTypeFilter::Include(value, span) | EntityTypeFilter::Exclude(value, span) => {
+                (value, *span)
+            }
+        };
+        validate_entity_type(value, span, diagnostics);
     }
     let mut tags = HashSet::new();
     for tag in query.tags.iter().chain(&query.excluded_tags) {
@@ -186,19 +186,128 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
             query.span,
         ));
     }
-    if let Some(item) = &query.item {
-        if item.slot != "contents" {
+    if let Some(filter) = &query.name_filter
+        && (filter.value.is_empty() || filter.value.chars().any(char::is_control))
+    {
+        diagnostics.push(Diagnostic::new(
+            "查询 name 不能为空或包含控制字符",
+            filter.span,
+        ));
+    }
+    for score in &query.scores {
+        if score.objective.is_empty() {
+            diagnostics.push(Diagnostic::new("scores 的目标名不能为空", score.span));
+        }
+        if !valid_int_range(&score.range) {
             diagnostics.push(Diagnostic::new(
-                format!(
-                    "Minecraft 26.3 的首版类型化物品查询只支持 contents 槽，实际为 `{}`",
-                    item.slot
-                ),
+                format!("`{}` 不是有效的整数区间，例如 1..5、..5、5..", score.range),
+                score.span,
+            ));
+        }
+    }
+    if let Some(filter) = &query.nbt_filter
+        && (filter.value.is_empty() || !balanced_snbt(&filter.value))
+    {
+        diagnostics.push(Diagnostic::new(
+            "查询 nbt 需要平衡的 SNBT 谓词或路径",
+            filter.span,
+        ));
+    }
+    if let Some(box_filter) = &query.box_filter {
+        for (label, value) in [
+            ("x", &box_filter.x),
+            ("y", &box_filter.y),
+            ("z", &box_filter.z),
+        ] {
+            if value.parse::<f64>().is_err() {
+                diagnostics.push(Diagnostic::new(
+                    format!("box {label} 需要数字"),
+                    box_filter.span,
+                ));
+            }
+        }
+        for (label, value) in [
+            ("dx", &box_filter.dx),
+            ("dy", &box_filter.dy),
+            ("dz", &box_filter.dz),
+        ] {
+            if !value.parse::<f64>().is_ok_and(|value| value >= 0.0) {
+                diagnostics.push(Diagnostic::new(
+                    format!("box {label} 需要非负数字"),
+                    box_filter.span,
+                ));
+            }
+        }
+    }
+    if let Some(distance) = &query.distance
+        && !valid_float_range(distance)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("`{distance}` 不是有效的距离区间，例如 3..10、..10、5.."),
+            query.span,
+        ));
+    }
+    if let Some(level) = &query.level
+        && !valid_int_range(level)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("`{level}` 不是有效的等级区间，例如 1..5、..5、5.."),
+            query.span,
+        ));
+    }
+    if let Some(gamemode) = &query.gamemode
+        && !crate::version::snapshot::snapshot().enum_contains("gamemode", gamemode)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("`{gamemode}` 不是有效的游戏模式"),
+            query.span,
+        ));
+    }
+    if let Some(filter) = &query.team_filter
+        && filter.value.is_empty()
+    {
+        diagnostics.push(Diagnostic::new("查询 team 不能为空", filter.span));
+    }
+    if let Some(rotation) = &query.rotation {
+        for (label, value) in [("偏航", &rotation.yaw), ("俯仰", &rotation.pitch)] {
+            if !valid_float_range(value) {
+                diagnostics.push(Diagnostic::new(
+                    format!("rotate 的{label}区间 `{value}` 无效"),
+                    rotation.span,
+                ));
+            }
+        }
+    }
+    if let Some(predicate) = &query.predicate
+        && !valid_resource_location(predicate)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("`{predicate}` 不是有效的谓词资源位置"),
+            query.span,
+        ));
+    }
+    if let Some(advancements) = &query.advancements
+        && (advancements.is_empty() || !balanced_snbt(advancements))
+    {
+        diagnostics.push(Diagnostic::new(
+            "查询 advancements 需要平衡的 SNBT 谓词",
+            query.span,
+        ));
+    }
+    if let Some(item) = &query.item {
+        let snapshot = crate::version::snapshot::snapshot();
+        if !snapshot.slots().accepts(&item.slot) && !valid_resource_location(&item.slot) {
+            diagnostics.push(Diagnostic::new(
+                format!("`{}` 不是有效的槽位来源", item.slot),
                 item.span,
             ));
         }
-        if !valid_resource_location(&item.item_id) {
+        if !valid_item_predicate(&item.item_id) {
             diagnostics.push(Diagnostic::new(
-                format!("`{}` 不是有效的物品资源位置", item.item_id),
+                format!(
+                    "`{}` 不是有效的物品谓词（物品 id、`#标签` 或带组件过滤器的 id）",
+                    item.item_id
+                ),
                 item.span,
             ));
         }
@@ -216,4 +325,73 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
             ));
         }
     }
+}
+
+/// 实体类型或 `#标签`。
+fn validate_entity_type(value: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
+    if let Some(tag) = value.strip_prefix('#') {
+        if !valid_resource_location(tag) {
+            diagnostics.push(Diagnostic::new(
+                format!("`{value}` 不是有效的实体类型标签资源位置"),
+                span,
+            ));
+        }
+    } else {
+        validate_id("entity_type", "实体类型", value, span, diagnostics);
+    }
+}
+
+/// 选择器区间：`5`、`..5`、`5..`、`5..10` 与小数版本。
+pub(super) fn valid_int_range(text: &str) -> bool {
+    valid_range(text, |value| value.parse::<i64>().is_ok())
+}
+
+pub(super) fn valid_float_range(text: &str) -> bool {
+    valid_range(text, |value| value.parse::<f64>().is_ok())
+}
+
+fn valid_range(text: &str, parse: impl Fn(&str) -> bool) -> bool {
+    if let Some((low, high)) = text.split_once("..") {
+        let low_ok = low.is_empty() || parse(low);
+        let high_ok = high.is_empty() || parse(high);
+        low_ok && high_ok && !(low.is_empty() && high.is_empty())
+    } else {
+        parse(text)
+    }
+}
+
+/// 物品谓词：物品 id、`#标签`，可带 `[组件过滤器]`。
+pub(super) fn valid_item_predicate(text: &str) -> bool {
+    if text.is_empty() || text.contains(char::is_whitespace) {
+        return false;
+    }
+    let base = text.strip_prefix('#').unwrap_or(text);
+    let location = base.split('[').next().unwrap_or(base);
+    valid_resource_location(location) && balanced_snbt(base)
+}
+
+/// SNBT 片段：括号与引号必须配对。
+fn balanced_snbt(text: &str) -> bool {
+    let mut depth = 0i32;
+    let mut quote: Option<char> = None;
+    for character in text.chars() {
+        if let Some(opening) = quote {
+            if character == opening {
+                quote = None;
+            }
+            continue;
+        }
+        match character {
+            '"' | '\'' => quote = Some(character),
+            '[' | '{' => depth += 1,
+            ']' | '}' => {
+                depth -= 1;
+                if depth < 0 {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    depth == 0 && quote.is_none()
 }

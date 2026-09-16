@@ -31,6 +31,10 @@ pub(super) fn constant_value(expression: &Expr) -> Option<i32> {
         | ExprKind::TimeQuery { .. }
         | ExprKind::GameTimeQuery
         | ExprKind::GameRuleQuery { .. }
-        | ExprKind::WorldBorderSize => None,
+        | ExprKind::WorldBorderSize
+        | ExprKind::Count { .. }
+        | ExprKind::Random { .. }
+        | ExprKind::DataGet { .. }
+        | ExprKind::Compute { .. } => None,
     }
 }

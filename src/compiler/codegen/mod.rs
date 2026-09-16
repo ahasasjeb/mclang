@@ -12,6 +12,7 @@
 
 mod actions;
 mod advancement;
+mod components;
 mod emit;
 mod expressions;
 mod names;

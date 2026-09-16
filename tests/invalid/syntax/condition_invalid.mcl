@@ -1,0 +1,22 @@
+// 编译测试（负向语义）：条件族的查询、槽位、维度与函数引用都要合法。
+// 期望诊断：找不到查询、无效槽位、未知维度、找不到函数、无效物品谓词。
+namespace invalid_conditions;
+
+@entity
+fn f() {
+    if entity(nowhere) {
+        run "say x";
+    }
+    if items(entity, self, "not_a_slot", "minecraft:diamond") {
+        run "say x";
+    }
+    if dimension("minecraft:not_a_dimension") {
+        run "say x";
+    }
+    if function(missing_function) {
+        run "say x";
+    }
+    if items(entity, self, "contents", "diamond") {
+        run "say x";
+    }
+}

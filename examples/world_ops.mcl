@@ -21,7 +21,7 @@ fn prepare() {
     clone(pos(0, 64, 0), pos(8, 64, 8), pos(60, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
 
     // 地物、结构与模板。
-    place.feature("minecraft:oak_tree", pos(0, 64, 20));
+    place.feature("minecraft:oak", pos(0, 64, 20));
     place.structure("minecraft:village_plains", pos(32, 64, 20));
     place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
     place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);

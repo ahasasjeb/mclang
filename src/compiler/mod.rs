@@ -25,17 +25,33 @@ pub struct CompiledPack {
     pub files: BTreeMap<PathBuf, String>,
 }
 
+/// 数据包函数的默认权限等级：26.3 的 `function-permission-level` 默认
+/// `GAMEMASTER`（等级 2）。函数在编译期与运行期都受此限制，`ADMIN`(3)/
+/// `OWNER`(4) 命令只能在显式放开后使用。
+pub const DEFAULT_FUNCTION_PERMISSION_LEVEL: u8 = 2;
+
+/// 编译选项。
+pub struct CompileOptions {
+    /// 写入 `pack.mcmeta` 的描述。
+    pub description: String,
+    /// 函数可用的最高权限等级（0–4）。
+    pub function_permission_level: u8,
+}
+
 /// 编译已经合并的整程序。
 ///
 /// 语义检查失败时返回全部诊断；通过后生成数据包文件。`description` 会写入
 /// `pack.mcmeta`。
-pub fn compile(program: &Program, description: &str) -> Result<CompiledPack, Vec<Diagnostic>> {
-    let diagnostics = validate::validate(program);
+pub fn compile(
+    program: &Program,
+    options: &CompileOptions,
+) -> Result<CompiledPack, Vec<Diagnostic>> {
+    let diagnostics = validate::validate(program, options.function_permission_level);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
 
     let mut compiler = codegen::Compiler::new(program);
     compiler.compile_functions();
-    Ok(compiler.finish(description))
+    Ok(compiler.finish(&options.description))
 }

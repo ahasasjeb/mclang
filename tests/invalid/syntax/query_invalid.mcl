@@ -1,0 +1,12 @@
+// 编译测试（负向语义）：查询属性的区间、枚举、槽位与谓词都要合法。
+// 期望诊断：距离区间、游戏模式、槽位、分数区间各一条。
+namespace invalid_queries;
+
+query bad = entity("minecraft:zombie") {
+    distance("3...10");
+    scores("points", "abc");
+    gamemode("not_a_mode");
+    item(not_a_slot) {
+        id = "minecraft:diamond";
+    }
+}

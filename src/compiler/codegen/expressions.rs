@@ -1,10 +1,13 @@
 //! 表达式与条件下降：产生计分板操作，并管理表达式临时值。
 
-use crate::ast::{BinaryOp, Comparison, Condition, Expr, ExprKind, Holder};
+use crate::ast::{
+    BinaryOp, CallTarget, Comparison, ComputeKind, ComputeSource, Condition, Expr, ExprKind,
+    Holder, ItemConditionSource, NbtComponentSource,
+};
 
 use super::Compiler;
 use super::Value;
-use super::emit::entity_query_clause;
+use super::emit::{entity_query_clause, entity_query_selector};
 use super::names::user_objective_name;
 use crate::compiler::constant::constant_value;
 
@@ -109,6 +112,81 @@ impl Compiler<'_> {
             }
             ExprKind::WorldBorderSize => {
                 self.capture_result("worldborder get".to_owned(), commands)
+            }
+            ExprKind::Count { query, .. } => {
+                let target = self.temporary();
+                let selector = entity_query_selector(self.query(query));
+                commands.push(format!(
+                    "scoreboard players set {target} {} 0",
+                    self.objective
+                ));
+                commands.push(format!(
+                    "execute store result score {target} {} if entity {selector}",
+                    self.objective
+                ));
+                Value::Score(target)
+            }
+            ExprKind::Random { min, max } => {
+                let target = self.temporary();
+                commands.push(format!(
+                    "scoreboard players set {target} {} 0",
+                    self.objective
+                ));
+                commands.push(format!(
+                    "execute store result score {target} {} run random value {min}..{max}",
+                    self.objective
+                ));
+                Value::Score(target)
+            }
+            ExprKind::DataGet { source, path, .. } => {
+                let targets = match source {
+                    NbtComponentSource::Entity(holder) => {
+                        format!("entity {}", self.component_holder(holder))
+                    }
+                    NbtComponentSource::Block(position) => {
+                        format!("block {}", super::world::position_text(position))
+                    }
+                    NbtComponentSource::Storage(storage, _) => format!("storage {storage}"),
+                };
+                let target = self.temporary();
+                commands.push(format!(
+                    "scoreboard players set {target} {} 0",
+                    self.objective
+                ));
+                commands.push(format!(
+                    "execute store result score {target} {} run data get {targets} {path}",
+                    self.objective
+                ));
+                Value::Score(target)
+            }
+            ExprKind::Compute {
+                source,
+                kind,
+                provider,
+                scale,
+                ..
+            } => {
+                let source = match source {
+                    ComputeSource::Default => "default".to_owned(),
+                    ComputeSource::Block(position) => {
+                        format!("block {}", super::world::position_text(position))
+                    }
+                    ComputeSource::Entity(holder) => {
+                        format!("entity {}", self.component_holder(holder))
+                    }
+                };
+                let kind = match kind {
+                    ComputeKind::Float => "float",
+                    ComputeKind::Integer => "integer",
+                };
+                let scale = scale
+                    .as_ref()
+                    .map(|scale| format!(" {scale}"))
+                    .unwrap_or_default();
+                self.capture_result(
+                    format!("compute {source} {kind} {provider}{scale}"),
+                    commands,
+                )
             }
             ExprKind::Negate(value) => {
                 let source_value = self.compile_expr(value, owner, commands);
@@ -218,17 +296,80 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) -> String {
         match condition {
-            Condition::Predicate { name, .. } => {
-                let flag = self.temporary();
-                commands.push(format!(
-                    "scoreboard players set {flag} {} 0",
-                    self.objective
-                ));
-                commands.push(format!(
-                    "execute if predicate {}:{name} run scoreboard players set {flag} {} 1",
-                    self.program.namespace, self.objective
-                ));
-                flag
+            Condition::Predicate { name, .. } => self.compile_atomic_condition(
+                format!("predicate {}:{name}", self.program.namespace),
+                commands,
+            ),
+            Condition::Block { pos, block, .. } => self.compile_atomic_condition(
+                format!(
+                    "block {} {}",
+                    super::world::position_text(pos),
+                    super::world::block_state_text(block)
+                ),
+                commands,
+            ),
+            Condition::Blocks {
+                start,
+                end,
+                destination,
+                masked,
+                ..
+            } => {
+                let mode = if *masked { " masked" } else { "" };
+                self.compile_atomic_condition(
+                    format!(
+                        "blocks {} {} {}{mode}",
+                        super::world::position_text(start),
+                        super::world::position_text(end),
+                        super::world::position_text(destination),
+                    ),
+                    commands,
+                )
+            }
+            Condition::Biome { pos, biome, .. } => self.compile_atomic_condition(
+                format!("biome {} {biome}", super::world::position_text(pos)),
+                commands,
+            ),
+            Condition::Loaded { pos, .. } => self.compile_atomic_condition(
+                format!("loaded {}", super::world::position_text(pos)),
+                commands,
+            ),
+            Condition::Dimension { dimension, .. } => {
+                self.compile_atomic_condition(format!("dimension {dimension}"), commands)
+            }
+            Condition::Entity { query, .. } => self.compile_atomic_condition(
+                format!("entity {}", entity_query_selector(self.query(query))),
+                commands,
+            ),
+            Condition::Data { source, path, .. } => self.compile_atomic_condition(
+                format!("data {} {path}", self.nbt_source_text(source)),
+                commands,
+            ),
+            Condition::Items {
+                source,
+                slots,
+                item,
+                ..
+            } => self.compile_atomic_condition(
+                format!(
+                    "items {} {slots} {item}",
+                    self.item_condition_source_text(source)
+                ),
+                commands,
+            ),
+            Condition::Slots { source, slots, .. } => self.compile_atomic_condition(
+                format!("slots {} {slots}", self.item_condition_source_text(source)),
+                commands,
+            ),
+            Condition::Function { target, .. } => {
+                let target = match target {
+                    CallTarget::Function(name) => format!("{}:{name}", self.program.namespace),
+                    CallTarget::Tag(tag) => format!("#{}:{tag}", self.program.namespace),
+                };
+                self.compile_atomic_condition(format!("function {target}"), commands)
+            }
+            Condition::Stopwatch { id, .. } => {
+                self.compile_atomic_condition(format!("stopwatch {id}"), commands)
             }
             Condition::Compare {
                 left,
@@ -302,6 +443,49 @@ impl Compiler<'_> {
                     self.objective, self.objective
                 ));
                 flag
+            }
+        }
+    }
+
+    /// 原子条件：置 0 后用一条 `execute if <谓词>` 冻结为 0/1 标志。
+    fn compile_atomic_condition(
+        &mut self,
+        predicate: String,
+        commands: &mut Vec<String>,
+    ) -> String {
+        let flag = self.temporary();
+        commands.push(format!(
+            "scoreboard players set {flag} {} 0",
+            self.objective
+        ));
+        commands.push(format!(
+            "execute if {predicate} run scoreboard players set {flag} {} 1",
+            self.objective
+        ));
+        flag
+    }
+
+    /// NBT 数据来源的命令文本（`data` 条件与表达式共用）。
+    pub(super) fn nbt_source_text(&self, source: &NbtComponentSource) -> String {
+        match source {
+            NbtComponentSource::Entity(holder) => {
+                format!("entity {}", self.component_holder(holder))
+            }
+            NbtComponentSource::Block(position) => {
+                format!("block {}", super::world::position_text(position))
+            }
+            NbtComponentSource::Storage(storage, _) => format!("storage {storage}"),
+        }
+    }
+
+    /// 物品条件的来源文本（`if items`/`if slots`）。
+    fn item_condition_source_text(&self, source: &ItemConditionSource) -> String {
+        match source {
+            ItemConditionSource::Entity(holder) => {
+                format!("entity {}", self.component_holder(holder))
+            }
+            ItemConditionSource::Block(position) => {
+                format!("block {}", super::world::position_text(position))
             }
         }
     }

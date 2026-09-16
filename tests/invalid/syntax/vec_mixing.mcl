@@ -1,0 +1,8 @@
+// 编译测试（负向语法）：vec3 不能混用 `^` 局部坐标与其它写法。
+// 期望解析诊断：vec3 不能混用 `^` 局部坐标与 `~`/绝对坐标。
+namespace invalid_syntax_vec_mixing;
+
+@entity
+fn f() {
+    teleport(self, vec3(^1, ~2, 3));
+}

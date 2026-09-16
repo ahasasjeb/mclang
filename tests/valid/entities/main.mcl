@@ -24,6 +24,29 @@ query triggers = entity("minecraft:item") {
 query players = entity("minecraft:player") { tag("ready"); }
 query mobs = entity("minecraft:zombie") {}
 
+// 2.3 实体查询属性扩展：类型标签、名称/NBT/分数过滤、坐标盒与朝向。
+query armed = entity("#minecraft:undead") {
+    without_type("minecraft:zombie_villager");
+    name("Bob");
+    scores("processed", "1..");
+    nbt("{Health:10.0f}");
+    box(0, 60, 0, 16, 8, 16);
+    distance("3..10");
+    level("5..");
+    gamemode("creative");
+    team("red");
+    rotate("0..90", "..45");
+    predicate("entities:rich");
+    advancements("{minecraft:story/root=true}");
+    item(weapon.mainhand) {
+        id = "minecraft:diamond_sword[damage=0]";
+        count = 1;
+        custom_name = "Excalibur";
+    }
+}
+
+resource predicate rich = """{"condition":"minecraft:random_chance","chance":0.5}""";
+
 item reward = item_stack("minecraft:diamond") {
     count = 3;
     custom_name = "Reward";

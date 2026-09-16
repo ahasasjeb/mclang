@@ -130,6 +130,22 @@ fn collect_synchronous_calls<'a>(
 fn collect_condition_calls<'a>(condition: &'a Condition, calls: &mut HashSet<&'a str>) {
     match condition {
         Condition::Predicate { .. } => {}
+        Condition::Function { target, .. } => {
+            // `execute if function` 会在运行期调用目标函数，属于调用图的一部分。
+            if let CallTarget::Function(name) = target {
+                calls.insert(name);
+            }
+        }
+        Condition::Block { .. }
+        | Condition::Blocks { .. }
+        | Condition::Biome { .. }
+        | Condition::Loaded { .. }
+        | Condition::Dimension { .. }
+        | Condition::Entity { .. }
+        | Condition::Data { .. }
+        | Condition::Items { .. }
+        | Condition::Slots { .. }
+        | Condition::Stopwatch { .. } => {}
         Condition::Compare { left, right, .. } => {
             collect_expr_calls(left, calls);
             collect_expr_calls(right, calls);
@@ -166,7 +182,11 @@ fn collect_expr_calls<'a>(expression: &'a Expr, calls: &mut HashSet<&'a str>) {
         | ExprKind::TimeQuery { .. }
         | ExprKind::GameTimeQuery
         | ExprKind::GameRuleQuery { .. }
-        | ExprKind::WorldBorderSize => {}
+        | ExprKind::WorldBorderSize
+        | ExprKind::Count { .. }
+        | ExprKind::Random { .. }
+        | ExprKind::DataGet { .. }
+        | ExprKind::Compute { .. } => {}
     }
 }
 

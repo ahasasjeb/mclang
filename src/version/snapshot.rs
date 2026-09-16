@@ -1,0 +1,283 @@
+//! 编译期加载的版本快照：注册表 id、枚举与资源类型清单。
+//!
+//! 快照由 `cargo xtask generate-version-data` 生成到
+//! `data/version/<版本>/`，通过 `include_str!` 嵌入二进制。校验只对
+//! `minecraft:` 命名空间的 id 生效；其它命名空间可能来自数据包，
+//! 编译器不掌握其内容，返回 `None` 表示“无法判断”。
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::OnceLock;
+
+use serde_json::Value;
+
+/// 当前随附的版本标识。
+pub const VERSION: &str = "26.3-rc-2";
+
+static SNAPSHOT: OnceLock<Snapshot> = OnceLock::new();
+
+/// 槽位清单：单槽、范围槽（前缀 + 数量）与多槽集合。
+#[derive(Default)]
+pub struct Slots {
+    single: BTreeSet<String>,
+    ranges: BTreeMap<String, usize>,
+    multi: BTreeSet<String>,
+}
+
+impl Slots {
+    fn from_value(value: Option<&Value>) -> Self {
+        let Some(object) = value.and_then(Value::as_object) else {
+            return Self::default();
+        };
+        let ranges = object
+            .get("ranges")
+            .and_then(Value::as_object)
+            .map(|ranges| {
+                ranges
+                    .iter()
+                    .filter_map(|(prefix, count)| {
+                        count.as_u64().map(|count| (prefix.clone(), count as usize))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Self {
+            single: string_set(object.get("single")),
+            ranges,
+            multi: string_set(object.get("multi")),
+        }
+    }
+
+    /// 某个槽位名是否在本版本的槽位表里。
+    pub fn accepts(&self, name: &str) -> bool {
+        if self.single.contains(name) || self.multi.contains(name) {
+            return true;
+        }
+        for (prefix, count) in &self.ranges {
+            if let Some(suffix) = name.strip_prefix(prefix.as_str())
+                && let Ok(index) = suffix.parse::<usize>()
+            {
+                return index < *count;
+            }
+        }
+        false
+    }
+
+    /// 全部槽位名（范围槽展开成具体索引），用于提示与补全。
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.single.iter().cloned().collect();
+        names.extend(self.multi.iter().cloned());
+        for (prefix, count) in &self.ranges {
+            for index in 0..*count {
+                names.push(format!("{prefix}{index}"));
+            }
+        }
+        names.sort();
+        names
+    }
+}
+
+/// 版本快照。
+pub struct Snapshot {
+    registries: BTreeMap<String, BTreeSet<String>>,
+    enums: BTreeMap<String, Vec<String>>,
+    resource_kinds: BTreeSet<String>,
+    slots: Slots,
+    commands: BTreeMap<String, Value>,
+}
+
+/// 全局快照。
+pub fn snapshot() -> &'static Snapshot {
+    SNAPSHOT.get_or_init(Snapshot::load)
+}
+
+impl Snapshot {
+    fn load() -> Self {
+        let registries = parse_json(include_str!("../../data/version/26.3-rc-2/registries.json"));
+        let enums = parse_json(include_str!("../../data/version/26.3-rc-2/enums.json"));
+        let commands = parse_json(include_str!("../../data/version/26.3-rc-2/commands.json"));
+        Self {
+            registries: object_sets(registries.get("registries")),
+            enums: object_arrays(enums.get("enums")),
+            resource_kinds: string_set(registries.get("resource_kinds")),
+            slots: Slots::from_value(registries.get("slots")),
+            commands: commands
+                .get("commands")
+                .and_then(Value::as_object)
+                .map(|object| {
+                    object
+                        .iter()
+                        .map(|(name, node)| (name.clone(), node.clone()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        }
+    }
+
+    /// 注册表里是否存在该 id。
+    ///
+    /// 返回 `None` 表示快照不覆盖该注册表，或者 id 属于其它命名空间
+    /// （可能由数据包提供），此时不做存在性判断。
+    pub fn registry_contains(&self, kind: &str, id: &str) -> Option<bool> {
+        let registry = self.registries.get(kind)?;
+        if namespace_of(id) != "minecraft" {
+            return None;
+        }
+        Some(registry.contains(id))
+    }
+
+    /// 注册表是否来自随附源码（用于决定是否给出拼写建议）。
+    pub fn knows_registry(&self, kind: &str) -> bool {
+        self.registries.contains_key(kind)
+    }
+
+    /// 最接近的注册表 id（编辑距离 ≤ 2）。
+    pub fn suggest_registry_id(&self, kind: &str, id: &str) -> Option<String> {
+        let registry = self.registries.get(kind)?;
+        if namespace_of(id) != "minecraft" {
+            return None;
+        }
+        closest(id, registry.iter().map(String::as_str))
+    }
+
+    /// 枚举取值，例如 `gamemode`、`display_slot`。
+    pub fn enum_values(&self, name: &str) -> Option<&[String]> {
+        self.enums.get(name).map(Vec::as_slice)
+    }
+
+    /// 枚举取值是否存在。
+    pub fn enum_contains(&self, name: &str, value: &str) -> bool {
+        self.enums
+            .get(name)
+            .is_some_and(|values| values.iter().any(|candidate| candidate == value))
+    }
+
+    /// 最近似的枚举取值。
+    pub fn suggest_enum(&self, name: &str, value: &str) -> Option<String> {
+        let values = self.enums.get(name)?;
+        closest(value, values.iter().map(String::as_str))
+    }
+
+    /// `resource` 声明是否支持该类型。
+    pub fn resource_kind_supported(&self, kind: &str) -> bool {
+        self.resource_kinds.contains(kind)
+    }
+
+    /// 槽位表。
+    pub fn slots(&self) -> &Slots {
+        &self.slots
+    }
+
+    /// 根命令节点（26.3 Brigadier 树），未知时 `None`。
+    pub fn root_command(&self, name: &str) -> Option<&Value> {
+        self.commands.get(name)
+    }
+
+    /// 根命令是否存在。
+    pub fn has_root_command(&self, name: &str) -> bool {
+        self.commands.contains_key(name)
+    }
+
+    /// 根命令声明的 `requires` 权限等级（0–4）；未声明时为 `None`。
+    pub fn root_command_level(&self, name: &str) -> Option<u8> {
+        self.root_command(name)?
+            .get("level")
+            .and_then(Value::as_u64)
+            .map(|level| level as u8)
+    }
+
+    /// 全部根命令名。
+    pub fn command_names(&self) -> impl Iterator<Item = &str> {
+        self.commands.keys().map(String::as_str)
+    }
+}
+
+fn parse_json(text: &str) -> Value {
+    serde_json::from_str(text).expect("版本快照必须是合法 JSON")
+}
+
+fn object_sets(value: Option<&Value>) -> BTreeMap<String, BTreeSet<String>> {
+    value
+        .and_then(Value::as_object)
+        .map(|object| {
+            object
+                .iter()
+                .map(|(key, value)| (key.clone(), string_set(Some(value))))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn object_arrays(value: Option<&Value>) -> BTreeMap<String, Vec<String>> {
+    value
+        .and_then(Value::as_object)
+        .map(|object| {
+            object
+                .iter()
+                .map(|(key, value)| {
+                    let values = value
+                        .as_array()
+                        .map(|values| {
+                            values
+                                .iter()
+                                .filter_map(|value| value.as_str().map(str::to_string))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    (key.clone(), values)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn string_set(value: Option<&Value>) -> BTreeSet<String> {
+    value
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn namespace_of(id: &str) -> &str {
+    id.split_once(':')
+        .map(|(namespace, _)| namespace)
+        .unwrap_or("minecraft")
+}
+
+/// 在候选集合中找编辑距离 ≤ 2 的最近者。
+fn closest<'a>(value: &str, candidates: impl Iterator<Item = &'a str>) -> Option<String> {
+    let mut best: Option<(usize, String)> = None;
+    for candidate in candidates {
+        let distance = edit_distance(value, candidate);
+        if distance <= 2 && best.as_ref().is_none_or(|(best, _)| distance < *best) {
+            best = Some((distance, candidate.to_string()));
+        }
+    }
+    best.map(|(_, candidate)| candidate)
+}
+
+/// 两段文本的 Levenshtein 距离（长度差异过大时直接返回上限）。
+fn edit_distance(left: &str, right: &str) -> usize {
+    let left: Vec<char> = left.chars().collect();
+    let right: Vec<char> = right.chars().collect();
+    if left.len().abs_diff(right.len()) > 4 {
+        return usize::MAX;
+    }
+    let mut previous: Vec<usize> = (0..=right.len()).collect();
+    let mut current = vec![0; right.len() + 1];
+    for (i, left_character) in left.iter().enumerate() {
+        current[0] = i + 1;
+        for (j, right_character) in right.iter().enumerate() {
+            let cost = usize::from(left_character != right_character);
+            current[j + 1] = (previous[j] + cost)
+                .min(previous[j + 1] + 1)
+                .min(current[j] + 1);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    previous[right.len()]
+}

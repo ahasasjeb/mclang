@@ -8,7 +8,7 @@ use crate::ast::*;
 
 use super::Compiler;
 use super::Value;
-use super::emit::{compile_message, entity_query_clause, nbt_text};
+use super::emit::{entity_query_clause, entity_query_selector, nbt_text};
 use super::names::parameter_holder;
 use super::world;
 
@@ -36,8 +36,12 @@ impl Compiler<'_> {
             StatementKind::InDimension { dimension, body } => {
                 self.compile_in_dimension(dimension, body, owner, commands);
             }
-            StatementKind::Spawn { entity_type, body } => {
-                self.compile_spawn(entity_type, body, owner, commands);
+            StatementKind::Spawn {
+                entity_type,
+                position,
+                body,
+            } => {
+                self.compile_spawn(entity_type, position.as_ref(), body, owner, commands);
             }
             StatementKind::Give {
                 target,
@@ -189,15 +193,27 @@ impl Compiler<'_> {
                 commands.push(world::locate_command(kind.as_str(), target));
             }
             StatementKind::SelfAction(action) => commands.extend(self.compile_self_action(action)),
-            StatementKind::Message {
-                target,
-                text,
-                color,
-            } => {
-                commands.push(compile_message(target, text, color.as_deref()));
+            StatementKind::Message { target, component } => {
+                commands.push(self.compile_message(target, component));
             }
-            StatementKind::PlaySound { sound, source } => {
-                commands.push(format!("playsound {sound} {source} @s ~ ~ ~ 1 1"));
+            StatementKind::PlaySound {
+                sound,
+                source,
+                targets,
+                position,
+                volume,
+                pitch,
+                min_volume,
+            } => {
+                commands.push(self.compile_play_sound(
+                    sound,
+                    source,
+                    targets.as_deref(),
+                    position.as_ref(),
+                    volume.as_deref(),
+                    pitch.as_deref(),
+                    min_volume.as_deref(),
+                ));
             }
             StatementKind::Call { target, arguments } => {
                 self.compile_call(target, arguments, owner, commands)
@@ -227,8 +243,9 @@ impl Compiler<'_> {
             StatementKind::Teleport {
                 targets,
                 destination,
+                rotation,
             } => {
-                self.compile_teleport(targets, destination, commands);
+                self.compile_teleport(targets, destination, rotation.as_ref(), commands);
             }
             StatementKind::NbtMerge { nbt } => {
                 commands.push(format!("data merge entity @s {}", nbt_text(nbt)));
@@ -301,16 +318,56 @@ impl Compiler<'_> {
         ));
     }
 
+    /// `sound.self`/`sound.play`：按原版顺序补齐可选参数。
+    #[allow(clippy::too_many_arguments)]
+    fn compile_play_sound(
+        &self,
+        sound: &str,
+        source: &str,
+        targets: Option<&str>,
+        position: Option<&PositionValue>,
+        volume: Option<&str>,
+        pitch: Option<&str>,
+        min_volume: Option<&str>,
+    ) -> String {
+        let selector = match targets {
+            None => "@s".to_owned(),
+            Some(query) => entity_query_selector(self.query(query)),
+        };
+        let mut command = format!("playsound {sound} {source} {selector}");
+        if position.is_some() || volume.is_some() || pitch.is_some() || min_volume.is_some() {
+            let position = position
+                .map(world::position_value_text)
+                .unwrap_or_else(|| "~ ~ ~".to_owned());
+            command.push_str(&format!(" {position}"));
+        }
+        if volume.is_some() || pitch.is_some() || min_volume.is_some() {
+            command.push_str(&format!(" {}", volume.unwrap_or("1")));
+        }
+        if pitch.is_some() || min_volume.is_some() {
+            command.push_str(&format!(" {}", pitch.unwrap_or("1")));
+        }
+        if let Some(min_volume) = min_volume {
+            command.push_str(&format!(" {min_volume}"));
+        }
+        command
+    }
+
     fn compile_spawn(
         &mut self,
         entity_type: &str,
+        position: Option<&PositionValue>,
         body: &[Statement],
         owner: &str,
         commands: &mut Vec<String>,
     ) {
         let helper = self.compile_helper(body, owner);
+        let positioned = match position {
+            Some(position) => format!(" positioned {}", world::position_value_text(position)),
+            None => String::new(),
+        };
         commands.push(format!(
-            "execute summon {entity_type} run function {}:{helper}",
+            "execute{positioned} summon {entity_type} run function {}:{helper}",
             self.program.namespace
         ));
     }

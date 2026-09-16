@@ -407,6 +407,7 @@ export function buildTranslator(data) {
     translateInline,
     isTranslatableInline,
     canonicalCallee,
+    nbtBodyTokens,
     isKnownWord: (word) => isKeyword(word) || isAttribute(word) || isValueWord(word) || isPropertyWord(word),
   };
 }

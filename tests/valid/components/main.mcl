@@ -1,0 +1,39 @@
+// 编译测试：文本组件（1.3）与消息组件化（2.7）。
+//
+// 覆盖六种组件构造器（text/translate/keybind/score/selector/nbt）、全部样式
+// 开关、五种点击事件与 show_text 悬停；检查生成的 tellraw JSON。
+namespace components_test;
+
+score value = 0;
+objective points;
+
+query players = entity("minecraft:player") { limit(10); };
+
+@load
+fn announce() {
+    message.all(text("你好") { color = "red"; bold = true; italic = false; click = run_command("/say hi"); hover = text("提示") { color = "gray"; }; });
+    message.all(translate("chat.type.text", [text("甲"), text("乙")]) { color = "gold"; });
+    message.all(keybind("key.jump"));
+    message.all(selector("@a"));
+    message.all(selector(players));
+    message.nearest(16, text("附近") { underlined = true; strikethrough = false; obfuscated = false; click = suggest_command("/msg "); }, aqua);
+    message.player(players, text("大家好") { hover = text("悬停内容"); });
+    message.all("旧写法", green);
+    message.all(text("配色") { color = "#aabbcc"; });
+    message.all(text("复制") { click = copy_to_clipboard("mclang"); });
+    message.all(text("翻页") { click = change_page(2); });
+    message.all(text("链接") { click = open_url("https://example.com"); });
+}
+
+@player
+fn status() {
+    message.self(score(self, points) { color = "yellow"; });
+    message.self(score(self, "runtime_objective"));
+    message.all(nbt(entity, self, "CustomName") { separator = text("、"); });
+}
+
+@load
+fn data_views() {
+    message.all(nbt(block, pos(0, 64, 0), "Items[0].id"));
+    message.all(nbt(storage, "components_test:data", "value") { interpret = true; });
+}

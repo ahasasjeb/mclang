@@ -15,6 +15,15 @@ use super::keywords::{
     template_rotation, time_method, weather_kind, worldborder_method,
 };
 
+/// `vec2_component` 的文本转成坐标分量：`~` 前缀是相对坐标。
+fn component_coordinate(text: String) -> Coordinate {
+    if text.starts_with('~') {
+        Coordinate::Relative(text)
+    } else {
+        Coordinate::Absolute(text)
+    }
+}
+
 /// `place.template` 的可选后缀，按原版顺序收集。
 struct TemplateOptions {
     rotation: Option<TemplateRotation>,
@@ -549,10 +558,19 @@ impl Parser {
                 }
             }
             "center" => {
-                let x = self.vec2_component("worldborder.center 的 X 坐标")?;
-                self.expect(TokenKind::Comma, "中心 X 坐标后需要 `,`")?;
-                let z = self.vec2_component("worldborder.center 的 Z 坐标")?;
-                WorldBorderOperation::Center { x, z }
+                if self.check_word("vec2") {
+                    WorldBorderOperation::Center(self.vec2_value("worldborder.center 坐标")?)
+                } else {
+                    let start = self.current().span;
+                    let x = self.vec2_component("worldborder.center 的 X 坐标")?;
+                    self.expect(TokenKind::Comma, "中心 X 坐标后需要 `,`")?;
+                    let z = self.vec2_component("worldborder.center 的 Z 坐标")?;
+                    WorldBorderOperation::Center(Vec2Value {
+                        x: component_coordinate(x),
+                        z: component_coordinate(z),
+                        span: start.merge(self.current().span),
+                    })
+                }
             }
             "damage_amount" => {
                 WorldBorderOperation::DamageAmount(self.signed_number_text("worldborder 每块伤害")?)
@@ -587,11 +605,15 @@ impl Parser {
         Ok(StatementKind::Locate { kind, target })
     }
 
-    /// `pos(x, y, z)`：方块坐标，绝对分量是整数，`~`/`^` 分量可带小数偏移。
+    /// `pos(x, y, z)` / `block_pos(x, y, z)`：方块坐标，绝对分量是整数，
+    /// `~`/`^` 分量可带小数偏移。
     pub(super) fn block_position(&mut self, label: &str) -> Result<BlockPosition, Diagnostic> {
-        let Some(start) = self.take_word("pos") else {
+        let start = self
+            .take_word("pos")
+            .or_else(|| self.take_word("block_pos"));
+        let Some(start) = start else {
             return Err(Diagnostic::new(
-                format!("{label}需要 `pos(x, y, z)`（中文 `坐标(...)`）"),
+                format!("{label}需要 `pos(x, y, z)`（中文 `坐标(...)`，别名 `block_pos`）"),
                 self.current().span,
             ));
         };
@@ -619,6 +641,127 @@ impl Parser {
             ));
         }
         Ok(position)
+    }
+
+    /// 位置值：`pos`/`block_pos` 的方块坐标，或 `vec3` 的精确坐标。
+    pub(super) fn position_value(&mut self, label: &str) -> Result<PositionValue, Diagnostic> {
+        if self.check_word("vec3") {
+            return Ok(PositionValue::Exact(self.vec3_value(label)?));
+        }
+        Ok(PositionValue::Block(self.block_position(label)?))
+    }
+
+    /// `vec3(x, y, z)`：精确坐标，绝对分量允许小数。
+    pub(super) fn vec3_value(&mut self, label: &str) -> Result<Vec3Value, Diagnostic> {
+        let Some(start) = self.take_word("vec3") else {
+            return Err(Diagnostic::new(
+                format!("{label}需要 `vec3(x, y, z)`"),
+                self.current().span,
+            ));
+        };
+        self.expect(TokenKind::LeftParen, "vec3 后需要 `(`")?;
+        let x = self.fractional_coordinate(label)?;
+        self.expect(TokenKind::Comma, "vec3 分量后需要 `,`")?;
+        let y = self.fractional_coordinate(label)?;
+        self.expect(TokenKind::Comma, "vec3 分量后需要 `,`")?;
+        let z = self.fractional_coordinate(label)?;
+        let end = self.expect(TokenKind::RightParen, "vec3 缺少 `)`")?.span;
+        let position = Vec3Value {
+            x,
+            y,
+            z,
+            span: start.span.merge(end),
+        };
+        let local = [&position.x, &position.y, &position.z]
+            .iter()
+            .filter(|coordinate| coordinate.is_local())
+            .count();
+        if local != 0 && local != 3 {
+            return Err(Diagnostic::new(
+                "vec3 不能混用 `^` 局部坐标与 `~`/绝对坐标",
+                position.span,
+            ));
+        }
+        Ok(position)
+    }
+
+    /// `vec2(x, z)`：水平精确坐标，对应原版 `Vec2Argument`。
+    pub(super) fn vec2_value(&mut self, label: &str) -> Result<Vec2Value, Diagnostic> {
+        let Some(start) = self.take_word("vec2") else {
+            return Err(Diagnostic::new(
+                format!("{label}需要 `vec2(x, z)`"),
+                self.current().span,
+            ));
+        };
+        self.expect(TokenKind::LeftParen, "vec2 后需要 `(`")?;
+        let x = self.fractional_coordinate(label)?;
+        self.expect(TokenKind::Comma, "vec2 分量后需要 `,`")?;
+        let z = self.fractional_coordinate(label)?;
+        let end = self.expect(TokenKind::RightParen, "vec2 缺少 `)`")?.span;
+        for coordinate in [&x, &z] {
+            if coordinate.is_local() {
+                return Err(Diagnostic::new(
+                    "vec2 不支持 `^` 局部坐标，请使用绝对坐标或 `~`",
+                    start.span.merge(end),
+                ));
+            }
+        }
+        Ok(Vec2Value {
+            x,
+            z,
+            span: start.span.merge(end),
+        })
+    }
+
+    /// `rotation(yaw, pitch)`：朝向，单位是度。
+    pub(super) fn rotation_value(&mut self, label: &str) -> Result<RotationValue, Diagnostic> {
+        let Some(start) = self.take_word("rotation") else {
+            return Err(Diagnostic::new(
+                format!("{label}需要 `rotation(yaw, pitch)`（中文 `朝向(...)`）"),
+                self.current().span,
+            ));
+        };
+        self.expect(TokenKind::LeftParen, "rotation 后需要 `(`")?;
+        let yaw = self.fractional_coordinate(label)?;
+        self.expect(TokenKind::Comma, "rotation 分量后需要 `,`")?;
+        let pitch = self.fractional_coordinate(label)?;
+        let end = self
+            .expect(TokenKind::RightParen, "rotation 缺少 `)`")?
+            .span;
+        Ok(RotationValue {
+            yaw,
+            pitch,
+            span: start.span.merge(end),
+        })
+    }
+
+    /// 精确坐标分量：`coordinate` 的小数版本。
+    fn fractional_coordinate(&mut self, label: &str) -> Result<Coordinate, Diagnostic> {
+        if let Some(token) = self.take(&TokenKind::Tilde) {
+            let offset = self.coordinate_offset(label, &token)?;
+            return Ok(Coordinate::Relative(format!("~{offset}")));
+        }
+        if let Some(token) = self.take(&TokenKind::Caret) {
+            let offset = self.coordinate_offset(label, &token)?;
+            return Ok(Coordinate::Local(format!("^{offset}")));
+        }
+        let negative = self.negative_sign();
+        let token = self.advance().clone();
+        let text = match token.kind {
+            TokenKind::Number(value) => value.to_string(),
+            TokenKind::Decimal(value) => format!("{value}"),
+            _ => {
+                return Err(Diagnostic::new(
+                    format!("{label}的坐标需要数字，或用 `~`/`^` 写相对坐标"),
+                    token.span,
+                ));
+            }
+        };
+        Ok(Coordinate::Absolute(if negative {
+            format!("-{text}")
+        } else {
+            text
+        }))
     }
 
     /// `column(x, z)`：列坐标，与原版 `ColumnPosArgument` 一样不支持 `^`。

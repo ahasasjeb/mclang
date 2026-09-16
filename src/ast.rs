@@ -39,7 +39,25 @@ pub struct Program {
 pub struct ObjectiveDecl {
     pub name: String,
     pub name_span: Span,
+    /// 准则；缺省是 `dummy`。
+    pub criteria: Option<String>,
+    /// 显示名，可以是组件或字符串。
+    pub display_name: Option<TextComponent>,
+    /// 渲染类型：`integer` 或 `hearts`。
+    pub render_type: Option<String>,
+    pub number_format: Option<NumberFormat>,
+    /// 显示槽位，例如 `sidebar`。
+    pub display_slot: Option<String>,
+    pub display_slot_span: Option<Span>,
     pub span: Span,
+}
+
+/// 数字格式：`blank`、`fixed(<组件>)` 或 `styled`。
+#[derive(Debug)]
+pub enum NumberFormat {
+    Blank,
+    Fixed(TextComponent),
+    Styled,
 }
 
 /// 数据槽的来源：实体自带数据或物品堆自定义数据。
@@ -91,13 +109,70 @@ pub enum FunctionTagEntry {
 pub struct EntityQueryDecl {
     pub name: String,
     pub name_span: Span,
+    /// 基础实体类型，`#` 前缀表示实体类型标签。
     pub entity_type: String,
+    /// `type(...)`/`without_type(...)` 追加的类型约束。
+    pub type_filters: Vec<EntityTypeFilter>,
     pub tags: Vec<String>,
     pub excluded_tags: Vec<String>,
     pub limit: Option<u32>,
     pub sort: Option<EntitySort>,
     pub within: Option<u32>,
+    pub name_filter: Option<QueryTextFilter>,
+    pub scores: Vec<QueryScoreFilter>,
+    pub nbt_filter: Option<QueryTextFilter>,
+    pub box_filter: Option<QueryBox>,
+    pub distance: Option<String>,
+    pub level: Option<String>,
+    pub gamemode: Option<String>,
+    pub team_filter: Option<QueryTextFilter>,
+    pub rotation: Option<QueryRotation>,
+    pub predicate: Option<String>,
+    pub advancements: Option<String>,
     pub item: Option<ItemFilter>,
+    pub span: Span,
+}
+
+/// 追加的实体类型约束：`type("#标签")` 或 `without_type("id")`。
+#[derive(Debug)]
+pub enum EntityTypeFilter {
+    Include(String, Span),
+    Exclude(String, Span),
+}
+
+/// 文本类选择器参数（`name`、`nbt`、`team`）：可带 `!` 否定。
+#[derive(Debug)]
+pub struct QueryTextFilter {
+    pub value: String,
+    pub negated: bool,
+    pub span: Span,
+}
+
+/// `scores("目标", "区间")`。
+#[derive(Debug)]
+pub struct QueryScoreFilter {
+    pub objective: String,
+    pub range: String,
+    pub span: Span,
+}
+
+/// `box(x, y, z, dx, dy, dz)`：选择器坐标盒。
+#[derive(Debug)]
+pub struct QueryBox {
+    pub x: String,
+    pub y: String,
+    pub z: String,
+    pub dx: String,
+    pub dy: String,
+    pub dz: String,
+    pub span: Span,
+}
+
+/// `rotate("偏航区间", "俯仰区间")`。
+#[derive(Debug)]
+pub struct QueryRotation {
+    pub yaw: String,
+    pub pitch: String,
     pub span: Span,
 }
 
@@ -373,6 +448,31 @@ pub struct ColumnPosition {
     pub span: Span,
 }
 
+/// 精确坐标（`vec3(x, y, z)`）：绝对分量允许小数，对应原版 `Vec3Argument`。
+#[derive(Debug)]
+pub struct Vec3Value {
+    pub x: Coordinate,
+    pub y: Coordinate,
+    pub z: Coordinate,
+    pub span: Span,
+}
+
+/// 水平精确坐标（`vec2(x, z)`），对应原版 `Vec2Argument`。
+#[derive(Debug)]
+pub struct Vec2Value {
+    pub x: Coordinate,
+    pub z: Coordinate,
+    pub span: Span,
+}
+
+/// 朝向（`rotation(yaw, pitch)`），单位是度，对应原版 `RotationArgument`。
+#[derive(Debug)]
+pub struct RotationValue {
+    pub yaw: Coordinate,
+    pub pitch: Coordinate,
+    pub span: Span,
+}
+
 /// 方块状态字面量或方块谓词：`block_state("minecraft:oak_stairs") { facing = "east"; }`。
 ///
 /// `#` 前缀的 id 是方块标签谓词，只能用在 `fill` 的过滤器与 `clone filtered` 里。
@@ -489,6 +589,8 @@ pub enum StatementKind {
     },
     Spawn {
         entity_type: String,
+        /// 召唤位置；缺省时沿用执行位置。
+        position: Option<PositionValue>,
         body: Vec<Statement>,
     },
     Give {
@@ -599,12 +701,17 @@ pub enum StatementKind {
     SelfAction(SelfAction),
     Message {
         target: MessageTarget,
-        text: String,
-        color: Option<String>,
+        component: TextComponent,
     },
     PlaySound {
         sound: String,
         source: String,
+        /// sound.self 为 None（目标 @s）；sound.play 是玩家查询名。
+        targets: Option<String>,
+        position: Option<PositionValue>,
+        volume: Option<String>,
+        pitch: Option<String>,
+        min_volume: Option<String>,
     },
     Call {
         target: CallTarget,
@@ -637,10 +744,27 @@ pub enum StatementKind {
     ScoreReset {
         target: ScoreTarget,
     },
-    /// `teleport(持有者, 坐标或实体查询);`：把实体移动到目标位置。
+    /// `scoreboard.enable(持有者, 目标);`：允许玩家用 `/trigger` 修改。
+    ScoreboardEnable {
+        target: ScoreTarget,
+    },
+    /// `scoreboard.operation(结果, 运算, 来源);`：原版 `scoreboard players operation`。
+    ScoreboardOperation {
+        result: ScoreTarget,
+        operation: ScoreboardOp,
+        source: ScoreTarget,
+    },
+    /// `scoreboard.display("槽位"[, 目标]);`：设置或清除显示槽。
+    ScoreboardDisplay {
+        slot: String,
+        slot_span: Span,
+        objective: Option<(String, Span)>,
+    },
+    /// `teleport(持有者, 坐标或实体查询[, rotation(朝向)]);`：把实体移动到目标位置。
     Teleport {
         targets: Holder,
         destination: TeleportDestination,
+        rotation: Option<RotationValue>,
     },
     /// `nbt { ... };`（中文 `数据 { ... };`）：把结构化 NBT 合并到当前实体。
     ///
@@ -844,10 +968,7 @@ pub enum WorldBorderOperation {
         distance: String,
         time: Option<String>,
     },
-    Center {
-        x: String,
-        z: String,
-    },
+    Center(Vec2Value),
     DamageAmount(String),
     DamageBuffer(String),
     WarningDistance(u32),
@@ -986,11 +1107,48 @@ pub struct ScoreTarget {
     pub objective_span: Span,
 }
 
+/// `scoreboard players operation` 的运算。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScoreboardOp {
+    Set,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Min,
+    Max,
+    Swap,
+}
+
+impl ScoreboardOp {
+    pub fn symbol(self) -> &'static str {
+        match self {
+            Self::Set => "=",
+            Self::Add => "+=",
+            Self::Subtract => "-=",
+            Self::Multiply => "*=",
+            Self::Divide => "/=",
+            Self::Modulo => "%=",
+            Self::Min => "<",
+            Self::Max => ">",
+            Self::Swap => "><",
+        }
+    }
+}
+
 /// `teleport` 的落点：绝对/相对坐标，或一个单个实体（跟随它的位置与朝向）。
 #[derive(Debug)]
 pub enum TeleportDestination {
-    Position(BlockPosition),
+    Position(PositionValue),
     Entity { query: String, query_span: Span },
+}
+
+/// 位置值：方块坐标（整数）或精确坐标（小数）。
+#[derive(Debug)]
+pub enum PositionValue {
+    Block(BlockPosition),
+    Exact(Vec3Value),
 }
 
 #[derive(Debug)]
@@ -1047,7 +1205,105 @@ pub enum SelfAction {
 pub enum MessageTarget {
     All,
     SelfEntity,
-    Nearest { within: u32 },
+    Nearest {
+        within: u32,
+    },
+    /// `message.player(<查询>, <组件>)`：向查询命中的玩家广播。
+    Query {
+        name: String,
+        name_span: Span,
+    },
+}
+
+/// 文本组件（1.3）：`tellraw` 与后续界面命令共用的富文本。
+///
+/// 语法统一为 `<构造器>(...)` 加可选样式块，例如
+/// `text("你好") { color = "red"; click = run_command("/say hi"); }`。
+#[derive(Debug)]
+pub struct TextComponent {
+    pub kind: TextComponentKind,
+    pub style: TextStyle,
+    pub span: Span,
+}
+
+#[derive(Debug)]
+pub enum TextComponentKind {
+    /// `text("...")`：纯文本。
+    Text(String),
+    /// `translate("键", [参数...])`：本地化键与可选参数。
+    Translate {
+        key: String,
+        args: Vec<TextComponent>,
+    },
+    /// `keybind("key.jump")`：按键名。
+    Keybind(String),
+    /// `score(持有者, 目标)`：计分板分数。目标可以是已声明的 `objective`
+    /// 名称，也可以是字符串形式的运行期目标名。
+    Score {
+        holder: Holder,
+        objective: ObjectiveRef,
+        objective_span: Span,
+    },
+    /// `selector("@a")` 或 `selector(查询)`：实体选择器。
+    Selector(SelectorValue),
+    /// `nbt(实体/方块/存储, "路径")`：NBT 值。
+    Nbt {
+        source: NbtComponentSource,
+        path: String,
+        path_span: Span,
+        interpret: bool,
+        plain: bool,
+        separator: Option<Box<TextComponent>>,
+    },
+}
+
+/// 选择器组件的取值：字面选择器或已声明的实体查询。
+#[derive(Debug)]
+pub enum SelectorValue {
+    /// 原样选择器文本（`@a`、`@e[...]`）。
+    Raw(String, Span),
+    /// 查询名；生成查询的选择器文本。
+    Query(String, Span),
+}
+
+/// 计分组件的目标：已声明目标或运行期字符串。
+#[derive(Debug)]
+pub enum ObjectiveRef {
+    /// 已声明的 `objective` 名称；生成 `<命名空间>_<名称>`。
+    Declared(String),
+    /// 字符串形式的运行期目标名，原样输出。
+    Raw(String),
+}
+
+/// NBT 组件的数据来源。
+#[derive(Debug)]
+pub enum NbtComponentSource {
+    Entity(Holder),
+    Block(BlockPosition),
+    Storage(String, Span),
+}
+
+/// 组件的样式与事件。
+#[derive(Debug, Default)]
+pub struct TextStyle {
+    pub color: Option<String>,
+    pub bold: Option<bool>,
+    pub italic: Option<bool>,
+    pub underlined: Option<bool>,
+    pub strikethrough: Option<bool>,
+    pub obfuscated: Option<bool>,
+    pub click: Option<ClickEvent>,
+    pub hover: Option<Box<TextComponent>>,
+}
+
+/// 点击事件（26.3 的 `click_event`）。
+#[derive(Debug)]
+pub enum ClickEvent {
+    OpenUrl(String),
+    RunCommand(String),
+    SuggestCommand(String),
+    CopyToClipboard(String),
+    ChangePage(u32),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1073,13 +1329,91 @@ pub enum Condition {
         span: Span,
     },
     Compare {
-        left: Expr,
+        left: Box<Expr>,
         comparison: Comparison,
-        right: Expr,
+        right: Box<Expr>,
+    },
+    /// `if block(pos, block_state)`：方块谓词（方块或 `#标签`）。
+    Block {
+        pos: BlockPosition,
+        block: BlockStateValue,
+        span: Span,
+    },
+    /// `if blocks(起点, 终点, 目标[, masked])`：区域方块比较。
+    Blocks {
+        start: BlockPosition,
+        end: BlockPosition,
+        destination: BlockPosition,
+        masked: bool,
+        span: Span,
+    },
+    /// `if biome(pos, "生物群系或 #标签")`。
+    Biome {
+        pos: BlockPosition,
+        biome: String,
+        biome_span: Span,
+        span: Span,
+    },
+    /// `if loaded(pos)`：区块已加载。
+    Loaded {
+        pos: BlockPosition,
+        span: Span,
+    },
+    /// `if dimension("维度")`：当前维度。
+    Dimension {
+        dimension: String,
+        dimension_span: Span,
+        span: Span,
+    },
+    /// `if entity(查询)`：查询是否命中实体。
+    Entity {
+        query: String,
+        query_span: Span,
+        span: Span,
+    },
+    /// `if data(来源, 路径)`：NBT 路径是否存在。
+    Data {
+        source: NbtComponentSource,
+        path: String,
+        path_span: Span,
+        span: Span,
+    },
+    /// `if items(来源, 槽位, 物品谓词)`：槽位里是否有匹配物品。
+    Items {
+        source: ItemConditionSource,
+        slots: String,
+        slots_span: Span,
+        item: String,
+        item_span: Span,
+        span: Span,
+    },
+    /// `if slots(来源, 槽位)`：槽位里是否有物品。
+    Slots {
+        source: ItemConditionSource,
+        slots: String,
+        slots_span: Span,
+        span: Span,
+    },
+    /// `if function(函数或 #标签)`：函数是否返回成功。
+    Function {
+        target: CallTarget,
+        span: Span,
+    },
+    /// `if stopwatch("id")`：秒表是否在运行。
+    Stopwatch {
+        id: String,
+        span: Span,
     },
     Not(Box<Condition>),
     And(Box<Condition>, Box<Condition>),
     Or(Box<Condition>, Box<Condition>),
+}
+
+/// `if items`/`if slots` 的来源：实体或方块。
+#[derive(Debug)]
+pub enum ItemConditionSource {
+    Entity(Holder),
+    Block(BlockPosition),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1131,12 +1465,51 @@ pub enum ExprKind {
     },
     /// `worldborder.get()`：世界边界边长。
     WorldBorderSize,
+    /// `count(查询)`：查询命中的实体数量。
+    Count {
+        query: String,
+        query_span: Span,
+    },
+    /// `random(最小值, 最大值)`：闭区间随机整数。
+    Random {
+        min: i32,
+        max: i32,
+    },
+    /// `data.get(来源, 路径)`：NBT 数值或列表长度。
+    DataGet {
+        source: NbtComponentSource,
+        path: String,
+        path_span: Span,
+    },
+    /// `compute(来源, float|integer, "provider"[, 缩放])`。
+    Compute {
+        source: ComputeSource,
+        kind: ComputeKind,
+        provider: String,
+        provider_span: Span,
+        scale: Option<String>,
+    },
     Negate(Box<Expr>),
     Binary {
         left: Box<Expr>,
         operation: BinaryOp,
         right: Box<Expr>,
     },
+}
+
+/// `compute` 的上下文来源。
+#[derive(Debug)]
+pub enum ComputeSource {
+    Default,
+    Block(BlockPosition),
+    Entity(Holder),
+}
+
+/// `compute` 的数值类型。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ComputeKind {
+    Float,
+    Integer,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

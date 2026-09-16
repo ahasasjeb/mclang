@@ -139,11 +139,11 @@ function renderGameRules(data) {
 
 function renderResourceKinds(data) {
   let html = filterBar("resource-kinds", "过滤资源类型");
-  html += heading4("JSON 资源类型", `SIMPLE_KINDS · ${data.resourceKinds.length} 项`);
+  html += heading4("JSON 资源类型", `resource_kinds · ${data.resourceKinds.length} 项`);
   html +=
     '<p class="table-note">' +
     renderNote(
-      '`resource <类型> <名称> = "…";` 声明的资源会写到 `data/<命名空间>/<类型>/<名称>.json`；`worldgen/*` 这类带斜杠的类型要写成字符串名称。其中只有 `predicate` 可以在 `if predicate(名称)` 里引用；编译器按资源位置校验名称，但不检查资源是否存在。',
+      '`resource <类型> <名称> = "…";` 声明的资源会写到 `data/<命名空间>/<类型>/<名称>.json`；`worldgen/*` 这类带斜杠的类型要写成字符串名称。其中只有 `predicate` 可以在 `if predicate(名称)` 里引用；类型清单来自 26.3 版本快照 `data/version/26.3-rc-2/registries.json`（`cargo xtask generate-version-data` 生成）。',
     ) +
     "</p>";
   html += '<div class="table-wrap"><table class="alias-table"><tbody>';

@@ -11,8 +11,9 @@ use std::collections::HashSet;
 
 use crate::ast::{
     AdvancementReference, AssignOp, CallTarget, Condition, DataSlotKind, EffectDuration,
-    EntityQueryDecl, Expr, GiveItem, GiveTarget, Holder, MessageTarget, NbtValue, ReturnKind,
-    ScoreTarget, SelfAction, Span, Statement, StatementKind, TeleportDestination, XpOperation,
+    EntityQueryDecl, Expr, GiveItem, GiveTarget, Holder, MessageTarget, NbtValue, PositionValue,
+    ReturnKind, RotationValue, ScoreTarget, SelfAction, Span, Statement, StatementKind,
+    TeleportDestination, TextComponent, XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
@@ -22,10 +23,8 @@ use super::expressions::{
     execution_context_label, validate_call_context, validate_condition, validate_expr,
 };
 use super::items::validate_give_count;
-use super::rules::{
-    valid_entity_tag, valid_resource_location, valid_sound_source, valid_text_color,
-    validate_identifier,
-};
+use super::registry::{validate_enum, validate_id};
+use super::rules::{valid_entity_tag, valid_resource_location, validate_identifier};
 use super::tags::reachable_functions;
 
 /// 遍历函数体时保持不变的校验环境。
@@ -149,7 +148,9 @@ fn validate_statement<'a>(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     match &statement.kind {
-        StatementKind::Run(_) => {}
+        StatementKind::Run(command) => {
+            validate_raw_command(command, statement.span, ctx, diagnostics);
+        }
         StatementKind::Give {
             target,
             item,
@@ -213,11 +214,30 @@ fn validate_statement<'a>(
             ctx,
             diagnostics,
         ),
-        StatementKind::Message { target, color, .. } => {
-            validate_message(target, color.as_deref(), statement.span, ctx, diagnostics);
+        StatementKind::Message { target, component } => {
+            validate_message(target, component, statement.span, ctx, diagnostics);
         }
-        StatementKind::PlaySound { sound, source } => {
-            validate_play_sound(sound, source, statement.span, ctx, diagnostics);
+        StatementKind::PlaySound {
+            sound,
+            source,
+            targets,
+            position,
+            volume,
+            pitch,
+            min_volume,
+        } => {
+            validate_play_sound(
+                sound,
+                source,
+                targets.as_deref(),
+                position.as_ref(),
+                volume.as_deref(),
+                pitch.as_deref(),
+                min_volume.as_deref(),
+                statement.span,
+                ctx,
+                diagnostics,
+            );
         }
         StatementKind::Each { query, body } => {
             validate_each(query, body, locals, statement.span, ctx, diagnostics);
@@ -225,8 +245,20 @@ fn validate_statement<'a>(
         StatementKind::InDimension { dimension, body } => {
             validate_in_dimension(dimension, body, locals, statement.span, ctx, diagnostics);
         }
-        StatementKind::Spawn { entity_type, body } => {
-            validate_spawn(entity_type, body, locals, statement.span, ctx, diagnostics);
+        StatementKind::Spawn {
+            entity_type,
+            position,
+            body,
+        } => {
+            validate_spawn(
+                entity_type,
+                position.as_ref(),
+                body,
+                locals,
+                statement.span,
+                ctx,
+                diagnostics,
+            );
         }
         StatementKind::Return(kind) => {
             validate_return(kind, locals, statement.span, ctx, diagnostics);
@@ -282,8 +314,16 @@ fn validate_statement<'a>(
         StatementKind::Teleport {
             targets,
             destination,
+            rotation,
         } => {
-            validate_teleport(targets, destination, statement.span, ctx, diagnostics);
+            validate_teleport(
+                targets,
+                destination,
+                rotation.as_ref(),
+                statement.span,
+                ctx,
+                diagnostics,
+            );
         }
         StatementKind::NbtMerge { nbt } => {
             validate_nbt_merge(nbt, statement.span, ctx, diagnostics);
@@ -573,7 +613,7 @@ pub(super) fn validate_score_target(
 }
 
 /// 持有者引用：`self`/`origin` 需要实体上下文，查询必须已声明。
-fn validate_holder(
+pub(super) fn validate_holder(
     holder: &Holder,
     span: Span,
     ctx: ValidationContext<'_, '_>,
@@ -611,14 +651,23 @@ fn validate_holder(
 fn validate_teleport(
     targets: &Holder,
     destination: &TeleportDestination,
+    rotation: Option<&RotationValue>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     validate_holder(targets, span, ctx, diagnostics);
+    if let Some(rotation) = rotation
+        && matches!(destination, TeleportDestination::Entity { .. })
+    {
+        diagnostics.push(Diagnostic::new(
+            "teleport 跟随实体时不能同时指定朝向：实体的朝向会一并跟随",
+            rotation.span,
+        ));
+    }
     match destination {
         TeleportDestination::Position(position) => {
-            super::world::validate_block_position(position, diagnostics);
+            super::world::validate_position_value(position, diagnostics);
         }
         TeleportDestination::Entity { query, query_span } => {
             if !ctx.symbols.queries.contains_key(query.as_str()) {
@@ -690,12 +739,13 @@ fn validate_advancement_action(
     }
     if let Some(advancement) = advancement {
         if advancement.external {
-            if !valid_resource_location(&advancement.name) {
-                diagnostics.push(Diagnostic::new(
-                    format!("`{}` 不是有效的进度资源位置", advancement.name),
-                    advancement.span,
-                ));
-            }
+            validate_id(
+                "advancement",
+                "进度",
+                &advancement.name,
+                advancement.span,
+                diagnostics,
+            );
         } else if !ctx
             .symbols
             .advancements
@@ -731,12 +781,7 @@ fn validate_effect_give(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     query_reference(target, span, ctx, diagnostics);
-    if !valid_resource_location(effect) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{effect}` 不是有效的效果资源位置"),
-            span,
-        ));
-    }
+    validate_id("mob_effect", "效果", effect, span, diagnostics);
     if let EffectDuration::Seconds(seconds) = duration
         && !(1..=1_000_000).contains(&seconds)
     {
@@ -763,13 +808,8 @@ fn validate_effect_clear(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     query_reference(target, span, ctx, diagnostics);
-    if let Some(effect) = effect
-        && !valid_resource_location(effect)
-    {
-        diagnostics.push(Diagnostic::new(
-            format!("`{effect}` 不是有效的效果资源位置"),
-            span,
-        ));
+    if let Some(effect) = effect {
+        validate_id("mob_effect", "效果", effect, span, diagnostics);
     }
 }
 
@@ -796,13 +836,8 @@ fn validate_clear_inventory(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     require_player_query(target, span, ctx, diagnostics);
-    if let Some(item) = item
-        && !valid_resource_location(item)
-    {
-        diagnostics.push(Diagnostic::new(
-            format!("`{item}` 不是有效的物品资源位置"),
-            span,
-        ));
+    if let Some(item) = item {
+        validate_id("item", "物品", item, span, diagnostics);
     }
     if let Some(max_count) = max_count
         && max_count > i32::MAX as u32
@@ -937,7 +972,7 @@ fn validate_tag_schedule(
 
 fn validate_message(
     target: &MessageTarget,
-    color: Option<&str>,
+    component: &TextComponent,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -955,37 +990,65 @@ fn validate_message(
             span,
         ));
     }
-    if let Some(color) = color
-        && !valid_text_color(color)
+    if let MessageTarget::Query { name, name_span } = target
+        && !ctx.symbols.queries.contains_key(name.as_str())
     {
         diagnostics.push(Diagnostic::new(
-            format!("`{color}` 不是有效的文本颜色"),
-            span,
+            format!("找不到实体查询 `{name}`"),
+            *name_span,
         ));
     }
+    super::components::validate_component(component, ctx, diagnostics);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_play_sound(
     sound: &str,
     source: &str,
+    targets: Option<&str>,
+    position: Option<&PositionValue>,
+    volume: Option<&str>,
+    pitch: Option<&str>,
+    min_volume: Option<&str>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if !ctx.context.satisfies(ExecutionContext::Player) {
-        diagnostics.push(Diagnostic::new("sound.self 需要玩家执行上下文", span));
+    match targets {
+        None => {
+            if !ctx.context.satisfies(ExecutionContext::Player) {
+                diagnostics.push(Diagnostic::new("sound.self 需要玩家执行上下文", span));
+            }
+        }
+        Some(query) => {
+            require_player_query(query, span, ctx, diagnostics);
+        }
     }
-    if !valid_resource_location(sound) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{sound}` 不是有效的声音资源位置"),
-            span,
-        ));
+    validate_id("sound", "声音", sound, span, diagnostics);
+    validate_enum("sound_source", "声音分类", source, span, diagnostics);
+    if let Some(position) = position {
+        super::world::validate_position_value(position, diagnostics);
     }
-    if !valid_sound_source(source) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{source}` 不是有效的声音分类"),
-            span,
-        ));
+    for (label, value, max) in [
+        ("音量", volume, None),
+        ("音调", pitch, Some(2.0)),
+        ("最小音量", min_volume, Some(1.0)),
+    ] {
+        let Some(value) = value else {
+            continue;
+        };
+        let parsed = value.parse::<f64>().ok();
+        let valid = parsed.is_some_and(|value| value >= 0.0 && max.is_none_or(|max| value <= max));
+        if !valid {
+            let range = match max {
+                Some(max) => format!("0 到 {max}"),
+                None => "非负数字".to_owned(),
+            };
+            diagnostics.push(Diagnostic::new(
+                format!("声音{label}必须是{range}"),
+                span,
+            ));
+        }
     }
 }
 
@@ -1028,12 +1091,7 @@ fn validate_in_dimension<'a>(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if !valid_resource_location(dimension) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{dimension}` 不是有效的维度资源位置"),
-            span,
-        ));
-    }
+    validate_id("dimension", "维度", dimension, span, diagnostics);
     let mut body_locals = locals.clone();
     validate_statements(
         body,
@@ -1048,22 +1106,22 @@ fn validate_in_dimension<'a>(
 
 fn validate_spawn<'a>(
     entity_type: &str,
+    position: Option<&PositionValue>,
     body: &'a [Statement],
     locals: &HashSet<&'a str>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if !valid_resource_location(entity_type) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{entity_type}` 不是有效的实体类型资源位置"),
-            span,
-        ));
-    } else if non_summonable_entity(entity_type) {
+    validate_id("entity_type", "实体类型", entity_type, span, diagnostics);
+    if super::rules::valid_resource_location(entity_type) && non_summonable_entity(entity_type) {
         diagnostics.push(Diagnostic::new(
             format!("Minecraft 的 /summon 不支持实体类型 `{entity_type}`"),
             span,
         ));
+    }
+    if let Some(position) = position {
+        super::world::validate_position_value(position, diagnostics);
     }
     let mut body_locals = locals.clone();
     validate_statements(
@@ -1097,7 +1155,8 @@ fn validate_return<'a>(
     }
     match (ctx.return_rules.returns_score, kind) {
         (true, ReturnKind::Value(value)) => validate_expr(value, locals, ctx, diagnostics),
-        (true, ReturnKind::Run(_) | ReturnKind::Fail) => {}
+        (_, ReturnKind::Run(command)) => validate_raw_command(command, span, ctx, diagnostics),
+        (true, ReturnKind::Fail) => {}
         (true, ReturnKind::Void) => diagnostics.push(Diagnostic::new(
             "返回 score 的函数需要 `return <表达式>;`、`return run \"命令\";` 或 `return fail;`",
             span,
@@ -1106,10 +1165,9 @@ fn validate_return<'a>(
             "无返回值函数只能使用 `return;`、`return fail;` 或 `return run \"命令\";`",
             span,
         )),
-        (false, ReturnKind::Void | ReturnKind::Run(_) | ReturnKind::Fail) => {}
+        (false, ReturnKind::Void | ReturnKind::Fail) => {}
     }
 }
-
 fn validate_call<'a>(
     function: &str,
     arguments: &'a [Expr],
@@ -1262,4 +1320,45 @@ fn validate_execute<'a>(
         ctx.return_rules.nested(),
         diagnostics,
     );
+}
+
+/// 函数权限模型（1.6）：`run` 字符串里的根命令不得越过
+/// `function-permission-level`。未知根命令留给后续的命令树校验（8.4）。
+fn validate_raw_command(
+    command: &str,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(first) = command.split_whitespace().next() else {
+        return;
+    };
+    let name = first.strip_prefix('/').unwrap_or(first);
+    let snapshot = crate::version::snapshot::snapshot();
+    let Some(level) = snapshot.root_command_level(name) else {
+        return;
+    };
+    if level > ctx.symbols.function_permission_level {
+        diagnostics.push(Diagnostic::new(
+            format!(
+                "`{name}` 需要权限等级 {level}（{}），超过数据包函数上限 {}（{}）；可用 `--function-permission-level` 提高",
+                permission_label(level),
+                ctx.symbols.function_permission_level,
+                permission_label(ctx.symbols.function_permission_level),
+            ),
+            span,
+        ));
+    }
+}
+
+/// 权限等级的中文标签。
+fn permission_label(level: u8) -> &'static str {
+    match level {
+        0 => "所有人",
+        1 => "MODERATOR",
+        2 => "GAMEMASTER",
+        3 => "ADMIN",
+        4 => "OWNER",
+        _ => "未知",
+    }
 }

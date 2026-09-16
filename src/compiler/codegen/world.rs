@@ -5,8 +5,9 @@
 
 use crate::ast::{
     BlockPosition, BlockStateValue, CloneFilter, CloneMode, ColumnPosition, FillMode,
-    ForceLoadOperation, GameRuleValue, NbtValue, SetBlockMode, TemplateMirror, TemplateRotation,
-    TimeOperation, WeatherKind, WorldBorderOperation,
+    ForceLoadOperation, GameRuleValue, NbtValue, PositionValue, RotationValue, SetBlockMode,
+    TemplateMirror, TemplateRotation, TimeOperation, Vec2Value, Vec3Value, WeatherKind,
+    WorldBorderOperation,
 };
 
 use super::emit::nbt_text;
@@ -42,6 +43,34 @@ pub(super) fn position_text(position: &BlockPosition) -> String {
         position.y.text(),
         position.z.text()
     )
+}
+
+/// `<x> <y> <z>` 精确坐标文本。
+pub(super) fn vec3_text(position: &Vec3Value) -> String {
+    format!(
+        "{} {} {}",
+        position.x.text(),
+        position.y.text(),
+        position.z.text()
+    )
+}
+
+/// `<x> <z>` 水平精确坐标文本（`worldborder.center` 等）。
+pub(super) fn vec2_text(position: &Vec2Value) -> String {
+    format!("{} {}", position.x.text(), position.z.text())
+}
+
+/// 朝向文本：`<yaw> <pitch>`（`teleport` 的旋转参数）。
+pub(super) fn rotation_text(rotation: &RotationValue) -> String {
+    format!("{} {}", rotation.yaw.text(), rotation.pitch.text())
+}
+
+/// 位置值文本：方块坐标与精确坐标共用 `<x> <y> <z>` 形状。
+pub(super) fn position_value_text(position: &PositionValue) -> String {
+    match position {
+        PositionValue::Block(position) => position_text(position),
+        PositionValue::Exact(position) => vec3_text(position),
+    }
 }
 
 /// `<x> <z>` 列坐标文本。
@@ -264,7 +293,7 @@ pub(super) fn worldborder_command(operation: &WorldBorderOperation) -> String {
         WorldBorderOperation::Set { distance, time } => {
             border_size_command("set", distance, time.as_deref())
         }
-        WorldBorderOperation::Center { x, z } => format!("worldborder center {x} {z}"),
+        WorldBorderOperation::Center(value) => format!("worldborder center {}", vec2_text(value)),
         WorldBorderOperation::DamageAmount(value) => format!("worldborder damage amount {value}"),
         WorldBorderOperation::DamageBuffer(value) => format!("worldborder damage buffer {value}"),
         WorldBorderOperation::WarningDistance(value) => {

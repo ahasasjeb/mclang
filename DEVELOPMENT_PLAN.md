@@ -245,22 +245,24 @@
 
 ### 第 1 阶段：类型系统与版本数据（基础设施）
 
-- [ ] 1.1 版本数据生成器（`cargo xtask generate-version-data`）
-  - 解析 `minecraft_client_26.3-rc-2/` 的 Brigadier 注册（`commands/Commands.java` 与 `server/commands/**`），导出根命令、字面量子命令、重定向、参数类型与 `requires` 权限等级到 `data/version/26.3-rc-2/commands.json`。
-  - 从注册表引导代码与 `data/minecraft/**` 导出 id 集合：item、block、entity_type、biome、dimension、damage_type、mob_effect、enchantment、attribute、particle、sound、advancement、recipe、loot_table、predicate、dialog、post_effect、timeline、world_clock、slot、slot_source、worldgen/* 等；同时导出标签注册表清单（16 个顶层注册表与子目录）与数据包资源目录清单（41 类 JSON、17 类 worldgen、structure、tags、function）。
-  - 导出枚举表：gamemode、difficulty、display slot、team color、heightmap、execute 关系、声音分类、时间单位、物品槽位。
-  - 输出排序且带源哈希，可复现；CI 校验生成物与随附源码一致。
+- [x] 1.1 版本数据生成器（`cargo xtask generate-version-data`）
+  - 解析 `minecraft_client_26.3-rc-2/` 的 Brigadier 注册（`commands/Commands.java` 与 `server/commands/**`），导出根命令、字面量子命令、重定向、参数类型与 `requires` 权限等级到 `data/version/26.3-rc-2/commands.json`；当前覆盖 101 个根命令，动态构建的子树（`gamerule`、`time` 的时钟子命令等）以一级清单近似。
+  - 从注册表引导代码与 `data/minecraft/**` 导出 id 集合：item、block、entity_type、biome、dimension、damage_type、mob_effect、enchantment、attribute、particle、sound、advancement、recipe、loot_table、predicate、dialog、post_effect、timeline、world_clock、slot、slot_source、worldgen/* 等；同时导出标签注册表清单（16 个顶层注册表与子目录）与数据包资源目录清单（`resource_kinds`）。
+  - 导出枚举表：gamemode、difficulty、display slot、team color、heightmap、anchor、swizzle、声音分类、时间单位、物品槽位。
+  - 输出排序且带 FNV-1a 源摘要，可复现；`cargo xtask check-version-data` 比对快照与随附源码，`tests/corpus.rs` 在每次 `cargo test` 时执行该校验。
   - 编译器加载快照：资源位置校验从“语法合法”升级为“注册表存在”，未知 id 报错并给出最近候选；`resource` 支持类型改为读取快照。
-- [ ] 1.2 坐标与向量类型：`pos`（绝对、`~`、`^`）、`block_pos`、`vec3`、`vec2`、`rotation`、`xyz` 对齐值；校验相对坐标与 `^` 所需的执行位置/朝向上下文。
-- [ ] 1.3 文本组件类型：`text("...") { color/bold/italic/underlined/strikethrough/obfuscated }`，以及 `translate`、`keybind`、`score`、`selector`、`nbt`、click/hover 事件；统一 JSON 序列化。
+  - 待补：动态构建子树的完整树形（`gamerule` 由运行期注册表生成，无法静态枚举）、从 `InventoryMenu`/`SlotRanges` 导出的槽位范围已收录，`slot_source` 无原版条目。
+- [x] 1.2 坐标与向量类型：`pos`（绝对、`~`、`^`）与别名 `block_pos`（绝对整数），`vec3(x, y, z)` 精确坐标（`teleport` 落点）、`vec2(x, z)` 水平精确坐标（`worldborder.center`）、`rotation(yaw, pitch)` 朝向（`teleport` 第三参数）；绝对分量范围、`^` 混用与 `vec2` 的局部坐标拒绝都在编译期检查。
+  - 待补：`xyz` 对齐值属于 `execute align`（2.1），随该阶段一起落地；`~`/`^` 所需的执行位置与朝向上下文在 2.1 的结构化 `execute` 中统一建模。
+- [x] 1.3 文本组件类型：`text("...") { color/bold/italic/underlined/strikethrough/obfuscated }`，以及 `translate`（含 `[参数...]`）、`keybind`、`score`、`selector`、`nbt`（entity/block/storage）与五种 click 事件（`open_url`/`run_command`/`suggest_command`/`copy_to_clipboard`/`change_page`）、`show_text` 悬停；中英文关键词与样式属性，JSON 序列化统一在 `codegen/components.rs`，输出稳定（键排序）。`score` 的目标支持已声明 `objective`（生成 `<命名空间>_<名称>`）或运行期字符串；`nbt` 路径支持下标与引号键。
 - [ ] 1.4 结构化 NBT 与路径
   - [x] `nbt { ... }` 复合字面量：全部 12 种标签类型（数值后缀、字符串、list、嵌套 compound、`[B;]`/`[I;]`/`[L;]` 数组）；解析期范围、数组元素类型与重复键检查；SNBT 输出集中在 `emit::nbt_text`；已接入 `set_block`/`fill` 的方块实体数据与 `item_stack` 的 `custom_data`。
   - [x] 实体具名标签：`nbt { ... }` 语句生成 `data merge entity @s {...}`；`data/version/26.3-rc-2/entity_nbt.json` 快照（`cargo run --bin generate-version-data` 生成，重跑生成器与源码比对）提供按实体类型/并集的键存在性与粗类型检查，未知键给出最近候选；常用标签支持中文别名（135 个，手动附录 E）。方块实体键校验、`ConversionTracker` 这类动态键与 `data` 的 get/remove/modify 仍待补。
   - [ ] 绑定访问器的类型化路径：`entity_data`、`block_data`、`storage_data` 的类型化读写（当前数据槽只支持单键路径）。
   - [ ] 原版 SNBT 的其余字面量记法未建模，除表现力无损失：十六进制 `0x`/二进制 `0b` 与下划线分隔（等值十进制可表达）、无符号前缀 `ub`/`us`/`ui`/`ul`（等价于补码负数）、无引号字符串（语言要求引号，输出统一加引号）。
   - [ ] `data` 命令的 get/merge/remove/modify 与 storage/block 目标依赖 2.4；当前只有实体合并与声明式数据槽搬运。
-- [ ] 1.5 命令结果表达式：`count(q)`、`data.get(...)`、`random(1, 6)`、`xp.query(...)`、`stopwatch.query(...)`、`compute(...)` 等经 `execute store result score` 落入计分，参与现有算术与条件系统。
-- [ ] 1.6 函数权限模型：语句与条件记录最低权限等级，默认按 `GAMEMASTER` 校验，越级给出解释 `function-permission-level` 的诊断；预留 `--function-permission-level <2..4>`。
+- [x] 1.5 命令结果表达式：`count(q)`、`data.get(entity/block/storage, 路径)`、`random(1, 6)`、`compute(来源, float|integer, provider[, 缩放])` 与既有 `xp.query(...)`、`stopwatch.query(...)` 等经 `execute store result score` 落入计分，参与现有算术与条件系统。`random` 区间与 `compute` provider 在编译期对照注册表检查。
+- [x] 1.6 函数权限模型：`run`/`return run` 字符串的根命令对照 `commands.json` 校验，默认按 `GAMEMASTER`（2）拒绝越级的 `ADMIN`/`OWNER` 命令并解释 `function-permission-level`；`build`/`check` 提供 `--function-permission-level <2..4>`。结构化语句的权限等级在 7.8 引入越级命令时接入同一机制。
 
 ### 第 2 阶段：补齐现有结构化能力
 
@@ -268,12 +270,12 @@
   - 修饰符：`execute as(q) at(q) positioned(pos) rotated(rot) facing(entity, eyes|feet) align(xyz) anchored(eyes|feet) in("dimension") on(relation) summon("id") { ... }`；重复或冲突的子句编译期报错。
   - 条件：`execute if/unless <条件> { ... }` 复用 2.2 的条件实现。
   - store：`store.result(...)`、`store.success(...)`、`store.data(...)`；结果表达式（1.5）隐式生成。
-- [ ] 2.2 条件族扩展：`if block(pos, block)`、`if blocks(...)`、`if biome(...)`、`if dimension(...)`、`if loaded(pos)`、`if entity(q)`、`if data(...)`、`if items(...)`、`if slots(...)`、`if function(f)`、`if stopwatch(...)`；沿用“原子冻结到临时计分项再组合”的求值策略，保证一次求值与确定顺序。
-- [ ] 2.3 实体查询属性扩展：`type("#tag")` 与否定、`name`、`scores`、`nbt`、坐标盒与 `distance`、`level`、`gamemode`、`team`、`rotate`、`predicate`、`advancements`；物品谓词支持完整组件与多槽位。
+- [x] 2.2 条件族扩展：`if block(pos, block)`、`if blocks(...)`、`if biome(...)`、`if dimension(...)`、`if loaded(pos)`、`if entity(q)`、`if data(...)`、`if items(...)`、`if slots(...)`、`if function(f)`、`if stopwatch(...)`；沿用“原子冻结到临时计分项再组合”的求值策略，保证一次求值与确定顺序。槽位来源在编译期对照 26.3 `SlotRanges` 快照校验，函数条件计入同步调用图递归检查。
+- [x] 2.3 实体查询属性扩展：`type("#tag")` 与否定（`without_type`）、`name`、`scores`、`nbt`、坐标盒 `box` 与 `distance`（与 `within` 取交集合并）、`level`、`gamemode`、`team`、`rotate`、`predicate`、`advancements`；物品谓词支持完整组件文本（`id[...]`）与任意槽位（对照 `SlotRanges` 与 `slot_source` 资源位置）。
 - [ ] 2.4 `data` 完整建模：`get`（结果表达式）、`merge`、`remove`、`modify` 全部操作与来源（from/string/compute/value）；沿用非玩家实体写保护。
 - [ ] 2.5 `item` 完整建模：`replace`/`fill`/`override`/`modify`，实体与方块目标、槽位集合、`slot_source` 资源引用。
 - [ ] 2.6 用户计分板：`objective` 声明（criteria、显示名、渲染类型、数字格式、显示槽）与 `players.enable/operation/display`；与内部 ABI objective 隔离。
-- [ ] 2.7 消息组件化：`message.all/self/nearest/player` 接受 1.3 的文本组件。
+- [x] 2.7 消息组件化：`message.all/self/nearest/player` 接受 1.3 的文本组件；纯字符串与末尾颜色参数保留为旧写法；`message.player(<查询>, <组件>)` 新增。
 - [ ] 2.8 声音完整参数：`sound.play(sound, source, targets, pos, volume, pitch, min_volume)`，保留 `sound.self` 简写。
 - [ ] 2.9 `spawn` 完整化：`spawn("id", pos) { nbt { ... } ... }`；继续拒绝 `noSummon` 类型。初始 NBT 已落地（spawn 体内 `nbt { ... }` → `data merge entity @s`），还缺坐标参数。
 - [x] 2.10 `function`/`schedule`/`return` 收尾：`#tag` 调用与函数标签声明（9.2）、浮点时间、`schedule.clear`、`return fail`、`return run`；宏参数进阶见 8.3。

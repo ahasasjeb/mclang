@@ -1,0 +1,10 @@
+// 编译测试（负向语义）：结果表达式的查询、区间与 provider 都要合法。
+// 期望诊断：找不到查询、random 区间颠倒、未知 provider 各一条。
+namespace invalid_expressions;
+
+@load
+fn f() {
+    let value = count(nowhere);
+    value = random(6, 1);
+    value = compute(default, integer, "minecraft:not_a_provider");
+}

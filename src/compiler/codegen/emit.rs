@@ -1,8 +1,8 @@
 //! 把结构化 AST 片段格式化为 Minecraft 命令参数、SNBT 和 JSON 文本。
 
 use crate::ast::{
-    AdvancementReference, EntityQueryDecl, ItemEnchantment, ItemStackDecl, MessageTarget, NbtValue,
-    NbtValueKind,
+    AdvancementReference, EntityQueryDecl, EntityTypeFilter, ItemEnchantment, ItemFilter,
+    ItemStackDecl, NbtValue, NbtValueKind,
 };
 
 /// 资源引用文本：本命名空间声明补上命名空间前缀，外部字符串原样保留。
@@ -15,40 +15,176 @@ pub(super) fn reference_id(namespace: &str, reference: &AdvancementReference) ->
 }
 
 pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
-    let mut selector = vec![format!("type={}", query.entity_type)];
+    let mut selector = Vec::new();
+    if let Some(tag) = query.entity_type.strip_prefix('#') {
+        selector.push(format!("type=#{tag}"));
+    } else {
+        selector.push(format!("type={}", query.entity_type));
+    }
+    for filter in &query.type_filters {
+        match filter {
+            EntityTypeFilter::Include(value, _) => selector.push(format!("type={value}")),
+            EntityTypeFilter::Exclude(value, _) => selector.push(format!("type=!{value}")),
+        }
+    }
     selector.extend(query.tags.iter().map(|tag| format!("tag={tag}")));
     selector.extend(query.excluded_tags.iter().map(|tag| format!("tag=!{tag}")));
+    if let Some(filter) = &query.name_filter {
+        selector.push(format!(
+            "name={}{}",
+            if filter.negated { "!" } else { "" },
+            filter.value
+        ));
+    }
+    for score in &query.scores {
+        selector.push(format!("scores={{{}={}}}", score.objective, score.range));
+    }
+    if let Some(filter) = &query.nbt_filter {
+        selector.push(format!(
+            "nbt={}{}",
+            if filter.negated { "!" } else { "" },
+            filter.value
+        ));
+    }
+    if let Some(box_filter) = &query.box_filter {
+        selector.push(format!(
+            "x={},y={},z={},dx={},dy={},dz={}",
+            box_filter.x, box_filter.y, box_filter.z, box_filter.dx, box_filter.dy, box_filter.dz
+        ));
+    }
+    if let Some(distance) = distance_option(query) {
+        selector.push(format!("distance={distance}"));
+    }
+    if let Some(level) = &query.level {
+        selector.push(format!("level={level}"));
+    }
+    if let Some(gamemode) = &query.gamemode {
+        selector.push(format!("gamemode={gamemode}"));
+    }
+    if let Some(filter) = &query.team_filter {
+        selector.push(format!(
+            "team={}{}",
+            if filter.negated { "!" } else { "" },
+            filter.value
+        ));
+    }
+    if let Some(rotation) = &query.rotation {
+        // 选择器里 `x_rotation` 是俯仰、`y_rotation` 是偏航。
+        selector.push(format!(
+            "x_rotation={},y_rotation={}",
+            rotation.pitch, rotation.yaw
+        ));
+    }
+    if let Some(predicate) = &query.predicate {
+        selector.push(format!("predicate={predicate}"));
+    }
+    if let Some(advancements) = &query.advancements {
+        selector.push(format!("advancements={advancements}"));
+    }
     if let Some(sort) = query.sort {
         selector.push(format!("sort={}", sort.as_str()));
     }
     if let Some(limit) = query.limit {
         selector.push(format!("limit={limit}"));
     }
-    if let Some(within) = query.within {
-        selector.push(format!("distance=..{within}"));
-    }
     format!("@e[{}]", selector.join(","))
+}
+
+/// 选择器的 `distance` 选项只能出现一次：`distance` 与 `within` 取交集。
+fn distance_option(query: &EntityQueryDecl) -> Option<String> {
+    match (&query.distance, query.within) {
+        (None, None) => None,
+        (Some(distance), None) => Some(distance.clone()),
+        (None, Some(within)) => Some(format!("..{within}")),
+        (Some(distance), Some(within)) => Some(
+            intersect_ranges(distance, &format!("..{within}")).unwrap_or_else(|| distance.clone()),
+        ),
+    }
+}
+
+/// 两个浮点区间的交集：`3..10` 与 `..32` 得到 `3..10`。
+fn intersect_ranges(left: &str, right: &str) -> Option<String> {
+    let (left_low, left_high) = parse_range(left)?;
+    let (right_low, right_high) = parse_range(right)?;
+    let low = match (left_low, right_low) {
+        (Some(left), Some(right)) => Some(left.max(right)),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    };
+    let high = match (left_high, right_high) {
+        (Some(left), Some(right)) => Some(left.min(right)),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    };
+    if let (Some(low), Some(high)) = (low, high)
+        && low > high
+    {
+        return None;
+    }
+    Some(match (low, high) {
+        (Some(low), Some(high)) => format!("{low}..{high}"),
+        (Some(low), None) => format!("{low}.."),
+        (None, Some(high)) => format!("..{high}"),
+        (None, None) => "..".to_owned(),
+    })
+}
+
+fn parse_range(text: &str) -> Option<(Option<f64>, Option<f64>)> {
+    if let Some((low, high)) = text.split_once("..") {
+        let low = if low.is_empty() {
+            None
+        } else {
+            Some(low.parse::<f64>().ok()?)
+        };
+        let high = if high.is_empty() {
+            None
+        } else {
+            Some(high.parse::<f64>().ok()?)
+        };
+        Some((low, high))
+    } else {
+        let value = text.parse::<f64>().ok()?;
+        Some((Some(value), Some(value)))
+    }
+}
+
+/// 物品过滤器到谓词文本：`id[组件...]`，`count`/`custom_name` 合并进组件列表。
+pub(super) fn item_filter_predicate(item: &ItemFilter) -> String {
+    let mut components = Vec::new();
+    if let Some(custom_name) = &item.custom_name {
+        components.push(format!(
+            "minecraft:custom_name={{text:{}}}",
+            snbt_string(custom_name)
+        ));
+    }
+    if let Some(count) = item.count {
+        components.push(format!("minecraft:count={count}"));
+    }
+    if components.is_empty() {
+        return item.item_id.clone();
+    }
+    let extra = components.join(",");
+    match item.item_id.rfind('[') {
+        Some(open) if item.item_id.ends_with(']') => {
+            let inner = &item.item_id[open + 1..item.item_id.len() - 1];
+            if inner.is_empty() {
+                format!("{}[{extra}]", &item.item_id[..open])
+            } else {
+                format!("{}[{inner},{extra}]", &item.item_id[..open])
+            }
+        }
+        _ => format!("{}[{extra}]", item.item_id),
+    }
 }
 
 pub(super) fn entity_query_clause(query: &EntityQueryDecl) -> String {
     let mut clause = format!("as {} at @s", entity_query_selector(query));
     if let Some(item) = &query.item {
-        let mut components = Vec::new();
-        if let Some(custom_name) = &item.custom_name {
-            components.push(format!(
-                "minecraft:custom_name={{text:{}}}",
-                snbt_string(custom_name)
-            ));
-        }
-        if let Some(count) = item.count {
-            components.push(format!("minecraft:count={count}"));
-        }
-        let predicate = if components.is_empty() {
-            item.item_id.clone()
-        } else {
-            format!("{}[{}]", item.item_id, components.join(","))
-        };
-        clause.push_str(&format!(" if items entity @s {} {predicate}", item.slot));
+        clause.push_str(&format!(
+            " if items entity @s {} {}",
+            item.slot,
+            item_filter_predicate(item)
+        ));
     }
     clause
 }
@@ -228,31 +364,6 @@ fn snbt_string(value: &str) -> String {
     }
     escaped.push('\"');
     escaped
-}
-
-pub(super) fn compile_message(target: &MessageTarget, text: &str, color: Option<&str>) -> String {
-    let selector = match target {
-        MessageTarget::All => "@a".to_owned(),
-        MessageTarget::SelfEntity => "@s".to_owned(),
-        MessageTarget::Nearest { within } => {
-            format!("@a[sort=nearest,limit=1,distance=..{within}]")
-        }
-    };
-    let mut component = serde_json::Map::new();
-    component.insert(
-        "text".to_owned(),
-        serde_json::Value::String(text.to_owned()),
-    );
-    if let Some(color) = color {
-        component.insert(
-            "color".to_owned(),
-            serde_json::Value::String(color.to_owned()),
-        );
-    }
-    format!(
-        "tellraw {selector} {}",
-        serde_json::Value::Object(component)
-    )
 }
 
 pub(super) fn pack_metadata(description: &str) -> String {

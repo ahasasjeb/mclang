@@ -23,10 +23,6 @@ export async function loadKeywordTables(repoRoot) {
     path.join(repoRoot, "src/compiler/validate/world.rs"),
     "utf8",
   );
-  const rulesSource = await readFile(
-    path.join(repoRoot, "src/compiler/validate/rules.rs"),
-    "utf8",
-  );
   const lspSource = await readFile(
     path.join(repoRoot, "src/lsp/features.rs"),
     "utf8",
@@ -37,6 +33,10 @@ export async function loadKeywordTables(repoRoot) {
   );
   const entityNbtSource = await readFile(
     path.join(repoRoot, "src/version/entity_nbt.rs"),
+    "utf8",
+  );
+  const registriesSource = await readFile(
+    path.join(repoRoot, "data/version/26.3-rc-2/registries.json"),
     "utf8",
   );
 
@@ -50,7 +50,7 @@ export async function loadKeywordTables(repoRoot) {
     keywordDocs: parseDocTable(lspSource, "KEYWORD_DOCS"),
     attributeDocs: parseDocTable(lspSource, "ATTRIBUTE_DOCS"),
     gameRules: parseGameRules(worldSource),
-    resourceKinds: parseSimpleKinds(rulesSource),
+    resourceKinds: parseRegistryKinds(registriesSource),
     advancementTriggers: parseAdvancementTriggers(advancementSource),
     nbtAliases: parseNbtAliases(entityNbtSource),
   };
@@ -137,17 +137,14 @@ function parseGameRules(source) {
   return rules;
 }
 
-/** 解析 `resource` 声明可用的简单资源类型。 */
-function parseSimpleKinds(source) {
-  const start = source.indexOf("const SIMPLE_KINDS");
-  const end = source.indexOf("];", start);
-  if (start < 0 || end < 0) throw new Error("rules.rs 中找不到 SIMPLE_KINDS");
-  const kinds = [];
-  for (const match of source.slice(start, end).matchAll(/"([a-z0-9_\/]+)"/g)) {
-    kinds.push(match[1]);
+/** 读取版本快照里的 `resource` 支持类型（由 xtask 从 26.3 源码生成）。 */
+function parseRegistryKinds(source) {
+  const snapshot = JSON.parse(source);
+  const kinds = snapshot.resource_kinds;
+  if (!Array.isArray(kinds) || kinds.length === 0) {
+    throw new Error("registries.json 中找不到 resource_kinds");
   }
-  kinds.sort();
-  return kinds;
+  return [...kinds].sort();
 }
 
 /** 解析 26.3 进度触发器清单（`const TRIGGERS`，来自 CriteriaTriggers）。 */function parseAdvancementTriggers(source) {
