@@ -9,7 +9,7 @@ objective points;
 
 query zombies = entity("minecraft:zombie") { limit(1); };
 
-resource predicate conditions_predicate = """{"condition":"minecraft:random_chance","chance":0.5}""";
+resource predicate conditions_predicate = """{"type":"minecraft:random_chance","chance":0.5}""";
 
 fn check_ready() -> score {
     return 1;

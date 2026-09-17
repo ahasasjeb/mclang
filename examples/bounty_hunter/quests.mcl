@@ -1,0 +1,175 @@
+// 任务事件：一条进度监听一种触发条件，奖励函数只负责撤销与结算。
+namespace bounty_hunter;
+
+item nether_icon = item_stack("minecraft:flint_and_steel") {}
+item end_icon = item_stack("minecraft:ender_eye") {}
+
+// 根进度：入伍时自动完成一次，向新玩家发放欢迎语。
+advancement hunter_root {
+    criterion join { trigger = tick; }
+    reward { function = on_enlist; }
+    display {
+        icon = hunter_badge;
+        title = "赏金猎人";
+        description = "击杀怪物、探索维度、按时睡觉来积累赏金。";
+        background = "minecraft:textures/block/gold_block.png";
+        frame = task;
+        announce_to_chat = false;
+    }
+}
+
+@player
+fn on_enlist() {
+    message.self(text("欢迎成为赏金猎人：击杀怪物、抵达下界与末地、每天睡觉都有赏金。") { color = "gold"; });
+}
+
+// 一次性探索进度：带展示与播报，完成后不再触发。
+advancement nether_expedition {
+    parent = hunter_root;
+    criterion arrive { trigger = changed_dimension; conditions = """{"to":"minecraft:the_nether"}"""; }
+    reward { function = on_nether; }
+    display {
+        icon = nether_icon;
+        title = "下界远征";
+        description = "第一次抵达下界。";
+        frame = goal;
+    }
+}
+
+@player
+fn on_nether() {
+    scoreboard.set(self, coins, scoreboard.get(self, coins) + 25);
+    message.self(text("抵达下界，赏金 +25。") { color = "gold"; });
+    sound.self("minecraft:entity.player.levelup", player);
+}
+
+advancement end_expedition {
+    parent = hunter_root;
+    criterion arrive { trigger = changed_dimension; conditions = """{"to":"minecraft:the_end"}"""; }
+    reward { function = on_end; }
+    display {
+        icon = end_icon;
+        title = "末地远征";
+        description = "第一次抵达末地。";
+        frame = challenge;
+    }
+}
+
+@player
+fn on_end() {
+    scoreboard.set(self, coins, scoreboard.get(self, coins) + 75);
+    message.self(text("抵达末地，赏金 +75。") { color = "gold"; });
+    sound.self("minecraft:entity.player.levelup", player);
+}
+
+// 每个游戏日第一次睡觉领取 +30；撤销后下一天可以再次触发。
+advancement daily_sleep {
+    criterion sleep { trigger = slept_in_bed; }
+    reward { function = on_sleep; }
+}
+
+@player
+fn on_sleep() {
+    advancement.revoke(self, daily_sleep);
+    let day = time.query() / 24000;
+    if day > scoreboard.get(self, last_sleep_day) {
+        scoreboard.set(self, last_sleep_day, day);
+        scoreboard.set(self, coins, scoreboard.get(self, coins) + 30);
+        message.self(text("新的一天，睡觉赏金 +30。") { color = "aqua"; });
+        effect.give(nearest_player, "minecraft:regeneration", 10);
+    }
+}
+
+// 击杀赏金：每个怪物一条隐形进度，奖励函数结构完全相同，只有撤销目标与
+// 基础赏金不同。手写需要 6 份进度 JSON、6 个奖励函数和整套计分板 ABI。
+advancement kill_zombie {
+    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}"""; }
+    reward { function = reward_zombie; }
+}
+
+advancement kill_skeleton {
+    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:skeleton"}}}"""; }
+    reward { function = reward_skeleton; }
+}
+
+advancement kill_creeper {
+    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:creeper"}}}"""; }
+    reward { function = reward_creeper; }
+}
+
+advancement kill_enderman {
+    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:enderman"}}}"""; }
+    reward { function = reward_enderman; }
+}
+
+advancement kill_wither_skeleton {
+    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:wither_skeleton"}}}"""; }
+    reward { function = reward_wither_skeleton; }
+}
+
+advancement kill_ender_dragon {
+    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ender_dragon"}}}"""; }
+    reward { function = reward_ender_dragon; }
+}
+
+// 统一结算：连杀 +1，随机 0–2 点浮动，连杀每级再 +2；返回本次赏金。
+@player
+fn settle_kill(base) -> score {
+    let combo = scoreboard.get(self, streak) + 1;
+    scoreboard.set(self, streak, combo);
+    let earned = base + random(0, 2) + combo * 2;
+    scoreboard.set(self, coins, scoreboard.get(self, coins) + earned);
+    scoreboard.set(self, kills, scoreboard.get(self, kills) + 1);
+    message.self(translate("chat.type.announcement", [text("余额"), score(self, coins)]) { color = "gold"; });
+    message.self(translate("chat.type.announcement", [text("连杀"), score(self, streak)]) { color = "yellow"; });
+    sound.self("minecraft:entity.experience_orb.pickup", player);
+    return earned;
+}
+
+@player
+fn reward_zombie() {
+    advancement.revoke(self, kill_zombie);
+    let earned = settle_kill(5);
+    scoreboard.set(self, last_reward, earned);
+    message.self(translate("chat.type.announcement", [text("击杀僵尸"), score(self, last_reward)]) { color = "gray"; });
+}
+
+@player
+fn reward_skeleton() {
+    advancement.revoke(self, kill_skeleton);
+    let earned = settle_kill(8);
+    scoreboard.set(self, last_reward, earned);
+    message.self(translate("chat.type.announcement", [text("击杀骷髅"), score(self, last_reward)]) { color = "gray"; });
+}
+
+@player
+fn reward_creeper() {
+    advancement.revoke(self, kill_creeper);
+    let earned = settle_kill(12);
+    scoreboard.set(self, last_reward, earned);
+    message.self(translate("chat.type.announcement", [text("击杀爬行者"), score(self, last_reward)]) { color = "gray"; });
+}
+
+@player
+fn reward_enderman() {
+    advancement.revoke(self, kill_enderman);
+    let earned = settle_kill(40);
+    scoreboard.set(self, last_reward, earned);
+    message.self(translate("chat.type.announcement", [text("击杀末影人"), score(self, last_reward)]) { color = "gray"; });
+}
+
+@player
+fn reward_wither_skeleton() {
+    advancement.revoke(self, kill_wither_skeleton);
+    let earned = settle_kill(25);
+    scoreboard.set(self, last_reward, earned);
+    message.self(translate("chat.type.announcement", [text("击杀凋灵骷髅"), score(self, last_reward)]) { color = "gray"; });
+}
+
+@player
+fn reward_ender_dragon() {
+    advancement.revoke(self, kill_ender_dragon);
+    let earned = settle_kill(500);
+    scoreboard.set(self, last_reward, earned);
+    message.self(translate("chat.type.announcement", [text("击杀末影龙"), score(self, last_reward)]) { color = "gray"; });
+}

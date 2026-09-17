@@ -17,7 +17,7 @@
     附魔("minecraft:fortune", 2);
 }
 
-资源 谓词 lucky = """{"condition":"minecraft:random_chance","chance":0.5}""";
+资源 谓词 lucky = """{"type":"minecraft:random_chance","chance":0.5}""";
 
 @加载
 函数 load() {

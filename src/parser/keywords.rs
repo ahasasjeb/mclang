@@ -403,12 +403,15 @@ pub(crate) fn word_matches(value: &str, english: &str) -> bool {
     value == english || keyword_alias(english).is_some_and(|alias| alias == value)
 }
 
-/// 不能用作标识符的保留字：全部规范关键词和布尔字面量。
+/// 不能用作标识符的保留字：全部关键词（中英文）和布尔字面量。
 ///
 /// 属性名（`load`、`tick`、`player` 等）不算保留字：`@` 前缀已经把它们和标识符
 /// 区分开，`@load fn load()` 这类自然命名应当保持可用。
 pub(crate) fn reserved_word(value: &str) -> bool {
-    KEYWORDS.iter().any(|keyword| keyword.english == value) || matches!(value, "true" | "false")
+    KEYWORDS
+        .iter()
+        .any(|keyword| keyword.english == value || keyword.chinese == value)
+        || matches!(value, "true" | "false" | "真" | "假")
 }
 
 pub(super) fn query_property(value: &str) -> Option<&'static str> {

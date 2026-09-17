@@ -15,7 +15,7 @@ item medal = item_stack("minecraft:emerald") {
 }
 item icon = item_stack("minecraft:crying_obsidian") {}
 
-resource predicate lucky = """{"condition":"minecraft:random_chance","chance":0.5}""";
+resource predicate lucky = """{"type":"minecraft:random_chance","chance":0.5}""";
 resource loot_table trophy = """{"type":"minecraft:generic","pools":[]}""";
 resource recipe token = """{"type":"minecraft:crafting_shapeless","ingredients":[],"result":{"id":"minecraft:emerald","count":1}}""";
 
@@ -32,7 +32,7 @@ fn on_self_placed() {
 advancement root_adv {
     criterion placed {
         trigger = placed_block;
-        conditions = """{"location":{"condition":"minecraft:match_block","blocks":"minecraft:obsidian"}}""";
+        conditions = """{"location":{"type":"minecraft:match_block","blocks":"minecraft:obsidian"}}""";
     }
     reward {
         function = on_placed;
@@ -56,6 +56,8 @@ advancement portal_frame {
     parent = root_adv;
     criterion placed { trigger = placed_block; }
     criterion ticked { trigger = tick; conditions = """{}"""; }
+    // 26.3 的击杀条件：entity 是内联战利品条件，实体谓词写在 predicate 里。
+    criterion slain { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}"""; }
     requirements = any;
     reward { function = on_self_placed; }
     display {

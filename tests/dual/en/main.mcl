@@ -20,7 +20,7 @@ item reward = item_stack("minecraft:diamond") {
     enchantment("minecraft:fortune", 2);
 }
 
-resource predicate lucky = """{"condition":"minecraft:random_chance","chance":0.5}""";
+resource predicate lucky = """{"type":"minecraft:random_chance","chance":0.5}""";
 
 @load
 fn load() {

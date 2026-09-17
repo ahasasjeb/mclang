@@ -16,7 +16,7 @@ advancement core_placed {
         trigger = placed_block;
         conditions = """{
             "location": {
-                "condition": "minecraft:match_block",
+                "type": "minecraft:match_block",
                 "blocks": "minecraft:crying_obsidian"
             }
         }""";

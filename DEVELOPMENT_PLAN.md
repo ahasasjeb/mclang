@@ -246,6 +246,22 @@
 - [x] 关键词：新增 `unless`/除非、`store`/存值，以及子句、实体关系、锚点、store 方法与数据类型的全部中英别名；`execute` 的中文关键词由“原生执行”改为“执行”。
 - [x] 语料与文档：`tests/valid/execute`、`tests/invalid/execute.mcl` 与四个语法负例、双言语料新增结构化 execute；手册新增「结构化执行」章节与 `execute_structured` 验证示例（含真实产物片段）；LSP 悬停、TextMate 高亮与文档翻译表同步。
 
+中文标识符（本次批次）：
+
+- [x] 用户标识符支持中文等 Unicode 字母：计分变量、函数、查询、物品、存储、数据槽、目标、谓词资源、进度、函数标签、参数与局部变量都可直接写中文；ASCII 名仍必须小写，长度限制改为 32 个字符，中英文关键词都是保留字。
+- [x] 编译期内部化（`compiler/rename.rs`）：语义检查之后、代码生成之前，非 ASCII 名字按稳定哈希换成 8 个随机小写字母的别名；同一份源码得到同一批别名，别名在整程序内唯一并避开所有保持原样的 ASCII 标识符与内部固定名，确保不与已有变量冲突；声明与引用共用一份遍历清单，诊断仍显示源码原名。
+- [x] 资源名（`resource`、`advancement`、`fn_tag`）同样接受中文标识符，输出为随机 ASCII 文件名；`advancement` 的准则名也参与内部化。
+- [x] 语料：`tests/valid/chinese_identifiers` 覆盖全部标识符位置与 ASCII 混用（重复构建逐字节一致）；`tests/invalid/chinese_identifiers.mcl` 覆盖中文保留字与大写 ASCII。
+- [x] `examples/beacon_base.mcl`：全中文标识符的信标基座检测示例——`placed_block` 进度监听放置泥土，奖励函数检查泥土下面一层的 3×3 `#minecraft:beacon_base_blocks`，符合则把泥土替换为信标；通过 `--deny-raw`。
+
+26.3 条件格式修复与触发器字段校验（本次批次）：
+
+- [x] 修复示例、语料与手册里的战利品条件判别键：26.3 把内联战利品条件的判别键从 `condition` 改成 `type`，`conditions` 与 `resource predicate` 里的旧写法会让原版加载进度时报 `Failed to parse`（`Caused by: No key type in MapLike[...]`）。涉及 `examples/beacon_base.mcl`、`examples/portal.mcl`、`examples/multi_counter/resources.mcl`、`examples/bounty_hunter/quests.mcl`、`tests/valid/{advancement,chinese_identifiers,conditions,entities}`、`tests/dual/{en,zh}` 与手册示例；实测依据为 NeoForge 26.3 客户端日志（`RegistryDataLoader` 报 `Errors in element bounty_hunter:kill_*`），修复后对照原版 `data/minecraft/advancement/**` 与 `data/minecraft/predicate/**` 逐项核对。
+- [x] 触发器字段快照：`cargo xtask generate-version-data` 新增 `advancement_triggers.json`，从 `CriteriaTriggers.java` 的注册调用与各触发器 `TriggerInstance` 的 `RecordCodecBuilder` 提取条件字段名与粗类型（战利品条件、物品谓词、id/列表、状态属性、范围等）；只扫描 `TriggerInstance` 自己的 CODEC 区域，不把嵌套记录（如 `Slots`）的字段混进来。
+- [x] 编译期校验：`conditions` 的字段名必须属于该触发器（未知字段给出最近候选或可用字段表），战利品条件字段需要谓词资源字符串或带 `type` 的内联条件对象（用旧 `condition` 键时给出针对性诊断）；`resource predicate` 正文必须包含 `type`。
+- [x] 语料：`tests/valid/advancement` 增加 26.3 格式的击杀条件；新增 `tests/invalid/advancement_conditions.mcl`（旧 `condition`、缺 `type`、未知字段、旧式谓词资源四类负例）。
+- [x] `examples/bounty_hunter/`：10 条进度、6 个击杀任务、连杀衰减、三段里程碑与首富播报的「重复型」示例，修复后重新构建并逐项核对产物。
+
 ## 三、路线图
 
 实施约定：

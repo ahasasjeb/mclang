@@ -1,0 +1,36 @@
+// 编译测试（负例）：进度条件的 26.3 格式。
+//
+// 26.3 的内联战利品条件用 `type` 作判别键（旧版本的 `condition` 已失效），
+// 实体谓词的类型字段是带命名空间的 `minecraft:entity_type`；字段名也必须
+// 来自对应触发器。全部四条声明与谓词资源都必须被拒绝：
+//   - old_key：      `condition` 应为 `type`
+//   - missing_type： 内联战利品条件缺少 `type`
+//   - unknown_field: 触发器没有 `mob` 字段（应为 `entity`）
+//   - 谓词资源 old_style：predicate 正文缺少 `type`
+//
+// 验证：
+//   cargo run --bin mclang -- check tests/invalid/advancement_conditions.mcl
+namespace advancement_conditions;
+
+resource predicate old_style = """{"condition":"minecraft:random_chance","chance":0.5}""";
+
+advancement old_key {
+    criterion kill {
+        trigger = player_killed_entity;
+        conditions = """{"entity":{"condition":"minecraft:entity_properties","entity":"this","predicate":{"entity_type":"minecraft:zombie"}}}""";
+    }
+}
+
+advancement missing_type {
+    criterion kill {
+        trigger = player_killed_entity;
+        conditions = """{"entity":{"entity_type":"minecraft:zombie"}}""";
+    }
+}
+
+advancement unknown_field {
+    criterion kill {
+        trigger = player_killed_entity;
+        conditions = """{"mob":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}""";
+    }
+}

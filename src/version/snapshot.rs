@@ -86,6 +86,7 @@ pub struct Snapshot {
     resource_kinds: BTreeSet<String>,
     slots: Slots,
     commands: BTreeMap<String, Value>,
+    triggers: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 /// 全局快照。
@@ -98,6 +99,9 @@ impl Snapshot {
         let registries = parse_json(include_str!("../../data/version/26.3-rc-2/registries.json"));
         let enums = parse_json(include_str!("../../data/version/26.3-rc-2/enums.json"));
         let commands = parse_json(include_str!("../../data/version/26.3-rc-2/commands.json"));
+        let triggers = parse_json(include_str!(
+            "../../data/version/26.3-rc-2/advancement_triggers.json"
+        ));
         Self {
             registries: object_sets(registries.get("registries")),
             enums: object_arrays(enums.get("enums")),
@@ -113,7 +117,21 @@ impl Snapshot {
                         .collect()
                 })
                 .unwrap_or_default(),
+            triggers: object_maps(triggers.get("triggers")),
         }
+    }
+
+    /// 进度触发器的条件字段表：字段名 → 粗类型。
+    ///
+    /// 未知触发器（快照里没有条目）返回 `None`，此时不做条件校验。
+    pub fn trigger_fields(&self, trigger: &str) -> Option<&BTreeMap<String, String>> {
+        self.triggers.get(trigger)
+    }
+
+    /// 触发器条件字段的最近似拼写（编辑距离 ≤ 2）。
+    pub fn suggest_trigger_field(&self, trigger: &str, field: &str) -> Option<String> {
+        let fields = self.triggers.get(trigger)?;
+        closest(field, fields.keys().map(String::as_str))
     }
 
     /// 注册表里是否存在该 id。
@@ -227,6 +245,25 @@ fn object_arrays(value: Option<&Value>) -> BTreeMap<String, Vec<String>> {
                         })
                         .unwrap_or_default();
                     (key.clone(), values)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn object_maps(value: Option<&Value>) -> BTreeMap<String, BTreeMap<String, String>> {
+    value
+        .and_then(Value::as_object)
+        .map(|object| {
+            object
+                .iter()
+                .filter_map(|(key, value)| {
+                    let inner = value.as_object()?;
+                    let map = inner
+                        .iter()
+                        .filter_map(|(key, value)| Some((key.clone(), value.as_str()?.to_owned())))
+                        .collect();
+                    Some((key.clone(), map))
                 })
                 .collect()
         })

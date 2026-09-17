@@ -173,19 +173,27 @@ fn validate_advancement(
                 criterion.trigger_span,
             ));
         }
-        if let Some(json) = &criterion.conditions
-            && let Err(error) = serde_json::from_str::<serde_json::Value>(json)
-        {
-            diagnostics.push(Diagnostic::new(
-                format!(
-                    "准则 `{}` 的 conditions JSON 无效（JSON 第 {} 行第 {} 列）：{}",
-                    criterion.name,
-                    error.line(),
-                    error.column(),
-                    error
-                ),
-                criterion.conditions_span.unwrap_or(criterion.span),
-            ));
+        if let Some(json) = &criterion.conditions {
+            let span = criterion.conditions_span.unwrap_or(criterion.span);
+            match serde_json::from_str::<serde_json::Value>(json) {
+                Ok(conditions) => {
+                    if let Some(trigger) = normalize_trigger(&criterion.trigger) {
+                        validate_conditions(trigger, &conditions, span, diagnostics);
+                    }
+                }
+                Err(error) => {
+                    diagnostics.push(Diagnostic::new(
+                        format!(
+                            "准则 `{}` 的 conditions JSON 无效（JSON 第 {} 行第 {} 列）：{}",
+                            criterion.name,
+                            error.line(),
+                            error.column(),
+                            error
+                        ),
+                        span,
+                    ));
+                }
+            }
         }
     }
 
@@ -264,6 +272,78 @@ fn validate_advancement(
                 display.background_span.unwrap_or(display.span),
             )),
             _ => {}
+        }
+    }
+}
+
+/// 校验已知触发器的 `conditions` 结构。
+///
+/// 字段表来自 26.3 源码里各触发器的 `TriggerInstance` 记录（见
+/// `data/version/26.3-rc-2/advancement_triggers.json`）；战利品条件字段
+/// 需要谓词资源字符串或带 `type` 的内联条件对象——26.3 把旧版本的判别键
+/// `condition` 改成了 `type`，写错时原版只会给出「Failed to parse」。
+fn validate_conditions(
+    trigger: &str,
+    conditions: &serde_json::Value,
+    span: crate::ast::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(fields) = crate::version::snapshot::snapshot().trigger_fields(trigger) else {
+        return;
+    };
+    let Some(object) = conditions.as_object() else {
+        diagnostics.push(Diagnostic::new(
+            format!("触发器 `{trigger}` 的 conditions 必须是 JSON 对象"),
+            span,
+        ));
+        return;
+    };
+    for (field, value) in object {
+        let Some(kind) = fields.get(field) else {
+            let mut message = format!("触发器 `{trigger}` 没有条件字段 `{field}`");
+            if let Some(candidate) =
+                crate::version::snapshot::snapshot().suggest_trigger_field(trigger, field)
+            {
+                message.push_str(&format!("，是否想写 `{candidate}`？"));
+            } else {
+                let known: Vec<&str> = fields.keys().map(String::as_str).collect();
+                message.push_str(&format!("；可用字段：{}", known.join("、")));
+            }
+            diagnostics.push(Diagnostic::new(message, span));
+            continue;
+        };
+        if kind != "loot_condition" {
+            continue;
+        }
+        match value {
+            serde_json::Value::String(reference) => {
+                if !valid_resource_location(reference) {
+                    diagnostics.push(Diagnostic::new(
+                        format!("`{field}` 的谓词引用 `{reference}` 不是有效的资源位置"),
+                        span,
+                    ));
+                }
+            }
+            serde_json::Value::Object(condition) => {
+                if !condition
+                    .get("type")
+                    .is_some_and(serde_json::Value::is_string)
+                {
+                    let mut message = format!(
+                        "`{field}` 的内联战利品条件缺少 `type`；26.3 的判别键是 `type` 而不是 `condition`，例如 {{\"type\":\"minecraft:entity_properties\",\"entity\":\"this\",\"predicate\":{{\"minecraft:entity_type\":\"minecraft:zombie\"}}}}"
+                    );
+                    if condition.contains_key("condition") {
+                        message = format!(
+                            "`{field}` 使用了 `condition` 作判别键，26.3 已改为 `type`；例如 {{\"type\":\"minecraft:entity_properties\",\"entity\":\"this\",\"predicate\":{{\"minecraft:entity_type\":\"minecraft:zombie\"}}}}"
+                        );
+                    }
+                    diagnostics.push(Diagnostic::new(message, span));
+                }
+            }
+            _ => diagnostics.push(Diagnostic::new(
+                format!("`{field}` 需要谓词资源字符串或带 `type` 的内联条件对象"),
+                span,
+            )),
         }
     }
 }

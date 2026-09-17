@@ -45,7 +45,7 @@ query armed = entity("#minecraft:undead") {
     }
 }
 
-resource predicate rich = """{"condition":"minecraft:random_chance","chance":0.5}""";
+resource predicate rich = """{"type":"minecraft:random_chance","chance":0.5}""";
 
 item reward = item_stack("minecraft:diamond") {
     count = 3;

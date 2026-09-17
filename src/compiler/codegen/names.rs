@@ -14,6 +14,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{Program, Statement, StatementKind};
+use crate::compiler::stable_hash;
 
 use super::Compiler;
 
@@ -145,14 +146,4 @@ pub(super) fn objective_name(namespace: &str) -> String {
 /// 目标名在所有数据包之间共享，加上命名空间前缀避免与其他包冲突。
 pub(super) fn user_objective_name(namespace: &str, name: &str) -> String {
     format!("{namespace}_{name}")
-}
-
-/// FNV-1a：跨平台稳定的 64 位哈希，保证生成名称可复现。
-fn stable_hash(value: &str) -> u64 {
-    let mut hash = 0xcbf29ce484222325_u64;
-    for byte in value.bytes() {
-        hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    hash
 }

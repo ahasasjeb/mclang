@@ -341,7 +341,7 @@ fn validate_resources<'a>(
                 resource.span,
             ));
         }
-        if !valid_resource_path(&resource.name) {
+        if !valid_resource_path(&resource.name) && !rules::valid_user_name(&resource.name) {
             diagnostics.push(Diagnostic::new(
                 format!("资源名称 `{}` 不是有效的资源路径", resource.name),
                 resource.span,
@@ -353,18 +353,34 @@ fn validate_resources<'a>(
                 resource.span,
             ));
         }
-        if let Err(error) = serde_json::from_str::<serde_json::Value>(&resource.json) {
-            diagnostics.push(Diagnostic::new(
-                format!(
-                    "资源 `{}/{}` 的 JSON 无效（JSON 第 {} 行第 {} 列）：{}",
-                    resource.kind,
-                    resource.name,
-                    error.line(),
-                    error.column(),
-                    error
-                ),
-                resource.span,
-            ));
+        match serde_json::from_str::<serde_json::Value>(&resource.json) {
+            Ok(value) => {
+                // predicate 资源的正文就是一段内联战利品条件，26.3 用 `type`
+                // 作判别键；缺了它原版只会在加载时报 Failed to parse。
+                if resource.kind == "predicate"
+                    && value
+                        .as_object()
+                        .is_some_and(|object| !object.contains_key("type"))
+                {
+                    diagnostics.push(Diagnostic::new(
+                        "predicate 资源必须是内联战利品条件：26.3 的判别键是 `type` 而不是 `condition`，例如 {\"type\":\"minecraft:random_chance\",\"chance\":0.5}",
+                        resource.span,
+                    ));
+                }
+            }
+            Err(error) => {
+                diagnostics.push(Diagnostic::new(
+                    format!(
+                        "资源 `{}/{}` 的 JSON 无效（JSON 第 {} 行第 {} 列）：{}",
+                        resource.kind,
+                        resource.name,
+                        error.line(),
+                        error.column(),
+                        error
+                    ),
+                    resource.span,
+                ));
+            }
         }
         let bucket = match resource.kind.as_str() {
             "predicate" => &mut symbols.predicates,

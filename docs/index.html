@@ -39,6 +39,7 @@
 <a class="lvl-3" href="#sec-注释-字符串与数字">注释、字符串与数字</a>
 <a class="lvl-3" href="#sec-程序结构与命名空间">程序结构与命名空间</a>
 <a class="lvl-3" href="#sec-中英关键词">中英关键词</a>
+<a class="lvl-3" href="#basics-identifiers">中文标识符</a>
 <a class="lvl-3" href="#basics-nbt">结构化 NBT（nbt）</a>
 <a class="lvl-3" href="#basics-context">执行上下文</a>
 <a class="lvl-2" href="#declarations">顶层声明</a>
@@ -206,7 +207,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <p>仓库自带 VSCode 插件（<code>editors/vscode</code>）与语言服务器（<code>mclang lsp</code>）。插件提供中英文关键词语法高亮、与命令行同一套即时诊断、补全、悬停说明和跨文件跳转；可执行文件会在工作区 <code>target/release</code>、<code>target/debug</code> 与 <code>PATH</code> 中自动查找，也可以用 <code>mclang.server.path</code> 指定。</p>
 <h2 id="basics">语言基础</h2>
 <h3 id="sec-注释-字符串与数字">注释、字符串与数字</h3>
-<ul><li>注释：<code>// 到行尾</code>，没有块注释。</li><li>字符串：双引号，支持转义 <code>\&quot;</code>、<code>\\</code>、<code>\n</code>、<code>\r</code>、<code>\t</code>，不能跨行。</li><li>原始字符串：<code>&quot;&quot;&quot;</code> 到下一个 <code>&quot;&quot;&quot;</code>，可以跨行，内容不做转义——适合内嵌 JSON。</li><li>数字：十进制整数（32 位范围内）与小数（<code>1.5</code>、<code>0.25</code>）；NBT 的类型后缀见<a href="#basics-nbt">结构化 NBT</a>。</li><li>标识符：字母、数字与下划线，不能以数字开头。声明名（函数、计分变量、查询、物品、存储、函数标签、参数与局部变量）必须是小写 ASCII 字母、数字与下划线，不超过 32 字节，且不能是保留字。</li></ul><h3 id="sec-程序结构与命名空间">程序结构与命名空间</h3>
+<ul><li>注释：<code>// 到行尾</code>，没有块注释。</li><li>字符串：双引号，支持转义 <code>\&quot;</code>、<code>\\</code>、<code>\n</code>、<code>\r</code>、<code>\t</code>，不能跨行。</li><li>原始字符串：<code>&quot;&quot;&quot;</code> 到下一个 <code>&quot;&quot;&quot;</code>，可以跨行，内容不做转义——适合内嵌 JSON。</li><li>数字：十进制整数（32 位范围内）与小数（<code>1.5</code>、<code>0.25</code>）；NBT 的类型后缀见<a href="#basics-nbt">结构化 NBT</a>。</li><li>标识符：字母、数字与下划线，不能以数字开头。ASCII 名必须是小写字母、数字与下划线，不超过 32 个字符，且不能是保留字（中英文关键词都是保留字）。中文等非 ASCII 字母也允许，编译时会被换成随机 ASCII 别名，见<a href="#basics-identifiers">中文标识符</a>。</li></ul><h3 id="sec-程序结构与命名空间">程序结构与命名空间</h3>
 <p>每个文件都以 <code class="kw"><span class="kw-en">namespace &lt;名称&gt;;</span><span class="kw-zh">命名空间 &lt;名称&gt;;</span></code> 开头。项目里所有文件必须声明同一个命名空间；命名空间只能包含小写 ASCII 字母、数字与下划线，不能以数字开头，也不能是 Windows 保留设备名。声明顺序不影响引用。</p>
 <h3 id="sec-中英关键词">中英关键词</h3>
 <p>下表只是示例，完整对照见<a href="#appendix-keywords">附录 A</a>：</p>
@@ -278,6 +279,28 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
     <span class="tok-lit">数量</span> = 1;
     <span class="tok-lit">自定义名称</span> = <span class="tok-str">&quot;苹果&quot;</span>;
 }</code></pre></figure>
+<h3 id="basics-identifiers">中文标识符</h3>
+<p>计分变量、函数、查询、物品、存储、数据槽、目标、谓词资源、进度、函数标签、参数与局部变量的名字可以直接写中文。编译时（语义检查之后、生成数据包之前）这些非 ASCII 名字会被替换成随机 ASCII 别名：别名由名字的稳定哈希驱动，同一份源码总是得到同样的 8 个小写字母；每个别名在整个项目里唯一，并自动避开已有的 ASCII 标识符，所以不会与现有变量冲突。引用与声明走同一张映射表，诊断信息仍使用源码里的名字。</p>
+<figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">&quot;中文标识符与</span><span class="code-actions"><span class="badge ok">编译器验证通过</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">chinese_id</span>;
+
+<span class="tok-kw">score</span> <span class="tok-ident">次数</span> = 0;
+<span class="tok-kw">score</span> <span class="tok-ident">ascii_counter</span> = 0;
+
+<span class="tok-kw">fn</span> <span class="tok-fn">计时</span>() -&gt; <span class="tok-kw">score</span> {
+    <span class="tok-ident">次数</span> += 1;
+    <span class="tok-ident">ascii_counter</span> = <span class="tok-ident">次数</span>;
+    <span class="tok-kw">return</span> <span class="tok-ident">ascii_counter</span>;
+}</code><code class="kw-zh"><span class="tok-kw">命名空间</span> <span class="tok-ident">chinese_id</span>;
+
+<span class="tok-kw">计分</span> <span class="tok-ident">次数</span> = 0;
+<span class="tok-kw">计分</span> <span class="tok-ident">ascii_counter</span> = 0;
+
+<span class="tok-kw">函数</span> <span class="tok-fn">计时</span>() -&gt; <span class="tok-kw">计分</span> {
+    <span class="tok-ident">次数</span> += 1;
+    <span class="tok-ident">ascii_counter</span> = <span class="tok-ident">次数</span>;
+    <span class="tok-kw">返回</span> <span class="tok-ident">ascii_counter</span>;
+}</code></pre></figure>
+<p>产物里 <code>计分 次数</code> 是 <code>#v_&lt;随机字母&gt;</code>，函数 <code>计时</code> 是 <code>data/chinese_id/function/&lt;随机字母&gt;.mcfunction</code>，<code>ascii_counter</code> 保持原样；进度与资源文件名同理。命名空间仍然只接受小写 ASCII，中英文关键词都不能用作标识符。</p>
 <h3 id="basics-nbt">结构化 NBT（nbt）</h3>
 <p><code>nbt { 键 = 值; }</code>（中文 <code>数据 { 键 = 值; }</code>）是一段结构化 NBT 数据，覆盖 26.3 SNBT 的全部 12 种标签类型。键写成标识符或字符串，每个条目以 <code>;</code> 结束；值的形式如下：</p>
 <div class="table-wrap"><table>
@@ -568,15 +591,15 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <span class="tok-kw">数据槽</span> <span class="tok-ident">note</span> = <span class="tok-kw">实体数据</span>(<span class="tok-str">&quot;pc_note.name&quot;</span>);</code></pre></figure>
 <h3 id="sec-json-资源-resource">JSON 资源（resource）</h3>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">语法</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">resource</span> <span class="tok-kw">predicate</span> &lt;<span class="tok-lit">name</span>&gt; = <span class="tok-str">&quot;&quot;&quot;{ ... }&quot;&quot;&quot;</span>;</code><code class="kw-zh"><span class="tok-kw">资源</span> <span class="tok-kw">谓词</span> &lt;<span class="tok-lit">name</span>&gt; = <span class="tok-str">&quot;&quot;&quot;{ ... }&quot;&quot;&quot;</span>;</code></pre></figure>
-<p>声明一份原样写出的 JSON 资源，编译后保存到 <code>data/&lt;命名空间&gt;/&lt;类型&gt;/&lt;名称&gt;.json</code>。可用的类型是 26.3 的资源目录名（见<a href="#appendix-registry">附录 C</a>），其中 <code class="kw"><span class="kw-en">predicate</span><span class="kw-zh">谓词</span></code> 可以在条件里用 <code class="kw"><span class="kw-en">if predicate(&lt;name&gt;)</span><span class="kw-zh">如果 谓词(&lt;name&gt;)</span></code> 引用；其他类型写英文名称，带斜杠的类型要写成字符串名称（例如 <code>&quot;worldgen/feature/example&quot;</code>）。JSON 会在编译期解析，格式错误直接报告行列位置，输出时统一重排为两空格缩进。</p>
+<p>声明一份原样写出的 JSON 资源，编译后保存到 <code>data/&lt;命名空间&gt;/&lt;类型&gt;/&lt;名称&gt;.json</code>。可用的类型是 26.3 的资源目录名（见<a href="#appendix-registry">附录 C</a>），其中 <code class="kw"><span class="kw-en">predicate</span><span class="kw-zh">谓词</span></code> 可以在条件里用 <code class="kw"><span class="kw-en">if predicate(&lt;name&gt;)</span><span class="kw-zh">如果 谓词(&lt;name&gt;)</span></code> 引用；其他类型写英文名称，带斜杠的类型要写成字符串名称（例如 <code>&quot;worldgen/feature/example&quot;</code>）。JSON 会在编译期解析，格式错误直接报告行列位置，输出时统一重排为两空格缩进。<code class="kw"><span class="kw-en">predicate</span><span class="kw-zh">谓词</span></code> 的正文是内联战利品条件，26.3 的判别键 <code>type</code> 必填（<code>condition</code> 只用于引用谓词资源）。</p>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">示例</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">resource</span> <span class="tok-kw">predicate</span> <span class="tok-ident">coin_flip</span> = <span class="tok-str">&quot;&quot;&quot;
 {
-  &quot;condition&quot;: &quot;minecraft:random_chance&quot;,
+  &quot;type&quot;: &quot;minecraft:random_chance&quot;,
   &quot;chance&quot;: 0.5
 }
 &quot;&quot;&quot;</span>;</code><code class="kw-zh"><span class="tok-kw">资源</span> <span class="tok-kw">谓词</span> <span class="tok-ident">coin_flip</span> = <span class="tok-str">&quot;&quot;&quot;
 {
-  &quot;condition&quot;: &quot;minecraft:random_chance&quot;,
+  &quot;type&quot;: &quot;minecraft:random_chance&quot;,
   &quot;chance&quot;: 0.5
 }
 &quot;&quot;&quot;</span>;</code></pre></figure>
@@ -629,7 +652,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
     }
 }</code></pre></figure>
 <p>进度是数据包唯一的事件入口：<code>criterion</code> 监听原版触发器（26.3 <code>CriteriaTriggers</code> 注册表，名字可以省略 <code>minecraft:</code> 前缀，完整清单见<a href="#appendix-triggers">附录 D</a>），事件命中时运行 <code>reward.function</code> 指向的函数。<strong>进度完成一次后不再触发</strong>；需要持续响应时，在奖励函数里用 <code>advancement.revoke(自身, 进度)</code> 撤销自己。</p>
-<p><code>conditions</code> 保持触发器的原始 JSON（<code>location</code>、<code class="kw"><span class="kw-en">blocks</span><span class="kw-zh">区域方块</span></code> 等字段由原版定义）；编译期检查 JSON 语法、触发器名与准则重名。<code>parent</code>、<code>reward.function</code>、<code>reward.loot</code>、<code>reward.recipe</code> 引用本命名空间声明时要求存在，字符串形式按外部资源位置处理；<code>reward.loot</code> 与 <code>reward.recipe</code> 引用 <code>resource loot_table</code> / <code>resource recipe</code> 声明。<code>display.icon</code> 引用已声明的 <code class="kw"><span class="kw-en">item</span><span class="kw-zh">物品</span></code> 定义，图标会带上它的组件。显示规则与原版一致：<strong>根进度的 <code>display</code> 必须声明 <code>background</code>，带 <code>parent</code> 的进度不能声明 <code>background</code></strong>。</p>
+<p><code>conditions</code> 保持触发器的原始 JSON（<code>location</code>、<code class="kw"><span class="kw-en">blocks</span><span class="kw-zh">区域方块</span></code> 等字段由原版定义）；编译期检查 JSON 语法、触发器名与准则重名，并按源码快照校验已知触发器的条件字段——字段名必须属于该触发器，战利品条件字段需要谓词资源字符串或带 <code>type</code> 的内联条件对象。注意 26.3 的内联战利品条件用 <code>type</code> 作判别键（<code>condition</code> 现在只用于引用谓词资源），例如 <code>{&quot;location&quot;:{&quot;type&quot;:&quot;minecraft:match_block&quot;,&quot;blocks&quot;:&quot;minecraft:dirt&quot;}}</code>；需要实体谓词时套 <code>minecraft:entity_properties</code>，实体填 <code>&quot;entity&quot;:&quot;this&quot;</code>，类型字段写 <code>minecraft:entity_type</code>，例如击杀僵尸：<code>{&quot;entity&quot;:{&quot;type&quot;:&quot;minecraft:entity_properties&quot;,&quot;entity&quot;:&quot;this&quot;,&quot;predicate&quot;:{&quot;minecraft:entity_type&quot;:&quot;minecraft:zombie&quot;}}}</code>。<code>parent</code>、<code>reward.function</code>、<code>reward.loot</code>、<code>reward.recipe</code> 引用本命名空间声明时要求存在，字符串形式按外部资源位置处理；<code>reward.loot</code> 与 <code>reward.recipe</code> 引用 <code>resource loot_table</code> / <code>resource recipe</code> 声明。<code>display.icon</code> 引用已声明的 <code class="kw"><span class="kw-en">item</span><span class="kw-zh">物品</span></code> 定义，图标会带上它的组件。显示规则与原版一致：<strong>根进度的 <code>display</code> 必须声明 <code>background</code>，带 <code>parent</code> 的进度不能声明 <code>background</code></strong>。</p>
 <p><code>reward</code> 与 <code>display</code> 都可以省略：只有触发逻辑的隐形进度是数据包的常规用法。</p>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">示例：放置方块时触发</span><span class="code-actions"><span class="badge ok">编译器验证通过</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">advancement_demo</span>;
 
@@ -638,7 +661,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <span class="tok-kw">advancement</span> <span class="tok-ident">core_placed</span> {
     <span class="tok-lit">criterion</span> <span class="tok-ident">placed</span> {
         <span class="tok-lit">trigger</span> = <span class="tok-ident">placed_block</span>;
-        <span class="tok-lit">conditions</span> = <span class="tok-str">&quot;&quot;&quot;{&quot;location&quot;:{&quot;condition&quot;:&quot;minecraft:match_block&quot;,&quot;blocks&quot;:&quot;minecraft:crying_obsidian&quot;}}&quot;&quot;&quot;</span>;
+        <span class="tok-lit">conditions</span> = <span class="tok-str">&quot;&quot;&quot;{&quot;location&quot;:{&quot;type&quot;:&quot;minecraft:match_block&quot;,&quot;blocks&quot;:&quot;minecraft:crying_obsidian&quot;}}&quot;&quot;&quot;</span>;
     }
     <span class="tok-lit">reward</span> {
         <span class="tok-kw">function</span> = <span class="tok-ident">on_core_placed</span>;
@@ -663,7 +686,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <span class="tok-kw">进度</span> <span class="tok-ident">core_placed</span> {
     <span class="tok-lit">criterion</span> <span class="tok-ident">placed</span> {
         <span class="tok-lit">触发器</span> = <span class="tok-ident">placed_block</span>;
-        <span class="tok-lit">条件</span> = <span class="tok-str">&quot;&quot;&quot;{&quot;location&quot;:{&quot;condition&quot;:&quot;minecraft:match_block&quot;,&quot;blocks&quot;:&quot;minecraft:crying_obsidian&quot;}}&quot;&quot;&quot;</span>;
+        <span class="tok-lit">条件</span> = <span class="tok-str">&quot;&quot;&quot;{&quot;location&quot;:{&quot;type&quot;:&quot;minecraft:match_block&quot;,&quot;blocks&quot;:&quot;minecraft:crying_obsidian&quot;}}&quot;&quot;&quot;</span>;
     }
     <span class="tok-lit">reward</span> {
         <span class="tok-kw">函数</span> = <span class="tok-ident">on_core_placed</span>;
@@ -1704,13 +1727,14 @@ scoreboard players set #v_phase mcl_ade30ff2a2f0 1</code></pre></figure>
 <thead><tr><th>名字</th><th>含义</th></tr></thead>
 <tbody>
 <tr><td><code>mcl_&lt;哈希&gt;</code></td><td>每个命名空间唯一的计分板 objective，哈希由命名空间决定</td></tr>
-<tr><td><code>#v_&lt;name&gt;</code></td><td>全局计分变量的假玩家</td></tr>
+<tr><td><code>#v_&lt;name&gt;</code></td><td>全局计分变量的假玩家；中文变量名先换成随机 ASCII 别名</td></tr>
 <tr><td><code>#p_&lt;哈希&gt;</code></td><td>函数参数的私有槽位</td></tr>
 <tr><td><code>#l_&lt;哈希&gt;</code></td><td>局部变量的私有槽位</td></tr>
 <tr><td><code>#t&lt;序号&gt;</code></td><td>表达式与条件的临时值</td></tr>
 <tr><td><code>__mcl/&lt;函数&gt;/&lt;序号&gt;</code></td><td>结构块展开出的辅助函数</td></tr>
 <tr><td><code>__mcl/load</code></td><td>编译器合成的初始化函数</td></tr>
 </tbody></table></div>
+<p>中文（或其他非 ASCII）声明名会在生成前换成 8 个随机小写字母的别名：别名由名字的稳定哈希产生，同一份源码总是得到同一批别名；分配时避开项目中所有保持原样的 ASCII 标识符与内部名字，所以别名既不会互相冲突，也不会与已有变量重名。ASCII 声明名保持原样。</p>
 <p><code>load.json</code> 只包含 <code>&lt;命名空间&gt;:__mcl/load</code>；<code>__mcl/load</code> 先创建 objective、补齐缺少的计分变量初始值、初始化存储，再按源码顺序调用全部 <code class="kw"><span class="kw-en">@load</span><span class="kw-zh">@加载</span></code> 函数。<code>tick.json</code> 只在存在 <code class="kw"><span class="kw-en">@tick</span><span class="kw-zh">@每刻</span></code> 函数时生成。每个 <code>.mcfunction</code> 以 <code># Generated by mclang.</code> 开头。</p>
 <h3 id="sec-可复现">可复现</h3>
 <p>输出使用 <code>BTreeMap</code> 与稳定哈希，不引入随机顺序；同一份源码总是生成同样的文件与内容，两种关键词写法的产物逐字节一致。资源 JSON 由 <code>serde_json</code> 统一重排，<code>pack.mcmeta</code> 的描述来自 <code>--description</code>。</p>
@@ -1721,7 +1745,7 @@ scoreboard players set #v_phase mcl_ade30ff2a2f0 1</code></pre></figure>
 </details>
 <details class="faq"><summary><code>/reload</code> 会重置计分变量、存储和秒表吗？</summary><p>不会。计分板、<code class="kw"><span class="kw-en">storage</span><span class="kw-zh">存储</span></code> 与秒表都属于世界存档数据。<code>__mcl/load</code> 只创建缺失的 objective、给缺失的计分变量补初始值、把 <code class="kw"><span class="kw-en">item_list</span><span class="kw-zh">物品列表</span></code> 存储补成空列表；已有值保持原样。需要每次加载都重置的状态请显式赋值。</p>
 </details>
-<details class="faq"><summary>为什么声明名只能用 ASCII？</summary><p>数据包最终落在文件系统上，函数名与文件名一一对应。编译器把声明名限制为小写 ASCII 字母、数字与下划线且不超过 32 字节；函数名与命名空间还会拒绝 Windows 保留设备名（<code>CON</code>、<code>NUL</code>、<code>COM1</code> 等），资源路径的每个文件名段同样受限，保证产物在常见平台上都能落地。中文关键词不改变这一点：标识符保持 ASCII，关键词可以随便写。</p>
+<details class="faq"><summary>中文声明名会变成什么？</summary><p>数据包最终落在文件系统上，函数名与文件名一一对应，所以中文（或其他非 ASCII）声明名在语义检查之后会被换成随机 ASCII 别名。别名由名字的稳定哈希产生——同样的源码总是得到同样的别名——并且在整程序范围内唯一、自动避开已有的 ASCII 标识符，不会与现有变量冲突；ASCII 声明名保持原样，命名空间仍只接受小写 ASCII。函数名与命名空间还会拒绝 Windows 保留设备名（<code>CON</code>、<code>NUL</code>、<code>COM1</code> 等），资源路径的每个文件名段同样受限，保证产物在常见平台上都能落地。</p>
 </details>
 <details class="faq"><summary><code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 会一直循环到什么时候？</summary><p><code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 的循环体和条件互相调用，每轮消耗命令链预算。请在循环体里修改条件涉及的计分变量；如果条件永远成立，最终会撞上 Minecraft 的命令链长度限制。</p>
 </details>
@@ -1746,7 +1770,7 @@ scoreboard players set #v_phase mcl_ade30ff2a2f0 1</code></pre></figure>
 
 <span class="tok-kw">resource</span> <span class="tok-kw">predicate</span> <span class="tok-ident">lucky</span> = <span class="tok-str">&quot;&quot;&quot;
 {
-  &quot;condition&quot;: &quot;minecraft:random_chance&quot;,
+  &quot;type&quot;: &quot;minecraft:random_chance&quot;,
   &quot;chance&quot;: 0.25
 }
 &quot;&quot;&quot;</span>;
@@ -1839,7 +1863,7 @@ scoreboard players set #v_phase mcl_ade30ff2a2f0 1</code></pre></figure>
 
 <span class="tok-kw">资源</span> <span class="tok-kw">谓词</span> <span class="tok-ident">lucky</span> = <span class="tok-str">&quot;&quot;&quot;
 {
-  &quot;condition&quot;: &quot;minecraft:random_chance&quot;,
+  &quot;type&quot;: &quot;minecraft:random_chance&quot;,
   &quot;chance&quot;: 0.25
 }
 &quot;&quot;&quot;</span>;
@@ -3002,7 +3026,7 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
     <p>本手册由 <code>docs/tools/build.mjs</code> 依据编译器源码与真实编译结果生成：
     关键词与别名表取自 <code>src/parser/keywords.rs</code>，共 83 个语言关键词、
     5 个函数属性、62 组别名表。</p>
-    <p>全部 11 个标注“编译器验证通过”的完整示例（<code>hello</code>、<code>mixed_language</code>、<code>nbt_tags</code>、<code>advancement_demo</code>、<code>execute_structured</code>、<code>scoreboard_state</code>、<code>entity_nbt_demo</code>、<code>raw_escape</code>、<code>tour_world</code>、<code>tour_core</code>、<code>tour_entities</code>）都分别用英文与中文关键词
+    <p>全部 12 个标注“编译器验证通过”的完整示例（<code>hello</code>、<code>mixed_language</code>、<code>chinese_identifiers</code>、<code>nbt_tags</code>、<code>advancement_demo</code>、<code>execute_structured</code>、<code>scoreboard_state</code>、<code>entity_nbt_demo</code>、<code>raw_escape</code>、<code>tour_world</code>、<code>tour_core</code>、<code>tour_entities</code>）都分别用英文与中文关键词
     编译过，两种写法的数据包逐字节一致；仓库 <code>examples/</code> 示例的往返验证可用
     <code>bun docs/tools/build.mjs --self-test</code> 复现。</p>
     <p>目标版本：Minecraft Java Edition 26.3-rc-2，数据包格式 121.0。手册随 <code>mclang 0.5.0</code> 生成。</p>

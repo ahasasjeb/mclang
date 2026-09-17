@@ -1,0 +1,264 @@
+{
+  "digest": "fnv1a64:b99d580460657323",
+  "source": "minecraft_client_26.3-rc-2",
+  "triggers": {
+    "allay_drop_item_on_block": {
+      "location": "loot_condition",
+      "player": "loot_condition"
+    },
+    "any_block_use": {
+      "location": "loot_condition",
+      "player": "loot_condition"
+    },
+    "avoid_vibration": {
+      "player": "loot_condition"
+    },
+    "bee_nest_destroyed": {
+      "blocks": "id_or_list",
+      "item": "item_predicate",
+      "num_bees_inside": "range",
+      "player": "loot_condition",
+      "state": "state_properties"
+    },
+    "bred_animals": {
+      "child": "loot_condition",
+      "parent": "loot_condition",
+      "partner": "loot_condition",
+      "player": "loot_condition"
+    },
+    "brewed_potion": {
+      "player": "loot_condition",
+      "potion": "other"
+    },
+    "changed_dimension": {
+      "from": "id",
+      "player": "loot_condition",
+      "to": "id"
+    },
+    "channeled_lightning": {
+      "player": "loot_condition",
+      "victims": "loot_condition"
+    },
+    "construct_beacon": {
+      "level": "range",
+      "player": "loot_condition"
+    },
+    "consume_item": {
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "crafter_recipe_crafted": {
+      "ingredients": "item_predicate",
+      "player": "loot_condition",
+      "recipes": "id_or_list"
+    },
+    "cured_zombie_villager": {
+      "player": "loot_condition",
+      "villager": "loot_condition",
+      "zombie": "loot_condition"
+    },
+    "default_block_use": {
+      "location": "loot_condition",
+      "player": "loot_condition"
+    },
+    "effects_changed": {
+      "effects": "other",
+      "player": "loot_condition",
+      "source": "loot_condition"
+    },
+    "enchanted_item": {
+      "item": "item_predicate",
+      "levels": "range",
+      "player": "loot_condition"
+    },
+    "enter_block": {
+      "blocks": "id_or_list",
+      "player": "loot_condition",
+      "state": "state_properties"
+    },
+    "entity_hurt_player": {
+      "damage": "other",
+      "player": "loot_condition"
+    },
+    "entity_killed_player": {
+      "entity": "loot_condition",
+      "killing_blow": "damage_source",
+      "player": "loot_condition"
+    },
+    "fall_after_explosion": {
+      "cause": "loot_condition",
+      "distance": "other",
+      "player": "loot_condition",
+      "start_position": "other"
+    },
+    "fall_from_height": {
+      "distance": "other",
+      "player": "loot_condition",
+      "start_position": "other"
+    },
+    "filled_bucket": {
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "fishing_rod_hooked": {
+      "entity": "loot_condition",
+      "item": "item_predicate",
+      "player": "loot_condition",
+      "rod": "item_predicate"
+    },
+    "hero_of_the_village": {
+      "player": "loot_condition"
+    },
+    "inventory_changed": {
+      "items": "item_predicate",
+      "player": "loot_condition",
+      "slots": "other"
+    },
+    "item_durability_changed": {
+      "delta": "range",
+      "durability": "range",
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "item_used_on_block": {
+      "location": "loot_condition",
+      "player": "loot_condition"
+    },
+    "kill_mob_near_sculk_catalyst": {
+      "entity": "loot_condition",
+      "killing_blow": "damage_source",
+      "player": "loot_condition"
+    },
+    "killed_by_arrow": {
+      "fired_from_weapon": "item_predicate",
+      "player": "loot_condition",
+      "unique_entity_types": "range",
+      "victims": "loot_condition"
+    },
+    "levitation": {
+      "distance": "other",
+      "duration": "range",
+      "player": "loot_condition"
+    },
+    "lightning_strike": {
+      "bystander": "loot_condition",
+      "lightning": "loot_condition",
+      "player": "loot_condition"
+    },
+    "location": {
+      "player": "loot_condition"
+    },
+    "nether_travel": {
+      "distance": "other",
+      "player": "loot_condition",
+      "start_position": "other"
+    },
+    "placed_block": {
+      "location": "loot_condition",
+      "player": "loot_condition"
+    },
+    "player_generates_container_loot": {
+      "loot_tables": "id_or_list",
+      "player": "loot_condition"
+    },
+    "player_hurt_entity": {
+      "damage": "other",
+      "entity": "loot_condition",
+      "player": "loot_condition"
+    },
+    "player_interacted_with_entity": {
+      "entity": "loot_condition",
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "player_killed_entity": {
+      "entity": "loot_condition",
+      "killing_blow": "damage_source",
+      "player": "loot_condition"
+    },
+    "player_sheared_equipment": {
+      "entity": "loot_condition",
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "recipe_crafted": {
+      "ingredients": "item_predicate",
+      "player": "loot_condition",
+      "recipes": "id_or_list"
+    },
+    "recipe_unlocked": {
+      "player": "loot_condition",
+      "recipes": "id_or_list"
+    },
+    "ride_entity_in_lava": {
+      "distance": "other",
+      "player": "loot_condition",
+      "start_position": "other"
+    },
+    "shot_crossbow": {
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "slept_in_bed": {
+      "player": "loot_condition"
+    },
+    "slide_down_block": {
+      "blocks": "id_or_list",
+      "player": "loot_condition",
+      "state": "state_properties"
+    },
+    "spear_mobs": {
+      "count": "other",
+      "player": "loot_condition"
+    },
+    "started_riding": {
+      "player": "loot_condition"
+    },
+    "summoned_entity": {
+      "entity": "loot_condition",
+      "player": "loot_condition"
+    },
+    "tame_animal": {
+      "entity": "loot_condition",
+      "player": "loot_condition"
+    },
+    "target_hit": {
+      "player": "loot_condition",
+      "projectile": "loot_condition",
+      "signal_strength": "range"
+    },
+    "thrown_item_picked_up_by_entity": {
+      "entity": "loot_condition",
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "thrown_item_picked_up_by_player": {
+      "entity": "loot_condition",
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "tick": {
+      "player": "loot_condition"
+    },
+    "used_ender_eye": {
+      "distance": "range",
+      "player": "loot_condition"
+    },
+    "used_totem": {
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "using_item": {
+      "item": "item_predicate",
+      "player": "loot_condition"
+    },
+    "villager_trade": {
+      "item": "item_predicate",
+      "player": "loot_condition",
+      "villager": "loot_condition"
+    },
+    "voluntary_exile": {
+      "player": "loot_condition"
+    }
+  }
+}

@@ -10,6 +10,23 @@ pub(super) fn valid_name(name: &str) -> bool {
         && characters.all(|character| matches!(character, 'a'..='z' | '0'..='9' | '_'))
 }
 
+/// 用户标识符：ASCII 部分沿用 `valid_name` 的小写约定，同时允许中文等
+/// 非 ASCII 字母；这些名字会在代码生成前由 `compiler::rename` 换成随机 ASCII 名。
+pub(super) fn valid_user_name(name: &str) -> bool {
+    let Some(first) = name.chars().next() else {
+        return false;
+    };
+    let first_ok =
+        first == '_' || first.is_ascii_lowercase() || (!first.is_ascii() && first.is_alphabetic());
+    first_ok
+        && name.chars().skip(1).all(|character| {
+            character == '_'
+                || character.is_ascii_lowercase()
+                || character.is_ascii_digit()
+                || (!character.is_ascii() && character.is_alphanumeric())
+        })
+}
+
 pub(super) fn valid_resource_path(path: &str) -> bool {
     !path.is_empty()
         && path.split('/').all(|segment| {
@@ -91,14 +108,16 @@ pub(super) fn validate_identifier(
     span: Span,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if !valid_name(name) {
+    if !valid_user_name(name) {
         diagnostics.push(Diagnostic::new(
-            format!("{kind}名 `{name}` 只能包含小写 ASCII 字母、数字和下划线，且不能以数字开头"),
+            format!(
+                "{kind}名 `{name}` 只能包含字母、数字和下划线，不能以数字开头；ASCII 字母必须小写"
+            ),
             span,
         ));
-    } else if name.len() > 32 {
+    } else if name.chars().count() > 32 {
         diagnostics.push(Diagnostic::new(
-            format!("{kind}名 `{name}` 不能超过 32 个字节"),
+            format!("{kind}名 `{name}` 不能超过 32 个字符"),
             span,
         ));
     } else if kind == "函数" && windows_reserved_name(name) {

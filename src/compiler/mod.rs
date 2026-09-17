@@ -10,6 +10,7 @@
 
 mod codegen;
 mod constant;
+mod rename;
 mod types;
 mod validate;
 
@@ -18,6 +19,16 @@ use std::path::PathBuf;
 
 use crate::ast::Program;
 use crate::diagnostic::Diagnostic;
+
+/// FNV-1a：跨平台稳定的 64 位哈希，用于可复现的生成名称。
+pub(crate) fn stable_hash(value: &str) -> u64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in value.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
 
 /// 一次成功编译的产物：数据包内的相对路径到文件内容。
 #[derive(Debug)]
@@ -40,16 +51,18 @@ pub struct CompileOptions {
 
 /// 编译已经合并的整程序。
 ///
-/// 语义检查失败时返回全部诊断；通过后生成数据包文件。`description` 会写入
-/// `pack.mcmeta`。
+/// 语义检查失败时返回全部诊断；通过后先把非 ASCII 标识符内部化为随机 ASCII
+/// 别名（见 [`rename`]），再生成数据包文件。`description` 会写入 `pack.mcmeta`。
 pub fn compile(
-    program: &Program,
+    program: &mut Program,
     options: &CompileOptions,
 ) -> Result<CompiledPack, Vec<Diagnostic>> {
     let diagnostics = validate::validate(program, options.function_permission_level);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
+
+    rename::rename_program(program);
 
     let mut compiler = codegen::Compiler::new(program);
     compiler.compile_functions();

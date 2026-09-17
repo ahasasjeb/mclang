@@ -1,0 +1,100 @@
+// 赏金猎人：由击杀、维度探索与作息事件驱动的数据包。
+//
+// 这是一个「手写重复量大」的典型数据包：每个任务都要一条进度 JSON、一个奖励
+// 函数、一套计分板 ABI 和函数标签；同样的物品组件、触发器条件与执行上下文在
+// 手写时反复出现。Mclang 版本只描述规则本身，其余全部由编译器生成。
+//
+// 编译：
+//   cargo run --bin mclang -- build examples/bounty_hunter -o build/bounty_hunter --deny-raw
+namespace bounty_hunter;
+
+// 全局系统状态（保存在假玩家上，随存档持久化）。
+score streak_timer = 0;   // 连杀衰减计时（游戏刻）
+score top_bounty = 0;     // 全服最高余额，用于破纪录播报
+
+// 每名玩家一份的用户计分板。
+objective coins;
+objective streak;
+objective kills;
+objective milestone;
+objective last_sleep_day;
+objective last_reward;
+
+query all_players = entity("minecraft:player") {}
+query nearest_player = entity("minecraft:player") { sort(nearest); limit(1); }
+
+// 里程碑奖励物品：物品组件只声明一次，所有 give 命令共用同一份产物。
+item hunter_badge = item_stack("minecraft:gold_ingot") {
+    custom_name = "猎人徽章";
+    lore("第一个里程碑的纪念。");
+    rarity = rare;
+    enchantment_glint_override = true;
+    custom_data = nbt { bounty_badge = true; };
+}
+item diamond_prize = item_stack("minecraft:diamond") {
+    count = 5;
+    custom_name = "赏金战利品";
+}
+
+@load
+fn load() {
+    message.all(text("赏金猎人已加载") { color = "green"; bold = true; });
+    message.all(text("击杀怪物、探索维度、按日睡觉都能获得赏金。") { color = "gray"; });
+}
+
+@tick
+fn tick_loop() {
+    streak_timer += 1;
+    if streak_timer >= 400 {
+        streak_timer = 0;
+        each(all_players) {
+            decay_streak();
+        }
+    }
+    each(all_players) {
+        check_milestones();
+        check_leader();
+    }
+}
+
+// 连杀每 20 秒衰减 1 点。
+@player
+fn decay_streak() {
+    if scoreboard.get(self, streak) > 0 {
+        scoreboard.set(self, streak, scoreboard.get(self, streak) - 1);
+    }
+}
+
+// 三段里程碑：猎人徽章、永久速度、赏金战利品。
+@player
+fn check_milestones() {
+    let balance = scoreboard.get(self, coins);
+    if balance >= 100 && scoreboard.get(self, milestone) == 0 {
+        scoreboard.set(self, milestone, 1);
+        self.give_item(hunter_badge);
+        message.self(translate("chat.type.announcement", [text("里程碑"), text("余额 100，获得猎人徽章")]) { color = "gold"; });
+        sound.self("minecraft:ui.toast.challenge_complete", player);
+    }
+    if balance >= 250 && scoreboard.get(self, milestone) == 1 {
+        scoreboard.set(self, milestone, 2);
+        effect.give_infinite(nearest_player, "minecraft:speed");
+        message.self(translate("chat.type.announcement", [text("里程碑"), text("余额 250，获得永久速度")]) { color = "gold"; });
+        sound.self("minecraft:ui.toast.challenge_complete", player);
+    }
+    if balance >= 500 && scoreboard.get(self, milestone) == 2 {
+        scoreboard.set(self, milestone, 3);
+        self.give_item(diamond_prize);
+        message.self(translate("chat.type.announcement", [text("里程碑"), text("余额 500，获得赏金战利品")]) { color = "gold"; });
+        sound.self("minecraft:ui.toast.challenge_complete", player);
+    }
+}
+
+// 刷新余额纪录时向全服播报；selector("@s") 在玩家上下文里解析为本人。
+@player
+fn check_leader() {
+    let balance = scoreboard.get(self, coins);
+    if balance > top_bounty {
+        top_bounty = balance;
+        message.all(translate("chat.type.announcement", [text("新纪录"), selector("@s")]) { color = "light_purple"; });
+    }
+}
