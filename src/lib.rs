@@ -177,6 +177,13 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::Assign { .. }
             | ast::StatementKind::ScoreSet { .. }
             | ast::StatementKind::ScoreReset { .. }
+            | ast::StatementKind::ScoreboardEnable { .. }
+            | ast::StatementKind::ScoreboardOperation { .. }
+            | ast::StatementKind::ScoreboardDisplay { .. }
+            | ast::StatementKind::DataMerge { .. }
+            | ast::StatementKind::DataRemove { .. }
+            | ast::StatementKind::DataModify { .. }
+            | ast::StatementKind::ItemAction { .. }
             | ast::StatementKind::Teleport { .. }
             | ast::StatementKind::NbtMerge { .. }
             | ast::StatementKind::AdvancementAction { .. }

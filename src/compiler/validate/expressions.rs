@@ -6,8 +6,8 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    BinaryOp, CallTarget, ComputeKind, ComputeSource, Condition, Expr, ExprKind, Holder,
-    ItemConditionSource, Span,
+    BinaryOp, CallTarget, ComputeKind, ComputeSource, Condition, DataSource, Expr, ExprKind,
+    Holder, ItemConditionSource, Span,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, Signature};
@@ -210,7 +210,7 @@ fn condition_span(condition: &Condition) -> Span {
     }
 }
 
-fn validate_item_condition_source(
+pub(super) fn validate_item_condition_source(
     source: &ItemConditionSource,
     span: Span,
     ctx: ValidationContext<'_, '_>,
@@ -227,7 +227,7 @@ fn validate_item_condition_source(
 }
 
 /// 槽位来源：槽位名（含 `prefix.N` 与通配）或 `slot_source` 资源位置。
-fn validate_slot_source(slots: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
+pub(super) fn validate_slot_source(slots: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
     let snapshot = crate::version::snapshot::snapshot();
     if !snapshot.slots().accepts(slots) && !super::rules::valid_resource_location(slots) {
         diagnostics.push(Diagnostic::new(
@@ -245,6 +245,101 @@ fn valid_item_predicate(text: &str) -> bool {
     let base = text.strip_prefix('#').unwrap_or(text);
     let location = base.split('[').next().unwrap_or(base);
     super::rules::valid_resource_location(location)
+}
+
+/// `compute` 的公共校验（表达式与 `data.modify` 的 compute 来源共用）。
+#[allow(clippy::too_many_arguments)]
+pub(super) fn validate_compute(
+    source: &ComputeSource,
+    kind: ComputeKind,
+    provider: &str,
+    provider_span: Span,
+    scale: Option<&str>,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match source {
+        ComputeSource::Default => {}
+        ComputeSource::Block(position) => {
+            super::world::validate_block_position(position, diagnostics);
+        }
+        ComputeSource::Entity(holder) => {
+            if matches!(holder, Holder::Origin) {
+                diagnostics.push(Diagnostic::new(
+                    "compute 的 entity 来源不能是投掷者；请用 self/自身 或实体查询",
+                    span,
+                ));
+            } else {
+                super::statements::validate_holder(holder, span, ctx, diagnostics);
+            }
+        }
+    }
+    let registry = match kind {
+        ComputeKind::Float => "context_float_provider",
+        ComputeKind::Integer => "context_int_provider",
+    };
+    let label = match kind {
+        ComputeKind::Float => "浮点 provider",
+        ComputeKind::Integer => "整数 provider",
+    };
+    super::registry::validate_id(registry, label, provider, provider_span, diagnostics);
+    if let Some(scale) = scale
+        && !scale
+            .parse::<f64>()
+            .is_ok_and(|value| value.is_finite() && value != 0.0)
+    {
+        diagnostics.push(Diagnostic::new("compute 的缩放必须是非零数字", span));
+    }
+}
+
+/// 数据来源的命令文本校验。
+pub(super) fn validate_data_source(
+    source: &DataSource,
+    span: Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match source {
+        DataSource::From {
+            target,
+            path,
+            path_span,
+        }
+        | DataSource::String {
+            target,
+            path,
+            path_span,
+            ..
+        } => {
+            super::components::validate_nbt_source(target, span, ctx, diagnostics);
+            if !super::components::valid_nbt_component_path(path) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{path}` 不是有效的 NBT 路径"),
+                    *path_span,
+                ));
+            }
+        }
+        DataSource::Value(_) => {}
+        DataSource::Compute {
+            source,
+            kind,
+            provider,
+            provider_span,
+            scale,
+        } => {
+            validate_compute(
+                source,
+                *kind,
+                provider,
+                *provider_span,
+                scale.as_deref(),
+                span,
+                ctx,
+                diagnostics,
+            );
+        }
+    }
 }
 
 pub(super) fn validate_expr(
@@ -381,46 +476,16 @@ pub(super) fn validate_expr(
             provider_span,
             scale,
         } => {
-            match source {
-                ComputeSource::Default => {}
-                ComputeSource::Block(position) => {
-                    super::world::validate_block_position(position, diagnostics);
-                }
-                ComputeSource::Entity(holder) => {
-                    if matches!(holder, Holder::Origin) {
-                        diagnostics.push(Diagnostic::new(
-                            "compute 的 entity 来源不能是投掷者；请用 self/自身 或实体查询",
-                            expression.span,
-                        ));
-                    } else {
-                        super::statements::validate_holder(
-                            holder,
-                            expression.span,
-                            ctx,
-                            diagnostics,
-                        );
-                    }
-                }
-            }
-            let registry = match kind {
-                ComputeKind::Float => "context_float_provider",
-                ComputeKind::Integer => "context_int_provider",
-            };
-            let label = match kind {
-                ComputeKind::Float => "浮点 provider",
-                ComputeKind::Integer => "整数 provider",
-            };
-            super::registry::validate_id(registry, label, provider, *provider_span, diagnostics);
-            if let Some(scale) = scale
-                && !scale
-                    .parse::<f64>()
-                    .is_ok_and(|value| value.is_finite() && value != 0.0)
-            {
-                diagnostics.push(Diagnostic::new(
-                    "compute 的缩放必须是非零数字",
-                    expression.span,
-                ));
-            }
+            validate_compute(
+                source,
+                *kind,
+                provider,
+                *provider_span,
+                scale.as_deref(),
+                expression.span,
+                ctx,
+                diagnostics,
+            );
         }
         ExprKind::Negate(value) => validate_expr(value, locals, ctx, diagnostics),
         ExprKind::Binary {

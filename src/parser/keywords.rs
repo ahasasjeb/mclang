@@ -402,7 +402,7 @@ pub(super) fn query_property(value: &str) -> Option<&'static str> {
     match value {
         "tag" | "标签" => Some("tag"),
         "without_tag" | "排除标签" => Some("without_tag"),
-        "type" | "类型" => Some("type"),
+        "type" | "实体类型" => Some("type"),
         "without_type" | "排除类型" => Some("without_type"),
         "limit" | "上限" => Some("limit"),
         "within" | "范围" => Some("within"),
@@ -660,6 +660,17 @@ pub(super) fn render_type(value: &str) -> Option<&'static str> {
     match value {
         "integer" | "整数" => Some("integer"),
         "hearts" | "爱心" => Some("hearts"),
+        _ => None,
+    }
+}
+
+/// `item` 命令的方法名。
+pub(super) fn item_method(value: &str) -> Option<&'static str> {
+    match value {
+        "replace" | "替换" => Some("replace"),
+        "fill" | "填充" => Some("fill"),
+        "override" | "覆盖" => Some("override"),
+        "modify" | "修改" => Some("modify"),
         _ => None,
     }
 }

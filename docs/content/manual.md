@@ -299,7 +299,7 @@ query <name> = entity("<实体类型或 #标签>") {
 
 | 属性 | 生成的参数 | 中文写法 |
 | --- | --- | --- |
-| `type("#tag")` / `without_type("id")` | `type=#tag` / `type=!id` | `类型(...)` / `排除类型(...)` |
+| `type("#tag")` / `without_type("id")` | `type=#tag` / `type=!id` | `实体类型(...)` / `排除类型(...)` |
 | `tag("t")` | `tag=t` | `标签("t")` |
 | `without_tag("t")` | `tag=!t` | `排除标签("t")` |
 | `limit(3)` | `limit=3` | `上限(3)` |
@@ -387,31 +387,43 @@ storage saved_items = item_list("portable_chest:state", "saved_items");
 
 ```mcl title="语法" fragment
 objective <name>;
+objective <name> {
+    criteria = "dummy";          // 或 trigger、deathCount、health…（中文 准则）
+    display_name = text("…");    // 组件或字符串（中文 显示名）
+    render_type = "integer";     // integer 或 hearts（中文 渲染类型）
+    number_format = blank | fixed(text("…")) | styled;   // 中文 数字格式
+    display_slot = "sidebar";    // 显示槽（中文 显示槽）
+}
 ```
 
-声明一个 dummy 准则的用户计分板目标，运行期名称是 `<命名空间>_<名称>`（例如 `portable_chest_box_key`）。`__mcl/load` 负责创建目标，`/reload` 不会清空已有分数。目标可以同时记录玩家与实体的分数，是「给实体打上属于谁」这类绑定的基础；读写用 `scoreboard.set/reset/get`（见[计分板](#statements-scoreboard)）。
+声明一个用户计分板目标，运行期名称是 `<命名空间>_<名称>`（例如 `portable_chest_box_key`）。`__mcl/load` 负责创建目标并应用显示名、渲染类型、数字格式与显示槽，`/reload` 不会清空已有分数。目标可以同时记录玩家与实体的分数，是「给实体打上属于谁」这类绑定的基础；读写用 `scoreboard.set/reset/get`（见[计分板](#statements-scoreboard)）。
 
 ```mcl title="示例" fragment
 objective box_key;
+objective trigger_ready {
+    criteria = "trigger";
+    display_name = text("就绪") { color = "gold"; };
+    display_slot = "sidebar";
+}
 ```
 
 ### 数据槽（data_slot）
 
 ```mcl title="语法" fragment
-data_slot <name> = item_data("<键>");
-data_slot <name> = entity_data("<键>");
+data_slot <name> = item_data("<路径>");
+data_slot <name> = entity_data("<路径>");
 ```
 
 数据槽是一段可读写的命名 NBT 位置，供 `self.deposit/withdraw/remove_data` 搬运容器物品：
 
-- `item_data`（中文 `物品数据`）落在物品堆的 `minecraft:custom_data` 组件里，路径是 `Item.components."minecraft:custom_data".<键>`，只能配合 `minecraft:item` 查询使用；
-- `entity_data`（中文 `实体数据`）落在 26.3 实体的通用 `data` 字段里，路径是 `data.<键>`，不能指向玩家（Minecraft 拒绝修改玩家 NBT）。
+- `item_data`（中文 `物品数据`）落在物品堆的 `minecraft:custom_data` 组件里，路径是 `Item.components."minecraft:custom_data".<路径>`，只能配合 `minecraft:item` 查询使用；
+- `entity_data`（中文 `实体数据`）落在 26.3 实体的通用 `data` 字段里，路径是 `data.<路径>`，不能指向玩家（Minecraft 拒绝修改玩家 NBT）。
 
-键由点分隔，每段只允许字母、数字和下划线；两种数据都随世界保存。
+路径由点分键组成，可带 `[下标]` 与引号键（例如 `pc_items`、`pc_note.name`、`records[0].payload`）；两种数据都随世界保存。
 
 ```mcl title="示例" fragment
 data_slot stash = item_data("pc_items");
-data_slot note = entity_data("pc_note");
+data_slot note = entity_data("pc_note.name");
 ```
 
 ### JSON 资源（resource）
@@ -597,17 +609,20 @@ each(all_players) {
 ### 生成实体（spawn）
 
 ```mcl title="语法" fragment
-spawn("<实体类型>") {
+spawn("<实体类型>"[, <坐标>]) {
     ...
 }
 ```
 
-在当前执行位置生成实体，块内的 `self` 指向新实体，总是进入非玩家实体上下文。`minecraft:player` 与 `minecraft:fishing_bobber` 在 26.3 中标记为不可召唤，编译器直接拒绝。生成 `execute summon <类型> run function <辅助函数>`。
+在当前执行位置（或指定坐标）生成实体，块内的 `self` 指向新实体，总是进入非玩家实体上下文。坐标可以是 `pos`/`block_pos` 或 `vec3`；带坐标时生成 `execute positioned <x y z> summon <类型> run function <辅助函数>`，否则是 `execute summon <类型> run function <辅助函数>`。`minecraft:player` 与 `minecraft:fishing_bobber` 在 26.3 中标记为不可召唤，编译器直接拒绝。
 
 ```mcl title="示例" fragment
 spawn("minecraft:chest_minecart") {
     self.add_tag("box");
     self.set_invulnerable(true);
+}
+spawn("minecraft:zombie", vec3(1.5, 64, 2.5)) {
+    nbt { Silent = true; }
 }
 ```
 
@@ -640,6 +655,51 @@ each(boxes) {
     teleport(self, vec3(0.5, 64, 0.5), rotation(90, 0));   // 精确落点并面向 +X
     teleport(self, current_trigger);                       // 从仓库取回触发物身边
 }
+```
+
+### 数据操作（data）
+
+```mcl title="语法" fragment
+data.merge(<目标>, nbt { ... });
+data.remove(<目标>, "<路径>");
+data.modify(<目标>, "<路径>", insert, <下标>, <来源>);
+data.modify(<目标>, "<路径>", prepend | append | set | merge, <来源>);
+let <name> = data.get(<目标>, "<路径>");
+```
+
+目标写法与 `nbt` 组件一致：`entity, <持有者>`（要求非玩家实体）、`block, <坐标>` 或 `storage, "<资源位置>"`。`data.merge` 生成 `data merge <目标> {...}`，`data.remove` 生成 `data remove <目标> <路径>`，`data.modify` 生成 `data modify <目标> <路径> <操作> …`。数据来源有四种：
+
+| 来源 | 生成 | 说明 |
+| --- | --- | --- |
+| `from(<目标>, "<路径>")` | `from <目标> <路径>` | 从另一个 NBT 位置复制 |
+| `value(<NBT 值>)` | `value <SNBT>` | 内联 NBT 值，可写 `value(nbt { ... })` 或标量 `value(1.5f)` |
+| `string(<目标>, "<路径>"[, <起始>[, <结束>]])` | `string <目标> <路径> …` | 读取后转成字符串 |
+| `compute(<上下文>, float\|integer, "<provider>"[, <缩放>])` | `compute …` | 用上下文 provider 计算数值 |
+
+`data.get` 是表达式，经 `execute store result` 落入计分项；读取失败或非数值时为 0。NBT 路径支持 `.` 分段、`[下标]` 与引号键。
+
+```mcl title="示例" fragment
+data.merge(entity, self, nbt { CustomName = "仓库"; Tags = ["a"]; });
+data.modify(block, pos(0, 64, 0), "Items", append, from(entity, self, "Items[0]"));
+let health = data.get(entity, self, "Health");
+```
+
+### 物品操作（item）
+
+```mcl title="语法" fragment
+item.replace(<目标>, "<槽位>", with(<物品定义>));
+item.replace(<目标>, "<槽位>", from(<来源>, "<来源槽位>"[, "<修饰器>"]));
+item.fill(<目标>, "<槽位>", with(<物品定义>) | from(...));
+item.override(<目标>, "<槽位>", with(<物品定义>) | from(...));
+item.modify(<目标>, "<槽位>", "<物品修饰器>");
+```
+
+目标与来源都是 `entity, <单个实体查询>`（必须 `limit(1)`）或 `block, <坐标>`；槽位与原版一致（`contents`、`weapon.mainhand`、`hotbar.*`、`container.0` …）。`with` 引用已声明的 `item` 定义并输出完整的物品组件文本；`from` 从另一个实体或方块的槽位复制；`item.modify` 应用 `loot_modifier` 资源位置。生成 `item replace/fill/override/modify …`。
+
+```mcl title="示例" fragment
+item.replace(entity, holder, "weapon.mainhand", with(reward));
+item.replace(block, pos(0, 64, 0), "container.0", from(entity, holder, "weapon"));
+item.modify(entity, holder, "weapon", "minecraft:set_count");
 ```
 
 ### 进度操作（advancement）
@@ -785,16 +845,18 @@ message.all(text("你好") {
 message.all(nbt(entity, self, "CustomName") { separator = text("、"); });
 ```
 
-### 声音（sound.self）
+### 声音（sound）
 
 ```mcl title="语法" fragment
 sound.self("<声音资源位置>", <声音分类>);
+sound.play("<声音资源位置>", <声音分类>, <玩家查询>[, <坐标>][, <音量>][, <音调>][, <最小音量>]);
 ```
 
-在当前实体位置播放声音，生成 `playsound <声音> <分类> @s ~ ~ ~ 1 1`。要求玩家执行上下文；声音分类见[附录 B](#appendix-aliases)。
+`sound.self` 在 `@s` 处播放；`sound.play` 向查询命中的玩家播放，可以指定坐标（`pos`/`vec3`，缺省 `~ ~ ~`）、音量（非负）、音调（0 到 2）与最小音量（0 到 1）。可选参数按原版顺序自动补齐：只写音量时坐标用 `~ ~ ~`，写音调时音量默认 1，写最小音量时音调默认 1。要求玩家执行上下文；声音分类见[附录 B](#appendix-aliases)。
 
 ```mcl title="示例" fragment
 sound.self("minecraft:block.note_block.pling", master);
+sound.play("minecraft:block.note_block.pling", master, nearby, vec3(0.5, 64, 0.5), 0.5, 1.5);
 ```
 
 ### 状态效果（effect）
@@ -870,11 +932,16 @@ if stopwatch.query("tour:batch", 1000) >= 10000 {
 scoreboard.set(<持有者>, <目标>, <值>);
 scoreboard.reset(<持有者>, <目标>);
 let <name> = scoreboard.get(<持有者>, <目标>);
+scoreboard.enable(<持有者>, <目标>);
+scoreboard.operation(<结果持有者>, <结果目标>, <运算>, <来源持有者>, <来源目标>);
+scoreboard.display("侧边栏"[, <目标>]);
 ```
 
 持有者（中文 `持有者`）有三种写法：`self`/`自身`（当前实体，要求实体上下文）、`origin`/`投掷者`（当前实体的来源实体）和实体查询名称（对查询结果逐个执行；`scoreboard.get` 要求该查询是 `limit(1)` 的单个实体）。目标必须是已声明的 `objective`。
 
-`scoreboard.set` 接受任意表达式，写用户计分板；`scoreboard.reset` 删除计分项；`scoreboard.get` 是表达式，读取失败（计分项不存在）时得到 0，因此可以用 `== 0` 作为「尚未赋值」的哨兵。
+`scoreboard.set` 接受任意表达式，写用户计分板；`scoreboard.reset` 删除计分项；`scoreboard.get` 是表达式，读取失败（计分项不存在）时得到 0，因此可以用 `== 0` 作为「尚未赋值」的哨兵。`scoreboard.enable` 允许玩家用 `/trigger` 修改目标（只对 `criteria = "trigger"` 的目标有意义）；`scoreboard.operation` 对应 `scoreboard players operation`，运算名可写 `set`、`add`、`subtract`、`multiply`、`divide`、`modulo`、`min`、`max`、`swap`；`scoreboard.display` 设置或清除显示槽。
+
+
 
 ```mcl title="示例：按玩家记录状态" verify id=scoreboard_state
 namespace scoreboard_state;

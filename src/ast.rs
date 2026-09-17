@@ -56,7 +56,7 @@ pub struct ObjectiveDecl {
 #[derive(Debug)]
 pub enum NumberFormat {
     Blank,
-    Fixed(TextComponent),
+    Fixed(Box<TextComponent>),
     Styled,
 }
 
@@ -773,6 +773,32 @@ pub enum StatementKind {
     NbtMerge {
         nbt: NbtValue,
     },
+    /// `data.merge(<目标>, nbt { ... });`：把复合标签合并进目标 NBT。
+    DataMerge {
+        target: NbtComponentSource,
+        nbt: NbtValue,
+    },
+    /// `data.remove(<目标>, "<路径>");`：删除路径。
+    DataRemove {
+        target: NbtComponentSource,
+        path: String,
+        path_span: Span,
+    },
+    /// `data.modify(<目标>, "<路径>", <操作>[, <参数>]);`。
+    DataModify {
+        target: NbtComponentSource,
+        path: String,
+        path_span: Span,
+        operation: DataOperation,
+    },
+    /// `item.replace/fill/override/modify(...)`：原版 `item` 命令。
+    ItemAction {
+        method: ItemMethod,
+        target: ItemConditionSource,
+        slots: String,
+        slots_span: Span,
+        action: ItemActionKind,
+    },
     /// `advancement.grant/revoke(...)`：给玩家授予或撤销进度。
     AdvancementAction {
         operation: AdvancementOperation,
@@ -1105,6 +1131,86 @@ pub struct ScoreTarget {
     pub holder: Holder,
     pub objective: String,
     pub objective_span: Span,
+}
+
+/// `item` 命令的方法。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ItemMethod {
+    Replace,
+    Fill,
+    Override,
+    Modify,
+}
+
+impl ItemMethod {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Replace => "replace",
+            Self::Fill => "fill",
+            Self::Override => "override",
+            Self::Modify => "modify",
+        }
+    }
+}
+
+/// `item` 命令的内容：`with <物品>`、`from <来源> <槽位>[ <修饰器>]` 或 `modify <修饰器>`。
+#[derive(Debug)]
+pub enum ItemActionKind {
+    With(String, Span),
+    From {
+        source: ItemConditionSource,
+        slots: String,
+        slots_span: Span,
+        modifier: Option<String>,
+    },
+    Modifier(String, Span),
+}
+
+/// `data modify` 的操作。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DataOperationKind {
+    Insert,
+    Prepend,
+    Append,
+    Set,
+    Merge,
+}
+
+/// `data modify` 的完整操作：操作种类、`insert` 下标与数据来源。
+#[derive(Debug)]
+pub struct DataOperation {
+    pub kind: DataOperationKind,
+    pub index: Option<i32>,
+    pub source: DataSource,
+}
+
+/// `data modify` 的数据来源。
+#[derive(Debug)]
+pub enum DataSource {
+    /// `from <来源目标> <路径>`
+    From {
+        target: NbtComponentSource,
+        path: String,
+        path_span: Span,
+    },
+    /// `value <NBT 标签>`
+    Value(NbtValue),
+    /// `string <来源目标> <路径> [起始 [结束]]`
+    String {
+        target: NbtComponentSource,
+        path: String,
+        path_span: Span,
+        start: Option<i32>,
+        end: Option<i32>,
+    },
+    /// `compute <上下文> float|integer <provider> [缩放]`
+    Compute {
+        source: ComputeSource,
+        kind: ComputeKind,
+        provider: String,
+        provider_span: Span,
+        scale: Option<String>,
+    },
 }
 
 /// `scoreboard players operation` 的运算。

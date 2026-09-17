@@ -6,8 +6,8 @@
 
 use crate::ast::{
     AdvancementOperation, AdvancementReference, AdvancementScope, DataSlotDecl, DataSlotKind,
-    EffectDuration, Expr, GiveItem, GiveTarget, Holder, RotationValue, ScoreTarget, SelfAction,
-    TeleportDestination, XpKind, XpOperation,
+    EffectDuration, Expr, GiveItem, GiveTarget, Holder, ItemActionKind, ItemConditionSource,
+    RotationValue, ScoreTarget, SelfAction, TeleportDestination, XpKind, XpOperation,
 };
 
 use super::Compiler;
@@ -226,6 +226,53 @@ impl Compiler<'_> {
         }
     }
 
+    /// `item.replace/fill/override/modify(...)`：原版 `item` 命令。
+    pub(super) fn compile_item_action(
+        &self,
+        method: crate::ast::ItemMethod,
+        target: &ItemConditionSource,
+        slots: &str,
+        action: &ItemActionKind,
+        commands: &mut Vec<String>,
+    ) {
+        let target = self.item_condition_source_text(target);
+        let mut command = format!("item {} {target} {slots}", method.as_str());
+        match action {
+            ItemActionKind::With(item, _) => {
+                command.push_str(&format!(" with {}", self.item_stack_argument_for(item)));
+            }
+            ItemActionKind::From {
+                source,
+                slots,
+                slots_span: _,
+                modifier,
+            } => {
+                command.push_str(&format!(
+                    " from {} {slots}",
+                    self.item_condition_source_text(source)
+                ));
+                if let Some(modifier) = modifier {
+                    command.push_str(&format!(" {modifier}"));
+                }
+            }
+            ItemActionKind::Modifier(modifier, _) => {
+                command.push_str(&format!(" {modifier}"));
+            }
+        }
+        commands.push(command);
+    }
+
+    /// 按声明名称取物品堆文本。
+    pub(super) fn item_stack_argument_for(&self, name: &str) -> String {
+        let item = self
+            .program
+            .item_stacks
+            .iter()
+            .find(|candidate| candidate.name == name)
+            .expect("semantic validation guarantees the item stack exists");
+        item_stack_argument(item)
+    }
+
     /// `scoreboard.set(持有者, 目标, 值)`：把表达式写入用户计分板。
     pub(super) fn compile_score_set(
         &mut self,
@@ -252,6 +299,43 @@ impl Compiler<'_> {
         let objective = user_objective_name(&self.program.namespace, &target.objective);
         let prefix = self.score_holder_prefix(&target.holder);
         commands.push(format!("{prefix}scoreboard players reset @s {objective}"));
+    }
+
+    /// `scoreboard.enable(持有者, 目标)`：允许玩家用 `/trigger` 修改目标。
+    pub(super) fn compile_scoreboard_enable(
+        &self,
+        target: &ScoreTarget,
+        commands: &mut Vec<String>,
+    ) {
+        let objective = user_objective_name(&self.program.namespace, &target.objective);
+        let prefix = self.score_holder_prefix(&target.holder);
+        commands.push(format!("{prefix}scoreboard players enable @s {objective}"));
+    }
+
+    /// `scoreboard.operation(结果, 运算, 来源)`。
+    pub(super) fn compile_scoreboard_operation(
+        &self,
+        result: &ScoreTarget,
+        operation: crate::ast::ScoreboardOp,
+        source: &ScoreTarget,
+        commands: &mut Vec<String>,
+    ) {
+        let result_objective = user_objective_name(&self.program.namespace, &result.objective);
+        let source_objective = user_objective_name(&self.program.namespace, &source.objective);
+        let prefix = self.score_holder_prefix(&result.holder);
+        commands.push(format!(
+            "{prefix}scoreboard players operation @s {result_objective} {} {} {source_objective}",
+            operation.symbol(),
+            self.score_operand(&source.holder)
+        ));
+    }
+
+    /// 运算的来源操作数：`@s` 或显式选择器（`origin` 已在语义阶段拒绝）。
+    fn score_operand(&self, holder: &Holder) -> String {
+        match holder {
+            Holder::SelfEntity | Holder::Origin => "@s".to_owned(),
+            Holder::Query(name, _) => entity_query_selector(self.query(name)),
+        }
     }
 
     /// `teleport(持有者, 坐标或实体查询[, rotation(朝向)])`：`tp @s` 到坐标或单个实体。

@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{AdvancementDecl, DataSlotDecl, EntityQueryDecl, FunctionTagDecl, ItemStackDecl};
+use crate::ast::{
+    AdvancementDecl, DataSlotDecl, EntityQueryDecl, FunctionTagDecl, ItemStackDecl, ObjectiveDecl,
+};
 
 /// 函数签名的语义摘要，供调用、调度和执行上下文检查使用。
 #[derive(Clone, Copy)]
@@ -65,6 +67,8 @@ impl ReturnRules {
 pub(super) struct StatementSymbols<'a> {
     pub(super) scores: &'a HashSet<&'a str>,
     pub(super) objectives: &'a HashSet<&'a str>,
+    /// 目标声明表，供 scoreboard.enable 等语句读取准则。
+    pub(super) objective_declarations: &'a HashMap<&'a str, &'a ObjectiveDecl>,
     pub(super) parameters: &'a HashSet<&'a str>,
     pub(super) functions: &'a HashMap<&'a str, Signature>,
     pub(super) queries: &'a HashMap<&'a str, &'a EntityQueryDecl>,

@@ -148,7 +148,7 @@ impl Parser {
     }
 
     /// 一个 NBT 值：嵌套复合、列表/数组、数值、字符串或布尔。
-    fn nbt_value(&mut self) -> Result<NbtValue, Diagnostic> {
+    pub(super) fn nbt_value(&mut self) -> Result<NbtValue, Diagnostic> {
         let start = self.current().span;
         match &self.current().kind {
             TokenKind::LeftBrace => self.nbt_compound_body(start, false),

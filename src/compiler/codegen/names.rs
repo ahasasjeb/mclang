@@ -103,6 +103,13 @@ pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut 
             | StatementKind::Assign { .. }
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
+            | StatementKind::ScoreboardEnable { .. }
+            | StatementKind::ScoreboardOperation { .. }
+            | StatementKind::ScoreboardDisplay { .. }
+            | StatementKind::DataMerge { .. }
+            | StatementKind::DataRemove { .. }
+            | StatementKind::DataModify { .. }
+            | StatementKind::ItemAction { .. }
             | StatementKind::Teleport { .. }
             | StatementKind::NbtMerge { .. }
             | StatementKind::AdvancementAction { .. }

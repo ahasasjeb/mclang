@@ -300,6 +300,24 @@ impl Parser {
     /// `compute(来源, float|integer, "provider"[, 缩放])`。
     fn compute_expression(&mut self, start_span: Span) -> Result<Expr, Diagnostic> {
         self.expect(TokenKind::LeftParen, "compute 后需要 `(`")?;
+        let (source, kind, provider, provider_span, scale) = self.compute_payload()?;
+        self.expect(TokenKind::RightParen, "compute 调用缺少 `)`")?;
+        Ok(Expr {
+            kind: ExprKind::Compute {
+                source,
+                kind,
+                provider,
+                provider_span,
+                scale,
+            },
+            span: start_span.merge(self.previous().span),
+        })
+    }
+
+    /// `compute` 的公共参数（表达式与 `data.modify` 的 compute 来源共用）。
+    pub(super) fn compute_payload(
+        &mut self,
+    ) -> Result<(ComputeSource, ComputeKind, String, Span, Option<String>), Diagnostic> {
         let (source_name, source_span) = self.ident("compute 来源 default/block/entity")?;
         let Some(source_kind) = compute_source(&source_name) else {
             return Err(Diagnostic::new(
@@ -340,16 +358,6 @@ impl Parser {
         } else {
             None
         };
-        self.expect(TokenKind::RightParen, "compute 调用缺少 `)`")?;
-        Ok(Expr {
-            kind: ExprKind::Compute {
-                source,
-                kind,
-                provider,
-                provider_span,
-                scale,
-            },
-            span: start_span.merge(self.previous().span),
-        })
+        Ok((source, kind, provider, provider_span, scale))
     }
 }

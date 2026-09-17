@@ -53,6 +53,9 @@ impl Slots {
             return true;
         }
         for (prefix, count) in &self.ranges {
+            if name == format!("{prefix}*") {
+                return true;
+            }
             if let Some(suffix) = name.strip_prefix(prefix.as_str())
                 && let Ok(index) = suffix.parse::<usize>()
             {

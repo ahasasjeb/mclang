@@ -1,0 +1,44 @@
+// 编译测试（2.4 / 1.4 / 2.5）：data 命令与 item 命令全形态。
+namespace data_ops_test;
+
+query holder = entity("minecraft:player") { limit(1); };
+score points = 0;
+
+item reward = item_stack("minecraft:diamond") { count = 2; custom_name = "奖励"; };
+
+data_slot extra = entity_data("nested.records[0].payload");
+
+@entity
+fn edit_data() {
+    data.merge(entity, self, nbt { CustomName = "仓库"; Tags = ["a", "b"]; });
+    data.merge(block, pos(0, 64, 0), nbt { label = "箱子"; });
+    data.merge(storage, "data_ops_test:store", nbt { count = 1; });
+    data.remove(entity, self, "Tags[0]");
+    data.modify(entity, self, "Health", set, value(1.5f));
+    data.modify(entity, self, "CustomName", set, value("改名"));
+    data.modify(entity, self, "data.count", set, value(nbt { n = 1; }));
+    data.modify(block, pos(0, 64, 0), "Items", append, from(entity, self, "Items[0]"));
+    data.modify(storage, "data_ops_test:store", "names", insert, 0, from(entity, self, "CustomName"));
+    data.modify(entity, self, "CustomName", set, string(storage, "data_ops_test:store", "names[0]"));
+    data.modify(entity, self, "CustomName", set, string(storage, "data_ops_test:store", "names[0]", 0, 3));
+    data.modify(entity, self, "data.count", set, compute(default, integer, "minecraft:cooking/time_coal"));
+    data.modify(entity, self, "data.count", set, compute(block, pos(1, 2, 3), float, "minecraft:cooking/speed_default", 2.5));
+}
+
+@load
+fn edit_items() {
+    item.replace(entity, holder, "weapon.mainhand", with(reward));
+    item.fill(entity, holder, "hotbar.*", with(reward));
+    item.override(entity, holder, "armor.head", with(reward));
+    item.replace(block, pos(0, 64, 0), "container.0", from(entity, holder, "weapon"));
+    item.replace(entity, holder, "weapon", from(block, pos(0, 64, 0), "container.3", "data_ops_test:modifier"));
+    item.modify(entity, holder, "weapon", "minecraft:set_count");
+}
+
+@player
+fn read_back() {
+    let health = data.get(entity, self, "Health");
+    let block_count = data.get(block, pos(0, 64, 0), "Items[0].count");
+    let stored = data.get(storage, "data_ops_test:store", "names[0]");
+    points = health + block_count + stored;
+}

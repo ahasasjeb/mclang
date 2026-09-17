@@ -12,12 +12,25 @@ score next_key = 0;
 objective box_key;
 objective box_active;
 
+// 2.6 目标属性：准则、显示名、渲染类型、数字格式与显示槽。
+objective trigger_ready {
+    criteria = "trigger";
+    display_name = text("就绪") { color = "gold"; };
+    display_slot = "sidebar";
+}
+objective hearts {
+    render_type = "hearts";
+    number_format = fixed(text("♥"));
+}
+
 query players = entity("minecraft:player") {}
 query boxes = entity("minecraft:chest_minecart") { tag("box"); limit(1); }
 query current = entity("minecraft:item") { tag("current"); limit(1); }
 
+// 1.4 类型化路径：数据槽支持多段路径与下标。
 data_slot stash = item_data("pc_items");
-data_slot note = entity_data("pc_note");
+data_slot note = entity_data("pc_note.name");
+data_slot nested = entity_data("pc_data.records[0].name");
 storage saved = item_list("scoreboard_test:state", "saved");
 
 fn main() {
@@ -35,6 +48,17 @@ fn main() {
             }
         }
     }
+}
+
+// 2.6 players.enable / operation / display。
+fn counters() {
+    each(players) {
+        scoreboard.enable(self, trigger_ready);
+        scoreboard.operation(self, box_active, add, self, box_key);
+        scoreboard.operation(self, box_active, max, players, hearts);
+    }
+    scoreboard.display("list", box_active);
+    scoreboard.display("below_name");
 }
 
 @non_player

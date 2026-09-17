@@ -1,0 +1,12 @@
+// 编译测试（负向语义）：data 路径与 item 引用的错误。
+// 期望诊断：NBT 路径、找不到物品定义、item 目标需要 limit(1) 各一条。
+namespace invalid_data_ops;
+
+query players = entity("minecraft:player") {};
+
+@entity
+fn f() {
+    data.remove(entity, self, "bad..path");
+    item.replace(entity, players, "weapon", with(missing_item));
+    item.modify(entity, self, "weapon", "not a location");
+}

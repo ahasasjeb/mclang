@@ -9,7 +9,7 @@ use crate::ast::*;
 use super::Compiler;
 use super::Value;
 use super::emit::{entity_query_clause, entity_query_selector, nbt_text};
-use super::names::parameter_holder;
+use super::names::{parameter_holder, user_objective_name};
 use super::world;
 
 impl Compiler<'_> {
@@ -240,6 +240,29 @@ impl Compiler<'_> {
             StatementKind::ScoreReset { target } => {
                 self.compile_score_reset(target, commands);
             }
+            StatementKind::ScoreboardEnable { target } => {
+                self.compile_scoreboard_enable(target, commands);
+            }
+            StatementKind::ScoreboardOperation {
+                result,
+                operation,
+                source,
+            } => {
+                self.compile_scoreboard_operation(result, *operation, source, commands);
+            }
+            StatementKind::ScoreboardDisplay {
+                slot, objective, ..
+            } => {
+                let objective = objective
+                    .as_ref()
+                    .map(|(name, _)| user_objective_name(&self.program.namespace, name));
+                match objective {
+                    Some(objective) => commands.push(format!(
+                        "scoreboard objectives setdisplay {slot} {objective}"
+                    )),
+                    None => commands.push(format!("scoreboard objectives setdisplay {slot}")),
+                }
+            }
             StatementKind::Teleport {
                 targets,
                 destination,
@@ -247,8 +270,101 @@ impl Compiler<'_> {
             } => {
                 self.compile_teleport(targets, destination, rotation.as_ref(), commands);
             }
+            StatementKind::ItemAction {
+                method,
+                target,
+                slots,
+                slots_span: _,
+                action,
+            } => {
+                self.compile_item_action(*method, target, slots, action, commands);
+            }
             StatementKind::NbtMerge { nbt } => {
                 commands.push(format!("data merge entity @s {}", nbt_text(nbt)));
+            }
+            StatementKind::DataMerge { target, nbt } => {
+                commands.push(format!(
+                    "data merge {} {}",
+                    self.nbt_source_text(target),
+                    nbt_text(nbt)
+                ));
+            }
+            StatementKind::DataRemove {
+                target,
+                path,
+                path_span: _,
+            } => {
+                commands.push(format!(
+                    "data remove {} {path}",
+                    self.nbt_source_text(target)
+                ));
+            }
+            StatementKind::DataModify {
+                target,
+                path,
+                path_span: _,
+                operation,
+            } => {
+                let kind = match operation.kind {
+                    DataOperationKind::Insert => "insert",
+                    DataOperationKind::Prepend => "prepend",
+                    DataOperationKind::Append => "append",
+                    DataOperationKind::Set => "set",
+                    DataOperationKind::Merge => "merge",
+                };
+                let mut command =
+                    format!("data modify {} {path} {kind}", self.nbt_source_text(target));
+                if let Some(index) = operation.index {
+                    command.push_str(&format!(" {index}"));
+                }
+                match &operation.source {
+                    DataSource::From {
+                        target,
+                        path,
+                        path_span: _,
+                    } => {
+                        command.push_str(&format!(" from {} {path}", self.nbt_source_text(target)))
+                    }
+                    DataSource::Value(nbt) => {
+                        command.push_str(&format!(" value {}", nbt_text(nbt)));
+                    }
+                    DataSource::String {
+                        target,
+                        path,
+                        path_span: _,
+                        start,
+                        end,
+                    } => {
+                        command
+                            .push_str(&format!(" string {} {path}", self.nbt_source_text(target)));
+                        if let Some(start) = start {
+                            command.push_str(&format!(" {start}"));
+                        }
+                        if let Some(end) = end {
+                            command.push_str(&format!(" {end}"));
+                        }
+                    }
+                    DataSource::Compute {
+                        source,
+                        kind,
+                        provider,
+                        provider_span: _,
+                        scale,
+                    } => {
+                        command.push_str(&format!(
+                            " compute {} {} {provider}",
+                            self.compute_source_text(source),
+                            match kind {
+                                ComputeKind::Float => "float",
+                                ComputeKind::Integer => "integer",
+                            }
+                        ));
+                        if let Some(scale) = scale {
+                            command.push_str(&format!(" {scale}"));
+                        }
+                    }
+                }
+                commands.push(command);
             }
             StatementKind::AdvancementAction {
                 operation,

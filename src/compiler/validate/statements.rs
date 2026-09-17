@@ -10,10 +10,11 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    AdvancementReference, AssignOp, CallTarget, Condition, DataSlotKind, EffectDuration,
-    EntityQueryDecl, Expr, GiveItem, GiveTarget, Holder, MessageTarget, NbtValue, PositionValue,
-    ReturnKind, RotationValue, ScoreTarget, SelfAction, Span, Statement, StatementKind,
-    TeleportDestination, TextComponent, XpOperation,
+    AdvancementReference, AssignOp, CallTarget, Condition, DataSlotKind, DataSource,
+    EffectDuration, EntityQueryDecl, Expr, GiveItem, GiveTarget, Holder, ItemActionKind,
+    ItemConditionSource, MessageTarget, NbtValue, NbtValueKind, PositionValue, ReturnKind,
+    RotationValue, ScoreTarget, SelfAction, Span, Statement, StatementKind, TeleportDestination,
+    TextComponent, XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
@@ -113,6 +114,13 @@ pub(super) fn collect_local_declarations<'a>(
             | StatementKind::Assign { .. }
             | StatementKind::ScoreSet { .. }
             | StatementKind::ScoreReset { .. }
+            | StatementKind::ScoreboardEnable { .. }
+            | StatementKind::ScoreboardOperation { .. }
+            | StatementKind::ScoreboardDisplay { .. }
+            | StatementKind::DataMerge { .. }
+            | StatementKind::DataRemove { .. }
+            | StatementKind::DataModify { .. }
+            | StatementKind::ItemAction { .. }
             | StatementKind::Teleport { .. }
             | StatementKind::NbtMerge { .. }
             | StatementKind::AdvancementAction { .. }
@@ -311,6 +319,55 @@ fn validate_statement<'a>(
         StatementKind::ScoreReset { target } => {
             validate_score_target(target, statement.span, ctx, diagnostics);
         }
+        StatementKind::ScoreboardEnable { target } => {
+            validate_score_target(target, statement.span, ctx, diagnostics);
+            if let Some(declaration) = ctx
+                .symbols
+                .objective_declarations
+                .get(target.objective.as_str())
+                && declaration.criteria.as_deref() != Some("trigger")
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!(
+                        "scoreboard.enable 只对 criteria = \"trigger\" 的目标有意义，`{}` 的准则是 `{}`",
+                        target.objective,
+                        declaration.criteria.as_deref().unwrap_or("dummy")
+                    ),
+                    statement.span,
+                ));
+            }
+        }
+        StatementKind::ScoreboardOperation {
+            result,
+            operation: _,
+            source,
+        } => {
+            validate_score_target(result, statement.span, ctx, diagnostics);
+            validate_score_target(source, statement.span, ctx, diagnostics);
+            for target in [result, source] {
+                if matches!(target.holder, Holder::Origin) {
+                    diagnostics.push(Diagnostic::new(
+                        "scoreboard.operation 的持有者不能是投掷者；请用 self/自身 或实体查询",
+                        statement.span,
+                    ));
+                }
+            }
+        }
+        StatementKind::ScoreboardDisplay {
+            slot,
+            slot_span,
+            objective,
+        } => {
+            validate_enum("display_slot", "显示槽", slot, *slot_span, diagnostics);
+            if let Some((name, name_span)) = objective
+                && !ctx.symbols.objectives.contains(name.as_str())
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("找不到计分板目标 `{name}`；先声明 `objective {name};`"),
+                    *name_span,
+                ));
+            }
+        }
         StatementKind::Teleport {
             targets,
             destination,
@@ -324,6 +381,135 @@ fn validate_statement<'a>(
                 ctx,
                 diagnostics,
             );
+        }
+        StatementKind::DataMerge { target, nbt } => {
+            super::components::validate_nbt_source(target, statement.span, ctx, diagnostics);
+            if !matches!(nbt.kind, NbtValueKind::Compound(_)) {
+                diagnostics.push(Diagnostic::new(
+                    "data.merge 需要复合标签 `nbt { ... }`（中文 `数据 { ... }`）",
+                    statement.span,
+                ));
+            }
+        }
+        StatementKind::DataRemove {
+            target,
+            path,
+            path_span,
+        } => {
+            super::components::validate_nbt_source(target, statement.span, ctx, diagnostics);
+            if !super::components::valid_nbt_component_path(path) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{path}` 不是有效的 NBT 路径"),
+                    *path_span,
+                ));
+            }
+        }
+        StatementKind::DataModify {
+            target,
+            path,
+            path_span,
+            operation,
+        } => {
+            super::components::validate_nbt_source(target, statement.span, ctx, diagnostics);
+            if !super::components::valid_nbt_component_path(path) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{path}` 不是有效的 NBT 路径"),
+                    *path_span,
+                ));
+            }
+            super::expressions::validate_data_source(
+                &operation.source,
+                statement.span,
+                ctx,
+                diagnostics,
+            );
+            if let DataSource::String {
+                start: Some(start),
+                end: Some(end),
+                ..
+            } = &operation.source
+                && start > end
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("string 来源的起始下标 {start} 不能大于结束下标 {end}"),
+                    statement.span,
+                ));
+            }
+        }
+        StatementKind::ItemAction {
+            method: _,
+            target,
+            slots,
+            slots_span,
+            action,
+        } => {
+            super::expressions::validate_item_condition_source(
+                target,
+                statement.span,
+                ctx,
+                diagnostics,
+            );
+            super::expressions::validate_slot_source(slots, *slots_span, diagnostics);
+            if let ItemConditionSource::Entity(Holder::Query(name, name_span)) = target
+                && let Some(query) = ctx.symbols.queries.get(name.as_str())
+                && query.limit != Some(1)
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("item 目标需要 limit(1) 的单个实体查询 `{name}`"),
+                    *name_span,
+                ));
+            }
+            match action {
+                ItemActionKind::With(item, span) => {
+                    if !ctx.symbols.item_stacks.contains_key(item.as_str()) {
+                        diagnostics.push(Diagnostic::new(
+                            format!(
+                                "找不到物品定义 `{item}`；先声明 `item {item} = item_stack(...);`"
+                            ),
+                            *span,
+                        ));
+                    }
+                }
+                ItemActionKind::From {
+                    source,
+                    slots,
+                    slots_span,
+                    modifier,
+                } => {
+                    super::expressions::validate_item_condition_source(
+                        source,
+                        statement.span,
+                        ctx,
+                        diagnostics,
+                    );
+                    super::expressions::validate_slot_source(slots, *slots_span, diagnostics);
+                    if let Some(modifier) = modifier
+                        && !super::rules::valid_resource_location(modifier)
+                    {
+                        diagnostics.push(Diagnostic::new(
+                            format!("`{modifier}` 不是有效的物品修饰器资源位置"),
+                            statement.span,
+                        ));
+                    }
+                    if let ItemConditionSource::Entity(Holder::Query(name, name_span)) = source
+                        && let Some(query) = ctx.symbols.queries.get(name.as_str())
+                        && query.limit != Some(1)
+                    {
+                        diagnostics.push(Diagnostic::new(
+                            format!("item 来源需要 limit(1) 的单个实体查询 `{name}`"),
+                            *name_span,
+                        ));
+                    }
+                }
+                ItemActionKind::Modifier(modifier, span) => {
+                    if !super::rules::valid_resource_location(modifier) {
+                        diagnostics.push(Diagnostic::new(
+                            format!("`{modifier}` 不是有效的物品修饰器资源位置"),
+                            *span,
+                        ));
+                    }
+                }
+            }
         }
         StatementKind::NbtMerge { nbt } => {
             validate_nbt_merge(nbt, statement.span, ctx, diagnostics);
@@ -1044,10 +1230,7 @@ fn validate_play_sound(
                 Some(max) => format!("0 到 {max}"),
                 None => "非负数字".to_owned(),
             };
-            diagnostics.push(Diagnostic::new(
-                format!("声音{label}必须是{range}"),
-                span,
-            ));
+            diagnostics.push(Diagnostic::new(format!("声音{label}必须是{range}"), span));
         }
     }
 }

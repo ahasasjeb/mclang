@@ -6,9 +6,9 @@ use crate::lexer::TokenKind;
 
 use super::Parser;
 use super::keywords::{
-    advancement_method, boolean_word, effect_method, message_target, scoreboard_method,
-    self_method, sound_source, stopwatch_method, text_color, time_unit, word_matches, xp_kind,
-    xp_method,
+    advancement_method, boolean_word, data_method, effect_method, item_method, message_target,
+    score_operation, scoreboard_method, self_method, sound_source, stopwatch_method, text_color,
+    time_unit, word_matches, xp_kind, xp_method,
 };
 
 impl Parser {
@@ -167,6 +167,12 @@ impl Parser {
             self.locate_statement()?
         } else if self.take_word("advancement").is_some() {
             self.advancement_statement()?
+        } else if self.check_word("data") && matches!(self.peek_kind(1).kind, TokenKind::Dot) {
+            self.take_word("data");
+            self.data_statement()?
+        } else if self.check_word("item") && matches!(self.peek_kind(1).kind, TokenKind::Dot) {
+            self.take_word("item");
+            self.item_statement()?
         } else if self.check_word("nbt") {
             let nbt = self.nbt_compound_with_aliases("nbt 语句")?;
             // 块风格语句，结尾分号可选；物品属性里的 `custom_data = nbt {...};` 仍需要分号。
@@ -716,6 +722,236 @@ impl Parser {
     /// `scoreboard.set(持有者, 目标, 值);` 与 `scoreboard.reset(持有者, 目标);`
     ///
     /// `scoreboard.get` 有返回值，只能在表达式里使用，语句形式会给出引导性诊断。
+    /// `item.replace/fill/override/modify(...)`。
+    fn item_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::Dot, "item 后需要 `.`")?;
+        let (method, method_span) = self.ident("item 方法")?;
+        let Some(method) = item_method(&method) else {
+            return Err(Diagnostic::new(
+                format!(
+                    "未知 item 方法 `{method}`，可用 replace/替换、fill/填充、override/覆盖、modify/修改"
+                ),
+                method_span,
+            ));
+        };
+        let method = match method {
+            "replace" => ItemMethod::Replace,
+            "fill" => ItemMethod::Fill,
+            "override" => ItemMethod::Override,
+            _ => ItemMethod::Modify,
+        };
+        self.expect(TokenKind::LeftParen, "item 方法后需要 `(`")?;
+        let target = self.item_condition_source("item 目标")?;
+        self.expect(TokenKind::Comma, "item 目标后需要 `,`")?;
+        let (slots, slots_span) = self.string("item 需要槽位字符串")?;
+        self.expect(TokenKind::Comma, "槽位后需要 `,`")?;
+        let action = if method == ItemMethod::Modify {
+            let (modifier, span) = self.string("item.modify 需要修饰器资源位置字符串")?;
+            ItemActionKind::Modifier(modifier, span)
+        } else {
+            let (kind, kind_span) = self.ident("item 内容 with 或 from")?;
+            match kind.as_str() {
+                "with" | "用" => {
+                    self.expect(TokenKind::LeftParen, "with 后需要 `(`")?;
+                    let (item, span) = self.ident("with 需要已声明的物品名称")?;
+                    self.expect(TokenKind::RightParen, "with 缺少 `)`")?;
+                    ItemActionKind::With(item, span)
+                }
+                "from" | "来源" => {
+                    self.expect(TokenKind::LeftParen, "from 后需要 `(`")?;
+                    let source = self.item_condition_source("from 来源")?;
+                    self.expect(TokenKind::Comma, "from 来源后需要 `,`")?;
+                    let (source_slots, source_slots_span) =
+                        self.string("from 需要来源槽位字符串")?;
+                    let modifier = if self.take(&TokenKind::Comma).is_some() {
+                        Some(self.string("from 修饰器资源位置字符串")?.0)
+                    } else {
+                        None
+                    };
+                    self.expect(TokenKind::RightParen, "from 缺少 `)`")?;
+                    ItemActionKind::From {
+                        source,
+                        slots: source_slots,
+                        slots_span: source_slots_span,
+                        modifier,
+                    }
+                }
+                _ => {
+                    return Err(Diagnostic::new(
+                        format!("item 内容只能是 with/用 或 from/来源，实际为 `{kind}`"),
+                        kind_span,
+                    ));
+                }
+            }
+        };
+        self.expect(TokenKind::RightParen, "item 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "item 调用后需要 `;`")?;
+        Ok(StatementKind::ItemAction {
+            method,
+            target,
+            slots,
+            slots_span,
+            action,
+        })
+    }
+
+    /// `data.merge/remove/modify`；`data.get` 只能出现在表达式里。
+    fn data_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::Dot, "data 后需要 `.`")?;
+        let (method, method_span) = self.ident("data 方法")?;
+        let Some(method) = data_method(&method) else {
+            return Err(Diagnostic::new(
+                format!(
+                    "未知 data 方法 `{method}`，可用 merge/合并、remove/移除、modify/修改；get/取 是表达式"
+                ),
+                method_span,
+            ));
+        };
+        if method == "get" {
+            return Err(Diagnostic::new(
+                "data.get 只能出现在表达式里，例如 `let health = data.get(entity, self, \"Health\");`",
+                method_span,
+            ));
+        }
+        self.expect(TokenKind::LeftParen, "data 方法后需要 `(`")?;
+        let target = self.nbt_source_value("data 目标")?;
+        match method {
+            "merge" => {
+                self.expect(TokenKind::Comma, "data 目标后需要 `,`")?;
+                let nbt = if matches!(target, NbtComponentSource::Entity(_)) {
+                    self.nbt_compound_with_aliases("data.merge 数据")?
+                } else {
+                    self.nbt_compound("data.merge 数据")?
+                };
+                self.expect(TokenKind::RightParen, "data.merge 调用缺少 `)`")?;
+                self.expect(TokenKind::Semicolon, "data.merge 调用后需要 `;`")?;
+                Ok(StatementKind::DataMerge { target, nbt })
+            }
+            "remove" => {
+                self.expect(TokenKind::Comma, "data 目标后需要 `,`")?;
+                let (path, path_span) = self.string("data.remove 需要 NBT 路径字符串")?;
+                self.expect(TokenKind::RightParen, "data.remove 调用缺少 `)`")?;
+                self.expect(TokenKind::Semicolon, "data.remove 调用后需要 `;`")?;
+                Ok(StatementKind::DataRemove {
+                    target,
+                    path,
+                    path_span,
+                })
+            }
+            _ => {
+                self.expect(TokenKind::Comma, "data 目标后需要 `,`")?;
+                let (path, path_span) = self.string("data.modify 需要 NBT 路径字符串")?;
+                self.expect(TokenKind::Comma, "路径后需要 `,`")?;
+                let (operation, operation_span) =
+                    self.ident("data.modify 操作 insert/prepend/append/set/merge")?;
+                let kind = match operation.as_str() {
+                    "insert" | "插入" => DataOperationKind::Insert,
+                    "prepend" | "前插" => DataOperationKind::Prepend,
+                    "append" | "追加" => DataOperationKind::Append,
+                    "set" | "设置" => DataOperationKind::Set,
+                    "merge" | "合并" => DataOperationKind::Merge,
+                    _ => {
+                        return Err(Diagnostic::new(
+                            format!(
+                                "未知 data.modify 操作 `{operation}`，可用 insert、prepend、append、set、merge"
+                            ),
+                            operation_span,
+                        ));
+                    }
+                };
+                let index = if kind == DataOperationKind::Insert {
+                    self.expect(TokenKind::Comma, "insert 后需要 `,`")?;
+                    Some(self.signed("insert 下标")?)
+                } else {
+                    None
+                };
+                self.expect(TokenKind::Comma, "操作后需要 `,`")?;
+                let source = self.data_source()?;
+                self.expect(TokenKind::RightParen, "data.modify 调用缺少 `)`")?;
+                self.expect(TokenKind::Semicolon, "data.modify 调用后需要 `;`")?;
+                Ok(StatementKind::DataModify {
+                    target,
+                    path,
+                    path_span,
+                    operation: DataOperation {
+                        kind,
+                        index,
+                        source,
+                    },
+                })
+            }
+        }
+    }
+
+    /// `from(...)`、`value(nbt { ... })`、`string(...)` 或 `compute(...)`。
+    fn data_source(&mut self) -> Result<DataSource, Diagnostic> {
+        let (name, span) = self.ident("数据来源 from、value、string 或 compute")?;
+        match name.as_str() {
+            "from" | "来源" => {
+                self.expect(TokenKind::LeftParen, "from 后需要 `(`")?;
+                let target = self.nbt_source_value("from 来源")?;
+                self.expect(TokenKind::Comma, "from 来源后需要 `,`")?;
+                let (path, path_span) = self.string("from 需要 NBT 路径字符串")?;
+                self.expect(TokenKind::RightParen, "from 缺少 `)`")?;
+                Ok(DataSource::From {
+                    target,
+                    path,
+                    path_span,
+                })
+            }
+            "value" | "值" => {
+                self.expect(TokenKind::LeftParen, "value 后需要 `(`")?;
+                // `value(nbt { ... })` 也可写成 `value({ ... })`，两者等价。
+                self.take_word("nbt");
+                let nbt = self.nbt_value()?;
+                self.expect(TokenKind::RightParen, "value 缺少 `)`")?;
+                Ok(DataSource::Value(nbt))
+            }
+            "string" | "字符串" => {
+                self.expect(TokenKind::LeftParen, "string 后需要 `(`")?;
+                let target = self.nbt_source_value("string 来源")?;
+                self.expect(TokenKind::Comma, "string 来源后需要 `,`")?;
+                let (path, path_span) = self.string("string 需要 NBT 路径字符串")?;
+                let start = if self.take(&TokenKind::Comma).is_some() {
+                    Some(self.signed("string 起始下标")?)
+                } else {
+                    None
+                };
+                let end = if start.is_some() && self.take(&TokenKind::Comma).is_some() {
+                    Some(self.signed("string 结束下标")?)
+                } else {
+                    None
+                };
+                self.expect(TokenKind::RightParen, "string 缺少 `)`")?;
+                Ok(DataSource::String {
+                    target,
+                    path,
+                    path_span,
+                    start,
+                    end,
+                })
+            }
+            "compute" | "计算" => {
+                self.expect(TokenKind::LeftParen, "compute 后需要 `(`")?;
+                let (source, kind, provider, provider_span, scale) = self.compute_payload()?;
+                self.expect(TokenKind::RightParen, "compute 缺少 `)`")?;
+                Ok(DataSource::Compute {
+                    source,
+                    kind,
+                    provider,
+                    provider_span,
+                    scale,
+                })
+            }
+            _ => Err(Diagnostic::new(
+                format!(
+                    "未知数据来源 `{name}`，可用 from/来源、value/值、string/字符串、compute/计算"
+                ),
+                span,
+            )),
+        }
+    }
+
     fn scoreboard_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::Dot, "scoreboard 后需要 `.`")?;
         let (method, method_span) = self.ident("scoreboard 方法")?;
@@ -725,6 +961,9 @@ impl Parser {
                 method_span,
             ));
         };
+        if method == "display" {
+            return self.scoreboard_display_statement();
+        }
         let target = self.score_target("scoreboard 方法")?;
         match method {
             "set" => {
@@ -739,12 +978,68 @@ impl Parser {
                 self.expect(TokenKind::Semicolon, "scoreboard.reset 调用后需要 `;`")?;
                 Ok(StatementKind::ScoreReset { target })
             }
+            "enable" => {
+                self.expect(TokenKind::RightParen, "scoreboard.enable 调用缺少 `)`")?;
+                self.expect(TokenKind::Semicolon, "scoreboard.enable 调用后需要 `;`")?;
+                Ok(StatementKind::ScoreboardEnable { target })
+            }
+            "operation" => {
+                self.expect(TokenKind::Comma, "结果计分目标后需要 `,`")?;
+                let (operation, operation_span) =
+                    self.ident("运算名称 set/add/subtract/multiply/divide/modulo/min/max/swap")?;
+                let Some(operation) = score_operation(&operation) else {
+                    return Err(Diagnostic::new(
+                        format!(
+                            "未知运算 `{operation}`，可用 set、add、subtract、multiply、divide、modulo、min、max、swap"
+                        ),
+                        operation_span,
+                    ));
+                };
+                let operation = match operation {
+                    "set" => ScoreboardOp::Set,
+                    "add" => ScoreboardOp::Add,
+                    "subtract" => ScoreboardOp::Subtract,
+                    "multiply" => ScoreboardOp::Multiply,
+                    "divide" => ScoreboardOp::Divide,
+                    "modulo" => ScoreboardOp::Modulo,
+                    "min" => ScoreboardOp::Min,
+                    "max" => ScoreboardOp::Max,
+                    _ => ScoreboardOp::Swap,
+                };
+                self.expect(TokenKind::Comma, "运算名称后需要 `,`")?;
+                let source = self.score_target_body("来源计分目标")?;
+                self.expect(TokenKind::RightParen, "scoreboard.operation 调用缺少 `)`")?;
+                self.expect(TokenKind::Semicolon, "scoreboard.operation 调用后需要 `;`")?;
+                Ok(StatementKind::ScoreboardOperation {
+                    result: target,
+                    operation,
+                    source,
+                })
+            }
             "get" => Err(Diagnostic::new(
                 "scoreboard.get 只能出现在表达式里，例如 `let id = scoreboard.get(self, box_key);`",
                 method_span,
             )),
-            _ => unreachable!("scoreboard_method 只返回 set、reset、get"),
+            _ => unreachable!("scoreboard_method 只返回已知方法"),
         }
+    }
+
+    /// `scoreboard.display("侧边栏"[, 目标]);`
+    fn scoreboard_display_statement(&mut self) -> Result<StatementKind, Diagnostic> {
+        self.expect(TokenKind::LeftParen, "scoreboard.display 后需要 `(`")?;
+        let (slot, slot_span) = self.string("scoreboard.display 需要显示槽字符串")?;
+        let objective = if self.take(&TokenKind::Comma).is_some() {
+            Some(self.ident("scoreboard.display 需要已声明的目标名称")?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::RightParen, "scoreboard.display 调用缺少 `)`")?;
+        self.expect(TokenKind::Semicolon, "scoreboard.display 调用后需要 `;`")?;
+        Ok(StatementKind::ScoreboardDisplay {
+            slot,
+            slot_span,
+            objective,
+        })
     }
 
     /// `teleport(持有者, 坐标或实体查询);`
@@ -845,6 +1140,11 @@ impl Parser {
     /// 读取计分目标的 `(持有者, 目标)` 部分，右括号留给调用方。
     pub(super) fn score_target(&mut self, label: &str) -> Result<ScoreTarget, Diagnostic> {
         self.expect(TokenKind::LeftParen, &format!("{label} 后需要 `(`"))?;
+        self.score_target_body(label)
+    }
+
+    /// `(持有者, 目标)` 的内部形式：`scoreboard.operation` 的来源参数不带括号。
+    pub(super) fn score_target_body(&mut self, _label: &str) -> Result<ScoreTarget, Diagnostic> {
         let holder = self.score_holder()?;
         self.expect(TokenKind::Comma, "计分持有者后需要 `,`")?;
         let (objective, objective_span) = self.ident("计分板目标名称")?;

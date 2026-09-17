@@ -166,15 +166,6 @@ impl Compiler<'_> {
                 scale,
                 ..
             } => {
-                let source = match source {
-                    ComputeSource::Default => "default".to_owned(),
-                    ComputeSource::Block(position) => {
-                        format!("block {}", super::world::position_text(position))
-                    }
-                    ComputeSource::Entity(holder) => {
-                        format!("entity {}", self.component_holder(holder))
-                    }
-                };
                 let kind = match kind {
                     ComputeKind::Float => "float",
                     ComputeKind::Integer => "integer",
@@ -184,7 +175,10 @@ impl Compiler<'_> {
                     .map(|scale| format!(" {scale}"))
                     .unwrap_or_default();
                 self.capture_result(
-                    format!("compute {source} {kind} {provider}{scale}"),
+                    format!(
+                        "compute {} {kind} {provider}{scale}",
+                        self.compute_source_text(source)
+                    ),
                     commands,
                 )
             }
@@ -479,13 +473,26 @@ impl Compiler<'_> {
     }
 
     /// 物品条件的来源文本（`if items`/`if slots`）。
-    fn item_condition_source_text(&self, source: &ItemConditionSource) -> String {
+    pub(super) fn item_condition_source_text(&self, source: &ItemConditionSource) -> String {
         match source {
             ItemConditionSource::Entity(holder) => {
                 format!("entity {}", self.component_holder(holder))
             }
             ItemConditionSource::Block(position) => {
                 format!("block {}", super::world::position_text(position))
+            }
+        }
+    }
+
+    /// `compute` 上下文来源的命令文本（表达式与 `data.modify` 共用）。
+    pub(super) fn compute_source_text(&self, source: &ComputeSource) -> String {
+        match source {
+            ComputeSource::Default => "default".to_owned(),
+            ComputeSource::Block(position) => {
+                format!("block {}", super::world::position_text(position))
+            }
+            ComputeSource::Entity(holder) => {
+                format!("entity {}", self.component_holder(holder))
             }
         }
     }

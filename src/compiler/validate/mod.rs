@@ -70,6 +70,11 @@ pub(super) fn validate(program: &Program, function_permission_level: u8) -> Vec<
         signatures,
         scores,
         objectives,
+        objective_declarations: program
+            .objectives
+            .iter()
+            .map(|objective| (objective.name.as_str(), objective))
+            .collect(),
     };
 
     validate_function_bodies(
@@ -86,6 +91,8 @@ pub(super) fn validate(program: &Program, function_permission_level: u8) -> Vec<
 struct Declarations<'a> {
     scores: HashSet<&'a str>,
     objectives: HashSet<&'a str>,
+    /// 目标声明表，供 scoreboard.enable 等语句读取准则。
+    objective_declarations: HashMap<&'a str, &'a ObjectiveDecl>,
     queries: HashMap<&'a str, &'a EntityQueryDecl>,
     item_stacks: HashMap<&'a str, &'a ItemStackDecl>,
     storages: HashSet<&'a str>,
@@ -204,7 +211,8 @@ fn valid_score_criteria(criteria: &str) -> bool {
     )
 }
 
-/// 显示名与数字格式组件的轻量检查：颜色与结构（不需要符号表）。
+/// 显示名与数字格式组件的轻量检查：递归检查颜色与悬停内容
+/// （不需要符号表，因此可以在收集阶段调用）。
 fn validate_objective_component(component: &TextComponent, diagnostics: &mut Vec<Diagnostic>) {
     if let Some(color) = &component.style.color
         && !components::valid_component_color(color)
@@ -214,18 +222,13 @@ fn validate_objective_component(component: &TextComponent, diagnostics: &mut Vec
             component.span,
         ));
     }
-    for (value, span) in [
-        component.style.click.is_some().then_some(component.span),
-        component.style.hover.is_some().then_some(component.span),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        let _ = value;
-        let _ = span;
-    }
     if let Some(hover) = &component.style.hover {
         validate_objective_component(hover, diagnostics);
+    }
+    if let TextComponentKind::Translate { args, .. } = &component.kind {
+        for arg in args {
+            validate_objective_component(arg, diagnostics);
+        }
     }
 }
 
@@ -311,10 +314,10 @@ fn collect_data_slots<'a>(
                 slot.span,
             ));
         }
-        if !valid_nbt_path(&slot.key) {
+        if !components::valid_nbt_component_path(&slot.key) {
             diagnostics.push(Diagnostic::new(
                 format!(
-                    "`{}` 不是受支持的数据槽键；键由点分隔，每段只允许字母、数字和下划线",
+                    "`{}` 不是有效的数据槽路径；路径由点分键组成，可带 `[下标]` 与引号键",
                     slot.key
                 ),
                 slot.key_span,
@@ -515,6 +518,7 @@ fn validate_function_bodies(
         let symbols = StatementSymbols {
             scores: &declarations.scores,
             objectives: &declarations.objectives,
+            objective_declarations: &declarations.objective_declarations,
             parameters: &parameters,
             functions: &declarations.signatures,
             queries: &declarations.queries,

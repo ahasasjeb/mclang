@@ -79,10 +79,36 @@ impl<'a> Compiler<'a> {
             self.objective
         )];
         for objective in &self.program.objectives {
-            commands.push(format!(
-                "scoreboard objectives add {} dummy",
-                names::user_objective_name(&self.program.namespace, &objective.name)
-            ));
+            let runtime = names::user_objective_name(&self.program.namespace, &objective.name);
+            let criteria = objective.criteria.as_deref().unwrap_or("dummy");
+            commands.push(format!("scoreboard objectives add {runtime} {criteria}"));
+            if let Some(display_name) = &objective.display_name {
+                commands.push(format!(
+                    "scoreboard objectives modify {runtime} displayname {}",
+                    self.component_json(display_name)
+                ));
+            }
+            if let Some(render_type) = &objective.render_type {
+                commands.push(format!(
+                    "scoreboard objectives modify {runtime} rendertype {render_type}"
+                ));
+            }
+            match &objective.number_format {
+                Some(NumberFormat::Blank) => commands.push(format!(
+                    "scoreboard objectives modify {runtime} numberformat blank"
+                )),
+                Some(NumberFormat::Styled) => commands.push(format!(
+                    "scoreboard objectives modify {runtime} numberformat styled"
+                )),
+                Some(NumberFormat::Fixed(component)) => commands.push(format!(
+                    "scoreboard objectives modify {runtime} numberformat fixed {}",
+                    self.component_json(component)
+                )),
+                None => {}
+            }
+            if let Some(slot) = &objective.display_slot {
+                commands.push(format!("scoreboard objectives setdisplay {slot} {runtime}"));
+            }
         }
         for score in &self.program.scores {
             commands.push(format!(
