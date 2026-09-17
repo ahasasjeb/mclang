@@ -1,0 +1,165 @@
+// 编译测试：for 循环、break/continue 与控制流优化。
+// 覆盖半开区间、常量与表达式边界、嵌套循环、while 里的 break/continue、
+// 常量条件折叠（if 与 while）以及循环变量的局部作用域。
+//
+// 验证：
+//   cargo run --bin mclang -- build tests/valid/loops -o build/tests/loops --deny-raw
+// 重点检查：
+//   data/loops/function/counted_sum.mcfunction 的常量上限比较（matches ..N）
+//   data/loops/function/always.mcfunction 里折叠掉的 if 与 while 0 == 1
+//   data/loops/function/nested.mcfunction 的辅助函数
+namespace loops;
+
+score total = 0;
+score sum = 0;
+
+// 常量边界：上限直接写进 `matches ..N`。
+fn counted_sum() -> score {
+    let result = 0;
+    for index in 0..5 {
+        result += index;
+    }
+    return result;
+}
+
+// 表达式边界：终点 materialize 到循环上限计分项。
+fn dynamic_bounds(low, high) -> score {
+    let result = 0;
+    for index in low..high {
+        result += index * 2;
+    }
+    return result;
+}
+
+// for + break/continue：跳过偶数，遇到负数提前结束。
+fn filtered_sum(values) -> score {
+    let result = 0;
+    for index in 0..values {
+        if index % 2 == 0 {
+            continue;
+        }
+        if index >= 20 {
+            break;
+        }
+        result += index;
+    }
+    return result;
+}
+
+// while + break/continue：连杀式计数。
+@non_player
+fn countdown() {
+    let step = 0;
+    while step < 100 {
+        step += 1;
+        if step == 3 {
+            continue;
+        }
+        if step == 7 {
+            break;
+        }
+        total += step;
+    }
+}
+
+// 嵌套循环：内层 break 只跳出内层，外层 continue 由外层状态处理。
+fn nested() {
+    for outer in 0..3 {
+        for inner in 0..4 {
+            if inner == 1 {
+                continue;
+            }
+            if inner == 3 {
+                break;
+            }
+            total += outer * 10 + inner;
+        }
+        if outer == 1 {
+            continue;
+        }
+        sum += outer;
+    }
+}
+
+// 常量条件：if 直接选分支，while 0 == 1 不生成循环。
+fn always() {
+    if 1 == 1 {
+        sum += 1;
+    } else {
+        sum = 999;
+    }
+    if 2 < 1 {
+        sum = 999;
+    }
+    while 0 == 1 {
+        sum = 999;
+    }
+    while 1 == 1 {
+        sum += 1;
+        if sum > 100 {
+            break;
+        }
+    }
+}
+
+// 空区间不生成任何循环命令；兄弟循环可以复用同一个循环变量名。
+fn empty_range() {
+    for index in 3..3 {
+        total += index;
+    }
+    for index in 5..1 {
+        total += index;
+    }
+}
+
+// 循环变量是局部名：与外层 let 使用不同的名字即可共存。
+fn local_names() {
+    let base = 100;
+    for step in 0..2 {
+        sum += step;
+    }
+    total += base;
+}
+
+// break/continue 在 execute 块里同样作用于最近一层循环。
+@non_player
+fn execute_block() {
+    for index in 0..10 {
+        execute if total <= 1000 {
+            if index == 2 {
+                continue;
+            }
+            if index == 4 {
+                break;
+            }
+        }
+        total += index;
+    }
+}
+
+// while 嵌套在 for 里：内层 while 的 continue 与 for 的 break 互不干扰。
+fn nested_while() {
+    for outer in 0..3 {
+        let inner = 0;
+        while inner < 5 {
+            inner += 1;
+            if inner == 2 {
+                continue;
+            }
+            sum += inner;
+        }
+        if outer == 1 {
+            break;
+        }
+    }
+}
+
+// 负常量区间与动态起点。
+fn negative_range() {
+    for index in -2..2 {
+        total += index;
+    }
+    for index in sum..10 {
+        total += index;
+    }
+}

@@ -1,7 +1,7 @@
 命名空间 portable_chest;
 
 // 触发物：丢出单个命名为 A 的绿宝石。已处理标签避免同一掉落物每刻重复触发。
-查询 trigger_items = 实体("minecraft:item") {
+公开 查询 trigger_items = 实体("minecraft:item") {
     排除标签("pc_processed");
     物品(内容) {
         类型 = "minecraft:emerald";
@@ -11,19 +11,20 @@
 }
 
 // 已经放出、留在玩家身边的矿车。
-查询 deployed_boxes = 实体("minecraft:chest_minecart") {
+公开 查询 deployed_boxes = 实体("minecraft:chest_minecart") {
     标签("pc_box");
     排除标签("pc_stowed");
 }
 
 // 停在世界边界仓库里的矿车。物品一直留在车里，不经过任何数据搬运。
-查询 stowed_boxes = 实体("minecraft:chest_minecart") {
+公开 查询 stowed_boxes = 实体("minecraft:chest_minecart") {
     标签("pc_box");
     标签("pc_stowed");
 }
 
 // 当前正在处理的触发物；从仓库取回矿车时作为传送落点。
-查询 current_trigger = 实体("minecraft:item") {
+公开 查询 current_trigger = 实体("minecraft:item") {
     标签("pc_current");
     上限(1);
 }
+

@@ -289,7 +289,10 @@ fn namespace_of(id: &str) -> &str {
 }
 
 /// 在候选集合中找编辑距离 ≤ 2 的最近者。
-fn closest<'a>(value: &str, candidates: impl Iterator<Item = &'a str>) -> Option<String> {
+pub(crate) fn closest<'a>(
+    value: &str,
+    candidates: impl Iterator<Item = &'a str>,
+) -> Option<String> {
     let mut best: Option<(usize, String)> = None;
     for candidate in candidates {
         let distance = edit_distance(value, candidate);

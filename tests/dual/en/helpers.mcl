@@ -1,0 +1,9 @@
+// 双语一致性语料的子模块（英文关键词版）。
+// 它 import main 使用入口的 score，入口也会 import 它，验证导入环与限定名。
+namespace dual;
+
+import main;
+
+export fn boost(value) -> score {
+    return value + total;
+}

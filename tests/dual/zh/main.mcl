@@ -2,6 +2,8 @@
 // 与 tests/dual/en/main.mcl 语义完全相同，两个项目分别构建后产物必须逐字节一致。
 命名空间 dual;
 
+导入 helpers;
+
 计分 active = 0;
 计分 total = 0;
 计分 flag = 0;
@@ -63,6 +65,28 @@
     返回 result;
 }
 
+函数 loop_showcase() {
+    对于 index 在 0..4 {
+        如果 index == 1 {
+            跳过;
+        }
+        如果 index == 3 {
+            跳出;
+        }
+        total += index;
+    }
+    当 total > 5 {
+        total -= 1;
+        如果 total == 7 {
+            跳过;
+        }
+        如果 total == 6 {
+            跳出;
+        }
+    }
+    total = boost(total);
+}
+
 函数 later() {
     调度 later() 延后 1.5 秒 追加;
 }
@@ -97,3 +121,4 @@
     消息.最近(16, 文本("附近") { 斜体 = 真; }, 青色);
     消息.玩家(players, 计分(自身, "runtime_objective"));
 }
+

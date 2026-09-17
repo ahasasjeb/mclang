@@ -1,4 +1,0 @@
-// 编译测试（负向）：与 first.mcl 的命名空间不一致。
-namespace second;
-
-fn b() {}

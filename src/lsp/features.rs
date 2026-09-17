@@ -16,7 +16,19 @@ use super::convert::{offset_to_position, path_to_uri, word_at};
 const KEYWORD_DOCS: &[(&str, &str)] = &[
     (
         "namespace",
-        "声明项目命名空间；同一项目内的所有文件必须一致。",
+        "声明项目命名空间；入口模块必需，其他模块省略则继承入口。",
+    ),
+    (
+        "import",
+        "从其他模块导入公开声明：`import lib::math;` 或 `import lib::{add as plus};`。",
+    ),
+    (
+        "export",
+        "把顶层声明公开给其他模块；只有 `export` 的声明才能被导入。",
+    ),
+    (
+        "as",
+        "导入别名：`import lib::{add as plus};`；也是 execute 子句 `as(查询)`。",
     ),
     ("score", "声明全局计分变量，并给出初始值。"),
     (
@@ -76,6 +88,13 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ),
     ("else", "条件分支的否定分支。"),
     ("while", "条件循环。"),
+    (
+        "for",
+        "`for 变量 in 起点..终点 { ... }`：半开区间循环，变量是循环体内的局部计分项。",
+    ),
+    ("in", "for 区间的连接词：`for index in 0..10`。"),
+    ("break", "跳出最近一层 for/while 循环。"),
+    ("continue", "跳过本次迭代，进入下一轮 for/while 循环。"),
     ("each", "对查询结果逐个执行，并进入实体上下文。"),
     ("call", "调用函数或 `#标签`。"),
     ("schedule", "延时调度函数或 `#标签`。"),

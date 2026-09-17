@@ -80,6 +80,13 @@ fn collect_synchronous_calls<'a>(
                 collect_condition_calls(condition, calls);
                 collect_synchronous_calls(body, tags, calls);
             }
+            StatementKind::For {
+                start, end, body, ..
+            } => {
+                collect_expr_calls(start, calls);
+                collect_expr_calls(end, calls);
+                collect_synchronous_calls(body, tags, calls);
+            }
             StatementKind::Execute { clauses, body } => {
                 if let crate::ast::ExecuteClauses::Structured(clauses) = clauses {
                     for clause in clauses {
@@ -140,6 +147,8 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::DataModify { .. }
             | StatementKind::ItemAction { .. }
             | StatementKind::Teleport { .. }
+            | StatementKind::Break
+            | StatementKind::Continue
             | StatementKind::NbtMerge { .. } => {}
         }
     }

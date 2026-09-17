@@ -1,0 +1,9 @@
+// 双语一致性语料的子模块（中文关键词版）。
+// 与 tests/dual/en/helpers.mcl 语义相同，产物必须逐字节一致。
+命名空间 dual;
+
+导入 main;
+
+公开 函数 boost(value) -> score {
+    返回 value + total;
+}

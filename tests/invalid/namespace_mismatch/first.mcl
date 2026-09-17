@@ -1,6 +1,0 @@
-// 编译测试（负向）：多文件的命名空间必须一致。
-// 本文件声明 first，second.mcl 声明 second；必须对这个**目录**运行 check
-// （单独 check 任一文件不会报错），期望报出命名空间不一致并给出位置。
-namespace first;
-
-fn a() {}

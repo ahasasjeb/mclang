@@ -1,0 +1,4 @@
+// 编译测试（负向）：命名空间与入口不一致。
+namespace second;
+
+export fn b() {}

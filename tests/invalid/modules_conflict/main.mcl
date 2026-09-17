@@ -1,0 +1,9 @@
+// 编译测试（负向）：两个模块导出同名函数，整模块导入时冲突。
+namespace module_conflict;
+
+import alpha;
+import beta;
+
+fn main() {
+    shared();
+}

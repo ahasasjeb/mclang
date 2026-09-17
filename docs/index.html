@@ -37,7 +37,8 @@
 <a class="lvl-3" href="#sec-编辑器支持">编辑器支持</a>
 <a class="lvl-2" href="#basics">语言基础</a>
 <a class="lvl-3" href="#sec-注释-字符串与数字">注释、字符串与数字</a>
-<a class="lvl-3" href="#sec-程序结构与命名空间">程序结构与命名空间</a>
+<a class="lvl-3" href="#sec-程序结构与模块">程序结构与模块</a>
+<a class="lvl-3" href="#basics-modules">模块与导入</a>
 <a class="lvl-3" href="#sec-中英关键词">中英关键词</a>
 <a class="lvl-3" href="#basics-identifiers">中文标识符</a>
 <a class="lvl-3" href="#basics-nbt">结构化 NBT（nbt）</a>
@@ -54,7 +55,7 @@
 <a class="lvl-3" href="#sec-函数标签-fn-tag">函数标签（fn_tag）</a>
 <a class="lvl-3" href="#sec-函数与属性-fn">函数与属性（fn）</a>
 <a class="lvl-2" href="#statements">语句参考</a>
-<a class="lvl-3" href="#sec-控制流-if-else-while">控制流（if / else / while）</a>
+<a class="lvl-3" href="#sec-控制流-if-else-while-for">控制流（if / else / while / for）</a>
 <a class="lvl-3" href="#sec-遍历实体-each">遍历实体（each）</a>
 <a class="lvl-3" href="#sec-生成实体-spawn">生成实体（spawn）</a>
 <a class="lvl-3" href="#sec-维度上下文-in-dimension">维度上下文（in_dimension）</a>
@@ -98,7 +99,7 @@
 <div class="callout note"><p class="callout-title">本手册怎么读</p><p>语法模板里的尖括号是占位符，例如 <code class="kw"><span class="kw-en">give(&lt;players&gt;, &lt;stack&gt;)</span><span class="kw-zh">给予(&lt;players&gt;, &lt;stack&gt;)</span></code>；标注“编译器验证通过”的完整示例由 <code>docs/tools/build.mjs</code> 分别用英文与中文关键词编译过，两种写法的数据包<strong>逐字节一致</strong>，示例里的 <code>.mcfunction</code> 片段是编译器实际产物。顶栏的 <strong>“English keywords / 中文关键词”</strong> 按钮会把页面上的 Mclang 代码块、行内关键词、方法名与枚举值整体切换；只翻译关键词，注释、字符串与标识符保持原样；生成的命令与目录树不参与切换。</p>
 </div>
 <h2 id="intro">认识 Mclang</h2>
-<p>手写 <code>.mcfunction</code> 时，一个“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、<code>execute as</code>/<code>at</code> 上下文、函数标签、<code>tellraw</code> 的 JSON 和 <code class="kw"><span class="kw-en">give</span><span class="kw-zh">给予</span></code> 的物品组件语法。Mclang 把源码分成了明确的层：</p>
+<p>手写 <code>.mcfunction</code> 时，一个“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、<code class="kw"><span class="kw-en">execute as</span><span class="kw-zh">执行 作为</span></code>/<code>at</code> 上下文、函数标签、<code>tellraw</code> 的 JSON 和 <code class="kw"><span class="kw-en">give</span><span class="kw-zh">给予</span></code> 的物品组件语法。Mclang 把源码分成了明确的层：</p>
 <ul><li><strong>声明层</strong>：<code class="kw"><span class="kw-en">namespace</span><span class="kw-zh">命名空间</span></code>、<code class="kw"><span class="kw-en">score</span><span class="kw-zh">计分</span></code>、<code class="kw"><span class="kw-en">objective</span><span class="kw-zh">目标</span></code>、<code class="kw"><span class="kw-en">query</span><span class="kw-zh">查询</span></code>、<code class="kw"><span class="kw-en">item</span><span class="kw-zh">物品</span></code>、<code class="kw"><span class="kw-en">storage</span><span class="kw-zh">存储</span></code>、<code class="kw"><span class="kw-en">data_slot</span><span class="kw-zh">数据槽</span></code>、<code class="kw"><span class="kw-en">resource</span><span class="kw-zh">资源</span></code>、<code class="kw"><span class="kw-en">fn_tag</span><span class="kw-zh">函数标签</span></code>、<code class="kw"><span class="kw-en">fn</span><span class="kw-zh">函数</span></code>，编译器检查重名、类型与资源位置。</li><li><strong>语句层</strong>：<code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code>、<code class="kw"><span class="kw-en">each</span><span class="kw-zh">遍历</span></code>、<code class="kw"><span class="kw-en">spawn</span><span class="kw-zh">召唤</span></code>、<code class="kw"><span class="kw-en">give</span><span class="kw-zh">给予</span></code>、<code class="kw"><span class="kw-en">self.*</span><span class="kw-zh">自身.*</span></code>、<code class="kw"><span class="kw-en">message.*</span><span class="kw-zh">消息.*</span></code>、<code class="kw"><span class="kw-en">effect.*</span><span class="kw-zh">效果.*</span></code>、<code class="kw"><span class="kw-en">xp.*</span><span class="kw-zh">经验.*</span></code>、<code class="kw"><span class="kw-en">scoreboard.*</span><span class="kw-zh">计分板.*</span></code>、<code class="kw"><span class="kw-en">teleport</span><span class="kw-zh">传送</span></code>、<code class="kw"><span class="kw-en">schedule</span><span class="kw-zh">调度</span></code>、<code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code>/<code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 以及 <code class="kw"><span class="kw-en">set_block</span><span class="kw-zh">设置方块</span></code>、<code class="kw"><span class="kw-en">fill</span><span class="kw-zh">填充</span></code>、<code class="kw"><span class="kw-en">clone</span><span class="kw-zh">复制</span></code> 等世界命令，每条都是独立 AST 节点。</li><li><strong>表达式层</strong>：整数、计分值、带返回值的函数调用与 <code>scoreboard.get</code>、<code class="kw"><span class="kw-en">xp.query</span><span class="kw-zh">经验.查询</span></code>、<code class="kw"><span class="kw-en">stopwatch.query</span><span class="kw-zh">秒表.查询</span></code>、<code class="kw"><span class="kw-en">time.query</span><span class="kw-zh">时间.查询</span></code>、<code class="kw"><span class="kw-en">gamerule.query</span><span class="kw-zh">游戏规则.查询</span></code>、<code>worldborder.get</code> 等查询表达式。</li><li><strong>逃生口</strong>：<code class="kw"><span class="kw-en">run</span><span class="kw-zh">原生命令</span></code>、字符串形式的 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 与 <code class="kw"><span class="kw-en">return run</span><span class="kw-zh">返回 原生命令</span></code> 接受原生命令文本，<code>--deny-raw</code> 可以强制项目完全停留在标准层。</li></ul><div class="callout tip"><p class="callout-title">中英关键词完全等价</p><p>每个关键词、函数属性、方法和枚举值都有英文与中文写法，两种写法可以在同一个文件、同一条语句里混用。编译器保证两种写法生成<strong>逐字节相同</strong>的数据包；本手册的构建脚本会在每次生成时重新验证这一点。</p>
 </div>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">一个最小的完整程序</span><span class="code-actions"><span class="badge ok">编译器验证通过</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">hello</span>;
@@ -171,7 +172,7 @@ mclang help | version</code></pre></figure>
 <tr><td><code>--description &lt;文本&gt;</code></td><td>写入 <code>pack.mcmeta</code> 的描述，默认 <code>Generated by mclang</code></td></tr>
 <tr><td><code>mclang lsp</code></td><td>在标准输入输出上启动语言服务器，供编辑器插件使用</td></tr>
 </tbody></table></div>
-<p>输入可以是单个 <code>.mcl</code> 文件，也可以是递归包含 <code>.mcl</code> 的目录；同一个项目里的所有文件必须声明相同命名空间，声明与引用在整个项目内可见。</p>
+<p>输入可以是单个 <code>.mcl</code> 文件（单模块项目），也可以是以 <code>main.mcl</code> 为入口的项目目录：入口用 <code class="kw"><span class="kw-en">import</span><span class="kw-zh">导入</span></code> 引入其他模块，只有入口可达的模块会被编译，跨模块引用需要对方 <code class="kw"><span class="kw-en">export</span><span class="kw-zh">公开</span></code>（见<a href="#basics-modules">模块与导入</a>）。</p>
 <figure class="code" data-lang="powershell"><figcaption><span class="code-title">检查并构建示例</span><span class="code-actions"><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code>cargo run -- check examples/portable_chest --deny-raw
 cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <p>把输出目录复制到世界的 <code>datapacks/</code> 下，执行 <code>/reload</code> 即可。数据包格式固定为 <code>121.0</code>。</p>
@@ -207,8 +208,60 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <p>仓库自带 VSCode 插件（<code>editors/vscode</code>）与语言服务器（<code>mclang lsp</code>）。插件提供中英文关键词语法高亮、与命令行同一套即时诊断、补全、悬停说明和跨文件跳转；可执行文件会在工作区 <code>target/release</code>、<code>target/debug</code> 与 <code>PATH</code> 中自动查找，也可以用 <code>mclang.server.path</code> 指定。</p>
 <h2 id="basics">语言基础</h2>
 <h3 id="sec-注释-字符串与数字">注释、字符串与数字</h3>
-<ul><li>注释：<code>// 到行尾</code>，没有块注释。</li><li>字符串：双引号，支持转义 <code>\&quot;</code>、<code>\\</code>、<code>\n</code>、<code>\r</code>、<code>\t</code>，不能跨行。</li><li>原始字符串：<code>&quot;&quot;&quot;</code> 到下一个 <code>&quot;&quot;&quot;</code>，可以跨行，内容不做转义——适合内嵌 JSON。</li><li>数字：十进制整数（32 位范围内）与小数（<code>1.5</code>、<code>0.25</code>）；NBT 的类型后缀见<a href="#basics-nbt">结构化 NBT</a>。</li><li>标识符：字母、数字与下划线，不能以数字开头。ASCII 名必须是小写字母、数字与下划线，不超过 32 个字符，且不能是保留字（中英文关键词都是保留字）。中文等非 ASCII 字母也允许，编译时会被换成随机 ASCII 别名，见<a href="#basics-identifiers">中文标识符</a>。</li></ul><h3 id="sec-程序结构与命名空间">程序结构与命名空间</h3>
-<p>每个文件都以 <code class="kw"><span class="kw-en">namespace &lt;名称&gt;;</span><span class="kw-zh">命名空间 &lt;名称&gt;;</span></code> 开头。项目里所有文件必须声明同一个命名空间；命名空间只能包含小写 ASCII 字母、数字与下划线，不能以数字开头，也不能是 Windows 保留设备名。声明顺序不影响引用。</p>
+<ul><li>注释：<code>// 到行尾</code>，没有块注释。</li><li>字符串：双引号，支持转义 <code>\&quot;</code>、<code>\\</code>、<code>\n</code>、<code>\r</code>、<code>\t</code>，不能跨行。</li><li>原始字符串：<code>&quot;&quot;&quot;</code> 到下一个 <code>&quot;&quot;&quot;</code>，可以跨行，内容不做转义——适合内嵌 JSON。</li><li>数字：十进制整数（32 位范围内）与小数（<code>1.5</code>、<code>0.25</code>）；NBT 的类型后缀见<a href="#basics-nbt">结构化 NBT</a>。</li><li>标识符：字母、数字与下划线，不能以数字开头。ASCII 名必须是小写字母、数字与下划线，不超过 32 个字符，且不能是保留字（中英文关键词都是保留字）。中文等非 ASCII 字母也允许，编译时会被换成随机 ASCII 别名，见<a href="#basics-identifiers">中文标识符</a>。</li></ul><h3 id="sec-程序结构与模块">程序结构与模块</h3>
+<p>项目是一个目录，入口模块固定叫 <code>main.mcl</code>：<code>mclang build &lt;目录&gt;</code> 从入口出发，沿 <code class="kw"><span class="kw-en">import</span><span class="kw-zh">导入</span></code> 边加载其他 <code>.mcl</code> 模块；入口到不了的 <code>.mcl</code> 文件不参与编译（入口只 import 一次就够，即使不引用它的名字，模块里的进度、函数标签等资源也会生效）。</p>
+<ul><li>每个 <code>.mcl</code> 文件是一个模块，模块路径是它相对项目根目录的路径：<code>lib/math.mcl</code> 与 <code>lib/math/mod.mcl</code> 都是 <code>lib/math</code>，入口自身是空路径。</li><li>入口必须声明 <code class="kw"><span class="kw-en">namespace &lt;名称&gt;;</span><span class="kw-zh">命名空间 &lt;名称&gt;;</span></code>；其他模块可以省略（继承入口），写了则必须与入口一致。命名空间只能包含小写 ASCII 字母、数字与下划线，不能以数字开头，也不能是 Windows 保留设备名。</li><li>顶层声明默认<strong>私有</strong>；<code class="kw"><span class="kw-en">export</span><span class="kw-zh">公开</span></code> 之后才能被其他模块导入，导入方必须写 <code class="kw"><span class="kw-en">import</span><span class="kw-zh">导入</span></code>。声明顺序不影响引用，导入环是允许的。</li></ul><p>单文件输入（<code>mclang build examples/counter.mcl</code>）等价于只有一个入口模块的项目，不需要 <code>main.mcl</code>，也不需要任何 <code class="kw"><span class="kw-en">import</span><span class="kw-zh">导入</span></code>。</p>
+<h3 id="basics-modules">模块与导入</h3>
+<figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">语法</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">import</span> <span class="tok-ident">lib</span>::<span class="tok-ident">math</span>;                       <span class="tok-com">// 导入整个模块的公开声明</span>
+<span class="tok-kw">import</span> <span class="tok-ident">lib</span>::<span class="tok-ident">strings</span>::{<span class="tok-ident">banner</span>, <span class="tok-ident">on_fire</span>}; <span class="tok-com">// 只导入列出的名字</span>
+<span class="tok-kw">import</span> <span class="tok-ident">lib</span>::<span class="tok-ident">strings</span>::{<span class="tok-ident">banner</span> <span class="tok-kw">as</span> <span class="tok-ident">wel</span>};   <span class="tok-com">// 导入时可以起别名</span>
+
+<span class="tok-kw">export</span> <span class="tok-kw">fn</span> <span class="tok-fn">sum</span>(<span class="tok-ident">left</span>, <span class="tok-ident">right</span>) -&gt; <span class="tok-kw">score</span> { ... }
+<span class="tok-kw">export</span> <span class="tok-kw">score</span> <span class="tok-ident">total</span> = 0;</code><code class="kw-zh"><span class="tok-kw">导入</span> <span class="tok-ident">lib</span>::<span class="tok-ident">math</span>;                       <span class="tok-com">// 导入整个模块的公开声明</span>
+<span class="tok-kw">导入</span> <span class="tok-ident">lib</span>::<span class="tok-ident">strings</span>::{<span class="tok-ident">banner</span>, <span class="tok-ident">on_fire</span>}; <span class="tok-com">// 只导入列出的名字</span>
+<span class="tok-kw">导入</span> <span class="tok-ident">lib</span>::<span class="tok-ident">strings</span>::{<span class="tok-ident">banner</span> <span class="tok-kw">作为</span> <span class="tok-ident">wel</span>};   <span class="tok-com">// 导入时可以起别名</span>
+
+<span class="tok-kw">公开</span> <span class="tok-kw">函数</span> <span class="tok-fn">sum</span>(<span class="tok-ident">left</span>, <span class="tok-ident">right</span>) -&gt; <span class="tok-kw">计分</span> { ... }
+<span class="tok-kw">公开</span> <span class="tok-kw">计分</span> <span class="tok-ident">total</span> = 0;</code></pre></figure>
+<p><code class="kw"><span class="kw-en">import</span><span class="kw-zh">导入</span></code> 的路径始终相对项目根目录，<code>a::b</code> 对应 <code>a/b.mcl</code> 或 <code>a/b/mod.mcl</code>；入口模块也可以用 <code>import main;</code> 被其他模块导入，因此入口与子模块可以互相引用。可见性规则：</p>
+<ul><li>模块自己的声明始终可见；导入进来的名字与局部声明重名时，局部声明优先。</li><li>两个模块整模块导入时导出同名声明会报错，改用选择性导入或 <code class="kw"><span class="kw-en">as</span><span class="kw-zh">作为</span></code> 别名。</li><li>选择性导入不存在的名字、导入没有 <code class="kw"><span class="kw-en">export</span><span class="kw-zh">公开</span></code> 的名字、模块文件缺失都会在编译期报错并给出位置。</li></ul><p>命名规则：函数、JSON 资源、进度与函数标签的限定名用 <code>/</code> 连接（例如 <code>lib/math</code> 里的 <code>sum</code> 是 <code>lib/math/sum</code>），因此产物直接落在 <code>data/&lt;命名空间&gt;/function/lib/math/sum.mcfunction</code>、<code>predicate/lib/strings/on_fire.json</code>；计分变量、目标、查询、物品、存储与数据槽的名字用 <code>.</code> 连接（例如 <code>lib.state.total</code>），因为计分板假玩家和目标名不能包含 <code>/</code>。入口模块的名字保持原样。</p>
+<figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">模块示例（examples/module_demo）</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">module_demo</span>;
+
+<span class="tok-kw">import</span> <span class="tok-ident">lib</span>::<span class="tok-ident">math</span>::{<span class="tok-ident">sum</span>, <span class="tok-ident">product</span>};
+
+<span class="tok-kw">export</span> <span class="tok-kw">score</span> <span class="tok-ident">total</span> = 0;
+
+<span class="tok-attr">@</span><span class="tok-attr">load</span>
+<span class="tok-kw">fn</span> <span class="tok-fn">load</span>() {
+    <span class="tok-kw">message</span>.<span class="tok-method">all</span>(<span class="tok-str">&quot;模块示例已加载&quot;</span>, <span class="tok-lit">green</span>);
+    <span class="tok-ident">total</span> = <span class="tok-fn">sum</span>(1, 2) + <span class="tok-fn">product</span>(3, 4);
+}</code><code class="kw-zh"><span class="tok-kw">命名空间</span> <span class="tok-ident">module_demo</span>;
+
+<span class="tok-kw">导入</span> <span class="tok-ident">lib</span>::<span class="tok-ident">math</span>::{<span class="tok-ident">sum</span>, <span class="tok-ident">product</span>};
+
+<span class="tok-kw">公开</span> <span class="tok-kw">计分</span> <span class="tok-ident">total</span> = 0;
+
+<span class="tok-attr">@</span><span class="tok-attr">加载</span>
+<span class="tok-kw">函数</span> <span class="tok-fn">load</span>() {
+    <span class="tok-kw">消息</span>.<span class="tok-method">全部</span>(<span class="tok-str">&quot;模块示例已加载&quot;</span>, <span class="tok-lit">绿色</span>);
+    <span class="tok-ident">total</span> = <span class="tok-fn">sum</span>(1, 2) + <span class="tok-fn">product</span>(3, 4);
+}</code></pre></figure>
+<figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">examples/module_demo/lib/math.mcl</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-com">// 子模块可以省略 namespace，继承入口；export 之后入口才能导入。</span>
+<span class="tok-kw">export</span> <span class="tok-kw">fn</span> <span class="tok-fn">sum</span>(<span class="tok-ident">left</span>, <span class="tok-ident">right</span>) -&gt; <span class="tok-kw">score</span> {
+    <span class="tok-kw">return</span> <span class="tok-ident">left</span> + <span class="tok-ident">right</span>;
+}
+
+<span class="tok-kw">export</span> <span class="tok-kw">fn</span> <span class="tok-fn">product</span>(<span class="tok-ident">left</span>, <span class="tok-ident">right</span>) -&gt; <span class="tok-kw">score</span> {
+    <span class="tok-kw">return</span> <span class="tok-ident">left</span> * <span class="tok-ident">right</span>;
+}</code><code class="kw-zh"><span class="tok-com">// 子模块可以省略 namespace，继承入口；export 之后入口才能导入。</span>
+<span class="tok-kw">公开</span> <span class="tok-kw">函数</span> <span class="tok-fn">sum</span>(<span class="tok-ident">left</span>, <span class="tok-ident">right</span>) -&gt; <span class="tok-kw">计分</span> {
+    <span class="tok-kw">返回</span> <span class="tok-ident">left</span> + <span class="tok-ident">right</span>;
+}
+
+<span class="tok-kw">公开</span> <span class="tok-kw">函数</span> <span class="tok-fn">product</span>(<span class="tok-ident">left</span>, <span class="tok-ident">right</span>) -&gt; <span class="tok-kw">计分</span> {
+    <span class="tok-kw">返回</span> <span class="tok-ident">left</span> * <span class="tok-ident">right</span>;
+}</code></pre></figure>
+<p><code>examples/module_demo</code> 由文档构建与回归测试实际编译：<code>sum</code> 的产物是 <code>data/module_demo/function/lib/math/sum.mcfunction</code>，函数在数据包里的名字就是 <code>module_demo:lib/math/sum</code>；<code>__mcl</code> 下的辅助函数同样带模块路径，例如 <code>__mcl/lib/math/sum/0</code>。</p>
 <h3 id="sec-中英关键词">中英关键词</h3>
 <p>下表只是示例，完整对照见<a href="#appendix-keywords">附录 A</a>：</p>
 <div class="table-wrap"><table>
@@ -747,7 +800,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 </tbody></table></div>
 <p>参数保存在函数私有的固定计分项 <code>#p_&lt;哈希&gt;</code> 里，调用方负责写值；<strong>从 Minecraft 直接调用参数化函数不会重新绑定参数</strong>，会沿用上次留下的值，所以参数化函数只应从 Mclang 调用。参数名不能与全局计分变量重名，函数内也不能重复声明。</p>
 <h2 id="statements">语句参考</h2>
-<h3 id="sec-控制流-if-else-while">控制流（if / else / while）</h3>
+<h3 id="sec-控制流-if-else-while-for">控制流（if / else / while / for）</h3>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">语法</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">if</span> &lt;<span class="tok-lit">条件</span>&gt; {
     ...
 } <span class="tok-kw">else</span> {
@@ -755,6 +808,10 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 }
 
 <span class="tok-kw">while</span> &lt;<span class="tok-lit">条件</span>&gt; {
+    ...
+}
+
+<span class="tok-kw">for</span> &lt;<span class="tok-ident">变量</span>&gt; <span class="tok-kw">in</span> &lt;<span class="tok-ident">起点</span>&gt;..&lt;<span class="tok-ident">终点</span>&gt; {
     ...
 }</code><code class="kw-zh"><span class="tok-kw">如果</span> &lt;<span class="tok-lit">条件</span>&gt; {
     ...
@@ -764,9 +821,79 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 
 <span class="tok-kw">当</span> &lt;<span class="tok-lit">条件</span>&gt; {
     ...
+}
+
+<span class="tok-kw">对于</span> &lt;<span class="tok-ident">变量</span>&gt; <span class="tok-kw">在</span> &lt;<span class="tok-ident">起点</span>&gt;..&lt;<span class="tok-ident">终点</span>&gt; {
+    ...
 }</code></pre></figure>
-<p><code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code> 与 <code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 保持当前执行上下文，不引入新实体。编译时条件会求值为 0/1 的临时计分项：<code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code> 生成 <code>execute if score &lt;flag&gt; matches 1 run function &lt;辅助函数&gt;</code>，<code class="kw"><span class="kw-en">else</span><span class="kw-zh">否则</span></code> 分支用 <code>matches 0</code>；条件里的 <code>&amp;&amp;</code>、<code>||</code>、<code></code>、比较与 <code class="kw"><span class="kw-en">predicate(…)</span><span class="kw-zh">谓词(…)</span></code> 也都会下降成计分板操作。</p>
-<p><strong><code class="kw"><span class="kw-en">return</span><span class="kw-zh">返回</span></code> 只能直接出现在函数最外层代码块</strong>，不能放进 <code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code>、<code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code>、<code class="kw"><span class="kw-en">each</span><span class="kw-zh">遍历</span></code>、<code class="kw"><span class="kw-en">spawn</span><span class="kw-zh">召唤</span></code>、<code class="kw"><span class="kw-en">in_dimension</span><span class="kw-zh">在维度</span></code> 或 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 块——这些结构会展开成辅助函数，块里的 <code class="kw"><span class="kw-en">return</span><span class="kw-zh">返回</span></code> 只会结束辅助函数。需要条件结果时先给局部变量赋值，在函数末尾统一 <code class="kw"><span class="kw-en">return</span><span class="kw-zh">返回</span></code>；结构化 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 的 store 子句则直接捕获块内最后一条命令的结果（见<a href="#statements-execute">结构化执行</a>）。</p>
+<p><code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code> 与 <code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 保持当前执行上下文，不引入新实体。条件里的 <code>&amp;&amp;</code>、<code>||</code>、<code></code>、比较与 <code class="kw"><span class="kw-en">predicate(…)</span><span class="kw-zh">谓词(…)</span></code> 都会下降成计分板操作：非恒定条件求值为 0/1 的临时计分项，<code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code> 生成 <code>execute if score &lt;flag&gt; matches 1 run function &lt;辅助函数&gt;</code>，<code class="kw"><span class="kw-en">else</span><span class="kw-zh">否则</span></code> 分支用 <code>matches 0</code>。</p>
+<p><strong>编译期能确定的条件会被折叠</strong>：<code class="kw"><span class="kw-en">if 1 == 1</span><span class="kw-zh">如果 1 == 1</span></code> 直接把真分支展开进当前函数（不生成标志，也不分配辅助函数），<code class="kw"><span class="kw-en">if 2 &lt; 1</span><span class="kw-zh">如果 2 &lt; 1</span></code> 整段省略（<code class="kw"><span class="kw-en">else</span><span class="kw-zh">否则</span></code> 分支同理）；<code class="kw"><span class="kw-en">while 0 == 1</span><span class="kw-zh">当 0 == 1</span></code> 不生成任何循环命令。</p>
+<p><code class="kw"><span class="kw-en">for</span><span class="kw-zh">对于</span></code> 是半开区间循环，起止都可以是表达式：常量终点直接生成 <code>matches ..&lt;终点-1&gt;</code> 比较，动态终点只求值一次并存入循环上限计分项；常量空区间（起点 ≥ 终点）不生成命令。循环变量是循环体内的局部计分项，兄弟循环可以复用同一个名字，但不能与参数、<code class="kw"><span class="kw-en">let</span><span class="kw-zh">令</span></code> 或全局计分变量重名。</p>
+<figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">&quot;for</span><span class="code-actions"><span class="badge ok">编译器验证通过</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">loops_demo</span>;
+
+<span class="tok-kw">score</span> <span class="tok-ident">total</span> = 0;
+<span class="tok-kw">score</span> <span class="tok-ident">sum</span> = 0;
+
+<span class="tok-kw">fn</span> <span class="tok-fn">counted</span>(<span class="tok-ident">values</span>) -&gt; <span class="tok-kw">score</span> {
+    <span class="tok-kw">let</span> <span class="tok-lit">result</span> = 0;
+    <span class="tok-kw">for</span> <span class="tok-ident">index</span> <span class="tok-kw">in</span> 0..<span class="tok-method">values</span> {
+        <span class="tok-kw">if</span> <span class="tok-ident">index</span> % 2 == 0 {
+            <span class="tok-kw">continue</span>;
+        }
+        <span class="tok-kw">if</span> <span class="tok-ident">index</span> &gt;= 20 {
+            <span class="tok-kw">break</span>;
+        }
+        <span class="tok-lit">result</span> += <span class="tok-ident">index</span>;
+    }
+    <span class="tok-kw">return</span> <span class="tok-lit">result</span>;
+}
+
+<span class="tok-attr">@</span><span class="tok-attr">tick</span>
+<span class="tok-kw">fn</span> <span class="tok-fn">tick</span>() {
+    <span class="tok-ident">sum</span> = <span class="tok-fn">counted</span>(100);
+    <span class="tok-kw">if</span> <span class="tok-ident">sum</span> &gt; 0 {
+        <span class="tok-ident">total</span> += <span class="tok-ident">sum</span>;
+    }
+    <span class="tok-kw">while</span> <span class="tok-ident">total</span> &gt; 1000 {
+        <span class="tok-ident">total</span> -= 100;
+        <span class="tok-kw">if</span> <span class="tok-ident">total</span> == 900 {
+            <span class="tok-kw">continue</span>;
+        }
+    }
+}</code><code class="kw-zh"><span class="tok-kw">命名空间</span> <span class="tok-ident">loops_demo</span>;
+
+<span class="tok-kw">计分</span> <span class="tok-ident">total</span> = 0;
+<span class="tok-kw">计分</span> <span class="tok-ident">sum</span> = 0;
+
+<span class="tok-kw">函数</span> <span class="tok-fn">counted</span>(<span class="tok-ident">values</span>) -&gt; <span class="tok-kw">计分</span> {
+    <span class="tok-kw">令</span> <span class="tok-lit">result</span> = 0;
+    <span class="tok-kw">对于</span> <span class="tok-ident">index</span> <span class="tok-kw">在</span> 0..<span class="tok-method">values</span> {
+        <span class="tok-kw">如果</span> <span class="tok-ident">index</span> % 2 == 0 {
+            <span class="tok-kw">跳过</span>;
+        }
+        <span class="tok-kw">如果</span> <span class="tok-ident">index</span> &gt;= 20 {
+            <span class="tok-kw">跳出</span>;
+        }
+        <span class="tok-lit">result</span> += <span class="tok-ident">index</span>;
+    }
+    <span class="tok-kw">返回</span> <span class="tok-lit">result</span>;
+}
+
+<span class="tok-attr">@</span><span class="tok-attr">每刻</span>
+<span class="tok-kw">函数</span> <span class="tok-fn">tick</span>() {
+    <span class="tok-ident">sum</span> = <span class="tok-fn">counted</span>(100);
+    <span class="tok-kw">如果</span> <span class="tok-ident">sum</span> &gt; 0 {
+        <span class="tok-ident">total</span> += <span class="tok-ident">sum</span>;
+    }
+    <span class="tok-kw">当</span> <span class="tok-ident">total</span> &gt; 1000 {
+        <span class="tok-ident">total</span> -= 100;
+        <span class="tok-kw">如果</span> <span class="tok-ident">total</span> == 900 {
+            <span class="tok-kw">跳过</span>;
+        }
+    }
+}</code></pre></figure>
+<p><code class="kw"><span class="kw-en">break</span><span class="kw-zh">跳出</span></code> 与 <code class="kw"><span class="kw-en">continue</span><span class="kw-zh">跳过</span></code> 只允许出现在 <code class="kw"><span class="kw-en">for</span><span class="kw-zh">对于</span></code>/<code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 里：<code class="kw"><span class="kw-en">each</span><span class="kw-zh">遍历</span></code>、<code class="kw"><span class="kw-en">spawn</span><span class="kw-zh">召唤</span></code> 的每个实体会单独执行，不能用它跳出。实现上每层循环有一个状态计分项（1 = continue，2 = break）：循环体里设置的循环状态在其所在辅助函数返回后立即生效，最多跳出一层循环；每层循环各自持有状态与上限计分项，嵌套循环互不干扰。</p>
+<p><strong><code class="kw"><span class="kw-en">return</span><span class="kw-zh">返回</span></code> 只能直接出现在函数最外层代码块</strong>，不能放进 <code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code>、<code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code>、<code class="kw"><span class="kw-en">for</span><span class="kw-zh">对于</span></code>、<code class="kw"><span class="kw-en">each</span><span class="kw-zh">遍历</span></code>、<code class="kw"><span class="kw-en">spawn</span><span class="kw-zh">召唤</span></code>、<code class="kw"><span class="kw-en">in_dimension</span><span class="kw-zh">在维度</span></code> 或 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 块——这些结构会展开成辅助函数，块里的 <code class="kw"><span class="kw-en">return</span><span class="kw-zh">返回</span></code> 只会结束辅助函数。需要条件结果时先给局部变量赋值，在函数末尾统一 <code class="kw"><span class="kw-en">return</span><span class="kw-zh">返回</span></code>；结构化 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 的 store 子句则直接捕获块内最后一条命令的结果（见<a href="#statements-execute">结构化执行</a>）。</p>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">示例</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">if</span> <span class="tok-ident">ticks</span> &gt;= 100 {
     <span class="tok-kw">message</span>.<span class="tok-method">all</span>(<span class="tok-str">&quot;整点&quot;</span>, <span class="tok-lit">gold</span>);
 } <span class="tok-kw">else</span> {
@@ -780,7 +907,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
         <span class="tok-kw">消息</span>.<span class="tok-method">全部</span>(<span class="tok-str">&quot;滴答&quot;</span>, <span class="tok-lit">灰色</span>);
     }
 }</code></pre></figure>
-<p><code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 的循环体与条件互相调度，运行时上限由 Minecraft 的命令链长度决定；请确保每次迭代都会改变条件里的计分变量。</p>
+<p><code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 的每轮迭代都会重新求值条件：循环辅助函数先算条件，命中就调用循环体辅助函数，再按循环状态处理 <code class="kw"><span class="kw-en">break</span><span class="kw-zh">跳出</span></code>/<code class="kw"><span class="kw-en">continue</span><span class="kw-zh">跳过</span></code> 并递归下一轮，运行时上限由 Minecraft 的命令链长度决定；请确保每次迭代都会改变条件里的计分变量，或使用 <code class="kw"><span class="kw-en">break</span><span class="kw-zh">跳出</span></code> 退出。</p>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">语法</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">let</span> &lt;<span class="tok-lit">name</span>&gt; = &lt;<span class="tok-ident">表达式</span>&gt;;
 &lt;<span class="tok-lit">name</span>&gt; = &lt;<span class="tok-ident">表达式</span>&gt;;
 &lt;<span class="tok-lit">name</span>&gt; += &lt;<span class="tok-ident">表达式</span>&gt;;   <span class="tok-com">// 还有 -=、*=、/=、%=</span></code><code class="kw-zh"><span class="tok-kw">令</span> &lt;<span class="tok-lit">name</span>&gt; = &lt;<span class="tok-ident">表达式</span>&gt;;
@@ -827,7 +954,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 }</code><code class="kw-zh"><span class="tok-kw">在维度</span>(<span class="tok-str">&quot;&lt;维度资源位置&gt;&quot;</span>) {
     ...
 }</code></pre></figure>
-<p>块内语句在指定维度执行，执行上下文保持不变。生成 <code>execute in &lt;维度&gt; run function &lt;辅助函数&gt;</code>。</p>
+<p>块内语句在指定维度执行，执行上下文保持不变。生成 <code class="kw"><span class="kw-en">execute in &lt;dimension&gt; run function &lt;辅助函数&gt;</span><span class="kw-zh">执行 在 &lt;维度&gt; 原生命令 函数条件 &lt;辅助函数&gt;</span></code>。</p>
 <h3 id="sec-传送-teleport">传送（teleport）</h3>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">语法</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">teleport</span>(&lt;<span class="tok-ident">持有者</span>&gt;, &lt;<span class="tok-kw">pos</span>&gt;[, <span class="tok-kw">rotation</span>(&lt;<span class="tok-ident">朝向偏航</span>&gt;, &lt;<span class="tok-ident">俯仰</span>&gt;)]);   <span class="tok-com">// 中文 朝向(...)</span>
 <span class="tok-kw">teleport</span>(&lt;<span class="tok-ident">持有者</span>&gt;, &lt;<span class="tok-ident">单个实体查询</span>&gt;);</code><code class="kw-zh"><span class="tok-kw">传送</span>(&lt;<span class="tok-ident">持有者</span>&gt;, &lt;<span class="tok-kw">坐标</span>&gt;[, <span class="tok-kw">朝向</span>(&lt;<span class="tok-ident">朝向偏航</span>&gt;, &lt;<span class="tok-ident">俯仰</span>&gt;)]);   <span class="tok-com">// 中文 朝向(...)</span>
@@ -926,7 +1053,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <div class="table-wrap"><table>
 <thead><tr><th>修饰符</th><th>作用</th><th>生成</th></tr></thead>
 <tbody>
-<tr><td><code class="kw"><span class="kw-en">as(&lt;query&gt;)</span><span class="kw-zh">作为(&lt;查询&gt;)</span></code></td><td>以查询命中的每个实体为执行实体</td><td><code>as &lt;选择器&gt;</code></td></tr>
+<tr><td><code class="kw"><span class="kw-en">as(&lt;query&gt;)</span><span class="kw-zh">作为(&lt;查询&gt;)</span></code></td><td>以查询命中的每个实体为执行实体</td><td><code class="kw"><span class="kw-en">as &lt;selector&gt;</span><span class="kw-zh">作为 &lt;选择器&gt;</span></code></td></tr>
 <tr><td><code class="kw"><span class="kw-en">at(&lt;query&gt;)</span><span class="kw-zh">在(&lt;查询&gt;)</span></code></td><td>在查询命中的每个实体处执行，但不改变执行实体</td><td><code>at &lt;选择器&gt;</code></td></tr>
 <tr><td><code class="kw"><span class="kw-en">positioned(&lt;位置&gt;)</span><span class="kw-zh">定位于(&lt;位置&gt;)</span></code></td><td>设置执行位置，并把锚点重置为脚部</td><td><code>positioned &lt;x y z&gt;</code></td></tr>
 <tr><td><code class="kw"><span class="kw-en">rotated(rotation(&lt;yaw&gt;, &lt;pitch&gt;))</span><span class="kw-zh">转向(朝向(&lt;yaw&gt;, &lt;pitch&gt;))</span></code></td><td>设置执行朝向</td><td><code>rotated &lt;yaw&gt; &lt;pitch&gt;</code></td></tr>
@@ -934,7 +1061,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <tr><td><code>facing(entity(&lt;查询&gt;), &lt;eyes | feet&gt;)</code></td><td>面向实体的眼睛或脚部</td><td><code>facing entity &lt;选择器&gt; eyes</code></td></tr>
 <tr><td><code>align(&lt;xyz 的子集&gt;)</code></td><td>把执行位置对齐到方块；写 <code>align(xz)</code>、<code>align(y)</code> 等</td><td><code>align xz</code></td></tr>
 <tr><td><code>anchored(&lt;eyes | feet&gt;)</code></td><td>切换后续相对坐标的锚点</td><td><code>anchored eyes</code></td></tr>
-<tr><td><code class="kw"><span class="kw-en">in(&quot;&lt;维度&gt;&quot;)</span><span class="kw-zh">进入维度(&quot;&lt;维度&gt;&quot;)</span></code></td><td>切换执行维度</td><td><code>in &lt;维度&gt;</code></td></tr>
+<tr><td><code class="kw"><span class="kw-en">in(&quot;&lt;维度&gt;&quot;)</span><span class="kw-zh">进入维度(&quot;&lt;维度&gt;&quot;)</span></code></td><td>切换执行维度</td><td><code class="kw"><span class="kw-en">in &lt;dimension&gt;</span><span class="kw-zh">在 &lt;维度&gt;</span></code></td></tr>
 <tr><td><code class="kw"><span class="kw-en">on(&lt;关系&gt;)</span><span class="kw-zh">关系(&lt;关系&gt;)</span></code></td><td>以当前实体的关系实体继续执行，需要实体上下文</td><td><code>on owner</code></td></tr>
 <tr><td><code class="kw"><span class="kw-en">summon(&quot;&lt;实体类型&gt;&quot;)</span><span class="kw-zh">召唤实体(&quot;&lt;实体类型&gt;&quot;)</span></code></td><td>在当前执行位置召唤实体，并以它继续执行</td><td><code>summon &lt;实体类型&gt;</code></td></tr>
 </tbody></table></div>
@@ -963,26 +1090,26 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <span class="tok-attr">@</span><span class="tok-attr">load</span>
 <span class="tok-kw">fn</span> <span class="tok-fn">load</span>() {
     <span class="tok-com">// 全部修饰符：面向原点、对齐到方块后执行。</span>
-    <span class="tok-kw">execute</span> <span class="tok-lit">as</span>(<span class="tok-ident">players</span>) <span class="tok-lit">at</span>(<span class="tok-ident">players</span>) <span class="tok-lit">positioned</span>(<span class="tok-kw">pos</span>(0, 64, 0)) <span class="tok-lit">rotated</span>(<span class="tok-kw">rotation</span>(0, 0)) <span class="tok-lit">facing</span>(<span class="tok-kw">pos</span>(0, 0, 0)) <span class="tok-lit">align</span>(<span class="tok-ident">xz</span>) <span class="tok-lit">anchored</span>(<span class="tok-lit">feet</span>) <span class="tok-lit">in</span>(<span class="tok-str">&quot;minecraft:overworld&quot;</span>) {
+    <span class="tok-kw">execute</span> <span class="tok-kw">as</span>(<span class="tok-ident">players</span>) <span class="tok-lit">at</span>(<span class="tok-ident">players</span>) <span class="tok-lit">positioned</span>(<span class="tok-kw">pos</span>(0, 64, 0)) <span class="tok-lit">rotated</span>(<span class="tok-kw">rotation</span>(0, 0)) <span class="tok-lit">facing</span>(<span class="tok-kw">pos</span>(0, 0, 0)) <span class="tok-lit">align</span>(<span class="tok-ident">xz</span>) <span class="tok-lit">anchored</span>(<span class="tok-lit">feet</span>) <span class="tok-kw">in</span>(<span class="tok-str">&quot;minecraft:overworld&quot;</span>) {
         <span class="tok-kw">message</span>.<span class="tok-method">self</span>(<span class="tok-str">&quot;就位&quot;</span>, <span class="tok-lit">aqua</span>);
     }
     <span class="tok-com">// 条件与 store.result：清点玩家背包并把数量写进计分板。</span>
-    <span class="tok-kw">execute</span> <span class="tok-lit">as</span>(<span class="tok-ident">players</span>) <span class="tok-kw">if</span> <span class="tok-kw">entity</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">store</span>.<span class="tok-method">result</span>(<span class="tok-kw">self</span>, <span class="tok-ident">cleared</span>) {
+    <span class="tok-kw">execute</span> <span class="tok-kw">as</span>(<span class="tok-ident">players</span>) <span class="tok-kw">if</span> <span class="tok-kw">entity</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">store</span>.<span class="tok-method">result</span>(<span class="tok-kw">self</span>, <span class="tok-ident">cleared</span>) {
         <span class="tok-kw">clear</span>(<span class="tok-ident">players</span>);
     }
     <span class="tok-com">// store.success：把命令成功与否写进查询命中的玩家。</span>
-    <span class="tok-kw">execute</span> <span class="tok-lit">as</span>(<span class="tok-ident">players</span>) <span class="tok-kw">store</span>.<span class="tok-method">success</span>(<span class="tok-ident">players</span>, <span class="tok-ident">cleared</span>) {
+    <span class="tok-kw">execute</span> <span class="tok-kw">as</span>(<span class="tok-ident">players</span>) <span class="tok-kw">store</span>.<span class="tok-method">success</span>(<span class="tok-ident">players</span>, <span class="tok-ident">cleared</span>) {
         <span class="tok-kw">give</span>(<span class="tok-ident">players</span>, <span class="tok-ident">token</span>);
     }
     <span class="tok-com">// 投掷者目标与 Boss 栏：前者拆成捕获与复制，后者写当前值。</span>
-    <span class="tok-kw">execute</span> <span class="tok-lit">as</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">store</span>.<span class="tok-method">result</span>(<span class="tok-kw">origin</span>, <span class="tok-ident">cleared</span>) {
+    <span class="tok-kw">execute</span> <span class="tok-kw">as</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">store</span>.<span class="tok-method">result</span>(<span class="tok-kw">origin</span>, <span class="tok-ident">cleared</span>) {
         <span class="tok-kw">self</span>.<span class="tok-method">add_tag</span>(<span class="tok-str">&quot;origin&quot;</span>);
     }
     <span class="tok-kw">execute</span> <span class="tok-kw">store</span>.<span class="tok-method">result</span>(<span class="tok-kw">bossbar</span>, <span class="tok-str">&quot;execute_demo:timer&quot;</span>, <span class="tok-lit">value</span>) {
         <span class="tok-kw">message</span>.<span class="tok-method">all</span>(<span class="tok-str">&quot;tick&quot;</span>);
     }
     <span class="tok-com">// store.data：写入实体通用数据、方块实体与存储。</span>
-    <span class="tok-kw">execute</span> <span class="tok-lit">as</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">store</span>.<span class="tok-method">data</span>(<span class="tok-kw">entity</span>, <span class="tok-kw">self</span>, <span class="tok-str">&quot;data.execute_demo&quot;</span>, <span class="tok-lit">int</span>, 1) {
+    <span class="tok-kw">execute</span> <span class="tok-kw">as</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">store</span>.<span class="tok-method">data</span>(<span class="tok-kw">entity</span>, <span class="tok-kw">self</span>, <span class="tok-str">&quot;data.execute_demo&quot;</span>, <span class="tok-lit">int</span>, 1) {
         <span class="tok-kw">self</span>.<span class="tok-method">add_tag</span>(<span class="tok-str">&quot;marked&quot;</span>);
     }
     <span class="tok-kw">execute</span> <span class="tok-kw">store</span>.<span class="tok-method">data</span>(<span class="tok-kw">block</span>, <span class="tok-kw">pos</span>(0, 64, 0), <span class="tok-str">&quot;Items&quot;</span>, <span class="tok-lit">byte</span>) {
@@ -1003,26 +1130,26 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 <span class="tok-attr">@</span><span class="tok-attr">加载</span>
 <span class="tok-kw">函数</span> <span class="tok-fn">load</span>() {
     <span class="tok-com">// 全部修饰符：面向原点、对齐到方块后执行。</span>
-    <span class="tok-kw">执行</span> <span class="tok-lit">作为</span>(<span class="tok-ident">players</span>) <span class="tok-lit">在</span>(<span class="tok-ident">players</span>) <span class="tok-lit">定位于</span>(<span class="tok-kw">坐标</span>(0, 64, 0)) <span class="tok-lit">转向</span>(<span class="tok-kw">朝向</span>(0, 0)) <span class="tok-lit">面向</span>(<span class="tok-kw">坐标</span>(0, 0, 0)) <span class="tok-lit">对齐</span>(<span class="tok-ident">xz</span>) <span class="tok-lit">锚点</span>(<span class="tok-lit">脚</span>) <span class="tok-lit">进入维度</span>(<span class="tok-str">&quot;minecraft:overworld&quot;</span>) {
+    <span class="tok-kw">执行</span> <span class="tok-kw">作为</span>(<span class="tok-ident">players</span>) <span class="tok-kw">在</span>(<span class="tok-ident">players</span>) <span class="tok-lit">定位于</span>(<span class="tok-kw">坐标</span>(0, 64, 0)) <span class="tok-lit">转向</span>(<span class="tok-kw">朝向</span>(0, 0)) <span class="tok-lit">面向</span>(<span class="tok-kw">坐标</span>(0, 0, 0)) <span class="tok-lit">对齐</span>(<span class="tok-ident">xz</span>) <span class="tok-lit">锚点</span>(<span class="tok-lit">脚</span>) <span class="tok-lit">进入维度</span>(<span class="tok-str">&quot;minecraft:overworld&quot;</span>) {
         <span class="tok-kw">消息</span>.<span class="tok-method">自身</span>(<span class="tok-str">&quot;就位&quot;</span>, <span class="tok-lit">青色</span>);
     }
     <span class="tok-com">// 条件与 store.result：清点玩家背包并把数量写进计分板。</span>
-    <span class="tok-kw">执行</span> <span class="tok-lit">作为</span>(<span class="tok-ident">players</span>) <span class="tok-kw">如果</span> <span class="tok-kw">实体</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">存值</span>.<span class="tok-method">结果</span>(<span class="tok-kw">自身</span>, <span class="tok-ident">cleared</span>) {
+    <span class="tok-kw">执行</span> <span class="tok-kw">作为</span>(<span class="tok-ident">players</span>) <span class="tok-kw">如果</span> <span class="tok-kw">实体</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">存值</span>.<span class="tok-method">结果</span>(<span class="tok-kw">自身</span>, <span class="tok-ident">cleared</span>) {
         <span class="tok-kw">清除</span>(<span class="tok-ident">players</span>);
     }
     <span class="tok-com">// store.success：把命令成功与否写进查询命中的玩家。</span>
-    <span class="tok-kw">执行</span> <span class="tok-lit">作为</span>(<span class="tok-ident">players</span>) <span class="tok-kw">存值</span>.<span class="tok-method">成功</span>(<span class="tok-ident">players</span>, <span class="tok-ident">cleared</span>) {
+    <span class="tok-kw">执行</span> <span class="tok-kw">作为</span>(<span class="tok-ident">players</span>) <span class="tok-kw">存值</span>.<span class="tok-method">成功</span>(<span class="tok-ident">players</span>, <span class="tok-ident">cleared</span>) {
         <span class="tok-kw">给予</span>(<span class="tok-ident">players</span>, <span class="tok-ident">token</span>);
     }
     <span class="tok-com">// 投掷者目标与 Boss 栏：前者拆成捕获与复制，后者写当前值。</span>
-    <span class="tok-kw">执行</span> <span class="tok-lit">作为</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">存值</span>.<span class="tok-method">结果</span>(<span class="tok-kw">投掷者</span>, <span class="tok-ident">cleared</span>) {
+    <span class="tok-kw">执行</span> <span class="tok-kw">作为</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">存值</span>.<span class="tok-method">结果</span>(<span class="tok-kw">投掷者</span>, <span class="tok-ident">cleared</span>) {
         <span class="tok-kw">自身</span>.<span class="tok-method">添加标签</span>(<span class="tok-str">&quot;origin&quot;</span>);
     }
     <span class="tok-kw">执行</span> <span class="tok-kw">存值</span>.<span class="tok-method">结果</span>(<span class="tok-kw">Boss栏</span>, <span class="tok-str">&quot;execute_demo:timer&quot;</span>, <span class="tok-lit">值</span>) {
         <span class="tok-kw">消息</span>.<span class="tok-method">全部</span>(<span class="tok-str">&quot;tick&quot;</span>);
     }
     <span class="tok-com">// store.data：写入实体通用数据、方块实体与存储。</span>
-    <span class="tok-kw">执行</span> <span class="tok-lit">作为</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">存值</span>.<span class="tok-method">数据</span>(<span class="tok-kw">实体</span>, <span class="tok-kw">自身</span>, <span class="tok-str">&quot;data.execute_demo&quot;</span>, <span class="tok-lit">整数</span>, 1) {
+    <span class="tok-kw">执行</span> <span class="tok-kw">作为</span>(<span class="tok-ident">zombies</span>) <span class="tok-kw">存值</span>.<span class="tok-method">数据</span>(<span class="tok-kw">实体</span>, <span class="tok-kw">自身</span>, <span class="tok-str">&quot;data.execute_demo&quot;</span>, <span class="tok-lit">整数</span>, 1) {
         <span class="tok-kw">自身</span>.<span class="tok-method">添加标签</span>(<span class="tok-str">&quot;marked&quot;</span>);
     }
     <span class="tok-kw">执行</span> <span class="tok-kw">存值</span>.<span class="tok-method">数据</span>(<span class="tok-kw">方块</span>, <span class="tok-kw">坐标</span>(0, 64, 0), <span class="tok-str">&quot;Items&quot;</span>, <span class="tok-lit">字节</span>) {
@@ -2277,14 +2404,16 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <tr><td><code>potion_lab.mcl</code></td><td>效果、经验、清空、秒表、函数标签与小数调度</td></tr>
 <tr><td><code>world_ops.mcl</code></td><td>方块、生物群系、复制、放置、区块加载、时间、天气、规则与边界</td></tr>
 <tr><td><code>portal.mcl</code></td><td>进度声明、<code>placed_block</code> / <code>enter_block</code> 触发器与可重复触发的 <code>advancement.revoke</code></td></tr>
-<tr><td><code>portable_chest/</code></td><td>多文件项目、用户计分板、<code class="kw"><span class="kw-en">teleport</span><span class="kw-zh">传送</span></code> 仓库、屏障盒与按玩家绑定的箱子</td></tr>
-<tr><td><code>multi_counter/</code></td><td>多文件项目、带返回值函数、资源 predicate 与调度心跳</td></tr>
+<tr><td><code>portable_chest/</code></td><td>多文件模块、用户计分板、<code class="kw"><span class="kw-en">teleport</span><span class="kw-zh">传送</span></code> 仓库、屏障盒与按玩家绑定的箱子</td></tr>
+<tr><td><code>multi_counter/</code></td><td>多文件模块、带返回值函数、资源 predicate 与调度心跳</td></tr>
+<tr><td><code>module_demo/</code></td><td>最小模块项目：<code>import lib::math::{sum, product}</code> 与 <code class="kw"><span class="kw-en">export</span><span class="kw-zh">公开</span></code> 的产物路径</td></tr>
+<tr><td><code>bounty_hunter/</code></td><td>进度事件、触发器条件、连杀结算与里程碑播报的大型示例</td></tr>
 </tbody></table></div>
 <h2 id="appendix-keywords">附录 A：语言关键词总表</h2>
 <p>关键词、函数属性与方法/枚举的中英写法完全等价；构造器关键词（<code class="kw"><span class="kw-en">pos</span><span class="kw-zh">坐标</span></code>、<code class="kw"><span class="kw-en">block_state</span><span class="kw-zh">方块状态</span></code>、<code class="kw"><span class="kw-en">entity</span><span class="kw-zh">实体</span></code> 等）与声明名保持 ASCII。</p>
 <div class="filter-bar" data-filter-root="keywords"><input type="search" class="table-filter" placeholder="过滤关键词：输入英文、中文或用途" aria-label="过滤关键词：输入英文、中文或用途"><span class="filter-count"></span></div>
-<h4>语言关键词 <small>KEYWORDS · 83 项</small></h4>
-<div class="table-wrap"><table class="alias-table"><thead><tr><th>English</th><th>中文</th><th>说明</th></tr></thead><tbody><tr><td><code>namespace</code></td><td><code>命名空间</code></td><td>声明项目命名空间；同一项目内的所有文件必须一致。</td></tr>
+<h4>语言关键词 <small>KEYWORDS · 90 项</small></h4>
+<div class="table-wrap"><table class="alias-table"><thead><tr><th>English</th><th>中文</th><th>说明</th></tr></thead><tbody><tr><td><code>namespace</code></td><td><code>命名空间</code></td><td>声明项目命名空间；入口模块必需，其他模块省略则继承入口。</td></tr>
 <tr><td><code>score</code></td><td><code>计分</code></td><td>声明全局计分变量，并给出初始值。</td></tr>
 <tr><td><code>objective</code></td><td><code>目标</code></td><td>声明用户计分板目标；配合 <code>scoreboard.set/reset/get</code> 记录玩家或实体的状态。</td></tr>
 <tr><td><code>scoreboard</code></td><td><code>计分板</code></td><td>计分板读写：<code>scoreboard.set(持有者, 目标, 值)</code>、<code>scoreboard.reset(持有者, 目标)</code>，<code>scoreboard.get(持有者, 目标)</code> 是表达式。</td></tr>
@@ -2311,6 +2440,13 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <tr><td><code>bossbar</code></td><td><code>Boss栏</code></td><td>Boss 栏资源引用：<code>store.result/success(bossbar, &quot;id&quot;, value|max)</code> 写当前值或上限。</td></tr>
 <tr><td><code>else</code></td><td><code>否则</code></td><td>条件分支的否定分支。</td></tr>
 <tr><td><code>while</code></td><td><code>当</code></td><td>条件循环。</td></tr>
+<tr><td><code>for</code></td><td><code>对于</code></td><td><code>for 变量 in 起点..终点 { ... }</code>：半开区间循环，变量是循环体内的局部计分项。</td></tr>
+<tr><td><code>in</code></td><td><code>在</code></td><td>for 区间的连接词：<code>for index in 0..10</code>。</td></tr>
+<tr><td><code>break</code></td><td><code>跳出</code></td><td>跳出最近一层 for/while 循环。</td></tr>
+<tr><td><code>continue</code></td><td><code>跳过</code></td><td>跳过本次迭代，进入下一轮 for/while 循环。</td></tr>
+<tr><td><code>import</code></td><td><code>导入</code></td><td>从其他模块导入公开声明：<code>import lib::math;</code> 或 <code>import lib::{add as plus};</code>。</td></tr>
+<tr><td><code>export</code></td><td><code>公开</code></td><td>把顶层声明公开给其他模块；只有 <code>export</code> 的声明才能被导入。</td></tr>
+<tr><td><code>as</code></td><td><code>作为</code></td><td>导入别名：<code>import lib::{add as plus};</code>；也是 execute 子句 <code>as(查询)</code>。</td></tr>
 <tr><td><code>each</code></td><td><code>遍历</code></td><td>对查询结果逐个执行，并进入实体上下文。</td></tr>
 <tr><td><code>call</code></td><td><code>调用</code></td><td>调用函数或 <code>#标签</code>。</td></tr>
 <tr><td><code>schedule</code></td><td><code>调度</code></td><td>延时调度函数或 <code>#标签</code>。</td></tr>
@@ -3024,9 +3160,9 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <footer>
   <div class="wrap">
     <p>本手册由 <code>docs/tools/build.mjs</code> 依据编译器源码与真实编译结果生成：
-    关键词与别名表取自 <code>src/parser/keywords.rs</code>，共 83 个语言关键词、
+    关键词与别名表取自 <code>src/parser/keywords.rs</code>，共 90 个语言关键词、
     5 个函数属性、62 组别名表。</p>
-    <p>全部 12 个标注“编译器验证通过”的完整示例（<code>hello</code>、<code>mixed_language</code>、<code>chinese_identifiers</code>、<code>nbt_tags</code>、<code>advancement_demo</code>、<code>execute_structured</code>、<code>scoreboard_state</code>、<code>entity_nbt_demo</code>、<code>raw_escape</code>、<code>tour_world</code>、<code>tour_core</code>、<code>tour_entities</code>）都分别用英文与中文关键词
+    <p>全部 13 个标注“编译器验证通过”的完整示例（<code>hello</code>、<code>mixed_language</code>、<code>chinese_identifiers</code>、<code>nbt_tags</code>、<code>advancement_demo</code>、<code>loops</code>、<code>execute_structured</code>、<code>scoreboard_state</code>、<code>entity_nbt_demo</code>、<code>raw_escape</code>、<code>tour_world</code>、<code>tour_core</code>、<code>tour_entities</code>）都分别用英文与中文关键词
     编译过，两种写法的数据包逐字节一致；仓库 <code>examples/</code> 示例的往返验证可用
     <code>bun docs/tools/build.mjs --self-test</code> 复现。</p>
     <p>目标版本：Minecraft Java Edition 26.3-rc-2，数据包格式 121.0。手册随 <code>mclang 0.5.0</code> 生成。</p>

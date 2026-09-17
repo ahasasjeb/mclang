@@ -35,6 +35,14 @@ enum Value {
     Score(String),
 }
 
+/// 一个正在下降的 `for`/`while` 循环。
+///
+/// `break`/`continue` 通过循环状态计分项在辅助函数之间传递：
+/// 0 = 正常运行，1 = continue（跳到下一轮），2 = break（跳出循环）。
+pub(super) struct LoopContext {
+    pub(super) state: String,
+}
+
 /// 单次代码生成的完整状态。
 pub(super) struct Compiler<'a> {
     program: &'a Program,
@@ -44,6 +52,10 @@ pub(super) struct Compiler<'a> {
     functions: BTreeMap<String, Vec<String>>,
     helper_counters: HashMap<String, usize>,
     temporary_counter: usize,
+    /// 当前嵌套的循环栈；栈顶是最近一层 `for`/`while`。
+    loops: Vec<LoopContext>,
+    /// 循环状态与循环上限的编号计数器。
+    loop_counter: usize,
     /// 是否使用了 `give(..., self.item)` 需要的空槽来源资源。
     uses_empty_slot: bool,
 }
@@ -57,6 +69,8 @@ impl<'a> Compiler<'a> {
             functions: BTreeMap::new(),
             helper_counters: HashMap::new(),
             temporary_counter: 0,
+            loops: Vec::new(),
+            loop_counter: 0,
             uses_empty_slot: false,
         }
     }

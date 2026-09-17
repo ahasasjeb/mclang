@@ -43,10 +43,18 @@ struct Parser {
 
 impl Parser {
     fn program(&mut self) -> Result<Program, Diagnostic> {
-        self.expect_word("namespace")?;
-        let (namespace, namespace_span) = self.ident("命名空间名称")?;
-        self.expect(TokenKind::Semicolon, "命名空间声明后需要 `;`")?;
+        // 命名空间只在入口模块必需；其他模块可以省略，写了则必须与入口一致。
+        let mut namespace = String::new();
+        let mut namespace_span = None;
+        if self.check_word("namespace") {
+            let start = self.advance().span;
+            let (name, span) = self.ident("命名空间名称")?;
+            self.expect(TokenKind::Semicolon, "命名空间声明后需要 `;`")?;
+            namespace = name;
+            namespace_span = Some(start.merge(span));
+        }
 
+        let mut imports = Vec::new();
         let mut scores = Vec::new();
         let mut objectives = Vec::new();
         let mut queries = Vec::new();
@@ -58,31 +66,57 @@ impl Parser {
         let mut function_tags = Vec::new();
         let mut functions = Vec::new();
         while !self.check(&TokenKind::Eof) {
+            if self.check_word("import") {
+                imports.push(self.import()?);
+                continue;
+            }
+            let exported = self.take_word("export").is_some();
             if self.check_word("score") {
-                scores.push(self.score()?);
+                let mut declaration = self.score()?;
+                declaration.exported = exported;
+                scores.push(declaration);
             } else if self.check_word("objective") {
-                objectives.push(self.objective()?);
+                let mut declaration = self.objective()?;
+                declaration.exported = exported;
+                objectives.push(declaration);
             } else if self.check_word("query") {
-                queries.push(self.query()?);
+                let mut declaration = self.query()?;
+                declaration.exported = exported;
+                queries.push(declaration);
             } else if self.check_word("item") {
-                item_stacks.push(self.item_stack()?);
+                let mut declaration = self.item_stack()?;
+                declaration.exported = exported;
+                item_stacks.push(declaration);
             } else if self.check_word("storage") {
-                storages.push(self.storage()?);
+                let mut declaration = self.storage()?;
+                declaration.exported = exported;
+                storages.push(declaration);
             } else if self.check_word("data_slot") {
-                data_slots.push(self.data_slot()?);
+                let mut declaration = self.data_slot()?;
+                declaration.exported = exported;
+                data_slots.push(declaration);
             } else if self.check_word("resource") {
-                resources.push(self.resource()?);
+                let mut declaration = self.resource()?;
+                declaration.exported = exported;
+                resources.push(declaration);
             } else if self.check_word("advancement") {
-                advancements.push(self.advancement()?);
+                let mut declaration = self.advancement()?;
+                declaration.exported = exported;
+                advancements.push(declaration);
             } else if self.check_word("fn_tag") {
-                function_tags.push(self.function_tag()?);
+                let mut declaration = self.function_tag()?;
+                declaration.exported = exported;
+                function_tags.push(declaration);
             } else {
-                functions.push(self.function()?);
+                let mut function = self.function()?;
+                function.exported = exported;
+                functions.push(function);
             }
         }
         Ok(Program {
             namespace,
             namespace_span,
+            imports,
             scores,
             objectives,
             queries,
@@ -94,6 +128,58 @@ impl Parser {
             function_tags,
             functions,
         })
+    }
+
+    /// `import 数学::几何;` 或 `import 数学::{加法, 减法 as 减};`
+    ///
+    /// 路径相对项目根目录；`items` 为 `None` 时导入整个模块的公开声明。
+    fn import(&mut self) -> Result<ImportDecl, Diagnostic> {
+        self.expect_word("import")?;
+        let (first, first_span) = self.ident("模块名称")?;
+        let mut path = vec![first];
+        let mut path_span = first_span;
+        let mut items = None;
+        loop {
+            if self.take(&TokenKind::ColonColon).is_none() {
+                break;
+            }
+            if self.take(&TokenKind::LeftBrace).is_some() {
+                items = Some(self.import_items()?);
+                break;
+            }
+            let (segment, span) = self.ident("模块路径分段")?;
+            path_span = path_span.merge(span);
+            path.push(segment);
+        }
+        self.expect(TokenKind::Semicolon, "import 声明后需要 `;`")?;
+        Ok(ImportDecl {
+            path,
+            path_span,
+            items,
+        })
+    }
+
+    fn import_items(&mut self) -> Result<Vec<ImportItem>, Diagnostic> {
+        let mut items = Vec::new();
+        loop {
+            let (name, name_span) = self.ident("导入的名称")?;
+            let mut alias = None;
+            if self.check_word("as") {
+                self.advance();
+                let (value, _) = self.ident("导入别名")?;
+                alias = Some(value);
+            }
+            items.push(ImportItem {
+                name,
+                name_span,
+                alias,
+            });
+            if self.take(&TokenKind::Comma).is_none() {
+                break;
+            }
+        }
+        self.expect(TokenKind::RightBrace, "导入列表缺少 `}`")?;
+        Ok(items)
     }
 
     fn ident(&mut self, expected: &str) -> Result<(String, Span), Diagnostic> {

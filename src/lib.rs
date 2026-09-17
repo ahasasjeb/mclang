@@ -4,18 +4,22 @@ mod compiler;
 mod diagnostic;
 mod lexer;
 mod lsp;
+mod modules;
+mod name_walk;
 mod parser;
 pub mod version;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use analysis::{SourceFile, merge_programs, parse_all};
+use analysis::parse_all;
 use compiler::{CompileOptions, CompiledPack, compile};
 use diagnostic::Diagnostic;
 
-pub use analysis::{FileDiagnostic, ProjectAnalysis, Span, Symbol, SymbolKind, analyze};
+pub use analysis::{
+    FileDiagnostic, ProjectAnalysis, SourceFile, Span, Symbol, SymbolKind, analyze,
+};
 pub use compiler::DEFAULT_FUNCTION_PERMISSION_LEVEL;
 pub use lsp::serve;
 
@@ -71,8 +75,8 @@ pub struct CheckSummary {
 }
 
 pub fn check_file(source_path: &Path, options: &CheckOptions) -> Result<CheckSummary, String> {
-    let sources = read_sources(source_path)?;
-    let mut program = frontend(&sources)?;
+    let loaded = read_project(source_path)?;
+    let mut program = frontend(&loaded)?;
     compile(
         &mut program,
         &CompileOptions {
@@ -80,7 +84,7 @@ pub fn check_file(source_path: &Path, options: &CheckOptions) -> Result<CheckSum
             function_permission_level: options.function_permission_level,
         },
     )
-    .map_err(|diagnostics| render(&sources, diagnostics))?;
+    .map_err(|diagnostics| render(&loaded.sources, diagnostics))?;
     Ok(CheckSummary {
         functions: program.functions.len(),
         scores: program.scores.len(),
@@ -101,8 +105,8 @@ pub fn build_file(
     output: &Path,
     options: &BuildOptions,
 ) -> Result<BuildResult, String> {
-    let sources = read_sources(source_path)?;
-    let mut program = frontend(&sources)?;
+    let loaded = read_project(source_path)?;
+    let mut program = frontend(&loaded)?;
     let raw_statements = raw_statement_count(&program.functions);
     if options.deny_raw && raw_statements > 0 {
         return Err(format!(
@@ -116,7 +120,7 @@ pub fn build_file(
             function_permission_level: options.function_permission_level,
         },
     )
-    .map_err(|diagnostics| render(&sources, diagnostics))?;
+    .map_err(|diagnostics| render(&loaded.sources, diagnostics))?;
     write_pack(output, &pack)?;
     Ok(BuildResult {
         output: output.to_path_buf(),
@@ -148,7 +152,9 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             ast::StatementKind::Each { body, .. }
             | ast::StatementKind::InDimension { body, .. }
             | ast::StatementKind::Spawn { body, .. }
-            | ast::StatementKind::While { body, .. } => raw_count_in_block(body),
+            | ast::StatementKind::While { body, .. }
+            | ast::StatementKind::For { body, .. } => raw_count_in_block(body),
+            ast::StatementKind::Break | ast::StatementKind::Continue => 0,
             ast::StatementKind::If {
                 then_body,
                 else_body,
@@ -199,32 +205,109 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
         .sum()
 }
 
-fn read_sources(path: &Path) -> Result<Vec<SourceFile>, String> {
-    let metadata =
-        fs::metadata(path).map_err(|error| format!("无法访问 {}：{error}", path.display()))?;
-    let mut paths = Vec::new();
-    if metadata.is_file() {
-        paths.push(path.to_path_buf());
-    } else if metadata.is_dir() {
-        discover_sources(path, &mut paths)?;
-    } else {
-        return Err(format!("输入 {} 不是普通文件或目录", path.display()));
-    }
-    paths.sort();
-    if paths.is_empty() {
-        return Err(format!("目录 {} 中没有 .mcl 源文件", path.display()));
-    }
-
-    paths
-        .into_iter()
-        .map(|path| {
-            let text = fs::read_to_string(&path)
-                .map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
-            Ok(SourceFile { path, text })
-        })
-        .collect()
+/// 从磁盘加载的项目：可达模块的源文件与入口在其中的下标。
+struct LoadedSources {
+    sources: Vec<SourceFile>,
+    root: usize,
 }
 
+/// 加载项目：入口是 `main.mcl`（目录输入）或给定文件（文件输入），
+/// 其余模块沿 `import` 边按需读取；不可达的 `.mcl` 文件不参与编译。
+fn read_project(path: &Path) -> Result<LoadedSources, String> {
+    let metadata =
+        fs::metadata(path).map_err(|error| format!("无法访问 {}：{error}", path.display()))?;
+    let (entry, directory) = if metadata.is_file() {
+        let directory = path
+            .parent()
+            .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+        (path.to_path_buf(), directory)
+    } else if metadata.is_dir() {
+        let entry = path.join("main.mcl");
+        if !entry.is_file() {
+            return Err(format!(
+                "目录 {} 缺少入口模块 main.mcl：项目根目录必须放入口模块，\
+                 其余 .mcl 文件由入口用 `import 模块::路径;` 引入",
+                path.display()
+            ));
+        }
+        (entry, path.to_path_buf())
+    } else {
+        return Err(format!("输入 {} 不是普通文件或目录", path.display()));
+    };
+
+    let mut sources: Vec<SourceFile> = Vec::new();
+    let mut indices: HashMap<PathBuf, usize> = HashMap::new();
+    let mut queue: VecDeque<PathBuf> = VecDeque::new();
+    let root = push_source(&mut sources, &mut indices, &entry)?;
+    queue.push_back(entry);
+
+    while let Some(file) = queue.pop_front() {
+        let index = indices[&file];
+        let text = &sources[index].text;
+        // 语法错误会在统一的解析阶段报告；这里拿不到导入表就停止展开该分支。
+        let imports = match lexer::lex(text, index) {
+            Ok(tokens) => parser::parse(tokens).map(|program| program.imports).ok(),
+            Err(_) => None,
+        };
+        let Some(imports) = imports else {
+            continue;
+        };
+        for import in imports {
+            let Some(target) = module_file(&directory, &import.path) else {
+                continue;
+            };
+            if indices.contains_key(&target) {
+                continue;
+            }
+            let target_index = push_source(&mut sources, &mut indices, &target)?;
+            sources[target_index].path = target.clone();
+            queue.push_back(target);
+        }
+    }
+
+    Ok(LoadedSources { sources, root })
+}
+
+fn push_source(
+    sources: &mut Vec<SourceFile>,
+    indices: &mut HashMap<PathBuf, usize>,
+    path: &Path,
+) -> Result<usize, String> {
+    let text = fs::read_to_string(path)
+        .map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
+    let index = sources.len();
+    indices.insert(path.to_path_buf(), index);
+    sources.push(SourceFile {
+        path: path.to_path_buf(),
+        text,
+    });
+    Ok(index)
+}
+
+/// `import a::b;` 对应的文件：`<根目录>/a/b.mcl` 或 `<根目录>/a/b/mod.mcl`。
+fn module_file(directory: &Path, segments: &[String]) -> Option<PathBuf> {
+    let mut base = directory.to_path_buf();
+    for segment in segments {
+        base.push(segment);
+    }
+    let file = base.with_extension("mcl");
+    if file.is_file() {
+        return Some(file);
+    }
+    let directory_module = base.join("mod.mcl");
+    directory_module.is_file().then_some(directory_module)
+}
+
+fn frontend(loaded: &LoadedSources) -> Result<ast::Program, String> {
+    let (programs, diagnostics) = parse_all(&loaded.sources);
+    if !diagnostics.is_empty() {
+        return Err(render(&loaded.sources, diagnostics));
+    }
+    modules::resolve(programs, &loaded.sources, loaded.root)
+        .map_err(|diagnostics| render(&loaded.sources, diagnostics))
+}
+
+/// 递归收集目录下的全部 `.mcl` 源文件（语言服务器用于发现工作区文件）。
 pub(crate) fn discover_sources(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), String> {
     let entries = fs::read_dir(directory)
         .map_err(|error| format!("无法读取目录 {}：{error}", directory.display()))?;
@@ -249,14 +332,6 @@ pub(crate) fn discover_sources(directory: &Path, paths: &mut Vec<PathBuf>) -> Re
         }
     }
     Ok(())
-}
-
-fn frontend(sources: &[SourceFile]) -> Result<ast::Program, String> {
-    let (programs, diagnostics) = parse_all(sources);
-    if !diagnostics.is_empty() {
-        return Err(render(sources, diagnostics));
-    }
-    merge_programs(programs).map_err(|diagnostics| render(sources, diagnostics))
 }
 
 fn render(sources: &[SourceFile], diagnostics: Vec<Diagnostic>) -> String {

@@ -14,10 +14,22 @@ use super::world;
 
 impl Compiler<'_> {
     /// 下降一个语句块。辅助函数命名计数器按所属函数（`owner`）独立编号。
+    ///
+    /// 位于循环体内时，任何可能设置 break/continue 状态的语句之后都会插入一条
+    /// 状态检查：`execute unless score <state> matches 0 run return 0`。它让
+    /// `if` 辅助函数里设置的循环状态能立即终止当前循环体。
     pub(super) fn compile_block(&mut self, statements: &[Statement], owner: &str) -> Vec<String> {
         let mut commands = Vec::new();
         for statement in statements {
             self.compile_statement(statement, owner, &mut commands);
+            if let Some(state) = self.loops.last().map(|context| context.state.clone())
+                && contains_flow_jump(statement)
+            {
+                commands.push(format!(
+                    "execute unless score {state} {} matches 0 run return 0",
+                    self.objective
+                ));
+            }
         }
         commands
     }
@@ -391,6 +403,29 @@ impl Compiler<'_> {
             } => self.compile_if(condition, then_body, else_body, owner, commands),
             StatementKind::While { condition, body } => {
                 self.compile_while(condition, body, owner, commands);
+            }
+            StatementKind::For {
+                variable,
+                start,
+                end,
+                body,
+                ..
+            } => {
+                self.compile_for(variable, start, end, body, owner, commands);
+            }
+            StatementKind::Break => {
+                let state = self.loop_state();
+                commands.push(format!(
+                    "scoreboard players set {state} {} 2",
+                    self.objective
+                ));
+            }
+            StatementKind::Continue => {
+                let state = self.loop_state();
+                commands.push(format!(
+                    "scoreboard players set {state} {} 1",
+                    self.objective
+                ));
             }
             StatementKind::Execute { clauses, body } => {
                 self.compile_execute(clauses, body, owner, commands);
@@ -859,6 +894,20 @@ impl Compiler<'_> {
         owner: &str,
         commands: &mut Vec<String>,
     ) {
+        // 常量条件在编译期直接选定分支：不生成标志，也不分配辅助函数。
+        match constant_condition(condition) {
+            Some(true) => {
+                let mut branch = self.compile_block(then_body, owner);
+                commands.append(&mut branch);
+                return;
+            }
+            Some(false) => {
+                let mut branch = self.compile_block(else_body, owner);
+                commands.append(&mut branch);
+                return;
+            }
+            None => {}
+        }
         let flag = self.compile_condition(condition, owner, commands);
         let then_helper = self.compile_helper(then_body, owner);
         commands.push(format!(
@@ -874,8 +923,9 @@ impl Compiler<'_> {
         }
     }
 
-    /// `while` 由条件辅助函数和循环体辅助函数互相调度实现，
-    /// 运行时上限仍由 Minecraft 的命令链长度决定。
+    /// `while` 循环：循环辅助函数在每轮开头求值条件，命中就调用循环体辅助函数，
+    /// 再按循环状态处理 `break`/`continue`。条件为常量时省去标志求值；
+    /// `while 0` 不生成任何命令。
     fn compile_while(
         &mut self,
         condition: &Condition,
@@ -883,21 +933,196 @@ impl Compiler<'_> {
         owner: &str,
         commands: &mut Vec<String>,
     ) {
+        let constant = constant_condition(condition);
+        if constant == Some(false) {
+            return;
+        }
+
+        let state = self.push_loop();
+        let body_helper = self.compile_helper(body, owner);
+        self.pop_loop();
+
         let loop_helper = self.next_helper_path(owner);
-        let body_helper = self.next_helper_path(owner);
-
-        let mut body_commands = self.compile_block(body, owner);
-        body_commands.push(format!("function {}:{loop_helper}", self.program.namespace));
-        self.functions.insert(body_helper.clone(), body_commands);
-
         let mut loop_commands = Vec::new();
-        let flag = self.compile_condition(condition, owner, &mut loop_commands);
-        loop_commands.push(format!(
-            "execute if score {flag} {} matches 1 run function {}:{body_helper}",
-            self.objective, self.program.namespace
+        if constant == Some(true) {
+            loop_commands.push(format!(
+                "execute if score {state} {} matches 0 run function {}:{body_helper}",
+                self.objective, self.program.namespace
+            ));
+            loop_commands.push(self.break_check(&state));
+            loop_commands.push(self.continue_reset(&state));
+            loop_commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+        } else {
+            let flag = self.compile_condition(condition, owner, &mut loop_commands);
+            loop_commands.push(format!(
+                "execute if score {flag} {} matches 1 run function {}:{body_helper}",
+                self.objective, self.program.namespace
+            ));
+            loop_commands.push(self.break_check(&state));
+            loop_commands.push(self.continue_reset(&state));
+            loop_commands.push(format!(
+                "execute if score {flag} {} matches 1 run function {}:{loop_helper}",
+                self.objective, self.program.namespace
+            ));
+        }
+        self.functions.insert(loop_helper.clone(), loop_commands);
+        commands.push(format!(
+            "scoreboard players set {state} {} 0",
+            self.objective
         ));
+        commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+    }
+
+    /// `for <变量> in <起点>..<终点> { ... }`：半开区间循环。
+    ///
+    /// 起点与终点可以是表达式：终点是常量时直接用 `matches ..N` 比较，否则
+    /// materialize 到循环上限计分项。上限不超过起点的常量区间不生成命令。
+    fn compile_for(
+        &mut self,
+        variable: &str,
+        start: &Expr,
+        end: &Expr,
+        body: &[Statement],
+        owner: &str,
+        commands: &mut Vec<String>,
+    ) {
+        let start_value = constant_integer(start);
+        let end_value = constant_integer(end);
+        if let (Some(start_value), Some(end_value)) = (start_value, end_value)
+            && start_value >= end_value
+        {
+            return;
+        }
+
+        let state = self.push_loop();
+        let variable_holder = self.variable_holder(owner, variable);
+        let body_helper = self.compile_helper(body, owner);
+        self.pop_loop();
+
+        let limit = match end_value {
+            Some(end_value) => LoopLimit::Constant(end_value),
+            None => {
+                let holder = self.next_loop_holder("limit");
+                let mut limit_commands = Vec::new();
+                let value = self.compile_expr(end, owner, &mut limit_commands);
+                self.store_value(&holder, value, &mut limit_commands);
+                for command in limit_commands {
+                    commands.push(command);
+                }
+                LoopLimit::Holder(holder)
+            }
+        };
+
+        commands.push(format!(
+            "scoreboard players set {state} {} 0",
+            self.objective
+        ));
+        match start_value {
+            Some(start_value) => commands.push(format!(
+                "scoreboard players set {variable_holder} {} {start_value}",
+                self.objective
+            )),
+            None => {
+                let mut start_commands = Vec::new();
+                let value = self.compile_expr(start, owner, &mut start_commands);
+                self.store_value(&variable_holder, value, &mut start_commands);
+                for command in start_commands {
+                    commands.push(command);
+                }
+            }
+        }
+
+        let loop_helper = self.next_helper_path(owner);
+        let in_range = self.range_check(&variable_holder, &limit);
+        let loop_commands = vec![
+            format!(
+                "execute if score {state} {} matches 0 {in_range} run function {}:{body_helper}",
+                self.objective, self.program.namespace
+            ),
+            self.break_check(&state),
+            self.continue_reset(&state),
+            format!(
+                "scoreboard players add {variable_holder} {} 1",
+                self.objective
+            ),
+            format!(
+                "execute {in_range} run function {}:{loop_helper}",
+                self.program.namespace
+            ),
+        ];
         self.functions.insert(loop_helper.clone(), loop_commands);
         commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+    }
+
+    /// 循环状态计分项：0 = 正常，1 = continue，2 = break。
+    fn push_loop(&mut self) -> String {
+        let state = self.next_loop_holder("state");
+        self.loops.push(super::LoopContext {
+            state: state.clone(),
+        });
+        state
+    }
+
+    fn pop_loop(&mut self) {
+        self.loops.pop();
+    }
+
+    fn next_loop_holder(&mut self, kind: &str) -> String {
+        let index = self.loop_counter;
+        self.loop_counter += 1;
+        format!("#loop_{kind}_{index}")
+    }
+
+    /// 当前循环状态计分项；语义检查保证 `break`/`continue` 只在循环体内。
+    fn loop_state(&self) -> String {
+        self.loops
+            .last()
+            .expect("语义检查保证 break/continue 只出现在循环体内")
+            .state
+            .clone()
+    }
+
+    fn break_check(&self, state: &str) -> String {
+        format!(
+            "execute if score {state} {} matches 2 run return 0",
+            self.objective
+        )
+    }
+
+    fn continue_reset(&self, state: &str) -> String {
+        format!(
+            "execute if score {state} {} matches 1 run scoreboard players set {state} {} 0",
+            self.objective, self.objective
+        )
+    }
+
+    /// `execute if score <循环变量> <目标> matches ..<上限-1>` 或 `... < <上限>`。
+    fn range_check(&self, variable: &str, limit: &LoopLimit) -> String {
+        match limit {
+            LoopLimit::Constant(end) => format!(
+                "if score {variable} {} matches ..{}",
+                self.objective,
+                i64::from(*end) - 1
+            ),
+            LoopLimit::Holder(holder) => format!(
+                "if score {variable} {} < {holder} {}",
+                self.objective, self.objective
+            ),
+        }
+    }
+
+    /// 把表达式求值结果写入目标计分项。
+    pub(super) fn store_value(&self, target: &str, value: Value, commands: &mut Vec<String>) {
+        match value {
+            Value::Integer(value) => commands.push(format!(
+                "scoreboard players set {target} {} {value}",
+                self.objective
+            )),
+            Value::Score(source) => commands.push(format!(
+                "scoreboard players operation {target} {} = {source} {}",
+                self.objective, self.objective
+            )),
+        }
     }
 
     /// 把语句块放入新辅助函数，返回该函数的路径。
@@ -913,6 +1138,76 @@ impl Compiler<'_> {
         let path = format!("__mcl/{owner}/{}", *counter);
         *counter += 1;
         path
+    }
+}
+
+/// `for` 循环的上限：常量直接用 `matches ..N` 比较，否则用计分项。
+enum LoopLimit {
+    Constant(i32),
+    Holder(String),
+}
+
+/// 编译期能确定的整数表达式的值。
+fn constant_integer(expression: &Expr) -> Option<i32> {
+    match &expression.kind {
+        ExprKind::Integer(value) => Some(*value),
+        ExprKind::Negate(value) => constant_integer(value)?.checked_neg(),
+        _ => None,
+    }
+}
+
+/// 编译期能确定真假的布尔条件；三值逻辑，`None` 表示要在运行期求值。
+fn constant_condition(condition: &Condition) -> Option<bool> {
+    match condition {
+        Condition::Compare {
+            left,
+            comparison,
+            right,
+        } => {
+            let left = constant_integer(left)?;
+            let right = constant_integer(right)?;
+            Some(match comparison {
+                Comparison::Equal => left == right,
+                Comparison::NotEqual => left != right,
+                Comparison::Less => left < right,
+                Comparison::LessEqual => left <= right,
+                Comparison::Greater => left > right,
+                Comparison::GreaterEqual => left >= right,
+            })
+        }
+        Condition::Not(inner) => Some(!constant_condition(inner)?),
+        Condition::And(left, right) => {
+            match (constant_condition(left), constant_condition(right)) {
+                (Some(false), _) | (_, Some(false)) => Some(false),
+                (Some(true), Some(true)) => Some(true),
+                _ => None,
+            }
+        }
+        Condition::Or(left, right) => match (constant_condition(left), constant_condition(right)) {
+            (Some(true), _) | (_, Some(true)) => Some(true),
+            (Some(false), Some(false)) => Some(false),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// 语句（含嵌套块）里是否可能出现 `break`/`continue`。
+///
+/// 保守判断：`if`/`execute`/内层循环里出现跳转时也返回真。多插入的状态检查
+/// 在状态为 0 时是空操作，因此不会改变行为，只多一条命令。
+fn contains_flow_jump(statement: &Statement) -> bool {
+    match &statement.kind {
+        StatementKind::Break | StatementKind::Continue => true,
+        StatementKind::If {
+            then_body,
+            else_body,
+            ..
+        } => then_body.iter().any(contains_flow_jump) || else_body.iter().any(contains_flow_jump),
+        StatementKind::Execute { body, .. }
+        | StatementKind::While { body, .. }
+        | StatementKind::For { body, .. } => body.iter().any(contains_flow_jump),
+        _ => false,
     }
 }
 

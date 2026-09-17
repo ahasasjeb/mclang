@@ -167,7 +167,7 @@ pub(super) fn validate_condition(
         }
         Condition::Function { target, span } => match target {
             CallTarget::Function(name) => match ctx.symbols.functions.get(name.as_str()) {
-                None => diagnostics.push(Diagnostic::new(format!("找不到函数 `{name}`"), *span)),
+                None => diagnostics.push(Diagnostic::new(format!("找不到函数 `{name}`；如果它来自其他模块，请确认对方声明了 `export`，并在本模块 `import` 它"), *span)),
                 Some(signature) => {
                     validate_call_context(name, *signature, *span, ctx, diagnostics);
                 }
@@ -367,7 +367,7 @@ pub(super) fn validate_expr(
         } => {
             match ctx.symbols.functions.get(function.as_str()) {
                 None => diagnostics.push(Diagnostic::new(
-                    format!("找不到函数 `{function}`"),
+                    format!("找不到函数 `{function}`；如果它来自其他模块，请确认对方声明了 `export`，并在本模块 `import` 它"),
                     expression.span,
                 )),
                 Some(signature) => {

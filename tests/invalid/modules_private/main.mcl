@@ -1,0 +1,8 @@
+// 编译测试（负向）：使用已导入模块里没有 export 的名字。
+namespace module_private;
+
+import library;
+
+fn main() {
+    hidden();
+}

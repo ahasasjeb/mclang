@@ -1,0 +1,6 @@
+// 编译测试（负向）：选择性导入的名字在目标模块里不存在。
+namespace module_unknown;
+
+import library::{mystery};
+
+fn main() {}

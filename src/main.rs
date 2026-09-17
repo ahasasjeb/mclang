@@ -163,6 +163,8 @@ fn print_help() {
             mclang lsp\n  \
             mclang help\n\n\
          默认输出目录为 build/<源文件名>。\n\
+         文件输入是单模块项目；目录输入以 <目录>/main.mcl 为入口模块，其他 .mcl 文件由 `import` 引入，\n\
+         只有入口可达的模块会被编译。跨模块引用要求对方声明 `export`。\n\
          函数权限等级默认 2（GAMEMASTER，26.3 服务器属性 function-permission-level 的默认值）。\n\
          `mclang lsp` 是给编辑器用的语言服务器，不直接从终端运行。"
     );

@@ -1,0 +1,8 @@
+// 子模块导出的计分变量在导入方是限定名（`lib.tallyers.tally`），
+// 因此导入方可以用同名的参数或局部变量，不会指向这个全局计分变量。
+export score tally = 0;
+
+export fn bump() {
+    tally += 1;
+}
+

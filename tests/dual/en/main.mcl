@@ -5,6 +5,8 @@
 //   Get-ChildItem -Recurse -File build/tests/dual-en | ForEach-Object { ... 对比哈希 }
 namespace dual;
 
+import helpers;
+
 score active = 0;
 score total = 0;
 score flag = 0;
@@ -64,6 +66,28 @@ fn tick() {
 fn double(value) -> score {
     let result = value * 2;
     return result;
+}
+
+fn loop_showcase() {
+    for index in 0..4 {
+        if index == 1 {
+            continue;
+        }
+        if index == 3 {
+            break;
+        }
+        total += index;
+    }
+    while total > 5 {
+        total -= 1;
+        if total == 7 {
+            continue;
+        }
+        if total == 6 {
+            break;
+        }
+    }
+    total = boost(total);
 }
 
 fn later() {

@@ -1,0 +1,8 @@
+// 子模块可以省略 namespace，继承入口；export 之后入口才能导入。
+export fn sum(left, right) -> score {
+    return left + right;
+}
+
+export fn product(left, right) -> score {
+    return left * right;
+}

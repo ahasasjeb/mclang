@@ -46,11 +46,13 @@ impl ExecutionContext {
     }
 }
 
-/// 当前语句位置是否允许 `return`，以及所在函数是否返回 score。
+/// 当前语句位置是否允许 `return`、所在函数是否返回 score，以及嵌套的
+/// `for`/`while` 循环层数（`break`/`continue` 只允许出现在循环体内）。
 #[derive(Clone, Copy)]
 pub(super) struct ReturnRules {
     pub(super) returns_score: bool,
     pub(super) allowed_here: bool,
+    pub(super) loop_depth: u32,
 }
 
 impl ReturnRules {
@@ -58,6 +60,15 @@ impl ReturnRules {
     pub(super) fn nested(self) -> Self {
         Self {
             allowed_here: false,
+            ..self
+        }
+    }
+
+    /// 进入 `for`/`while` 循环体：嵌套层数加一，`return` 同样不再直接对应外层函数。
+    pub(super) fn in_loop(self) -> Self {
+        Self {
+            allowed_here: false,
+            loop_depth: self.loop_depth + 1,
             ..self
         }
     }

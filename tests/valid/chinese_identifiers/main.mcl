@@ -9,8 +9,11 @@
 // 也不会与 ascii_score / ascii_reward 的产物名相同。
 namespace zh_names;
 
+// 模块系统：extra.mcl 是子模块，双方互相引用对方的公开声明。
+import extra;
+
 计分 次数 = 0;
-计分 总分数 = 0;
+export 计分 总分数 = 0;
 计分 ascii_score = 7;
 // 跨类别同名：函数与计分变量共用同一个别名，引用按语法位置区分。
 计分 统计 = 0;
@@ -43,7 +46,7 @@ namespace zh_names;
     值(使用调用);
 }
 
-fn 统计(增量) -> score {
+export fn 统计(增量) -> score {
     令 结果 = 增量 * 2;
     返回 结果;
 }
@@ -146,3 +149,5 @@ fn 进度操作() {
     准则 计时 { 触发器 = tick; }
     奖励 { 函数 = 使用调用; }
 }
+
+

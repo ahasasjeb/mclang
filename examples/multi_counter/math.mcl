@@ -1,5 +1,6 @@
 namespace multi_counter;
 
-fn difference(left, right) -> score {
+// 只依赖参数的函数不需要 import，其他模块导入 math 即可使用。
+export fn difference(left, right) -> score {
     return left - right;
 }

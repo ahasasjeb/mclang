@@ -39,12 +39,36 @@ pub(super) struct ValidationContext<'a, 'b> {
     pub(super) return_rules: ReturnRules,
 }
 
-/// 收集函数体内的全部 `let` 声明，并报告重名、与全局计分变量或参数冲突。
-pub(super) fn collect_local_declarations<'a>(
+/// 收集函数体内的全部 `let` 与 `for` 循环变量，并报告重名、与全局计分变量或
+/// 参数冲突。
+///
+/// `let` 是函数级名字：同名只允许声明一次。`for` 变量属于它所在的循环体，
+/// 因此兄弟循环可以复用同一个名字，但不能与 `let`、参数、全局计分变量或
+/// 外层循环变量重名。
+pub(super) fn collect_local_declarations(
+    statements: &[Statement],
+    scores: &HashSet<&str>,
+    parameters: &HashSet<&str>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let mut persistent = HashSet::new();
+    let mut loops = Vec::new();
+    collect_scoped_declarations(
+        statements,
+        scores,
+        parameters,
+        &mut persistent,
+        &mut loops,
+        diagnostics,
+    );
+}
+
+fn collect_scoped_declarations<'a>(
     statements: &'a [Statement],
     scores: &HashSet<&str>,
     parameters: &HashSet<&str>,
-    locals: &mut HashSet<&'a str>,
+    persistent: &mut HashSet<&'a str>,
+    loops: &mut Vec<&'a str>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for statement in statements {
@@ -63,69 +87,86 @@ pub(super) fn collect_local_declarations<'a>(
                         statement.span,
                     ));
                 }
-                if !locals.insert(name) {
+                if !persistent.insert(name) || loops.contains(&name.as_str()) {
                     diagnostics.push(Diagnostic::new(
-                        format!("函数内重复声明局部变量 `{name}`"),
+                        format!("函数内重复声明局部变量或循环变量 `{name}`"),
                         statement.span,
                     ));
                 }
+            }
+            StatementKind::For {
+                variable,
+                variable_span,
+                body,
+                ..
+            } => {
+                validate_identifier("循环变量", variable, *variable_span, diagnostics);
+                if scores.contains(variable.as_str()) {
+                    diagnostics.push(Diagnostic::new(
+                        format!("循环变量 `{variable}` 与全局计分变量重名"),
+                        *variable_span,
+                    ));
+                }
+                if parameters.contains(variable.as_str()) {
+                    diagnostics.push(Diagnostic::new(
+                        format!("循环变量 `{variable}` 与函数参数重名"),
+                        *variable_span,
+                    ));
+                }
+                if persistent.contains(variable.as_str()) || loops.contains(&variable.as_str()) {
+                    diagnostics.push(Diagnostic::new(
+                        format!("函数内重复声明循环变量或局部变量 `{variable}`"),
+                        *variable_span,
+                    ));
+                }
+                loops.push(variable);
+                collect_scoped_declarations(
+                    body,
+                    scores,
+                    parameters,
+                    persistent,
+                    loops,
+                    diagnostics,
+                );
+                loops.pop();
             }
             StatementKind::If {
                 then_body,
                 else_body,
                 ..
             } => {
-                collect_local_declarations(then_body, scores, parameters, locals, diagnostics);
-                collect_local_declarations(else_body, scores, parameters, locals, diagnostics);
+                collect_scoped_declarations(
+                    then_body,
+                    scores,
+                    parameters,
+                    persistent,
+                    loops,
+                    diagnostics,
+                );
+                collect_scoped_declarations(
+                    else_body,
+                    scores,
+                    parameters,
+                    persistent,
+                    loops,
+                    diagnostics,
+                );
             }
             StatementKind::Execute { body, .. }
             | StatementKind::Each { body, .. }
             | StatementKind::InDimension { body, .. }
             | StatementKind::Spawn { body, .. }
             | StatementKind::While { body, .. } => {
-                collect_local_declarations(body, scores, parameters, locals, diagnostics);
+                collect_scoped_declarations(
+                    body,
+                    scores,
+                    parameters,
+                    persistent,
+                    loops,
+                    diagnostics,
+                );
             }
-            StatementKind::Run(_)
-            | StatementKind::Give { .. }
-            | StatementKind::EffectGive { .. }
-            | StatementKind::EffectClear { .. }
-            | StatementKind::XpChange { .. }
-            | StatementKind::StopwatchAction { .. }
-            | StatementKind::ClearInventory { .. }
-            | StatementKind::SetBlock { .. }
-            | StatementKind::Fill { .. }
-            | StatementKind::FillBiome { .. }
-            | StatementKind::Clone { .. }
-            | StatementKind::PlaceFeature { .. }
-            | StatementKind::PlaceJigsaw { .. }
-            | StatementKind::PlaceStructure { .. }
-            | StatementKind::PlaceTemplate { .. }
-            | StatementKind::ForceLoad(_)
-            | StatementKind::TimeAction { .. }
-            | StatementKind::Weather { .. }
-            | StatementKind::GameRuleSet { .. }
-            | StatementKind::WorldBorder(_)
-            | StatementKind::Locate { .. }
-            | StatementKind::SelfAction(_)
-            | StatementKind::Message { .. }
-            | StatementKind::PlaySound { .. }
-            | StatementKind::Call { .. }
-            | StatementKind::Schedule { .. }
-            | StatementKind::ScheduleClear { .. }
-            | StatementKind::Assign { .. }
-            | StatementKind::ScoreSet { .. }
-            | StatementKind::ScoreReset { .. }
-            | StatementKind::ScoreboardEnable { .. }
-            | StatementKind::ScoreboardOperation { .. }
-            | StatementKind::ScoreboardDisplay { .. }
-            | StatementKind::DataMerge { .. }
-            | StatementKind::DataRemove { .. }
-            | StatementKind::DataModify { .. }
-            | StatementKind::ItemAction { .. }
-            | StatementKind::Teleport { .. }
-            | StatementKind::NbtMerge { .. }
-            | StatementKind::AdvancementAction { .. }
-            | StatementKind::Return(_) => {}
+            _ => {}
         }
     }
 }
@@ -544,6 +585,31 @@ fn validate_statement<'a>(
         }
         StatementKind::While { condition, body } => {
             validate_while(condition, body, locals, ctx, diagnostics);
+        }
+        StatementKind::For {
+            variable,
+            start,
+            end,
+            body,
+            ..
+        } => {
+            validate_for(variable, start, end, body, locals, ctx, diagnostics);
+        }
+        StatementKind::Break | StatementKind::Continue => {
+            if ctx.return_rules.loop_depth == 0 {
+                let keyword = if matches!(&statement.kind, StatementKind::Break) {
+                    "break"
+                } else {
+                    "continue"
+                };
+                diagnostics.push(Diagnostic::new(
+                    format!(
+                        "`{keyword}` 只能出现在 for/while 循环体内；each/spawn 的每个实体会单独执行，\
+                         不能用它跳出"
+                    ),
+                    statement.span,
+                ));
+            }
         }
         StatementKind::Execute { clauses, body } => {
             validate_execute(clauses, body, statement.span, locals, ctx, diagnostics);
@@ -1373,7 +1439,7 @@ fn validate_call<'a>(
         }
         validate_call_context(function, *signature, span, ctx, diagnostics);
     } else {
-        diagnostics.push(Diagnostic::new(format!("找不到函数 `{function}`"), span));
+        diagnostics.push(Diagnostic::new(format!("找不到函数 `{function}`；如果它来自其他模块，请确认对方声明了 `export`，并在本模块 `import` 它"), span));
     }
     for argument in arguments {
         validate_expr(argument, locals, ctx, diagnostics);
@@ -1387,7 +1453,7 @@ fn validate_schedule(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     match ctx.symbols.functions.get(function) {
-        None => diagnostics.push(Diagnostic::new(format!("找不到函数 `{function}`"), span)),
+        None => diagnostics.push(Diagnostic::new(format!("找不到函数 `{function}`；如果它来自其他模块，请确认对方声明了 `export`，并在本模块 `import` 它"), span)),
         Some(signature) if signature.required_context != ExecutionContext::None => diagnostics
             .push(Diagnostic::new(
                 format!("不能调度需要执行上下文的函数 `{function}`，调度不会保留实体或玩家"),
@@ -1483,7 +1549,31 @@ fn validate_while<'a>(
         ctx.symbols,
         ctx.context,
         ctx.entity_type,
-        ctx.return_rules.nested(),
+        ctx.return_rules.in_loop(),
+        diagnostics,
+    );
+}
+
+fn validate_for<'a>(
+    variable: &'a str,
+    start: &'a Expr,
+    end: &'a Expr,
+    body: &'a [Statement],
+    locals: &HashSet<&'a str>,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    validate_expr(start, locals, ctx, diagnostics);
+    validate_expr(end, locals, ctx, diagnostics);
+    let mut body_locals = locals.clone();
+    body_locals.insert(variable);
+    validate_statements(
+        body,
+        &mut body_locals,
+        ctx.symbols,
+        ctx.context,
+        ctx.entity_type,
+        ctx.return_rules.in_loop(),
         diagnostics,
     );
 }

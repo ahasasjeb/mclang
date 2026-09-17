@@ -1,12 +1,15 @@
 // 编译测试：多文件项目（中文关键词）。
-// 与 math.mcl、rewards.mcl 共享同一命名空间，验证跨文件符号解析。
+// math.mcl 与 rewards.mcl 是子模块，通过 import/export 互相引用。
 //
 // 验证：
 //   cargo run -- build tests/valid/multifile -o build/tests/multifile --deny-raw
 namespace multifile;
 
-计分 total = 0;
-查询 players = 实体("minecraft:player") {}
+import math;
+import rewards;
+
+export 计分 total = 0;
+export 查询 players = 实体("minecraft:player") {}
 
 @加载
 函数 load() {

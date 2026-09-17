@@ -8,23 +8,27 @@
 //   cargo run --bin mclang -- build examples/bounty_hunter -o build/bounty_hunter --deny-raw
 namespace bounty_hunter;
 
+// quests.mcl 的进度奖励函数与展示图标使用本模块的声明，因此都要 export；
+// main 侧的 import 只是把 quests 模块纳入构建（它的进度是事件入口）。
+import quests;
+
 // 全局系统状态（保存在假玩家上，随存档持久化）。
 score streak_timer = 0;   // 连杀衰减计时（游戏刻）
 score top_bounty = 0;     // 全服最高余额，用于破纪录播报
 
 // 每名玩家一份的用户计分板。
-objective coins;
-objective streak;
-objective kills;
+export objective coins;
+export objective streak;
+export objective kills;
 objective milestone;
-objective last_sleep_day;
-objective last_reward;
+export objective last_sleep_day;
+export objective last_reward;
 
 query all_players = entity("minecraft:player") {}
-query nearest_player = entity("minecraft:player") { sort(nearest); limit(1); }
+export query nearest_player = entity("minecraft:player") { sort(nearest); limit(1); }
 
 // 里程碑奖励物品：物品组件只声明一次，所有 give 命令共用同一份产物。
-item hunter_badge = item_stack("minecraft:gold_ingot") {
+export item hunter_badge = item_stack("minecraft:gold_ingot") {
     custom_name = "猎人徽章";
     lore("第一个里程碑的纪念。");
     rarity = rare;
@@ -98,3 +102,4 @@ fn check_leader() {
         message.all(translate("chat.type.announcement", [text("新纪录"), selector("@s")]) { color = "light_purple"; });
     }
 }
+

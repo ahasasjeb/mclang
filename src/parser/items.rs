@@ -193,6 +193,7 @@ impl Parser {
         let end = self.advance().span;
         self.take(&TokenKind::Semicolon);
         Ok(ItemStackDecl {
+            exported: false,
             name,
             name_span,
             item_id,

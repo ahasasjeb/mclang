@@ -1,0 +1,13 @@
+// 子模块可以省略 namespace，继承入口的命名空间。
+// helper 没有 export：模块私有的名字不会与其他模块冲突，其他模块也看不到。
+fn helper(value) -> score {
+    return value + 1;
+}
+
+export fn sum(left, right) -> score {
+    return helper(left) + right;
+}
+
+export fn product(left, right) -> score {
+    return left * right;
+}

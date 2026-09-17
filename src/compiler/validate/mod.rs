@@ -10,7 +10,7 @@ mod expressions;
 mod items;
 mod recursion;
 mod registry;
-mod rules;
+pub(super) mod rules;
 mod statements;
 mod tags;
 mod world;
@@ -109,7 +109,7 @@ fn validate_namespace(program: &Program, diagnostics: &mut Vec<Diagnostic>) {
     if !valid_name(&program.namespace) || windows_reserved_name(&program.namespace) {
         diagnostics.push(Diagnostic::new(
             "命名空间只能包含小写 ASCII 字母、数字和下划线，不能以数字开头或使用 Windows 保留设备名",
-            program.namespace_span,
+            program.namespace_span.unwrap_or_default(),
         ));
     }
 }
@@ -522,12 +522,10 @@ fn validate_function_bodies(
             .iter()
             .map(|parameter| parameter.name.as_str())
             .collect::<HashSet<_>>();
-        let mut declared_locals = HashSet::new();
         collect_local_declarations(
             &function.body,
             &declarations.scores,
             &parameters,
-            &mut declared_locals,
             diagnostics,
         );
         let mut visible_locals = HashSet::new();
@@ -556,6 +554,7 @@ fn validate_function_bodies(
             ReturnRules {
                 returns_score: function.returns_score,
                 allowed_here: true,
+                loop_depth: 0,
             },
             diagnostics,
         );

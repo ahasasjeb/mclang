@@ -41,6 +41,7 @@ impl Parser {
             .expect(TokenKind::Semicolon, "计分变量声明后需要 `;`")?
             .span;
         Ok(ScoreDecl {
+            exported: false,
             name,
             name_span,
             initial,
@@ -134,6 +135,7 @@ impl Parser {
                 .span
         };
         Ok(ObjectiveDecl {
+            exported: false,
             name,
             name_span,
             criteria,
@@ -186,6 +188,7 @@ impl Parser {
             .expect(TokenKind::Semicolon, "数据槽声明后需要 `;`")?
             .span;
         Ok(DataSlotDecl {
+            exported: false,
             name,
             name_span,
             kind: if source == "item_data" {
@@ -395,6 +398,7 @@ impl Parser {
         let end = self.advance().span;
         self.take(&TokenKind::Semicolon);
         Ok(EntityQueryDecl {
+            exported: false,
             name,
             name_span,
             entity_type,
@@ -538,6 +542,7 @@ impl Parser {
             .expect(TokenKind::Semicolon, "存储声明后需要 `;`")?
             .span;
         Ok(StorageDecl {
+            exported: false,
             name,
             name_span,
             storage_id,
@@ -595,6 +600,7 @@ impl Parser {
         let end = self.advance().span;
         self.take(&TokenKind::Semicolon);
         Ok(FunctionTagDecl {
+            exported: false,
             name,
             name_span,
             values,
@@ -644,6 +650,7 @@ impl Parser {
             .expect(TokenKind::Semicolon, "资源声明后需要 `;`")?
             .span;
         Ok(ResourceDecl {
+            exported: false,
             kind,
             name,
             name_span,
@@ -742,6 +749,7 @@ impl Parser {
             ));
         }
         Ok(AdvancementDecl {
+            exported: false,
             name,
             name_span,
             parent,
@@ -1072,6 +1080,7 @@ impl Parser {
         };
         let (body, end) = self.block()?;
         Ok(Function {
+            exported: false,
             name,
             name_span,
             parameters,

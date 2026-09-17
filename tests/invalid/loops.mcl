@@ -1,0 +1,42 @@
+// 编译测试（负向）：break/continue 的作用域与循环变量重名。
+namespace invalid_loops;
+
+score total = 0;
+query players = entity("minecraft:player") {}
+
+fn break_outside() {
+    break;
+}
+
+fn continue_in_each() {
+    each(players) {
+        continue;
+    }
+}
+
+fn continue_in_spawn() {
+    spawn("minecraft:zombie") {
+        break;
+    }
+}
+
+fn for_collides_with_let() {
+    let index = 1;
+    for index in 0..3 {
+        total += index;
+    }
+}
+
+fn nested_loop_variable() {
+    for index in 0..3 {
+        for index in 0..2 {
+            total += index;
+        }
+    }
+}
+
+fn break_in_raw() {
+    execute as(players) {
+        break;
+    }
+}

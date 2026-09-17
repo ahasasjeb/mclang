@@ -1,0 +1,4 @@
+// 没有 export：其他模块看不到 hidden。
+namespace module_private;
+
+fn hidden() {}

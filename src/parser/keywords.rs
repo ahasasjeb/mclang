@@ -128,6 +128,34 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "当",
     },
     Keyword {
+        english: "for",
+        chinese: "对于",
+    },
+    Keyword {
+        english: "in",
+        chinese: "在",
+    },
+    Keyword {
+        english: "break",
+        chinese: "跳出",
+    },
+    Keyword {
+        english: "continue",
+        chinese: "跳过",
+    },
+    Keyword {
+        english: "import",
+        chinese: "导入",
+    },
+    Keyword {
+        english: "export",
+        chinese: "公开",
+    },
+    Keyword {
+        english: "as",
+        chinese: "作为",
+    },
+    Keyword {
         english: "each",
         chinese: "遍历",
     },

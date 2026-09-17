@@ -1,0 +1,26 @@
+// 模块示例：入口 import 子模块，子模块的公开函数落在带模块路径的文件里。
+//
+// 编译：
+//   cargo run --bin mclang -- build examples/module_demo -o build/module_demo --deny-raw
+// 产物：
+//   data/module_demo/function/lib/math/sum.mcfunction
+//   data/module_demo/function/lib/math/product.mcfunction
+namespace module_demo;
+
+import lib::math::{sum, product};
+
+export score total = 0;
+
+@load
+fn load() {
+    message.all("模块示例已加载", green);
+    total = sum(1, 2) + product(3, 4);
+}
+
+@tick
+fn tick() {
+    if total >= 100 {
+        total = 0;
+        message.all("reset", gray);
+    }
+}

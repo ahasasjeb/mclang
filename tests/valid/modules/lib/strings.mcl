@@ -1,0 +1,10 @@
+// 与 lib/math.mcl 同名的私有 helper：两个模块各自持有，互不冲突。
+fn helper(value) -> score {
+    return value;
+}
+
+export resource predicate on_fire = """{"type":"minecraft:random_chance","chance":0.25}""";
+
+export fn banner() {
+    message.all("modules: welcome", gold);
+}

@@ -1,0 +1,6 @@
+// 编译测试（负向）：导入不存在的模块。
+namespace module_missing;
+
+import lib::nowhere;
+
+fn main() {}

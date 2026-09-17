@@ -1,12 +1,17 @@
 namespace multi_counter;
 
-fn announce(boundary) {
+import main;
+import math;
+
+// main.mcl 的 @tick 会调用 announce，因此必须 export。
+export fn announce(boundary) {
     let overshoot = difference(ticks, boundary);
     if overshoot >= 0 {
         message.all("Counter reached its boundary", gold);
     }
 }
 
+// 模块私有：跨文件的循环与调度只在 tasks 内部使用。
 fn drain_pending() {
     while pending > 0 {
         message.all("processing one pending task");

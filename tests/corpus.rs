@@ -82,19 +82,79 @@ fn valid_corpus_compiles() {
 #[test]
 fn invalid_corpus_is_rejected() {
     let root = repo_root().join("tests/invalid");
-    let mut directories: Vec<_> = fs::read_dir(&root)
-        .expect("缺少 tests/invalid")
-        .map(|entry| entry.expect("无法读取 tests/invalid").path())
-        .collect();
-    directories.sort();
-    assert!(!directories.is_empty(), "tests/invalid 为空");
-    for directory in directories {
+    let mut checked = 0;
+    let mut stack = vec![root.clone()];
+    while let Some(directory) = stack.pop() {
+        let mut entries: Vec<PathBuf> = fs::read_dir(&directory)
+            .unwrap_or_else(|error| panic!("无法读取 {}：{error}", directory.display()))
+            .map(|entry| entry.expect("无法读取目录项").path())
+            .collect();
+        entries.sort();
+        // 有 main.mcl 的目录是模块项目：整体检查一次。
+        if entries
+            .iter()
+            .any(|path| path.file_name().is_some_and(|name| name == "main.mcl"))
+        {
+            assert!(
+                check_file(&directory, &CheckOptions::default()).is_err(),
+                "tests/invalid/{} 应当被拒绝",
+                directory.display()
+            );
+            checked += 1;
+            continue;
+        }
+        // 其余目录里的每个 .mcl 文件按单文件项目各自检查。
+        for path in entries {
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().and_then(|value| value.to_str()) == Some("mcl") {
+                assert!(
+                    check_file(&path, &CheckOptions::default()).is_err(),
+                    "tests/invalid/{} 应当被拒绝",
+                    path.display()
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 0, "tests/invalid 里没有可检查的用例");
+}
+
+/// 模块项目的产物布局：子模块的声明落到模块路径下的文件，引用使用限定名。
+#[test]
+fn module_outputs_are_qualified() {
+    let output = output_directory("modules");
+    build(&repo_root().join("tests/valid/modules"), &output, true)
+        .expect("tests/valid/modules 应当通过严格模式");
+    let files = collect_files(&output);
+    for expected in [
+        "data/modules/function/load.mcfunction",
+        "data/modules/function/lib/math/sum.mcfunction",
+        "data/modules/function/lib/strings/banner.mcfunction",
+        "data/modules/function/lib/state/heartbeat.mcfunction",
+        "data/modules/predicate/lib/strings/on_fire.json",
+        "data/modules/tags/function/lib/state/heartbeat_group.json",
+        "data/modules/advancement/lib/state/collector.json",
+    ] {
         assert!(
-            check_file(&directory, &CheckOptions::default()).is_err(),
-            "tests/invalid/{} 应当被拒绝",
-            directory.display()
+            files.contains_key(expected),
+            "缺少产物 {expected}；实际产物：{:#?}",
+            files.keys().collect::<Vec<_>>()
         );
     }
+    let load = String::from_utf8(files["data/modules/function/load.mcfunction"].clone())
+        .expect("产物必须是 UTF-8");
+    assert!(
+        load.contains("function modules:lib/strings/banner"),
+        "load 应当调用限定名：{load}"
+    );
+    let advancement =
+        String::from_utf8(files["data/modules/advancement/lib/state/collector.json"].clone())
+            .expect("产物必须是 UTF-8");
+    assert!(
+        advancement.contains("\"function\": \"modules:lib/state/heartbeat\""),
+        "进度奖励应当引用限定名：{advancement}"
+    );
 }
 
 #[test]
@@ -143,6 +203,76 @@ fn examples_build_in_strict_mode() {
         build(&source, &output, true)
             .unwrap_or_else(|error| panic!("examples/{name} 严格模式构建失败：\n{error}"));
     }
+}
+
+/// 同一份源码重复构建必须逐字节一致（模块合并顺序不能依赖哈希顺序）。
+#[test]
+fn builds_are_reproducible() {
+    let source = repo_root().join("tests/valid/modules");
+    let first = output_directory("repro-first");
+    let second = output_directory("repro-second");
+    build(&source, &first, true).expect("第一次构建应当成功");
+    build(&source, &second, true).expect("第二次构建应当成功");
+    assert_eq!(
+        collect_files(&first),
+        collect_files(&second),
+        "重复构建的产物不一致"
+    );
+}
+
+/// 语言服务器用的内存分析同样按 `import` 解析模块，不需要真实文件系统。
+#[test]
+fn analyze_resolves_modules_in_memory() {
+    use mclang::SourceFile;
+
+    let project = |files: &[(&str, &str)]| {
+        files
+            .iter()
+            .map(|(path, text)| SourceFile {
+                path: PathBuf::from(path),
+                text: (*text).to_owned(),
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let sources = project(&[
+        (
+            "proj/main.mcl",
+            "namespace memory;\n\nimport lib::math::{sum, product as mul};\n\nfn main() -> score {\n    return sum(1, 2) + mul(3, 4);\n}\n",
+        ),
+        (
+            "proj/lib/math.mcl",
+            "export fn sum(a, b) -> score {\n    return a + b;\n}\n\nexport fn product(a, b) -> score {\n    return a * b;\n}\n",
+        ),
+    ]);
+    let analysis = mclang::analyze(&sources);
+    assert!(
+        analysis.diagnostics.is_empty(),
+        "内存模块项目应当通过：{:?}",
+        analysis
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message.clone())
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        analysis.symbols.iter().any(|symbol| symbol.name == "sum"),
+        "符号表里应当有 sum"
+    );
+
+    let missing = project(&[(
+        "proj/main.mcl",
+        "namespace memory;\n\nimport lib::missing;\n\nfn main() {}\n",
+    )]);
+    let analysis = mclang::analyze(&missing);
+    assert!(
+        analysis
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("找不到模块")),
+        "缺失模块应当报告：{:?}",
+        analysis.diagnostics
+    );
 }
 
 #[test]

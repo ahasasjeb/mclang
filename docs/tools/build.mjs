@@ -260,22 +260,25 @@ function verifyRepositoryExamples(compiler, translator) {
       writeSource(path.join(zhDir, relative), translator.translate(text, "zh"));
       checkedFiles += 1;
     }
-    for (const [label, dir] of [
-      ["英文", enDir],
-      ["中文", zhDir],
+    // 单文件示例按“单模块项目”检查与构建；目录示例以 main.mcl 为入口。
+    const enTarget = project.only ? path.join(enDir, project.only) : enDir;
+    const zhTarget = project.only ? path.join(zhDir, project.only) : zhDir;
+    for (const [label, target] of [
+      ["英文", enTarget],
+      ["中文", zhTarget],
     ]) {
-      const result = run(compiler, ["check", dir, "--deny-raw"], repoRoot);
+      const result = run(compiler, ["check", target, "--deny-raw"], repoRoot);
       if (!result.success) {
         fail(`仓库示例 ${project.name}（${label}）检查失败：\n${result.stdout}${result.stderr}`);
       }
     }
     const enPack = path.join(workDir, "selftest", project.name, "pack-en");
     const zhPack = path.join(workDir, "selftest", project.name, "pack-zh");
-    for (const [label, dir, pack] of [
-      ["英文", enDir, enPack],
-      ["中文", zhDir, zhPack],
+    for (const [label, target, pack] of [
+      ["英文", enTarget, enPack],
+      ["中文", zhTarget, zhPack],
     ]) {
-      const result = run(compiler, ["build", dir, "-o", pack], repoRoot);
+      const result = run(compiler, ["build", target, "-o", pack], repoRoot);
       if (!result.success) {
         fail(`仓库示例 ${project.name}（${label}）构建失败：\n${result.stdout}${result.stderr}`);
       }

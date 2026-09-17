@@ -1,8 +1,12 @@
 namespace multi_counter;
 
-score ticks = 0;
-score enabled = 1;
-score pending = 3;
+import math;
+import resources;
+import tasks;
+
+export score ticks = 0;
+export score enabled = 1;
+export score pending = 3;
 
 @load
 fn load() {

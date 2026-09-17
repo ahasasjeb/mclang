@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Span {
     pub source: usize,
     pub start: usize,
@@ -15,10 +15,16 @@ impl Span {
     }
 }
 
+/// 一个模块（一个 `.mcl` 文件）解析出的整程序。
+///
+/// 模块系统就位后 `namespace` 只在入口模块（项目根目录的 `main.mcl`）必需，
+/// 其余模块可以省略；若写了则必须与入口一致，缺省时空串由模块解析补上。
+/// `imports` 在模块解析阶段消费，合并后的整程序里为空。
 #[derive(Debug)]
 pub struct Program {
     pub namespace: String,
-    pub namespace_span: Span,
+    pub namespace_span: Option<Span>,
+    pub imports: Vec<ImportDecl>,
     pub scores: Vec<ScoreDecl>,
     pub objectives: Vec<ObjectiveDecl>,
     pub queries: Vec<EntityQueryDecl>,
@@ -31,12 +37,33 @@ pub struct Program {
     pub functions: Vec<Function>,
 }
 
+/// `import 数学::几何;` 或 `import 数学::{加法, 减法 as 减};`
+///
+/// 路径始终相对项目根目录（入口模块所在目录），`a::b` 对应 `a/b.mcl` 或
+/// `a/b/mod.mcl`。`items` 为 `None` 表示导入整个模块的公开声明。
+#[derive(Debug)]
+pub struct ImportDecl {
+    pub path: Vec<String>,
+    pub path_span: Span,
+    pub items: Option<Vec<ImportItem>>,
+}
+
+/// 选择性导入中的单个名字，可带 `as` 别名。
+#[derive(Debug)]
+pub struct ImportItem {
+    pub name: String,
+    pub name_span: Span,
+    pub alias: Option<String>,
+}
+
 /// `objective 名称;`：声明一个用户计分板目标（dummy 准则）。
 ///
 /// 运行期目标名是 `<命名空间>_<名称>`，例如 `portable_chest_box_key`；
 /// `__mcl/load` 负责创建，`/reload` 不会清空已有分数。
 #[derive(Debug)]
 pub struct ObjectiveDecl {
+    /// `export objective`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     /// 准则；缺省是 `dummy`。
@@ -76,6 +103,8 @@ pub enum DataSlotKind {
 /// 在容器物品与实体之间搬运数据。
 #[derive(Debug)]
 pub struct DataSlotDecl {
+    /// `export data_slot`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     pub kind: DataSlotKind,
@@ -87,6 +116,8 @@ pub struct DataSlotDecl {
 /// `fn_tag` 声明的函数标签，输出到 `data/<命名空间>/tags/function/<名称>.json`。
 #[derive(Debug)]
 pub struct FunctionTagDecl {
+    /// `export fn_tag`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     pub values: Vec<FunctionTagEntry>,
@@ -107,6 +138,8 @@ pub enum FunctionTagEntry {
 
 #[derive(Debug)]
 pub struct EntityQueryDecl {
+    /// `export query`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     /// 基础实体类型，`#` 前缀表示实体类型标签。
@@ -206,6 +239,8 @@ pub struct ItemFilter {
 
 #[derive(Debug)]
 pub struct ItemStackDecl {
+    /// `export item`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     pub item_id: String,
@@ -256,6 +291,8 @@ pub struct ItemEnchantment {
 
 #[derive(Debug)]
 pub struct StorageDecl {
+    /// `export storage`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     pub storage_id: String,
@@ -265,6 +302,8 @@ pub struct StorageDecl {
 
 #[derive(Debug)]
 pub struct ResourceDecl {
+    /// `export resource`：是否对其他模块公开。
+    pub exported: bool,
     pub kind: String,
     pub name: String,
     pub name_span: Span,
@@ -291,6 +330,8 @@ pub struct AdvancementReference {
 /// 运行时命中后由 `rewards.function` 触发的函数接管后续逻辑。
 #[derive(Debug)]
 pub struct AdvancementDecl {
+    /// `export advancement`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     pub parent: Option<AdvancementReference>,
@@ -369,6 +410,8 @@ impl AdvancementFrame {
 
 #[derive(Debug)]
 pub struct ScoreDecl {
+    /// `export score`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     pub initial: i32,
@@ -377,6 +420,8 @@ pub struct ScoreDecl {
 
 #[derive(Debug)]
 pub struct Function {
+    /// `export fn`：是否对其他模块公开。
+    pub exported: bool,
     pub name: String,
     pub name_span: Span,
     pub parameters: Vec<Parameter>,
@@ -822,6 +867,18 @@ pub enum StatementKind {
         condition: Condition,
         body: Vec<Statement>,
     },
+    /// `for <变量> in <起点>..<终点> { ... }`：半开区间，变量是循环体内的局部计分项。
+    For {
+        variable: String,
+        variable_span: Span,
+        start: Expr,
+        end: Expr,
+        body: Vec<Statement>,
+    },
+    /// `break`：跳出最近一层 `for`/`while`。
+    Break,
+    /// `continue`：进入最近一层 `for`/`while` 的下一次迭代。
+    Continue,
     Return(ReturnKind),
 }
 

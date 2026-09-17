@@ -1,6 +1,8 @@
 // 任务事件：一条进度监听一种触发条件，奖励函数只负责撤销与结算。
 namespace bounty_hunter;
 
+import main;
+
 item nether_icon = item_stack("minecraft:flint_and_steel") {}
 item end_icon = item_stack("minecraft:ender_eye") {}
 
@@ -173,3 +175,4 @@ fn reward_ender_dragon() {
     scoreboard.set(self, last_reward, earned);
     message.self(translate("chat.type.announcement", [text("击杀末影龙"), score(self, last_reward)]) { color = "gray"; });
 }
+

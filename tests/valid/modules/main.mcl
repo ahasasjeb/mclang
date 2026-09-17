@@ -1,0 +1,64 @@
+// 编译测试：模块与导入系统。
+// 覆盖整模块导入、选择性导入、别名、目录模块（lib/state/mod.mcl）、模块私有
+// 名字互不冲突、入口与子模块互相引用（导入环），以及跨模块的计分变量、目标、
+// 查询、物品、谓词资源、函数标签与进度引用。
+//
+// 验证：
+//   cargo run --bin mclang -- build tests/valid/modules -o build/tests/modules --deny-raw
+// 重点检查：
+//   data/modules/function/lib/math/sum.mcfunction
+//   data/modules/function/lib/state/heartbeat.mcfunction
+//   data/modules/advancement/lib/state/collector.json
+//   data/modules/tags/function/lib/state/heartbeat_group.json
+namespace modules;
+
+// 整模块导入：lib/math.mcl 的全部公开声明可见。
+import lib::math;
+// 选择性导入 + 别名：只引入需要的名字。
+import lib::strings::{banner as welcome, on_fire};
+// 目录模块：lib/state/mod.mcl 与 lib/state.mcl 等价。
+import lib::state;
+// 名字与参数/局部变量同名的计分变量。
+import lib::counters;
+
+export score total = 0;
+export objective coins;
+export query players = entity("minecraft:player") {}
+export item badge = item_stack("minecraft:diamond") { count = 1; }
+
+@load
+fn load() {
+    welcome();
+    total = sum(1, 2) + product(3, 4);
+    call #heartbeat_group();
+}
+
+@tick
+fn tick() {
+    if predicate(on_fire) {
+        heartbeat();
+    }
+    each(players) {
+        scoreboard.set(self, coins, total);
+    }
+}
+
+// 跨模块引用：state 模块的进度与函数标签。
+fn award() {
+    advancement.grant(players, collector);
+}
+
+// 参数 `tally` 与导入的 `lib::counters` 里的计分变量同名：
+// 参数引用必须留在局部，不能变成 `lib.counters.tally`。
+fn scaled(tally) -> score {
+    return tally * 2;
+}
+
+fn reset_counters() {
+    let tally = 0;
+    bump();
+    scoreboard.set(players, coins, tally);
+}
+
+
+

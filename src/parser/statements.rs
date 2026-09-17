@@ -90,6 +90,26 @@ impl Parser {
             let condition = self.condition()?;
             let (body, _) = self.block()?;
             StatementKind::While { condition, body }
+        } else if self.take_word("for").is_some() {
+            let (variable, variable_span) = self.ident("循环变量名称")?;
+            self.expect_word("in")?;
+            let start = self.expression()?;
+            self.expect(TokenKind::DotDot, "for 区间需要 `..`")?;
+            let end = self.expression()?;
+            let (body, _) = self.block()?;
+            StatementKind::For {
+                variable,
+                variable_span,
+                start,
+                end,
+                body,
+            }
+        } else if self.take_word("break").is_some() {
+            self.expect(TokenKind::Semicolon, "break 后需要 `;`")?;
+            StatementKind::Break
+        } else if self.take_word("continue").is_some() {
+            self.expect(TokenKind::Semicolon, "continue 后需要 `;`")?;
+            StatementKind::Continue
         } else if self.take_word("execute").is_some() {
             self.execute_statement()?
         } else if self.take_word("return").is_some() {

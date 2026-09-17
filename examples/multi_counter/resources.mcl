@@ -7,6 +7,7 @@ resource predicate coin_flip = """
 }
 """;
 
+// 模块私有的函数：没有 export，其他模块不能调用。
 fn random_message() {
     if predicate(coin_flip) {
         message.all("Heads");

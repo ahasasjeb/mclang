@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{Program, Statement, StatementKind};
+use crate::ast::Program;
 use crate::compiler::stable_hash;
 
 use super::Compiler;
@@ -46,7 +46,7 @@ pub(super) fn build_holders(program: &Program) -> HashMap<(&str, &str), String> 
             );
         }
         let mut locals = Vec::new();
-        collect_local_names(&function.body, &mut locals);
+        crate::name_walk::collect_local_names(&function.body, &mut locals);
         for name in locals {
             holders.insert(
                 (function.name.as_str(), name),
@@ -55,68 +55,6 @@ pub(super) fn build_holders(program: &Program) -> HashMap<(&str, &str), String> 
         }
     }
     holders
-}
-
-pub(super) fn collect_local_names<'a>(statements: &'a [Statement], locals: &mut Vec<&'a str>) {
-    for statement in statements {
-        match &statement.kind {
-            StatementKind::Let { name, .. } => locals.push(name),
-            StatementKind::If {
-                then_body,
-                else_body,
-                ..
-            } => {
-                collect_local_names(then_body, locals);
-                collect_local_names(else_body, locals);
-            }
-            StatementKind::Execute { body, .. }
-            | StatementKind::Each { body, .. }
-            | StatementKind::InDimension { body, .. }
-            | StatementKind::Spawn { body, .. }
-            | StatementKind::While { body, .. } => collect_local_names(body, locals),
-            StatementKind::Run(_)
-            | StatementKind::Give { .. }
-            | StatementKind::EffectGive { .. }
-            | StatementKind::EffectClear { .. }
-            | StatementKind::XpChange { .. }
-            | StatementKind::StopwatchAction { .. }
-            | StatementKind::ClearInventory { .. }
-            | StatementKind::SetBlock { .. }
-            | StatementKind::Fill { .. }
-            | StatementKind::FillBiome { .. }
-            | StatementKind::Clone { .. }
-            | StatementKind::PlaceFeature { .. }
-            | StatementKind::PlaceJigsaw { .. }
-            | StatementKind::PlaceStructure { .. }
-            | StatementKind::PlaceTemplate { .. }
-            | StatementKind::ForceLoad(_)
-            | StatementKind::TimeAction { .. }
-            | StatementKind::Weather { .. }
-            | StatementKind::GameRuleSet { .. }
-            | StatementKind::WorldBorder(_)
-            | StatementKind::Locate { .. }
-            | StatementKind::SelfAction(_)
-            | StatementKind::Message { .. }
-            | StatementKind::PlaySound { .. }
-            | StatementKind::Call { .. }
-            | StatementKind::Schedule { .. }
-            | StatementKind::ScheduleClear { .. }
-            | StatementKind::Assign { .. }
-            | StatementKind::ScoreSet { .. }
-            | StatementKind::ScoreReset { .. }
-            | StatementKind::ScoreboardEnable { .. }
-            | StatementKind::ScoreboardOperation { .. }
-            | StatementKind::ScoreboardDisplay { .. }
-            | StatementKind::DataMerge { .. }
-            | StatementKind::DataRemove { .. }
-            | StatementKind::DataModify { .. }
-            | StatementKind::ItemAction { .. }
-            | StatementKind::Teleport { .. }
-            | StatementKind::NbtMerge { .. }
-            | StatementKind::AdvancementAction { .. }
-            | StatementKind::Return(_) => {}
-        }
-    }
 }
 
 pub(super) fn score_holder(name: &str) -> String {

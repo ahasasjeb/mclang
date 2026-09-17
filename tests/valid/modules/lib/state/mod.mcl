@@ -1,0 +1,27 @@
+// 目录模块：lib/state/mod.mcl 的模块路径是 lib/state。
+// 它 import main（入口），与入口的 import 形成合法的导入环。
+import main;
+
+export fn heartbeat() {
+    total += 1;
+    if total > 10 {
+        total = 0;
+    }
+}
+
+// 函数标签的值引用本模块函数；标签与进度都会带上模块路径。
+export fn_tag heartbeat_group {
+    value(heartbeat);
+}
+
+export advancement collector {
+    criterion collect { trigger = tick; }
+    reward { function = heartbeat; }
+    display {
+        icon = badge;
+        title = "收集者";
+        description = "每次心跳都在计数。";
+        background = "minecraft:textures/block/diamond_block.png";
+        frame = task;
+    }
+}

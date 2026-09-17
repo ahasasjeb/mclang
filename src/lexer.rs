@@ -30,6 +30,10 @@ pub enum TokenKind {
     Semicolon,
     Comma,
     Dot,
+    /// `..`：`for` 区间的分隔符。
+    DotDot,
+    /// `::`：模块路径分隔符。
+    ColonColon,
     Equal,
     EqualEqual,
     Bang,
@@ -113,7 +117,21 @@ impl Lexer<'_> {
                 ']' => self.single(TokenKind::RightBracket),
                 ';' => self.single(TokenKind::Semicolon),
                 ',' => self.single(TokenKind::Comma),
-                '.' => self.single(TokenKind::Dot),
+                '.' => self.one_or_two(TokenKind::Dot, '.', TokenKind::DotDot),
+                ':' if self.peek_second() == Some(':') => {
+                    self.one_or_two(TokenKind::ColonColon, ':', TokenKind::ColonColon)
+                }
+                ':' => {
+                    self.advance();
+                    self.diagnostics.push(Diagnostic::new(
+                        "无法识别字符 `:`；模块路径用 `::` 分隔，资源位置写在字符串里",
+                        Span {
+                            source: self.source_id,
+                            start,
+                            end: self.cursor,
+                        },
+                    ));
+                }
                 '=' => self.one_or_two(TokenKind::Equal, '=', TokenKind::EqualEqual),
                 '!' => self.one_or_two(TokenKind::Bang, '=', TokenKind::BangEqual),
                 '&' if self.peek_second() == Some('&') => {

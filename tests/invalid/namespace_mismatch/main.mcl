@@ -1,0 +1,8 @@
+// 编译测试（负向）：被导入模块的命名空间必须与入口一致。
+namespace first;
+
+import other;
+
+fn a() {
+    b();
+}

@@ -14,6 +14,8 @@ mod rename;
 mod types;
 mod validate;
 
+pub(crate) use validate::rules::{valid_user_name, windows_reserved_name};
+
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
