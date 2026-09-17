@@ -60,6 +60,8 @@ const RECEIVER_FAMILIES = {
   调度: "schedule_method",
   advancement: "advancement_method",
   进度: "advancement_method",
+  store: "store_method",
+  存值: "store_method",
 };
 
 /** 方法表反查出的规范接收者，用于把中文接收者还原成英文。 */
@@ -79,6 +81,7 @@ const CANONICAL_RECEIVERS = {
   weather_kind: "weather",
   schedule_method: "schedule",
   advancement_method: "advancement",
+  store_method: "store",
 };
 
 /** 后面跟 `=` 或 `(` 时按属性表翻译的函数。 */
@@ -96,6 +99,10 @@ const PROPERTY_FAMILIES = [
   "display_property",
 ];
 
+/** 只在后面跟 `(` 时按函数名翻译的表：`facing(...)` 是 execute 子句，
+ * `facing = "south"` 却是方块状态属性，不能混用同一张表。 */
+const CALL_FAMILIES = ["execute_clause"];
+
 /** 调用实参里允许出现的枚举值表，键是规范化的“接收者.方法”或裸函数名。 */
 const CALL_VALUE_CONTEXTS = {
   sort: ["entity_sort"],
@@ -111,6 +118,12 @@ const CALL_VALUE_CONTEXTS = {
   set_block: ["set_block_mode"],
   fill: ["fill_mode"],
   "place.template": ["template_rotation", "template_mirror", "strict_word"],
+  anchored: ["anchor_value"],
+  facing: ["anchor_value"],
+  on: ["entity_relation"],
+  "store.data": ["store_method", "store_data_type"],
+  "store.result": ["bossbar_field"],
+  "store.success": ["bossbar_field"],
 };
 
 /** `属性 = 值` 形式下的枚举值表。 */
@@ -172,7 +185,7 @@ export function buildTranslator(data) {
   const isAttribute = (word) =>
     attributes.some((pair) => pair.en === word || pair.zh === word);
   const isPropertyWord = (word) =>
-    PROPERTY_FAMILIES.some((family) => hasPair(word, family));
+    [...PROPERTY_FAMILIES, ...CALL_FAMILIES].some((family) => hasPair(word, family));
   const isValueWord = (word) =>
     LOOSE_VALUE_FAMILIES.some((family) => hasPair(word, family)) ||
     hasPair(word, "boolean_word") ||
@@ -194,7 +207,11 @@ export function buildTranslator(data) {
     if (!word) return null;
     const keyword = keywords.find((pair) => pair.en === word || pair.zh === word);
     if (keyword) return keyword.en;
-    for (const family of [...PROPERTY_FAMILIES, ...Object.values(RECEIVER_FAMILIES)]) {
+    for (const family of [
+      ...PROPERTY_FAMILIES,
+      ...CALL_FAMILIES,
+      ...Object.values(RECEIVER_FAMILIES),
+    ]) {
       const { forward, backward } = indexOf(family);
       if (forward.has(word)) return word;
       if (backward.has(word)) return backward.get(word);
@@ -277,8 +294,16 @@ export function buildTranslator(data) {
       return lookupKeywords(word, target);
     }
 
-    if (next?.text === "=" || next?.text === "(") {
+    if (next?.text === "=") {
       for (const family of PROPERTY_FAMILIES) {
+        const rewritten = rewrite(word, family, target);
+        if (rewritten) return rewritten;
+      }
+    }
+
+    // 函数调用位置：声明属性与 execute 子句都写在这。
+    if (next?.text === "(") {
+      for (const family of [...PROPERTY_FAMILIES, ...CALL_FAMILIES]) {
         const rewritten = rewrite(word, family, target);
         if (rewritten) return rewritten;
       }

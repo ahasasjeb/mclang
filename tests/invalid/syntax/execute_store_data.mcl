@@ -1,0 +1,8 @@
+// 编译测试（负向语法）：store.data 的第一个参数只能是 result/success 模式或 NBT 来源。
+namespace execute_syntax_store_data;
+
+fn bad() {
+    execute store.data(contents, entity, self, "X", int) {
+        message.all("x");
+    }
+}

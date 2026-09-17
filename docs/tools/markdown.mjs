@@ -205,11 +205,12 @@ function joinParagraph(lines) {
 }
 
 function renderTable(rows, hooks) {
+  // 单元格里的 `\|` 是转义竖线（例如 `value \| max`），不能当列分隔符。
   const cells = (row) =>
     row
       .replace(/^\||\|$/g, "")
-      .split("|")
-      .map((cell) => cell.trim());
+      .split(/(?<!\\)\|/)
+      .map((cell) => cell.trim().replace(/\\\|/g, "|"));
   const header = cells(rows[0]);
   const body = rows.slice(1).filter((row) => !/^\|[\s:|-]+\|$/.test(row));
   let html = '<div class="table-wrap"><table>\n<thead><tr>';

@@ -91,20 +91,7 @@ impl Parser {
             let (body, _) = self.block()?;
             StatementKind::While { condition, body }
         } else if self.take_word("execute").is_some() {
-            let (clauses, span) = self.string("execute 后需要子句字符串")?;
-            if clauses.trim().is_empty()
-                || clauses.contains(['\n', '\r'])
-                || clauses.starts_with("execute ")
-                || clauses.starts_with("run ")
-                || clauses.ends_with(" run")
-            {
-                return Err(Diagnostic::new(
-                    "execute 字符串应只包含子句，例如 `as @a at @s`",
-                    span,
-                ));
-            }
-            let (body, _) = self.block()?;
-            StatementKind::Execute { clauses, body }
+            self.execute_statement()?
         } else if self.take_word("return").is_some() {
             let kind = if self.take(&TokenKind::Semicolon).is_some() {
                 ReturnKind::Void

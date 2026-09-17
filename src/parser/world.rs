@@ -713,7 +713,8 @@ impl Parser {
         })
     }
 
-    /// `rotation(yaw, pitch)`：朝向，单位是度。
+    /// `rotation(yaw, pitch)`：朝向，单位是度；与原版 `RotationArgument` 一样
+    /// 只支持绝对角度与 `~` 相对角度，不支持 `^` 局部坐标。
     pub(super) fn rotation_value(&mut self, label: &str) -> Result<RotationValue, Diagnostic> {
         let Some(start) = self.take_word("rotation") else {
             return Err(Diagnostic::new(
@@ -728,6 +729,12 @@ impl Parser {
         let end = self
             .expect(TokenKind::RightParen, "rotation 缺少 `)`")?
             .span;
+        if yaw.is_local() || pitch.is_local() {
+            return Err(Diagnostic::new(
+                "rotation 不支持 `^` 局部坐标，请使用绝对角度或 `~`",
+                start.span.merge(end),
+            ));
+        }
         Ok(RotationValue {
             yaw,
             pitch,

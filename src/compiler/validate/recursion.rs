@@ -80,8 +80,19 @@ fn collect_synchronous_calls<'a>(
                 collect_condition_calls(condition, calls);
                 collect_synchronous_calls(body, tags, calls);
             }
-            StatementKind::Execute { body, .. }
-            | StatementKind::Each { body, .. }
+            StatementKind::Execute { clauses, body } => {
+                if let crate::ast::ExecuteClauses::Structured(clauses) = clauses {
+                    for clause in clauses {
+                        if let crate::ast::ExecuteClauseKind::If(condition)
+                        | crate::ast::ExecuteClauseKind::Unless(condition) = &clause.kind
+                        {
+                            collect_condition_calls(condition, calls);
+                        }
+                    }
+                }
+                collect_synchronous_calls(body, tags, calls);
+            }
+            StatementKind::Each { body, .. }
             | StatementKind::InDimension { body, .. }
             | StatementKind::Spawn { body, .. } => collect_synchronous_calls(body, tags, calls),
             StatementKind::Assign { value, .. } | StatementKind::Let { value, .. } => {

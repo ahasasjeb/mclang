@@ -10,9 +10,9 @@
 手写 `.mcfunction` 时，一个“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、`execute as`/`at` 上下文、函数标签、`tellraw` 的 JSON 和 `give` 的物品组件语法。Mclang 把源码分成了明确的层：
 
 - **声明层**：`namespace`、`score`、`objective`、`query`、`item`、`storage`、`data_slot`、`resource`、`fn_tag`、`fn`，编译器检查重名、类型与资源位置。
-- **语句层**：`each`、`spawn`、`give`、`self.*`、`message.*`、`effect.*`、`xp.*`、`scoreboard.*`、`teleport`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都是独立 AST 节点。
+- **语句层**：`execute`、`each`、`spawn`、`give`、`self.*`、`message.*`、`effect.*`、`xp.*`、`scoreboard.*`、`teleport`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都是独立 AST 节点。
 - **表达式层**：整数、计分值、带返回值的函数调用与 `scoreboard.get`、`xp.query`、`stopwatch.query`、`time.query`、`gamerule.query`、`worldborder.get` 等查询表达式。
-- **逃生口**：`run` 与 `execute` 接受原生命令字符串，`--deny-raw` 可以强制项目完全停留在标准层。
+- **逃生口**：`run`、字符串形式的 `execute` 与 `return run` 接受原生命令文本，`--deny-raw` 可以强制项目完全停留在标准层。
 
 :::tip 中英关键词完全等价
 每个关键词、函数属性、方法和枚举值都有英文与中文写法，两种写法可以在同一个文件、同一条语句里混用。编译器保证两种写法生成**逐字节相同**的数据包；本手册的构建脚本会在每次生成时重新验证这一点。
@@ -567,7 +567,7 @@ while <条件> {
 
 `if` 与 `while` 保持当前执行上下文，不引入新实体。编译时条件会求值为 0/1 的临时计分项：`if` 生成 `execute if score <flag> matches 1 run function <辅助函数>`，`else` 分支用 `matches 0`；条件里的 `&&`、`||`、`!`、比较与 `predicate(…)` 也都会下降成计分板操作。
 
-**`return` 只能直接出现在函数最外层代码块**，不能放进 `if`、`while`、`each`、`spawn`、`in_dimension` 或 `execute` 块——这些结构会展开成辅助函数，块里的 `return` 只会结束辅助函数。需要条件结果时先给局部变量赋值，在函数末尾统一 `return`。
+**`return` 只能直接出现在函数最外层代码块**，不能放进 `if`、`while`、`each`、`spawn`、`in_dimension` 或 `execute` 块——这些结构会展开成辅助函数，块里的 `return` 只会结束辅助函数。需要条件结果时先给局部变量赋值，在函数末尾统一 `return`；结构化 `execute` 的 store 子句则直接捕获块内最后一条命令的结果（见[结构化执行](#statements-execute)）。
 
 ```mcl title="示例" fragment
 if ticks >= 100 {
@@ -729,33 +729,108 @@ fn on_core_placed() {
 }
 ```
 
-### 原生执行子句（execute）
+### 结构化执行（execute） {#statements-execute}
+
 ```mcl title="语法" fragment
-execute "<子句>" {
+execute [<修饰符>...] [if <条件> | unless <条件>]... [<store>...] {
     ...
 }
 ```
 
-块内语句在一个额外的原版 `execute` 上下文中运行，子句字符串只写参数部分，例如 `"as @a at @s"` 或 `"positioned ~ ~ ~ facing entity @s"`。字符串不能为空、不能跨行、不能以 `execute ` 或 `run ` 开头、也不能以 ` run` 结尾；`execute` 语句计入 `--deny-raw`。
+`execute` 先按顺序调整执行上下文，再运行代码块；产物是一条真实的原版 `execute ... run function <辅助函数>` 命令链。子句顺序固定为**修饰符 → 条件 → store**：条件与 store 依赖修饰符建立的上下文，修饰符写在条件之后、重复的修饰符、条件写在 store 之后都会编译报错。
 
-```mcl title="示例" verify id=execute_demo raw
+| 修饰符 | 作用 | 生成 |
+| --- | --- | --- |
+| `as(<查询>)` | 以查询命中的每个实体为执行实体 | `as <选择器>` |
+| `at(<查询>)` | 在查询命中的每个实体处执行，但不改变执行实体 | `at <选择器>` |
+| `positioned(<位置>)` | 设置执行位置，并把锚点重置为脚部 | `positioned <x y z>` |
+| `rotated(rotation(<yaw>, <pitch>))` | 设置执行朝向 | `rotated <yaw> <pitch>` |
+| `facing(pos(...))` | 面向一个坐标 | `facing <x y z>` |
+| `facing(entity(<查询>), <eyes \| feet>)` | 面向实体的眼睛或脚部 | `facing entity <选择器> eyes` |
+| `align(<xyz 的子集>)` | 把执行位置对齐到方块；写 `align(xz)`、`align(y)` 等 | `align xz` |
+| `anchored(<eyes \| feet>)` | 切换后续相对坐标的锚点 | `anchored eyes` |
+| `in("<维度>")` | 切换执行维度 | `in <维度>` |
+| `on(<关系>)` | 以当前实体的关系实体继续执行，需要实体上下文 | `on owner` |
+| `summon("<实体类型>")` | 在当前执行位置召唤实体，并以它继续执行 | `summon <实体类型>` |
+
+`on` 的关系取值为 `owner`、`leasher`、`target`、`attacker`、`vehicle`、`controller`、`origin`、`passengers`，与原版 `ExecuteCommand` 的关系扩展一一对应。`at` 直接转发查询选择器：`at(q)` 对每个命中实体各执行一次，因此 `execute as(q) at(q)` 是原版的交叉组合；只要一份位置时给查询加 `limit(1)`。
+
+条件复用 `if`/`while` 的整套条件族（谓词、方块、生物群系、比较、`&&`/`||`/`!` 等），多个条件全部成立才执行块体；`unless` 是条件的否定（`unless c` 生成 `unless score <flag> matches 1`）。条件在修饰符建立的上下文里求值，所以 `execute as(players) at(players) if block(pos(~, ~-1, ~), block_state("minecraft:stone"))` 检查的是每名玩家脚下的方块。
+
+store 从块内最后一条命令取值：
+
+| store | 写入内容 | 目标 |
+| --- | --- | --- |
+| `store.result(<持有者>, <目标>)` | 块内最后一条命令的结果 | 用户计分板目标 |
+| `store.success(<持有者>, <目标>)` | 命令成功为 1，失败为 0 | 用户计分板目标 |
+| `store.result(bossbar, "<资源位置>", value \| max)` | 结果 | Boss 栏的当前值或上限 |
+| `store.success(bossbar, "<资源位置>", value \| max)` | 成功为 1，失败为 0 | Boss 栏的当前值或上限 |
+| `store.data([result \| success,] <来源>, "<路径>", <类型>[, <缩放>])` | 结果或成功与否，按类型转换 | 实体、方块或存储的 NBT |
+
+语义要点：
+
+- store 捕获的是**块内最后一条命令**在修饰符上下文里的结果；条件不成立时块体不运行，store 不写入。
+- 最后一条语句是 `if`、`while`、`each`、`spawn`、`in_dimension` 或 `execute` 等控制结构时结果不会传递，编译器直接拒绝；调用带 `-> score` 返回值的函数可以，此时捕获的是函数的返回值。
+- 计分板持有者支持 `self`/自身、`origin`/投掷者 与实体查询（查询生成计分板选择器，可一次写入多个实体）。投掷者目标会拆成「先捕获到临时计分项，再用 `on origin` 复制」：命令没有执行时（例如查询没有命中）目标保持原样，与原版 store 的触发条件一致。
+- `store.data` 的实体来源需要 `limit(1)` 查询；`self` 要求非玩家上下文，查询来源会检查实体类型，`origin` 无法静态确认，投掷者恰好是玩家时 Minecraft 拒绝写入。
+- Boss 栏必须在运行期已经存在（由 `/bossbar add` 或后续的 bossbar 命令族创建），否则整条命令失败、不写入。
+- 没有命中实体、命令失败或条件不成立时 Minecraft 可能完全不写入，这与原版 `execute store` 一致；读取时先按 0 处理。
+
+```mcl title="示例" verify id=execute_structured
 namespace execute_demo;
 
-query all_players = entity("minecraft:player") {}
+objective cleared;
+
+query players = entity("minecraft:player") {}
+query zombies = entity("minecraft:zombie") { within(16); }
+
+item token = item_stack("minecraft:gold_nugget") { count = 3; }
 
 @load
 fn load() {
-    call spotlight();
-}
-
-fn spotlight() {
-    each(all_players) {
-        execute "positioned ~ ~ ~ facing entity @s" {
-            message.self("面向自己执行", light_purple);
-        }
+    // 全部修饰符：面向原点、对齐到方块后执行。
+    execute as(players) at(players) positioned(pos(0, 64, 0)) rotated(rotation(0, 0)) facing(pos(0, 0, 0)) align(xz) anchored(feet) in("minecraft:overworld") {
+        message.self("就位", aqua);
+    }
+    // 条件与 store.result：清点玩家背包并把数量写进计分板。
+    execute as(players) if entity(zombies) store.result(自身, cleared) {
+        clear(players);
+    }
+    // store.success：把命令成功与否写进查询命中的玩家。
+    execute as(players) store.success(players, cleared) {
+        give(players, token);
+    }
+    // 投掷者目标与 Boss 栏：前者拆成捕获与复制，后者写当前值。
+    execute as(zombies) store.result(origin, cleared) {
+        self.add_tag("origin");
+    }
+    execute store.result(bossbar, "execute_demo:timer", value) {
+        message.all("tick");
+    }
+    // store.data：写入实体通用数据、方块实体与存储。
+    execute as(zombies) store.data(entity, 自身, "data.execute_demo", int, 1) {
+        self.add_tag("marked");
+    }
+    execute store.data(block, pos(0, 64, 0), "Items", byte) {
+        set_block(pos(0, 64, 0), block_state("minecraft:chest"));
+    }
+    execute store.data(storage, "execute_demo:state", "count", double, 1) {
+        message.all("done");
     }
 }
 ```
+
+条件与 `store.result` 的实际产物（辅助函数里先算标志，再进入带 store 的块体）：
+
+:::generated example=execute_structured file=data/execute_demo/function/__mcl/load/1.mcfunction title="data/execute_demo/function/__mcl/load/1.mcfunction"
+:::
+
+:::generated example=execute_structured file=data/execute_demo/function/__mcl/load/2.mcfunction title="data/execute_demo/function/__mcl/load/2.mcfunction"
+:::
+
+:::note 字符串子句仍是逃生口
+`execute "as @a at @s" { ... }` 原样转发子句字符串，只做空值、跨行与首尾 `run` 的形状检查，并计入 `--deny-raw`；结构化子句则完全绕过字符串，可以在严格模式项目里使用。
+:::
 
 ### 函数调用（call）
 
@@ -1333,7 +1408,7 @@ if !(ticks < 100) || ready == 1 {
 ```
 
 :::note 条件如何求值
-条件最终变成一个 0/1 的标志计分项：比较生成 `execute if/unless score A <symbol> B run scoreboard players set <flag> … 1`，`&&` 用两条 `if score … matches 1` 串联，`||` 分别置 1，`!` 先置 1 再在内部为 1 时清零。编译器为条件分配临时计分项（`#t<序号>`），同一份源码的分配结果稳定可复现。
+条件最终变成一个 0/1 的标志计分项：比较生成 `execute if/unless score A <symbol> B run scoreboard players set <flag> … 1`，`&&` 用两条 `if score … matches 1` 串联，`||` 分别置 1，`!` 先置 1 再在内部为 1 时清零。编译器为条件分配临时计分项（`#t<序号>`），同一份源码的分配结果稳定可复现。结构化 `execute` 的 `if`/`unless` 子句复用同一套求值：标志在修饰符建立的上下文里算完，再用一条 `execute if score <flag> matches 1 run function <辅助函数>` 进入块体。
 :::
 
 ## 编译产物与运行模型 {#artifacts}

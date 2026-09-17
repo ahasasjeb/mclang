@@ -1,0 +1,8 @@
+// 编译测试（负向语法）：align 的轴列表只能是非空的 x/y/z 子集。
+namespace execute_syntax_align;
+
+fn bad() {
+    execute align(xx) {
+        message.all("x");
+    }
+}

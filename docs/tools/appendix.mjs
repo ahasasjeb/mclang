@@ -37,6 +37,20 @@ const ALIAS_GROUPS = [
   ["worldborder_method", "worldborder 方法", "世界边界操作；`get` 是表达式。"],
   ["locate_kind", "locate 方法", "定位结构、生物群系或兴趣点。"],
   [
+    "execute_clause",
+    "execute 修饰符",
+    "结构化 `execute` 的修饰符子句；`facing` 同时有坐标与 `entity(查询)` 两种写法。",
+  ],
+  ["entity_relation", "execute on 关系", "`on(关系)` 的取值，对应原版的关系扩展。"],
+  ["anchor_value", "实体锚点", "`anchored(锚点)` 与 `facing(entity(查询), 锚点)` 的取值。"],
+  [
+    "store_method",
+    "store 方法",
+    "`store.result/success` 写用户计分板或 Boss 栏，`store.data` 写 NBT。",
+  ],
+  ["store_data_type", "store.data 类型", "`store.data` 的数值类型实参。"],
+  ["bossbar_field", "Boss 栏字段", "`store.result/success(bossbar, \"id\", 字段)` 的可写字段。"],
+  [
     "advancement_method",
     "advancement 方法",
     "`advancement.grant/revoke(…)` 的五种作用范围；只有 `grant`/`授予` 可以带准则名。",

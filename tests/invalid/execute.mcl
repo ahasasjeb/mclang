@@ -1,0 +1,87 @@
+// 编译测试（负向语义）：结构化 execute 的重复子句、子句顺序、上下文与 store。
+// 期望诊断：
+//   - as/align 等子句只能出现一次
+//   - 修饰符必须写在 if/unless 之前，条件必须写在 store 之前
+//   - store 的投掷者持有者需要实体上下文，计分板目标与 Boss 栏资源位置必须有效
+//   - store 需要块内至少一条命令，且最后一条要能产生结果
+//   - store.data 的路径、来源与玩家写保护
+//   - on 需要执行实体，summon 不能召唤玩家，维度与查询必须存在
+namespace execute_invalid;
+
+objective goal;
+
+query players = entity("minecraft:player") {}
+query players_single = entity("minecraft:player") { limit(1); }
+query zombies = entity("minecraft:zombie") {}
+query zombies_single = entity("minecraft:zombie") { limit(1); }
+query armed = entity("minecraft:zombie") {
+    item(weapon.mainhand) {
+        id = "minecraft:diamond_sword";
+    }
+}
+
+fn void_helper() {}
+
+fn basics() {
+    execute as(players) as(players) {
+        message.all("x");
+    }
+    execute as(players) if entity(zombies) at(zombies) {
+        message.all("x");
+    }
+    execute store.result(zombies, goal) if entity(zombies) {
+        message.all("x");
+    }
+    execute store.result(origin, goal) {
+        message.all("x");
+    }
+    execute store.result(bossbar, "not a location", value) {
+        message.all("x");
+    }
+    execute store.data(entity, origin, "X", int) {
+        message.all("x");
+    }
+    execute store.result(自身, goal) {
+    }
+    execute store.result(zombies, missing_objective) {
+        message.all("x");
+    }
+    execute store.data(entity, 自身, "Bad Path.", int) {
+        message.all("x");
+    }
+    execute store.data(entity, players, "X", int) {
+        message.all("x");
+    }
+    execute store.data(entity, players_single, "X", int) {
+        message.all("x");
+    }
+    execute store.data(entity, zombies, "X", int) {
+        message.all("x");
+    }
+    execute on(owner) {
+        message.all("x");
+    }
+    execute summon("minecraft:player") {
+        message.all("x");
+    }
+    execute in("minecraft:nowhere") {
+        message.all("x");
+    }
+    execute as(unknown_query) {
+        message.all("x");
+    }
+    execute at(armed) {
+        message.all("x");
+    }
+    execute facing(entity(armed), eyes) {
+        message.all("x");
+    }
+    execute store.result(zombies_single, goal) {
+        if entity(zombies) {
+            message.all("x");
+        }
+    }
+    execute store.result(zombies_single, goal) {
+        void_helper();
+    }
+}

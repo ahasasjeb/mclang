@@ -24,13 +24,13 @@
 | 不可达 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 不建模 | 可由其他结构化语句等价表达，或对数据包无意义 |
 
-当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **15 个完整覆盖**（`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`、`clone`、`fillbiome`、`forceload`、`time`、`weather`、`gamerule`、`worldborder`、`locate`、`advancement`），14 个有部分结构化入口；32 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
+当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **16 个完整覆盖**（`execute`、`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`、`clone`、`fillbiome`、`forceload`、`time`、`weather`、`gamerule`、`worldborder`、`locate`、`advancement`），13 个有部分结构化入口；32 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
 
 ### 1.1 执行、函数与数据核心
 
 | 命令 | 原版形态（26.3-rc-2） | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `execute` | `run`；`if`/`unless`（block、biome、loaded、dimension、score、blocks、entity、predicate、function、stopwatch、data、items、slots）；修饰符 as、at、positioned、rotated、facing、align、anchored、in、on（8 种关系）、summon；store result/success | 部分 | 只有 `execute "子句" {}` 字符串包装；缺全部结构化子句、条件与 store |
+| `execute` | `run`；`if`/`unless`（block、biome、loaded、dimension、score、blocks、entity、predicate、function、stopwatch、data、items、slots）；修饰符 as、at、positioned、rotated、facing、align、anchored、in、on（8 种关系）、summon；store result/success | 完成 | 结构化修饰符、`if`/`unless` 条件（复用 2.2 条件族）与 `store.result/success/data`：计分板、Boss 栏（`bossbar, "id", value\|max`）与实体/方块/存储 NBT 目标全覆盖；字符串子句保留为逃生口并计入 `--deny-raw`。计分板持有者支持 `self`、实体查询与 `origin`（origin 拆成临时项捕获 + `on origin` 复制，未触发时目标保持原样）；`store.data` 的实体来源要求 `limit(1)`，`self`/查询按非玩家校验，`origin` 由运行期非玩家路径处理 |
 | `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call`、表达式调用与 `#tag` 已支持，标签成员在编译期检查执行上下文与参数；缺 `<fn> <nbt>` 宏参数与 `with` |
 | `return` | `<int>`；`fail`；`run <命令>` | 完成 | 计分返回值、store ABI、`return fail`、`return run` 全覆盖；`return run` 的命令文本计入 `--deny-raw` |
 | `schedule` | `function <fn> <time> [replace\|append]`；`clear <fn>` | 完成 | 整数与浮点时间（按原版 `TimeArgument` 换算为游戏刻）、`replace`/`append`、`schedule.clear`、`#tag` 调度 |
@@ -234,6 +234,18 @@
 - [x] `examples/portal.mcl`：放置方块（`placed_block`）与进入方块（`enter_block`）两个事件入口，奖励函数用 `advancement.revoke(self, …)` 撤销进度实现可重复触发，并通过 `--deny-raw` 与双语翻译自检。
 - [x] 文档：手册新增进度声明与进度操作章节、附录 D 触发器总表（从编译器源码提取）、`portal.mcl` 示例条目。
 
+结构化 execute（本次批次）：
+
+- [x] `execute` 结构化子句：修饰符 `as(q)`、`at(q)`、`positioned(pos|vec3)`、`rotated(rotation)`、`facing(pos|entity(q), 锚点)`、`align(xyz 子集)`、`anchored(锚点)`、`in("维度")`、`on(关系)`、`summon("实体类型")`；重复修饰符、修饰符写在条件之后、条件写在 store 之后都在编译期报错。
+- [x] `if`/`unless` 条件复用 2.2 的条件族：在修饰符建立的执行上下文里求值为 0/1 标志，再用一条 `execute if score <flag> matches 1 run function` 进入块体；`unless` 生成 `unless score <flag> matches 1`。
+- [x] `store.result/success(持有者, 目标)`、`store.result/success(bossbar, "id", value|max)` 与 `store.data([result|success,] 来源, "路径", 类型[, 缩放])`：store 链包裹块内最后一条命令（可叠加多个目标），条件不成立或块体不运行时按原版语义不写入。
+- [x] `origin` 持有者：计分板与 NBT 目标都通过「临时计分项捕获 + `on origin` 复制」表达，复制由回调触发标志保护，未触发时目标保持原样。
+- [x] 上下文推导：`as` 按查询类型进入玩家/非玩家上下文，`at` 保持不变，`on` 要求当前有实体并放宽为任意实体，`summon` 进入非玩家上下文且类型参与具名 NBT 校验。
+- [x] `store.data` 的实体来源要求 `limit(1)`，`self` 要求非玩家上下文、查询来源检查实体类型、`origin` 走运行期非玩家路径；`store` 的持有者支持 `self`、实体查询与 `origin`；Boss 栏 store 校验资源位置；最后一条语句是控制结构或未声明返回值的函数调用时报错。
+- [x] 旧字符串子句保留为逃生口并继续计入 `--deny-raw`；结构化子句下降为真实命令链，通过严格模式。
+- [x] 关键词：新增 `unless`/除非、`store`/存值，以及子句、实体关系、锚点、store 方法与数据类型的全部中英别名；`execute` 的中文关键词由“原生执行”改为“执行”。
+- [x] 语料与文档：`tests/valid/execute`、`tests/invalid/execute.mcl` 与四个语法负例、双言语料新增结构化 execute；手册新增「结构化执行」章节与 `execute_structured` 验证示例（含真实产物片段）；LSP 悬停、TextMate 高亮与文档翻译表同步。
+
 ## 三、路线图
 
 实施约定：
@@ -266,10 +278,11 @@
 
 ### 第 2 阶段：补齐现有结构化能力
 
-- [ ] 2.1 `execute` 结构化子句与 store
+- [x] 2.1 `execute` 结构化子句与 store
   - 修饰符：`execute as(q) at(q) positioned(pos) rotated(rot) facing(entity, eyes|feet) align(xyz) anchored(eyes|feet) in("dimension") on(relation) summon("id") { ... }`；重复或冲突的子句编译期报错。
   - 条件：`execute if/unless <条件> { ... }` 复用 2.2 的条件实现。
   - store：`store.result(...)`、`store.success(...)`、`store.data(...)`；结果表达式（1.5）隐式生成。
+  - 落地说明：修饰符按书写顺序下降为真实 `execute` 链；条件在修饰符建立的上下文里求值为标志后进入块体；store 链包裹块内最后一条命令（多个 store 可叠加），控制结构尾部与无返回值函数调用会编译报错；`on` 需要实体上下文并放宽为任意实体，`summon` 推导实体类型与 NBT 校验上下文；旧字符串子句仍可用。
 - [x] 2.2 条件族扩展：`if block(pos, block)`、`if blocks(...)`、`if biome(...)`、`if dimension(...)`、`if loaded(pos)`、`if entity(q)`、`if data(...)`、`if items(...)`、`if slots(...)`、`if function(f)`、`if stopwatch(...)`；沿用“原子冻结到临时计分项再组合”的求值策略，保证一次求值与确定顺序。槽位来源在编译期对照 26.3 `SlotRanges` 快照校验，函数条件计入同步调用图递归检查。
 - [x] 2.3 实体查询属性扩展：`type("#tag")` 与否定（`without_type`）、`name`、`scores`、`nbt`、坐标盒 `box` 与 `distance`（与 `within` 取交集合并）、`level`、`gamemode`、`team`、`rotate`、`predicate`、`advancements`；物品谓词支持完整组件文本（`id[...]`）与任意槽位（对照 `SlotRanges` 与 `slot_source` 资源位置）。
 - [x] 2.4 `data` 完整建模：`data.get`（结果表达式）、`data.merge`、`data.remove`、`data.modify`（insert/prepend/append/set/merge）与四种来源（from/string/value/compute）；entity/block/storage 三类目标；实体目标沿用非玩家写保护。

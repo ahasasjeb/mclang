@@ -6,6 +6,8 @@
 计分 total = 0;
 计分 flag = 0;
 
+目标 progress;
+
 查询 players = 实体("minecraft:player") { 上限(1); }
 
 物品 reward = 物品堆("minecraft:diamond") {
@@ -35,6 +37,21 @@
     遍历(players) {
         自身.给予物品(reward, 2);
         声音.自身("minecraft:block.note_block.pling", 主音量);
+        执行 存值.结果(投掷者, progress) {
+            清除(players);
+        }
+    }
+    执行 存值.结果(Boss栏, "dual:timer", 值) {
+        active = active + 1;
+    }
+    执行 作为(players) 在(players) 如果 方块(坐标(~, ~-1, ~), 方块状态("minecraft:stone")) {
+        自身.添加标签("checked");
+    }
+    执行 作为(players) 存值.结果(自身, progress) {
+        清除(players);
+    }
+    执行 存值.数据(方块, 坐标(0, 64, 0), "Items", 字节) {
+        设置方块(坐标(0, 64, 0), 方块状态("minecraft:chest"));
     }
     如果 谓词(lucky) {
         flag = double(total) + 1;

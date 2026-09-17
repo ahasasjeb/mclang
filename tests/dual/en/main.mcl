@@ -9,6 +9,8 @@ score active = 0;
 score total = 0;
 score flag = 0;
 
+objective progress;
+
 query players = entity("minecraft:player") { limit(1); }
 
 item reward = item_stack("minecraft:diamond") {
@@ -38,6 +40,21 @@ fn tick() {
     each(players) {
         self.give_item(reward, 2);
         sound.self("minecraft:block.note_block.pling", master);
+        execute store.result(origin, progress) {
+            clear(players);
+        }
+    }
+    execute store.result(bossbar, "dual:timer", value) {
+        active = active + 1;
+    }
+    execute as(players) at(players) if block(pos(~, ~-1, ~), block_state("minecraft:stone")) {
+        self.add_tag("checked");
+    }
+    execute as(players) store.result(自身, progress) {
+        clear(players);
+    }
+    execute store.data(block, pos(0, 64, 0), "Items", byte) {
+        set_block(pos(0, 64, 0), block_state("minecraft:chest"));
     }
     if predicate(lucky) {
         flag = double(total) + 1;

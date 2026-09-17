@@ -137,7 +137,14 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
         .map(|statement| match &statement.kind {
             ast::StatementKind::Run(_) => 1,
             ast::StatementKind::Return(ast::ReturnKind::Run(_)) => 1,
-            ast::StatementKind::Execute { body, .. } => 1 + raw_count_in_block(body),
+            ast::StatementKind::Execute {
+                clauses: ast::ExecuteClauses::Raw(_),
+                body,
+            } => 1 + raw_count_in_block(body),
+            ast::StatementKind::Execute {
+                clauses: ast::ExecuteClauses::Structured(_),
+                body,
+            } => raw_count_in_block(body),
             ast::StatementKind::Each { body, .. }
             | ast::StatementKind::InDimension { body, .. }
             | ast::StatementKind::Spawn { body, .. }

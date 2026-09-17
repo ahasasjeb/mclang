@@ -64,7 +64,16 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ("let", "声明只在当前函数体内可见的局部变量。"),
     ("return", "结束函数：返回计分值、`fail` 或 `run` 原生命令。"),
     ("fail", "`return fail`：让调用方看到这次执行失败。"),
-    ("if", "条件分支。"),
+    ("if", "条件分支；`execute` 里是“条件成立才执行”的子句。"),
+    ("unless", "`execute` 的条件子句：条件不成立才执行。"),
+    (
+        "store",
+        "`execute` 的写入子句：`store.result/success` 写用户计分板或 Boss 栏，`store.data` 写 NBT。",
+    ),
+    (
+        "bossbar",
+        "Boss 栏资源引用：`store.result/success(bossbar, \"id\", value|max)` 写当前值或上限。",
+    ),
     ("else", "条件分支的否定分支。"),
     ("while", "条件循环。"),
     ("each", "对查询结果逐个执行，并进入实体上下文。"),
@@ -93,7 +102,7 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ("run", "原生命令逃生口：执行未结构化的命令文本。"),
     (
         "execute",
-        "原生命令子句逃生口：在额外执行上下文中运行语句。",
+        "结构化执行：修饰符 `as/at/positioned/rotated/facing/align/anchored/in/on/summon`，条件 `if/unless`，以及 `store.result/success/data`；字符串子句形式仍是底层逃生口。",
     ),
     ("contents", "物品查询的槽位名：容器内容。"),
     (

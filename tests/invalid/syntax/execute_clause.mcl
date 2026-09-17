@@ -1,0 +1,8 @@
+// 编译测试（负向语法）：未知的 execute 子句名。
+namespace execute_syntax_clause;
+
+fn bad() {
+    execute aligned(xyz) {
+        message.all("x");
+    }
+}

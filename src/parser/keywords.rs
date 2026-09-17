@@ -6,8 +6,9 @@
 //! 出现，进入 AST 后所有阶段只处理英文规范值。
 
 use crate::ast::{
-    AdvancementFrame, AdvancementRequirements, Attribute, CloneMode, FillMode, ItemRarity,
-    LocateKind, SetBlockMode, TemplateMirror, TemplateRotation, WeatherKind, XpKind,
+    AdvancementFrame, AdvancementRequirements, Anchor, Attribute, BossBarField, CloneMode,
+    EntityRelation, FillMode, ItemRarity, LocateKind, SetBlockMode, StoreDataMode, StoreDataType,
+    TemplateMirror, TemplateRotation, WeatherKind, XpKind,
 };
 
 /// 语言关键词的规范英文写法与中文别名。
@@ -107,6 +108,18 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "如果",
     },
     Keyword {
+        english: "unless",
+        chinese: "除非",
+    },
+    Keyword {
+        english: "store",
+        chinese: "存值",
+    },
+    Keyword {
+        english: "bossbar",
+        chinese: "Boss栏",
+    },
+    Keyword {
         english: "else",
         chinese: "否则",
     },
@@ -188,7 +201,7 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
     },
     Keyword {
         english: "execute",
-        chinese: "原生执行",
+        chinese: "执行",
     },
     Keyword {
         english: "contents",
@@ -1014,6 +1027,88 @@ pub(super) fn locate_kind(value: &str) -> Option<LocateKind> {
         "structure" | "结构" => Some(LocateKind::Structure),
         "biome" | "生物群系" => Some(LocateKind::Biome),
         "poi" | "兴趣点" => Some(LocateKind::Poi),
+        _ => None,
+    }
+}
+
+/// 结构化 `execute` 的修饰符子句名，对应原版 `ExecuteCommand.register` 的分支。
+pub(super) fn execute_clause(value: &str) -> Option<&'static str> {
+    match value {
+        "as" | "作为" => Some("as"),
+        "at" | "在" => Some("at"),
+        "positioned" | "定位于" => Some("positioned"),
+        "rotated" | "转向" => Some("rotated"),
+        "facing" | "面向" => Some("facing"),
+        "align" | "对齐" => Some("align"),
+        "anchored" | "锚点" => Some("anchored"),
+        "in" | "进入维度" => Some("in"),
+        "on" | "关系" => Some("on"),
+        "summon" | "召唤实体" => Some("summon"),
+        _ => None,
+    }
+}
+
+/// `execute on` 的实体关系名。
+pub(super) fn entity_relation(value: &str) -> Option<EntityRelation> {
+    match value {
+        "owner" | "主人" => Some(EntityRelation::Owner),
+        "leasher" | "拴绳者" => Some(EntityRelation::Leasher),
+        "target" | "攻击目标" => Some(EntityRelation::Target),
+        "attacker" | "攻击者" => Some(EntityRelation::Attacker),
+        "vehicle" | "载具" => Some(EntityRelation::Vehicle),
+        "controller" | "控制者" => Some(EntityRelation::Controller),
+        "origin" | "起源" => Some(EntityRelation::Origin),
+        "passengers" | "乘客" => Some(EntityRelation::Passengers),
+        _ => None,
+    }
+}
+
+/// 实体锚点：`facing entity` 与 `anchored` 共用。
+pub(super) fn anchor_value(value: &str) -> Option<Anchor> {
+    match value {
+        "eyes" | "眼睛" => Some(Anchor::Eyes),
+        "feet" | "脚" => Some(Anchor::Feet),
+        _ => None,
+    }
+}
+
+/// `execute store` 的方法名；`store.data` 缺省写入 result。
+pub(super) fn store_method(value: &str) -> Option<&'static str> {
+    match value {
+        "result" | "结果" => Some("result"),
+        "success" | "成功" => Some("success"),
+        "data" | "数据" => Some("data"),
+        _ => None,
+    }
+}
+
+/// `store.data` 的写入模式；与方法名共用英文拼写，但只接受 result 与 success。
+pub(super) fn store_data_mode(value: &str) -> Option<StoreDataMode> {
+    match value {
+        "result" | "结果" => Some(StoreDataMode::Result),
+        "success" | "成功" => Some(StoreDataMode::Success),
+        _ => None,
+    }
+}
+
+/// Boss 栏的可写字段：当前值与上限。
+pub(super) fn bossbar_field(value: &str) -> Option<BossBarField> {
+    match value {
+        "value" | "值" => Some(BossBarField::Value),
+        "max" | "上限" => Some(BossBarField::Max),
+        _ => None,
+    }
+}
+
+/// `store.data` 的数值类型。
+pub(super) fn store_data_type(value: &str) -> Option<StoreDataType> {
+    match value {
+        "byte" | "字节" => Some(StoreDataType::Byte),
+        "short" | "短整数" => Some(StoreDataType::Short),
+        "int" | "整数" => Some(StoreDataType::Int),
+        "long" | "长整数" => Some(StoreDataType::Long),
+        "float" | "浮点" => Some(StoreDataType::Float),
+        "double" | "双精度" => Some(StoreDataType::Double),
         _ => None,
     }
 }

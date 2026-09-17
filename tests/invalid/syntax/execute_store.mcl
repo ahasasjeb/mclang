@@ -1,0 +1,10 @@
+// 编译测试（负向语法）：store 的方法只能是 result、success 或 data。
+namespace execute_syntax_store;
+
+objective goal;
+
+fn bad() {
+    execute store.value(自身, goal) {
+        message.all("x");
+    }
+}

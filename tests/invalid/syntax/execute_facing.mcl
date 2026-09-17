@@ -1,0 +1,10 @@
+// 编译测试（负向语法）：facing entity 需要查询与锚点两个参数。
+namespace execute_syntax_facing;
+
+query zombies = entity("minecraft:zombie") {}
+
+fn bad() {
+    execute facing(entity(zombies)) {
+        message.all("x");
+    }
+}

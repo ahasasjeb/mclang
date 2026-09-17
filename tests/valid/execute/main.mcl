@@ -1,0 +1,120 @@
+// 编译测试：结构化 execute 的修饰符、条件与 store。
+// 覆盖全部修饰符（as/at/positioned/rotated/facing/align/anchored/in/on/summon）、
+// if/unless 条件、store.result/success/data 的计分板、Boss 栏与 NBT 目标，
+// 以及中英文关键词混用。
+//
+// 验证：
+//   cargo run -- build tests/valid/execute -o build/tests/execute --deny-raw
+// 重点检查 __mcl/load/ 下的辅助函数：修饰符链、条件标志与 store 包裹的最后一条命令。
+namespace execute_case;
+
+score hits = 0;
+
+objective stored_result;
+objective stored_success;
+
+query all_players = entity("minecraft:player") {}
+query zombies = entity("minecraft:zombie") { limit(10); }
+query marker = entity("minecraft:armor_stand") { limit(1); }
+
+storage results = item_list("execute_case:state", "results");
+
+item token = item_stack("minecraft:gold_nugget") { count = 2; }
+
+fn answer() -> score {
+    let value = 42;
+    return value;
+}
+
+@load
+fn load() {
+    // 没有子句时等价于一次普通 execute。
+    execute {
+        message.all("load");
+    }
+    // 全部修饰符写在同一块上。
+    execute as(all_players) at(all_players) positioned(pos(0, 64, 0)) rotated(rotation(90, 0)) facing(pos(0, 0, 0)) align(xz) anchored(feet) in("minecraft:overworld") {
+        message.self("modifiers");
+    }
+    execute as(zombies) facing(entity(all_players), eyes) {
+        self.add_tag("watching");
+    }
+    // on 关系读取当前实体的关系实体。
+    execute as(all_players) on(owner) {
+        self.add_tag("owner");
+    }
+    // summon 进入新实体上下文。
+    execute at(all_players) summon("minecraft:armor_stand") {
+        nbt { CustomName = "marker"; }
+    }
+    // 中文子句与英文查询混用。
+    execute 作为(zombies) 在(zombies) 面向(entity(marker), 眼睛) 对齐(xyz) 锚点(脚) {
+        self.add_tag("mixed");
+    }
+    // 条件：if 与 unless，多个条件取交集。
+    execute if entity(zombies) {
+        message.all("zombies");
+    }
+    execute unless loaded(pos(0, 64, 0)) {
+        message.all("unloaded");
+    }
+    execute as(all_players) if block(pos(~, ~-1, ~), block_state("minecraft:stone")) unless dimension("minecraft:the_end") {
+        message.self("stone");
+    }
+    execute if function(answer) if stopwatch("execute_case:timer") {
+        message.all("function and stopwatch");
+    }
+    execute if hits < 10 {
+        message.all("low");
+    }
+    execute if scoreboard.get(marker, stored_result) >= 1 {
+        message.all("stored");
+    }
+    // store：结果与成功写入用户计分板。
+    execute as(all_players) store.result(自身, stored_result) {
+        clear(all_players);
+    }
+    execute as(all_players) if entity(zombies) store.success(all_players, stored_success) {
+        give(all_players, token);
+    }
+    // store：块内最后一条命令是带返回值的函数调用时，返回值也会被捕获。
+    execute as(all_players) store.result(marker, stored_result) {
+        answer();
+    }
+    // store.data：实体（单个查询）、方块与存储三种目标。
+    execute as(zombies) store.data(entity, 自身, "data.execute_case", int, 1) {
+        self.add_tag("stored");
+    }
+    execute store.data(entity, marker, "data.execute_case", short) {
+        message.all("stored marker");
+    }
+    execute store.data(block, pos(0, 64, 0), "Items", byte) {
+        set_block(pos(0, 64, 0), block_state("minecraft:chest"));
+    }
+    execute store.data(storage, "execute_case:state", "last", double, 0.5) {
+        message.all("stored storage");
+    }
+    // store.data 的成功模式与中英文关键词混用。
+    execute 存值.数据(成功, 存储, "execute_case:state", "last_ok", 字节) {
+        message.all("stored success");
+    }
+    // 没有命中实体时目标不写入；Boss 栏的 current 与上限。
+    execute store.result(bossbar, "execute_case:timer", value) {
+        message.all("bar value");
+    }
+    execute store.success(Boss栏, "execute_case:timer", 上限) {
+        message.all("bar max");
+    }
+}
+
+// 投掷者目标：先捕获到临时计分项，再用 on origin 复制。
+@non_player
+fn origin_stores() {
+    execute as(zombies) store.result(origin, stored_result) store.success(origin, stored_success) {
+        self.add_tag("origin");
+    }
+    execute as(zombies) store.data(entity, origin, "data.execute_case_origin", int) {
+        self.add_tag("origin_data");
+    }
+}
+

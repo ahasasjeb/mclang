@@ -189,6 +189,20 @@ pub(super) fn entity_query_clause(query: &EntityQueryDecl) -> String {
     clause
 }
 
+/// `execute as` 的选择器子句：只切换执行实体，不移动执行位置；
+/// 查询自带的物品过滤用 `if items entity @s` 追加。
+pub(super) fn entity_query_as_clause(query: &EntityQueryDecl) -> String {
+    let mut clause = format!("as {}", entity_query_selector(query));
+    if let Some(item) = &query.item {
+        clause.push_str(&format!(
+            " if items entity @s {} {}",
+            item.slot,
+            item_filter_predicate(item)
+        ));
+    }
+    clause
+}
+
 pub(super) fn item_stack_argument(item: &ItemStackDecl) -> String {
     let mut components = Vec::new();
     if let Some(custom_name) = &item.custom_name {

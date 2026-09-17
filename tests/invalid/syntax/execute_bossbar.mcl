@@ -1,0 +1,8 @@
+// 编译测试（负向语法）：Boss 栏 store 的字段只能是 value 或 max。
+namespace execute_syntax_bossbar;
+
+fn bad() {
+    execute store.result(bossbar, "execute_syntax_bossbar:timer", top) {
+        message.all("x");
+    }
+}

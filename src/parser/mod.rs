@@ -6,6 +6,7 @@
 //! - [`declarations`]：命名空间、计分、实体查询、物品、存储、资源和函数声明；
 //! - [`statements`]：函数体语句；
 //! - [`conditions`]：布尔条件和比较；
+//! - [`execute`]：结构化 `execute` 子句；
 //! - [`expressions`]：算术表达式与实参列表；
 //! - [`keywords`]：中英文关键词与枚举值的规范化表。
 //!
@@ -15,6 +16,7 @@
 mod components;
 mod conditions;
 mod declarations;
+mod execute;
 mod expressions;
 mod items;
 pub(crate) mod keywords;
