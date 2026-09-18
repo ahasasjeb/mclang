@@ -17,7 +17,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
   - `mclang check <源文件.mcl|项目目录> [--deny-raw]`
   - `mclang lsp`（标准输入输出上的语言服务器，供编辑器插件调用）
   - `mclang help` / `mclang version`
-- 默认输出到 `build/<项目名>`；`.mclang-manifest` 记录上次产物，重建只清理自己上次生成的文件。
+- 默认输出到 `build/<项目名>`；`.mclang-manifest` 记录上次产物，重建只清理自己上次生成的文件，并回收 `data/` 下不再包含文件的空目录。
 
 编译流水线：
 

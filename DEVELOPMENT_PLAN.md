@@ -315,7 +315,7 @@
 
 - **模块边界**：词法（`src/lexer.rs`）、语法树（`src/ast*`）、解析（`src/parser/`）、语义检查（`src/compiler/validate/`）、代码生成（`src/compiler/codegen/`）、命令行（`src/main.rs`）。
 - **诊断**：带文件名、行列与源码片段，一次返回全部错误；`src/analysis.rs` 为工具侧提供结构化诊断与符号表。
-- **产物**：`pack.mcmeta`、`.mcfunction` 与 load/tick 标签；`.mclang-manifest` 记录输出所有权，重建只清理自己生成的文件。
+- **产物**：`pack.mcmeta`、`.mcfunction` 与 load/tick 标签；`.mclang-manifest` 记录输出所有权，重建只清理自己生成的文件，并回收 `data/` 下不再包含文件的空目录。
 - **命令**：`build`/`check` 支持单文件与递归项目目录，检查命名空间一致性。
 - **质量门槛**：`cargo fmt`、`cargo clippy --all-targets` 零警告；`tests/valid`、`tests/invalid` 编译语料；端到端示例。
 - **可复现**：`BTreeMap` 与稳定哈希；`tests/corpus.rs` 断言重复构建逐字节一致。

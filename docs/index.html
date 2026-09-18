@@ -191,7 +191,7 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
         │   ├── __mcl/load.mcfunction             # 编译器合成的初始化函数
         │   └── __mcl/tick/0.mcfunction           # 结构块展开出的辅助函数
         └── ...</code></pre></figure>
-<p>每次构建都会重写 <code>.mclang-manifest</code>，下一次构建先删除上次清单里的文件再写新文件；清单损坏、含绝对路径或 <code>..</code> 时构建直接失败，目录里的其他文件不会被碰。</p>
+<p>每次构建都会重写 <code>.mclang-manifest</code>，下一次构建先删除上次清单里的文件再写新文件；清单损坏、含绝对路径或 <code>..</code> 时构建直接失败，目录里的其他文件不会被碰。写完新文件后，编译器会回收 <code class="kw"><span class="kw-en">data/</span><span class="kw-zh">数据操作/</span></code> 下不再包含文件的空目录，因此函数改名或模块删除不会在产物里留下空文件夹。</p>
 <figure class="code" data-lang="mcfunction"><figcaption><span class="code-title">build/hello/pack.mcmeta</span><span class="code-actions"><span class="badge">编译器实际产物</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code>{
   &quot;pack&quot;: {
     &quot;description&quot;: &quot;Mclang 手册示例 hello&quot;,

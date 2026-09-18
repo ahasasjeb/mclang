@@ -1,40 +1,48 @@
 // 文档数据源：直接从编译器源码提取关键词、别名与注册表，避免手抄出错。
 //
 // 提取三部分：
-// 1. `src/parser/keywords.rs` 的 `KEYWORDS` / `ATTRIBUTES` 常量；
-// 2. 同文件里全部 `"英文" | "中文" => ...` 形式的别名表（按函数分组）；
-// 3. `src/compiler/validate/world.rs` 的游戏规则表与 `rules.rs` 的资源类型表。
+// 1. `src/parser/keywords/` 的 `KEYWORDS` / `ATTRIBUTES` 常量；
+// 2. 同一模块里全部 `"英文" | "中文" => ...` 形式的别名表（按函数分组）；
+// 3. `src/compiler/validate/world/` 的游戏规则表与 `rules.rs` 的资源类型表。
 //
 // 文档工具与编译器共用同一份数据后，关键词对照表不可能与实现脱节；
 // 示例翻译同样使用这些表，并由构建脚本调用真实编译器验证。
 
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const CJK = /[\u3400-\u9fff\uf900-\ufaff]/;
 
+/** 读取 Rust 模块：`src/x.rs` 与同名目录下的全部 `.rs`，拼接成单一数据源文本。 */
+async function readRustModule(repoRoot, relative) {
+  const parts = [await readFile(path.join(repoRoot, `${relative}.rs`), "utf8")];
+  const directory = path.join(repoRoot, relative);
+  let entries = [];
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  const files = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".rs"))
+    .map((entry) => entry.name)
+    .sort();
+  for (const name of files) {
+    parts.push(await readFile(path.join(directory, name), "utf8"));
+  }
+  return parts.join("\n");
+}
+
 /** 读取并解析全部文档数据。 */
 export async function loadKeywordTables(repoRoot) {
-  const keywordsSource = await readFile(
-    path.join(repoRoot, "src/parser/keywords.rs"),
-    "utf8",
+  const keywordsSource = await readRustModule(repoRoot, "src/parser/keywords");
+  const worldSource = await readRustModule(repoRoot, "src/compiler/validate/world");
+  const lspSource = await readRustModule(repoRoot, "src/lsp/features");
+  const advancementSource = await readRustModule(
+    repoRoot,
+    "src/compiler/validate/advancement",
   );
-  const worldSource = await readFile(
-    path.join(repoRoot, "src/compiler/validate/world.rs"),
-    "utf8",
-  );
-  const lspSource = await readFile(
-    path.join(repoRoot, "src/lsp/features.rs"),
-    "utf8",
-  );
-  const advancementSource = await readFile(
-    path.join(repoRoot, "src/compiler/validate/advancement.rs"),
-    "utf8",
-  );
-  const entityNbtSource = await readFile(
-    path.join(repoRoot, "src/version/entity_nbt.rs"),
-    "utf8",
-  );
+  const entityNbtSource = await readRustModule(repoRoot, "src/version/entity_nbt");
   const registriesSource = await readFile(
     path.join(repoRoot, "data/version/26.3-rc-2/registries.json"),
     "utf8",

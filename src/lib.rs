@@ -332,15 +332,13 @@ fn write_pack(output: &Path, pack: &CompiledPack) -> Result<(), String> {
     let manifest_path = output.join(".mclang-manifest");
     remove_old_outputs(output, &manifest_path)?;
 
-    for (relative, contents) in &pack.files {
-        let path = output.join(relative);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
-        }
-        fs::write(&path, contents)
-            .map_err(|error| format!("无法写入 {}：{error}", path.display()))?;
-    }
+    // 新构建本身不会产生空目录：目录只作为文件的父路径创建。空目录来自重建时
+    // 被清单删掉的旧文件，所以无论本次写入是否完整，最后都清理一次 data/ 下的
+    // 空目录，避免函数改名、模块删除后把空壳留在输出里。
+    let files_result = write_files(output, pack);
+    let prune_result = remove_empty_directories(&output.join("data"));
+    files_result?;
+    prune_result?;
 
     let manifest = pack
         .files
@@ -351,6 +349,51 @@ fn write_pack(output: &Path, pack: &CompiledPack) -> Result<(), String> {
         + "\n";
     fs::write(&manifest_path, manifest)
         .map_err(|error| format!("无法写入 {}：{error}", manifest_path.display()))
+}
+
+fn write_files(output: &Path, pack: &CompiledPack) -> Result<(), String> {
+    for (relative, contents) in &pack.files {
+        let path = output.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
+        }
+        fs::write(&path, contents)
+            .map_err(|error| format!("无法写入 {}：{error}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// 自底向上删除目录树里不再包含任何文件的空目录。
+///
+/// 编译器的产物都写在 `data/` 下，调用方也只对该子树调用本函数；只删空目录，
+/// 有内容的目录原样保留，因此不会影响清单之外的文件。符号链接不会被当作目录
+/// 进入，未创建的目录直接视为干净。
+fn remove_empty_directories(directory: &Path) -> Result<(), String> {
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(format!("无法读取目录 {}：{error}", directory.display())),
+    };
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("无法读取目录项：{error}"))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("无法读取 {} 的类型：{error}", entry.path().display()))?;
+        if file_type.is_dir() {
+            remove_empty_directories(&entry.path())?;
+        }
+    }
+    // 子目录可能刚被清空，重新检查一次再决定是否删除自己。
+    let empty = fs::read_dir(directory)
+        .map_err(|error| format!("无法读取目录 {}：{error}", directory.display()))?
+        .next()
+        .is_none();
+    if !empty {
+        return Ok(());
+    }
+    fs::remove_dir(directory)
+        .map_err(|error| format!("无法删除空目录 {}：{error}", directory.display()))
 }
 
 fn remove_old_outputs(output: &Path, manifest: &Path) -> Result<(), String> {

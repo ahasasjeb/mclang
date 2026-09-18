@@ -219,6 +219,51 @@ fn builds_are_reproducible() {
     );
 }
 
+/// 重建会删掉上次清单里的文件，不再包含文件的目录必须回收；清单之外的文件保留。
+#[test]
+fn rebuild_leaves_no_empty_directories() {
+    let output = output_directory("rebuild");
+    build(&repo_root().join("examples/give_reward.mcl"), &output, true).expect("首次构建应当成功");
+    fs::write(output.join("keep.txt"), "keep me").expect("无法写入用户文件");
+    // 不能复用 `build`：它会先清空输出目录，而这里要验证的是原地重建。
+    build_file(
+        &repo_root().join("examples/portable_chest"),
+        &output,
+        &BuildOptions {
+            description: "Mclang 回归测试".into(),
+            deny_raw: true,
+        },
+    )
+    .expect("换项目重建应当成功");
+
+    assert!(
+        output.join("keep.txt").is_file(),
+        "清单之外的文件不应被删除"
+    );
+    assert!(
+        !output.join("data/give_reward").exists(),
+        "旧命名空间的产物目录应当被回收"
+    );
+
+    let mut stack = vec![output.clone()];
+    while let Some(directory) = stack.pop() {
+        let entries: Vec<PathBuf> = fs::read_dir(&directory)
+            .expect("无法读取产物目录")
+            .map(|entry| entry.expect("无法读取产物目录项").path())
+            .collect();
+        assert!(
+            !entries.is_empty(),
+            "重建后残留空目录：{}",
+            directory.display()
+        );
+        for path in entries {
+            if path.is_dir() {
+                stack.push(path);
+            }
+        }
+    }
+}
+
 /// 语言服务器用的内存分析同样按 `import` 解析模块，不需要真实文件系统。
 #[test]
 fn analyze_resolves_modules_in_memory() {
