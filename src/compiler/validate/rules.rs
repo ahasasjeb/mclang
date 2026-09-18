@@ -1,6 +1,7 @@
 //! 与具体声明无关的语法规则：名称、资源位置、标签、枚举值和保留字。
 
 use crate::ast::{Function, Span};
+use crate::compiler::types::ExecutionContext;
 use crate::diagnostic::Diagnostic;
 use crate::parser::keywords::reserved_word;
 
@@ -145,16 +146,16 @@ pub(super) fn validate_identifier(
 }
 
 /// 从函数属性推导它需要的最低执行上下文。
-pub(super) fn function_context(function: &Function) -> super::ExecutionContext {
+pub(super) fn function_context(function: &Function) -> ExecutionContext {
     use crate::ast::Attribute;
 
     if function.attributes.contains(&Attribute::Player) {
-        super::ExecutionContext::Player
+        ExecutionContext::Player
     } else if function.attributes.contains(&Attribute::NonPlayer) {
-        super::ExecutionContext::Mob
+        ExecutionContext::Mob
     } else if function.attributes.contains(&Attribute::Entity) {
-        super::ExecutionContext::Entity
+        ExecutionContext::Entity
     } else {
-        super::ExecutionContext::None
+        ExecutionContext::None
     }
 }
