@@ -358,14 +358,9 @@ pub(super) fn validate_store_data(
     }
 }
 
-/// 函数权限模型（1.6）：`run` 字符串里的根命令不得越过
-/// `function-permission-level`。未知根命令留给后续的命令树校验（8.4）。
-pub(super) fn validate_raw_command(
-    command: &str,
-    span: Span,
-    ctx: ValidationContext<'_, '_>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+/// 函数权限模型（1.6）：`run` 字符串里的根命令不得越过数据包函数固定的
+/// GAMEMASTER 等级（2）。未知根命令留给后续的命令树校验（8.4）。
+pub(super) fn validate_raw_command(command: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
     let Some(first) = command.split_whitespace().next() else {
         return;
     };
@@ -374,13 +369,13 @@ pub(super) fn validate_raw_command(
     let Some(level) = snapshot.root_command_level(name) else {
         return;
     };
-    if level > ctx.symbols.function_permission_level {
+    let limit = crate::compiler::FUNCTION_PERMISSION_LEVEL;
+    if level > limit {
         diagnostics.push(Diagnostic::new(
             format!(
-                "`{name}` 需要权限等级 {level}（{}），超过数据包函数上限 {}（{}）；可用 `--function-permission-level` 提高",
+                "`{name}` 需要权限等级 {level}（{}），超过数据包函数上限 {limit}（{}）",
                 permission_label(level),
-                ctx.symbols.function_permission_level,
-                permission_label(ctx.symbols.function_permission_level),
+                permission_label(limit),
             ),
             span,
         ));

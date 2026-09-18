@@ -10,7 +10,7 @@
 
 - 目标版本固定在仓库内 `minecraft_client_26.3-rc-2/` 源码，数据包格式 `121.0`；资源类型、注册表、命令签名一律以该源码为准。
 - 函数与函数标签目录依据 `ServerFunctionLibrary` 与 `Registries`，使用 `data/<namespace>/function` 和 `data/<namespace>/tags/function`。
-- 26.3 的 `function-permission-level` 服务器属性默认 `GAMEMASTER`（等级 2，见 `DedicatedServerProperties:147`）。函数在编译期（`ServerFunctionLibrary`）与运行期（`FunctionCommand.modifySenderForExecution` 的 `withMaximumPermission`）都被限制在该等级，因此 `ADMIN`（3）/`OWNER`（4）命令无法从数据包函数合法执行。标准层默认按等级 2 规划；越级命令标记为“不可达”，只能出现在 `run` 字符串中并由编译器给出警告，未来可用 `--function-permission-level` 显式放开。
+- 26.3 的 `function-permission-level` 服务器属性默认 `GAMEMASTER`（等级 2，见 `DedicatedServerProperties:147`）。函数在编译期（`ServerFunctionLibrary`）与运行期（`FunctionCommand.modifySenderForExecution` 的 `withMaximumPermission`）都被限制在该等级，因此 `ADMIN`（3）/`OWNER`（4）命令无法从数据包函数合法执行。标准层固定按等级 2 规划；越级命令标记为“不可达”，即使出现在 `run` 字符串中也会被编译器拒绝。
 
 ## 一、原版命令覆盖矩阵
 
@@ -300,7 +300,7 @@
   - [ ] 原版 SNBT 的其余字面量记法未建模，除表现力无损失：十六进制 `0x`/二进制 `0b` 与下划线分隔（等值十进制可表达）、无符号前缀 `ub`/`us`/`ui`/`ul`（等价于补码负数）、无引号字符串（语言要求引号，输出统一加引号）。
   - [x] `data` 命令的 get/merge/remove/modify 与 storage/block 目标已随 2.4 落地。
 - [x] 1.5 命令结果表达式：`count(q)`、`data.get(entity/block/storage, 路径)`、`random(1, 6)`、`compute(来源, float|integer, provider[, 缩放])` 与既有 `xp.query(...)`、`stopwatch.query(...)` 等经 `execute store result score` 落入计分，参与现有算术与条件系统。`random` 区间与 `compute` provider 在编译期对照注册表检查。
-- [x] 1.6 函数权限模型：`run`/`return run` 字符串的根命令对照 `commands.json` 校验，默认按 `GAMEMASTER`（2）拒绝越级的 `ADMIN`/`OWNER` 命令并解释 `function-permission-level`；`build`/`check` 提供 `--function-permission-level <2..4>`。结构化语句的权限等级在 7.8 引入越级命令时接入同一机制。
+- [x] 1.6 函数权限模型：`run`/`return run` 字符串的根命令对照 `commands.json` 校验，固定按 `GAMEMASTER`（2）拒绝越级的 `ADMIN`/`OWNER` 命令并解释权限缺口。结构化语句的权限等级在 7.8 引入越级命令时接入同一机制。
 
 ### 第 2 阶段：补齐现有结构化能力
 
@@ -383,7 +383,7 @@
 - [ ] 7.5 `list`、`seed`、`version`、`help`：只读反馈，明确不建模或提供只写日志的语句。
 - [ ] 7.6 `fetchprofile`：工具类，按需提供；`serverpack` 仅在开发构建注册，不进入标准层。
 - [ ] 7.7 `test`：gametest 工具链保持不建模，需要时通过 `run` 在开发构建中使用。
-- [ ] 7.8 权限放开策略：`tick`、`debug`、`jfr`、`kick` 等 ADMIN/OWNER 命令只在 `--function-permission-level` 提升后提供结构化入口，并在文档中说明服务端配置前提。
+- [ ] 7.8 越级命令策略：`tick`、`debug`、`jfr`、`kick` 等 ADMIN/OWNER 命令在固定的 GAMEMASTER 等级下不可达，不提供结构化入口，只在校验诊断中说明权限缺口。
 
 ### 第 8 阶段：语言与工具体验
 

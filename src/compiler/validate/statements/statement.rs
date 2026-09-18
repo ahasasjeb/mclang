@@ -8,7 +8,7 @@ pub(super) fn validate_statement<'a>(
 ) {
     match &statement.kind {
         StatementKind::Run(command) => {
-            validate_raw_command(command, statement.span, ctx, diagnostics);
+            validate_raw_command(command, statement.span, diagnostics);
         }
         StatementKind::Give {
             target,

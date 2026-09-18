@@ -42,7 +42,7 @@ pub(super) struct ResourceSymbols<'a> {
     pub(super) advancements: HashSet<&'a str>,
 }
 
-pub(super) fn validate(program: &Program, function_permission_level: u8) -> Vec<Diagnostic> {
+pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     validate_namespace(program, &mut diagnostics);
@@ -79,12 +79,7 @@ pub(super) fn validate(program: &Program, function_permission_level: u8) -> Vec<
             .collect(),
     };
 
-    validate_function_bodies(
-        program,
-        &declarations,
-        function_permission_level,
-        &mut diagnostics,
-    );
+    validate_function_bodies(program, &declarations, &mut diagnostics);
     validate_synchronous_recursion(program, &mut diagnostics);
     diagnostics
 }

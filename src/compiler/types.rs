@@ -90,6 +90,4 @@ pub(super) struct StatementSymbols<'a> {
     pub(super) advancements: &'a HashMap<&'a str, &'a AdvancementDecl>,
     pub(super) advancement_resources: &'a HashSet<&'a str>,
     pub(super) function_tags: &'a HashMap<&'a str, &'a FunctionTagDecl>,
-    /// 数据包函数可用的最高权限等级（`function-permission-level`，默认 2）。
-    pub(super) function_permission_level: u8,
 }

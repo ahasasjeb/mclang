@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use mclang::{BuildOptions, CheckOptions, build_file, check_file};
+use mclang::{BuildOptions, build_file, check_file};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -31,7 +31,6 @@ fn build(source: &Path, output: &Path, deny_raw: bool) -> Result<(), String> {
         &BuildOptions {
             description: "Mclang 回归测试".into(),
             deny_raw,
-            function_permission_level: mclang::DEFAULT_FUNCTION_PERMISSION_LEVEL,
         },
     )
     .map(|_| ())
@@ -70,7 +69,7 @@ fn valid_corpus_compiles() {
     directories.sort();
     assert!(!directories.is_empty(), "tests/valid 为空");
     for directory in directories {
-        check_file(&directory, &CheckOptions::default()).unwrap_or_else(|error| {
+        check_file(&directory).unwrap_or_else(|error| {
             panic!(
                 "tests/valid/{} 应当编译通过：\n{error}",
                 directory.display()
@@ -96,7 +95,7 @@ fn invalid_corpus_is_rejected() {
             .any(|path| path.file_name().is_some_and(|name| name == "main.mcl"))
         {
             assert!(
-                check_file(&directory, &CheckOptions::default()).is_err(),
+                check_file(&directory).is_err(),
                 "tests/invalid/{} 应当被拒绝",
                 directory.display()
             );
@@ -109,7 +108,7 @@ fn invalid_corpus_is_rejected() {
                 stack.push(path);
             } else if path.extension().and_then(|value| value.to_str()) == Some("mcl") {
                 assert!(
-                    check_file(&path, &CheckOptions::default()).is_err(),
+                    check_file(&path).is_err(),
                     "tests/invalid/{} 应当被拒绝",
                     path.display()
                 );
@@ -283,7 +282,7 @@ fn version_snapshot_matches_minecraft_source() {
 }
 
 #[test]
-fn function_permission_level_is_enforced() {
+fn function_permission_limit_is_enforced() {
     let directory = output_directory("permission");
     fs::create_dir_all(&directory).expect("无法创建权限测试目录");
     fs::write(
@@ -292,15 +291,9 @@ fn function_permission_level_is_enforced() {
     )
     .expect("无法写入权限测试源文件");
 
-    let default = mclang::check_file(&directory, &CheckOptions::default())
-        .expect_err("默认等级下 `stop` 应当被拒绝");
+    let error = mclang::check_file(&directory).expect_err("`stop` 应当被拒绝");
     assert!(
-        default.contains("stop") && default.contains("OWNER"),
-        "诊断应当解释权限缺口：{default}"
+        error.contains("stop") && error.contains("OWNER"),
+        "诊断应当解释权限缺口：{error}"
     );
-
-    let owner = CheckOptions {
-        function_permission_level: 4,
-    };
-    mclang::check_file(&directory, &owner).expect("等级 4 下 `stop` 应当通过");
 }

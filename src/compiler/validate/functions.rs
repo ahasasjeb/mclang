@@ -98,7 +98,6 @@ pub(super) fn validate_function_declaration(
 pub(super) fn validate_function_bodies(
     program: &Program,
     declarations: &Declarations<'_>,
-    function_permission_level: u8,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for function in &program.functions {
@@ -128,7 +127,6 @@ pub(super) fn validate_function_bodies(
             advancements: &declarations.advancements,
             advancement_resources: &declarations.advancement_resources,
             function_tags: &declarations.function_tags,
-            function_permission_level,
         };
         validate_statements(
             &function.body,
