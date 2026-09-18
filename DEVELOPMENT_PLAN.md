@@ -143,20 +143,6 @@
 | `posteffect` | add/clear/list/remove | 缺失 | 6.7 |
 | `dialog` | show/clear | 缺失 | 6.3；`resource dialog` 已能写数据 |
 
-### 2.5 服务器管理与开发命令
-
-这些命令默认不在数据包标准层内，仍列入清单以保证覆盖完整。
-
-| 命令 | 权限 | 状态 | 说明 |
-| --- | --- | --- | --- |
-| `ban`、`ban-ip`、`banlist`、`op`、`deop`、`pardon`、`pardon-ip`、`whitelist` | ADMIN | 不可达 | 服务器管理 |
-| `perf`、`save-all`、`save-off`、`save-on`、`setidletimeout`、`stop`、`transfer`、`publish`、`unpublish` | OWNER/ADMIN | 不可达 | 服务器管理 |
-| `jfr`、`tick`、`debug` | OWNER/ADMIN | 不可达 | 性能与调试 |
-| `seed`、`version` | 视环境 | 只读反馈 | 只输出信息；`Commands.java:252` 起仅在非集成服务器注册 |
-| `help` | — | 只读反馈 | 只输出帮助 |
-| `raid`、`debugpath`、`debugmobspawning`、`warden_spawn_tracker`、`spawn_armor_trims`、`serverpack`、`debugconfig`、`chase` | — | 仅开发构建 | `raid` 等见 `Commands.java:283` 的 `DEBUG_DEV_COMMANDS \|\| IS_RUNNING_IN_IDE`；`chase` 需 `DEBUG_CHASE_COMMAND`；`debugconfig` 另需专用服务器 |
-
-`fetchprofile`（只读反馈）与 `test`（测试工具）已在 §2.1 列出。
 
 ### 2.6 数据包内容（非命令）
 
