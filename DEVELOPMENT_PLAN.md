@@ -1,20 +1,50 @@
 # Mclang 开发计划
 
-## 目标
+> 本文件随实现持续推进：§二 记录逐命令现状，§三 只列未完成工作，§四 归档已完成能力。
+> 维护约定：完成一项能力后，从 §三 删除对应条目、把记录补进 §四，并同步 §二 的状态与 §一 的统计。
 
-用 Rust 实现一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言。编译器把 `.mcl` 源文件转换为可直接放入世界 `datapacks` 目录的数据包，并在编译期报告词法、语法和语义错误。
+## 目标与基线
 
-标准层的判定准则不变：作者能否用有名称、有结构、可补全、可静态检查的语法描述意图；只能原样复制字符串的功能不算完成。本文件在 0.5 版能力之上，给出与 26.3-rc-2 原版命令的逐条对比、全部缺口，以及分阶段路线图。
+- **目标**：用 Rust 实现一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言。编译器把 `.mcl` 源文件转换为可直接放入世界 `datapacks` 目录的数据包，并在编译期报告词法、语法和语义错误。
+- **标准层判定准则**：作者能否用有名称、有结构、可补全、可静态检查的语法描述意图；只能原样复制字符串的功能不算完成。
+- **版本基线**：目标版本固定在仓库内 `minecraft_client_26.3-rc-2/` 源码，数据包格式 `121.0`；资源类型、注册表与命令签名一律以该源码为准。
+- **数据包目录**：函数与函数标签依据 `ServerFunctionLibrary` 与 `Registries`，使用 `data/<namespace>/function` 与 `data/<namespace>/tags/function`。
+- **函数权限**：26.3 的 `function-permission-level` 服务器属性默认 `GAMEMASTER`（等级 2，见 `DedicatedServerProperties:147`）。函数在编译期（`ServerFunctionLibrary`）与运行期（`FunctionCommand.modifySenderForExecution` 的 `withMaximumPermission`）都被限制在该等级，因此 `ADMIN`（3）/`OWNER`（4）命令无法从数据包函数合法执行。标准层固定按等级 2 规划；越级命令标记为“不可达”，即使出现在 `run` 字符串中也会被编译器拒绝。
 
-## 版本基线与函数权限
+## 一、进度总览
 
-- 目标版本固定在仓库内 `minecraft_client_26.3-rc-2/` 源码，数据包格式 `121.0`；资源类型、注册表、命令签名一律以该源码为准。
-- 函数与函数标签目录依据 `ServerFunctionLibrary` 与 `Registries`，使用 `data/<namespace>/function` 和 `data/<namespace>/tags/function`。
-- 26.3 的 `function-permission-level` 服务器属性默认 `GAMEMASTER`（等级 2，见 `DedicatedServerProperties:147`）。函数在编译期（`ServerFunctionLibrary`）与运行期（`FunctionCommand.modifySenderForExecution` 的 `withMaximumPermission`）都被限制在该等级，因此 `ADMIN`（3）/`OWNER`（4）命令无法从数据包函数合法执行。标准层固定按等级 2 规划；越级命令标记为“不可达”，即使出现在 `run` 字符串中也会被编译器拒绝。
+### 1.1 命令覆盖统计
 
-## 一、原版命令覆盖矩阵
+26.3-rc-2 的命令树共 97 个根命令名（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名），逐条清单见 §二。
 
-状态含义：
+| 状态 | 数量 | 含义 |
+| --- | --- | --- |
+| 完成 | 25 | 结构化语法覆盖该命令的常规数据包用法，编译期检查完整 |
+| 部分 | 7 | 已有结构化入口，子命令或参数面存在明确缺口 |
+| 缺失 | 29 | 没有结构化入口，只能写 `run` 字符串或完全不可用 |
+| 不可达 | 21 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
+| 等价覆盖 | 2 | 没有独立结构化入口，但用途已由其他结构化语句覆盖 |
+| 只读反馈 | 4 | 只向命令来源输出信息，不改变世界状态 |
+| 测试工具 | 1 | gametest 测试框架，不属于数据包标准层 |
+| 仅开发构建 | 8 | 只在开发标志或 IDE 环境注册，正式版数据包不可用 |
+
+### 1.2 阶段进度
+
+| 阶段 | 进度 | 剩余重点 |
+| --- | --- | --- |
+| 1 类型系统与版本数据 | 6/6（余说明性待补） | 动态子命令树与动态 NBT 键、SNBT 备选记法 |
+| 2 补齐现有结构化能力 | 10/10 | — |
+| 3 世界与方块命令族 | 12/12 | `place.feature` 内联 JSON |
+| 4 实体与玩家命令族 | 3/18 | enchant、damage、attribute、team、ride 等 |
+| 5 物品、战利品与进度 | 1/5 | loot、recipe、slot_source、完整物品谓词 |
+| 6 界面与感官 | 1/8 | title、bossbar、particle、dialog、msg 等 |
+| 7 服务器数据与工具 | 2/8（7.1 部分） | random.roll/reset、reload/datapack 等 |
+| 8 语言与工具体验 | 2/8（8.6 部分） | 函数宏、参数形状校验、增量构建、标准库 |
+| 9 数据包内容与资源 schema | 0/8（9.2 函数标签已完成） | 注册表标签、资源 schema、worldgen、打包 |
+
+## 二、原版命令覆盖矩阵
+
+状态定义（与 §一 的统计一致）：
 
 | 状态 | 含义 |
 | --- | --- |
@@ -22,97 +52,98 @@
 | 部分 | 已有结构化入口，但子命令或参数面存在明确缺口 |
 | 缺失 | 没有结构化入口，只能写 `run` 字符串或完全不可用 |
 | 不可达 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
-| 不建模 | 可由其他结构化语句等价表达，或对数据包无意义 |
+| 等价覆盖 | 没有独立结构化入口，但用途已由其他结构化语句覆盖 |
+| 只读反馈 | 只向命令来源输出信息，不改变世界状态 |
+| 测试工具 | gametest 测试框架的命令，不属于数据包标准层 |
+| 仅开发构建 | 只在开发标志或 IDE 环境注册，正式版数据包不可用 |
 
-当前统计：26.3-rc-2 共 **97 个根命令名**（含 `xp`、`tp`、`tell`、`w`、`tm`、`me` 等别名）。其中 **16 个完整覆盖**（`execute`、`return`、`schedule`、`effect`、`experience`/`xp`、`clear`、`stopwatch`、`clone`、`fillbiome`、`forceload`、`time`、`weather`、`gamerule`、`worldborder`、`locate`、`advancement`），13 个有部分结构化入口；32 个缺失；21 个默认权限不可达；15 个只读/工具/开发命令不计划建模。命令之外的数据包内容见 1.6，对应路线图为第 9 阶段。
-
-### 1.1 执行、函数与数据核心
+### 2.1 执行、函数与数据核心
 
 | 命令 | 原版形态（26.3-rc-2） | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `execute` | `run`；`if`/`unless`（block、biome、loaded、dimension、score、blocks、entity、predicate、function、stopwatch、data、items、slots）；修饰符 as、at、positioned、rotated、facing、align、anchored、in、on（8 种关系）、summon；store result/success | 完成 | 结构化修饰符、`if`/`unless` 条件（复用 2.2 条件族）与 `store.result/success/data`：计分板、Boss 栏（`bossbar, "id", value\|max`）与实体/方块/存储 NBT 目标全覆盖；字符串子句保留为逃生口并计入 `--deny-raw`。计分板持有者支持 `self`、实体查询与 `origin`（origin 拆成临时项捕获 + `on origin` 复制，未触发时目标保持原样）；`store.data` 的实体来源要求 `limit(1)`，`self`/查询按非玩家校验，`origin` 由运行期非玩家路径处理 |
-| `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call`、表达式调用与 `#tag` 已支持，标签成员在编译期检查执行上下文与参数；缺 `<fn> <nbt>` 宏参数与 `with` |
-| `return` | `<int>`；`fail`；`run <命令>` | 完成 | 计分返回值、store ABI、`return fail`、`return run` 全覆盖；`return run` 的命令文本计入 `--deny-raw` |
+| `execute` | `run`；`if`/`unless`（block、biome、loaded、dimension、score、blocks、entity、predicate、function、stopwatch、data、items、slots）；修饰符 as、at、positioned、rotated、facing、align、anchored、in、on（8 种关系）、summon；store result/success | 完成 | 结构化修饰符、条件族与 store 全覆盖（细节见 §四）；旧字符串子句保留为逃生口并计入 `--deny-raw` |
+| `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call`、表达式调用与 `#tag` 已支持；缺 `<fn> <nbt>` 宏参数与 `with`（8.3） |
+| `return` | `<int>`；`fail`；`run <命令>` | 完成 | 计分返回值、store ABI、`return fail`、`return run` 全覆盖；`return run` 计入 `--deny-raw` |
 | `schedule` | `function <fn> <time> [replace\|append]`；`clear <fn>` | 完成 | 整数与浮点时间（按原版 `TimeArgument` 换算为游戏刻）、`replace`/`append`、`schedule.clear`、`#tag` 调度 |
-| `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 部分 | 已有实体具名 NBT 合并（`nbt { ... }` → `data merge entity @s`，键对照源码快照校验）与已声明数据槽上的实体/物品搬运（`自身.存入/取出/移除数据`）；缺通用路径与 get 表达式 |
-| `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 部分 | 已有 `objective` 声明与 `scoreboard.set/reset/get`（支持自身/投掷者/查询持有者，可用作表达式）；无显示槽、enable、operation、displayname 与数字格式 |
-| `item` | replace/fill/override/modify（entity/block 目标、槽位集合、from/with/loot_modifier） | 部分 | 只有 `give(..., self.item)` 用的 `replace ... from entity ... contents` |
-| `loot` | loot/fish/kill/mine + give/insert/replace/spawn | 缺失 | 战利品表资源可声明，但没有取用命令 |
-| `advancement` | grant/revoke × only/from/until/through/everything | 完成 | `advancement.grant/revoke[_through|_from|_until|_everything]`，目标是玩家（self/投掷者/玩家查询）；进度引用本命名空间声明或字符串资源位置，`only` 可带准则名 |
-| `recipe` | give/take `<recipe\|*>` | 缺失 | — |
-| `reload` | — | 缺失 | — |
-| `datapack` | enable/disable/list；create（不可达，需 OWNER） | 缺失 | — |
-| `compute` | default/block/entity × float/integer provider | 缺失 | — |
+| `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 完成 | `data.get`（表达式）/`merge`/`remove`/`modify` 与 entity/block/storage 三类目标；实体目标沿用非玩家写保护 |
+| `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 完成 | `objective` 声明（准则/显示名/渲染类型/数字格式/显示槽）与 `set/get/reset/enable/operation/display`；与内部 ABI 目标隔离 |
+| `item` | replace/fill/override/modify（entity/block 目标、槽位集合、from/with/loot_modifier） | 完成 | `replace/fill/override/modify`；实体（`limit(1)`）与方块目标、任意槽位、`with`/`from` 与可选修饰器 |
+| `loot` | loot/fish/kill/mine + give/insert/replace/spawn | 缺失 | 战利品表资源可声明，但没有取用命令（5.1） |
+| `advancement` | grant/revoke × only/from/until/through/everything | 完成 | `advancement.grant/revoke[_through\|_from\|_until\|_everything]`，目标是玩家；进度引用本命名空间声明或字符串资源位置，`only` 可带准则名 |
+| `recipe` | give/take `<recipe\|*>` | 缺失 | — （5.4） |
+| `reload` | — | 缺失 | — （7.4） |
+| `datapack` | enable/disable/list；create（不可达，需 OWNER） | 缺失 | — （7.4） |
+| `compute` | default/block/entity × float/integer provider | 完成 | 结果表达式 `compute(来源, float\|integer, provider[, 缩放])`；provider 与上下文对照注册表校验 |
 | `stopwatch` | create/query/restart/remove | 完成 | `stopwatch.create/restart/remove(id)`；`query` 作为表达式并支持可选缩放，失败写入 0 |
-| `random` | value/roll/reset | 缺失 | — |
-| `test` | gametest 系列 | 不建模 | 测试框架，不属于数据包标准层 |
-| `fetchprofile` | name/id/entity | 不建模 | 只输出可点击引用，无返回值 |
+| `random` | value/roll/reset | 部分 | `random(1, 6)` 结果表达式已支持；缺 `random.roll` 与 `random.reset`（7.1） |
+| `test` | gametest 系列 | 测试工具 | 测试框架，不属于数据包标准层（7.7） |
+| `fetchprofile` | name/id/entity | 只读反馈 | 只输出可点击引用，无返回值（7.6） |
 
-### 1.2 实体与玩家
+### 2.2 实体与玩家
 
 | 命令 | 原版形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `summon` | `<entity> [pos] [nbt]` | 部分 | `spawn("id") {}` 可进入新实体上下文；缺坐标；初始 NBT 可用（spawn 体内的 `nbt { ... }` 语句） |
-| `give` | `<players> <item> [count]` | 部分 | 目标必须是已声明玩家查询，物品必须是 `item_stack` 定义；无内联任意组件 |
-| `kill` | `[targets]` | 部分 | 只有 `self.remove()` |
-| `tag` | `add`/`remove`/`list` | 部分 | 只有 `self.add_tag`/`self.remove_tag`；无多目标与 `list` |
-| `team` | list/add/remove/empty/join/leave/modify（displayName/color/friendlyFire/seeFriendlyInvisibles/nametagVisibility/deathMessageVisibility/collisionRule/prefix/suffix） | 缺失 | — |
-| `attribute` | get；base set/get/reset；modifier add/remove/value get | 缺失 | — |
+| `summon` | `<entity> [pos] [nbt]` | 完成 | `spawn("id", pos\|vec3) { ... }` 进入新实体上下文；初始 NBT 在召唤后合并；拒绝 `noSummon` 类型 |
+| `give` | `<players> <item> [count]` | 部分 | 目标必须是已声明玩家查询，物品必须是 `item_stack` 定义；缺内联任意组件与完整物品谓词（5.5） |
+| `kill` | `[targets]` | 部分 | 只有 `self.remove()`，无目标参数 |
+| `tag` | add/remove/list | 部分 | 只有 `self.add_tag`/`self.remove_tag`；多目标与 `list` 见 4.16 |
+| `team` | list/add/remove/empty/join/leave/modify（displayName/color/friendlyFire/seeFriendlyInvisibles/nametagVisibility/deathMessageVisibility/collisionRule/prefix/suffix） | 缺失 | 4.17 |
+| `attribute` | get；base set/get/reset；modifier add/remove/value get | 缺失 | 4.6 |
 | `effect` | give（时长/等级/隐藏粒子/infinite）；clear | 完成 | `effect.give`、`effect.give_infinite`、`effect.clear`；秒数与等级按 26.3 范围编译期检查 |
-| `enchant` | `<targets> <enchantment> [level]` | 缺失 | — |
+| `enchant` | `<targets> <enchantment> [level]` | 缺失 | 4.2 |
 | `experience`（`xp`） | add/set/query（points/levels） | 完成 | `xp.add`/`xp.set`；`xp.query` 作为表达式，要求 `limit(1)` 玩家查询 |
 | `clear` | `[targets] [item] [maxCount]` | 完成 | `clear(玩家查询[, 物品][, 数量])`，数量上限 2147483647 |
-| `damage` | `<target> <amount> [damage_type] [at <pos>\|by <entity> [from <cause>]]` | 缺失 | — |
-| `teleport`（`tp`） | 坐标/实体/朝向 | 部分 | `teleport(持有者, pos(...))` 与 `teleport(持有者, 单个实体查询)`；缺朝向与 `facing`/旋转参数 |
-| `ride` | mount/dismount | 缺失 | — |
-| `rotate` | rotation/facing | 缺失 | — |
-| `spreadplayers` | 中心/间距/范围 + `under` | 缺失 | — |
-| `spectate` | `[target] [player]` | 缺失 | — |
-| `trigger` | add/set | 缺失 | — |
-| `gamemode` | `<mode> [players]` | 缺失 | — |
-| `defaultgamemode` | `<mode>` | 缺失 | — |
-| `difficulty` | 查询/设置 | 缺失 | — |
-| `spawnpoint` | `[players] [pos] [rotation]` | 缺失 | — |
-| `setworldspawn` | `[pos] [rotation]` | 缺失 | — |
-| `waypoint` | list；modify color（含 hex/reset）/style | 缺失 | — |
-| `swing` | `[targets] [hand] [animation] [duration]` | 缺失 | — |
-| `emote`（`me`） | `<action>` | 不建模 | `message.all` 已能广播文本 |
+| `damage` | `<target> <amount> [damage_type] [at <pos>\|by <entity> [from <cause>]]` | 缺失 | 4.5 |
+| `teleport`（`tp`） | 坐标/实体/朝向 | 部分 | 已有 `pos`/`vec3`、`rotation` 与单个实体查询；缺 `facing` 与朝向变体（4.7） |
+| `ride` | mount/dismount | 缺失 | 4.8 |
+| `rotate` | rotation/facing | 缺失 | 4.9 |
+| `spreadplayers` | 中心/间距/范围 + `under` | 缺失 | 4.10 |
+| `spectate` | `[target] [player]` | 缺失 | 4.11 |
+| `swing` | `[targets] [hand] [animation] [duration]` | 缺失 | 4.12 |
+| `trigger` | add/set | 缺失 | `scoreboard.enable` 已能开启 `trigger` 目标；命令本身见 4.13 |
+| `gamemode` | `<mode> [players]` | 缺失 | 4.14 |
+| `defaultgamemode` | `<mode>` | 缺失 | 4.14 |
+| `difficulty` | 查询/设置 | 缺失 | 4.14 |
+| `spawnpoint` | `[players] [pos] [rotation]` | 缺失 | 4.15 |
+| `setworldspawn` | `[pos] [rotation]` | 缺失 | 4.15 |
+| `waypoint` | list；modify color（含 hex/reset）/style | 缺失 | 4.18 |
+| `emote`（`me`） | `<action>` | 等价覆盖 | `message.all` 已能广播文本 |
 | `kick` | `<players> [reason]` | 不可达 | 需要 ADMIN |
-| `list` | `[uuids]` | 缺失 | 只读反馈，低优先 |
+| `list` | `[uuids]` | 缺失 | 只读反馈，低优先（7.5） |
 
-### 1.3 世界与方块
+### 2.3 世界与方块
 
 | 命令 | 原版形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `setblock` | `<pos> <block> [destroy\|keep\|replace\|strict]` | 部分 | `set_block(pos, block_state[, 模式])`；缺方块实体 NBT（依赖 1.4） |
-| `fill` | `<from> <to> <block> [mode\|replace filter\|keep]` | 部分 | `fill(from, to, block_state[, 模式][, replace 过滤器])`；缺方块实体 NBT（依赖 1.4） |
+| `setblock` | `<pos> <block> [destroy\|keep\|replace\|strict]` | 完成 | `set_block(pos, block_state[, 模式][, nbt { ... }])` |
+| `fill` | `<from> <to> <block> [mode\|replace filter\|keep]` | 完成 | `fill(from, to, block_state[, 模式][, replace 过滤器][, nbt { ... }])` |
 | `clone` | 同/跨维度 + masked/filtered/force/move/normal/strict | 完成 | `clone(起点, 终点, 目标[, 选项...])`，选项顺序无关、重复报错 |
 | `fillbiome` | `<from> <to> <biome> [replace filter]` | 完成 | `fill_biome(from, to, "生物群系"[, replace, "过滤器"])` |
-| `place` | feature/jigsaw/structure/template | 部分 | `place.feature/jigsaw/structure/template`；feature 的内联 JSON 未建模 |
+| `place` | feature/jigsaw/structure/template | 部分 | `place.feature/jigsaw/structure/template`；feature 的内联 JSON 未建模（3.6） |
 | `forceload` | add/remove/query | 完成 | `forceload.add/remove/remove_all/query`，绝对范围检查 256 区块上限 |
-| `time` | set/add/pause/resume/rate/query + `of <clock>` | 完成 | `time.set/add/pause/resume/rate(..., [时钟])`；`time.query([时钟])` 与 `time.query_gametime()` 是表达式；26.3 世界时钟模型 |
+| `time` | set/add/pause/resume/rate/query + `of <clock>` | 完成 | `time.set/add/pause/resume/rate(..., [时钟])`；`time.query([时钟])` 与 `time.query_gametime()` 是表达式 |
 | `weather` | clear/rain/thunder [duration] | 完成 | `weather.clear/rain/thunder([持续时间])` |
-| `gamerule` | `<rule> [value]`，每条规则生成短名与全名两个字面量 | 完成 | `gamerule.set(规则, 值)` 与表达式 `gamerule.query(规则)`；规则名、类型与范围来自 26.3 `GameRules` |
+| `gamerule` | `<rule> [value]` | 完成 | `gamerule.set(规则, 值)` 与表达式 `gamerule.query(规则)`；规则名、类型与范围来自 26.3 `GameRules` |
 | `worldborder` | add/set/center/damage amount/buffer/get/warning distance/time | 完成 | `worldborder.add/set/center/damage_amount/damage_buffer/warning_distance/warning_time`；`worldborder.get()` 是表达式 |
 | `locate` | structure/biome/poi | 完成 | `locate.structure/biome/poi("目标或 #标签")`；仅命令反馈 |
 
-### 1.4 显示、声音与界面
+### 2.4 显示、声音与界面
 
 | 命令 | 原版形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `bossbar` | add/remove/list/set（name/color/style/value/max/visible/players）/get | 缺失 | — |
-| `title` | title/subtitle/actionbar/times/clear/reset | 缺失 | — |
-| `tellraw` | `<players> <component>` | 部分 | `message.*` 只生成纯文本加颜色 |
-| `say` | `<message>` | 不建模 | `message.all` 近似 |
-| `msg`（`tell`、`w`） | `<players> <message>` | 缺失 | 私聊，低优先 |
-| `teammsg`（`tm`） | `<message>` | 缺失 | 队伍聊天，低优先 |
-| `particle` | `<name> [pos] [delta] [speed] [count] [force\|normal] [viewers]` | 缺失 | 目前只能 `run` |
-| `playsound` | `<sound> [source] [targets] [pos] [volume] [pitch] [minVolume]` | 部分 | 只有 `sound.self`，音量/音调固定 1 |
-| `stopsound` | `<targets> [*\|source] [sound]` | 缺失 | — |
-| `posteffect` | add/clear/list/remove | 缺失 | — |
-| `dialog` | show/clear | 缺失 | `resource dialog` 已能写数据 |
+| `bossbar` | add/remove/list/set（name/color/style/value/max/visible/players）/get | 缺失 | 6.2 |
+| `title` | title/subtitle/actionbar/times/clear/reset | 缺失 | 6.1 |
+| `tellraw` | `<players> <component>` | 完成 | `message.all/self/nearest/player` 接受文本组件（样式、click/hover、translate/keybind/score/selector/nbt）；纯字符串与末尾颜色保留为旧写法 |
+| `say` | `<message>` | 等价覆盖 | `message.all` 已覆盖广播文本 |
+| `msg`（`tell`、`w`） | `<players> <message>` | 缺失 | 私聊，低优先（6.8） |
+| `teammsg`（`tm`） | `<message>` | 缺失 | 队伍聊天，低优先（6.8） |
+| `particle` | `<name> [pos] [delta] [speed] [count] [force\|normal] [viewers]` | 缺失 | 6.4 |
+| `playsound` | `<sound> [source] [targets] [pos] [volume] [pitch] [minVolume]` | 完成 | `sound.self` 与 `sound.play(sound, source, targets, pos, volume, pitch, min_volume)` |
+| `stopsound` | `<targets> [*\|source] [sound]` | 缺失 | 6.6 |
+| `posteffect` | add/clear/list/remove | 缺失 | 6.7 |
+| `dialog` | show/clear | 缺失 | 6.3；`resource dialog` 已能写数据 |
 
-### 1.5 服务器管理与开发命令
+### 2.5 服务器管理与开发命令
 
 这些命令默认不在数据包标准层内，仍列入清单以保证覆盖完整。
 
@@ -121,158 +152,39 @@
 | `ban`、`ban-ip`、`banlist`、`op`、`deop`、`pardon`、`pardon-ip`、`whitelist` | ADMIN | 不可达 | 服务器管理 |
 | `perf`、`save-all`、`save-off`、`save-on`、`setidletimeout`、`stop`、`transfer`、`publish`、`unpublish` | OWNER/ADMIN | 不可达 | 服务器管理 |
 | `jfr`、`tick`、`debug` | OWNER/ADMIN | 不可达 | 性能与调试 |
-| `seed`、`version`、`help` | 视环境 | 不建模 | 只读反馈 |
-| `raid`、`debugpath`、`debugmobspawning`、`warden_spawn_tracker`、`spawn_armor_trims`、`serverpack`、`debugconfig`、`chase` | — | 不建模 | 仅开发构建注册 |
+| `seed`、`version` | 视环境 | 只读反馈 | 只输出信息；`Commands.java:252` 起仅在非集成服务器注册 |
+| `help` | — | 只读反馈 | 只输出帮助 |
+| `raid`、`debugpath`、`debugmobspawning`、`warden_spawn_tracker`、`spawn_armor_trims`、`serverpack`、`debugconfig`、`chase` | — | 仅开发构建 | `raid` 等见 `Commands.java:283` 的 `DEBUG_DEV_COMMANDS \|\| IS_RUNNING_IN_IDE`；`chase` 需 `DEBUG_CHASE_COMMAND`；`debugconfig` 另需专用服务器 |
 
-### 1.6 数据包内容（非命令）
+`fetchprofile`（只读反馈）与 `test`（测试工具）已在 §2.1 列出。
+
+### 2.6 数据包内容（非命令）
 
 命令之外的 data pack 组成。除此之外还有两类内容不在范围内：资源包资产（`sounds.json`、模型、纹理、字体、图集、后处理着色器）与客户端行为，mclang 只生成 data pack。
 
 | 内容 | 26.3 形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `pack.mcmeta` | `description`（文本或组件）、`min_format`/`max_format`、`overlays`、`filters`、`features.enabled` | 部分 | 只写 description 与固定 `[121,0]`；overlay、filter、特性标志均无 |
-| `pack.png` | 包图标 | 缺失 | — |
+| `pack.mcmeta` | `description`（文本或组件）、`min_format`/`max_format`、`overlays`、`filters`、`features.enabled` | 部分 | 只写 description 与固定 `[121,0]`；overlay、filter、特性标志均无（9.1） |
+| `pack.png` | 包图标 | 缺失 | —（9.1） |
 | 函数文件 | `data/<ns>/function/*.mcfunction` | 完成 | 每个函数一个文件，带生成注释头 |
 | 函数标签 | `data/<ns>/tags/function/*.json` | 完成 | `fn_tag` 声明输出用户标签，支持函数、嵌套 `#标签`、外部字符串条目与 `replace`、编译期环路检查；`minecraft:load`/`tick` 仍由编译器生成 |
-| 注册表标签 | `data/<ns>/tags/<注册表>/**`：16 个顶层注册表（banner_pattern、block、damage_type、dialog、enchantment、entity_type、fluid、game_event、instrument、item、painting_variant、point_of_interest_type、potion、timeline、villager_trade、worldgen）及子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等） | 缺失 | 无结构化声明 |
-| predicate | JSON | 部分 | 原始 JSON；只检查同命名空间引用 |
-| loot_table | JSON | 部分 | 原始 JSON |
-| item_modifier | JSON | 部分 | 原始 JSON |
-| advancement | JSON | 部分 | 结构化 `advancement` 声明（准则/触发器/奖励/展示/父级）已落地；准则的 `conditions` 仍是原始 JSON |
-| recipe | JSON | 部分 | 原始 JSON |
-| 动态注册表 JSON | damage_type、enchantment、enchantment_provider、dialog、timeline、world_clock、trade_set、villager_trade、trial_spawner、trim_material/pattern、jukebox_song、instrument、painting_variant、banner_pattern、装饰陶片、各类变体与声音变体、test_environment/test_instance 等 41 类 | 部分 | 原始 JSON，无字段 schema |
-| worldgen | 17 类 JSON：biome、feature、placed_feature、structure、structure_set、template_pool、processor_list、noise、noise_settings、density_function、carver、material_rule、material_condition、block_state_provider、multi_noise_biome_source_parameter_list、flat_level_generator_preset、world_preset | 部分 | 原始 JSON，无 schema 与引用校验 |
-| dimension / dimension_type | JSON：`dimension_type` 随原版数据提供；`dimension` 用于自定义维度实例 | 部分 | 原始 JSON |
-| structure | `data/<ns>/structure/*.nbt` | 缺失 | 无法生成二进制 NBT |
-| 特性包 | `pack.mcmeta` 的 `features.enabled` 与内置数据包布局（`data/minecraft/datapacks/*`） | 缺失 | — |
-| 持久化存储 | `data` 的 `storage` 内容 | 部分 | 只有 `item_list`（见 2.4） |
-| 打包与分发 | zip 数据包、overlay 目录 | 缺失 | 只输出目录 |
-| 资源引用图 | 跨资源引用（advancement 父级、loot table、predicate、item modifier、dialog、tag、function） | 部分 | 只检查同命名空间 predicate |
-| JSON 字段校验 | 字段、枚举、未知字段与类型 | 缺失 | 仅 JSON 语法、资源类型、名称与重复声明 |
+| 注册表标签 | `data/<ns>/tags/<注册表>/**`：16 个顶层注册表（banner_pattern、block、damage_type、dialog、enchantment、entity_type、fluid、game_event、instrument、item、painting_variant、point_of_interest_type、potion、timeline、villager_trade、worldgen）及子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等） | 缺失 | 无结构化声明（9.2） |
+| predicate | JSON | 部分 | 原始 JSON；只检查同命名空间引用（9.3） |
+| loot_table | JSON | 部分 | 原始 JSON（9.3） |
+| item_modifier | JSON | 部分 | 原始 JSON（9.3） |
+| advancement | JSON | 部分 | 结构化 `advancement` 声明（准则/触发器/奖励/展示/父级）已落地；准则的 `conditions` 仍是原始 JSON（9.3） |
+| recipe | JSON | 部分 | 原始 JSON（9.3） |
+| 动态注册表 JSON | damage_type、enchantment、enchantment_provider、dialog、timeline、world_clock、trade_set、villager_trade、trial_spawner、trim_material/pattern、jukebox_song、instrument、painting_variant、banner_pattern、装饰陶片、各类变体与声音变体、test_environment/test_instance 等 41 类 | 部分 | 原始 JSON，无字段 schema（9.3） |
+| worldgen | 17 类 JSON：biome、feature、placed_feature、structure、structure_set、template_pool、processor_list、noise、noise_settings、density_function、carver、material_rule、material_condition、block_state_provider、multi_noise_biome_source_parameter_list、flat_level_generator_preset、world_preset | 部分 | 原始 JSON，无 schema 与引用校验（9.5） |
+| dimension / dimension_type | JSON：`dimension_type` 随原版数据提供；`dimension` 用于自定义维度实例 | 部分 | 原始 JSON（9.5） |
+| structure | `data/<ns>/structure/*.nbt` | 缺失 | 无法生成二进制 NBT（9.6） |
+| 特性包 | `pack.mcmeta` 的 `features.enabled` 与内置数据包布局（`data/minecraft/datapacks/*`） | 缺失 | —（9.1） |
+| 持久化存储 | `data` 的 `storage` 内容 | 部分 | 只有 `item_list` 数据槽（见 §4.4） |
+| 打包与分发 | zip 数据包、overlay 目录 | 缺失 | 只输出目录（9.7） |
+| 资源引用图 | 跨资源引用（advancement 父级、loot table、predicate、item modifier、dialog、tag、function） | 部分 | 只检查同命名空间 predicate（9.4） |
+| JSON 字段校验 | 字段、枚举、未知字段与类型 | 缺失 | 仅 JSON 语法、资源类型、名称与重复声明（9.3） |
 
-## 二、已完成能力（0.1–0.5）
-
-编译器闭环与质量：
-
-- [x] 建立 Rust 模块边界：词法分析、语法树、解析、语义检查、代码生成、命令行入口。
-- [x] 定义最小语言：命名空间、全局计分变量、函数、`@load`/`@tick`、原生命令、函数调用、赋值、算术、条件分支、调度和返回。
-- [x] 实现带文件名、行列和源码片段的诊断，一次返回全部错误。
-- [x] 生成 `pack.mcmeta`、`.mcfunction` 文件以及 load/tick 标签；安全重建与 `.mclang-manifest` 输出所有权。
-- [x] 提供 `build` 与 `check`，支持单文件与递归项目目录，检查命名空间一致性。
-- [x] 词法、解析、语义与数据包输出的 mcl 编译语料（`tests/valid`、`tests/invalid`）；端到端示例；`cargo fmt`、`cargo clippy` 零警告；语言参考、编译器设计与快速上手文档。
-
-语言能力：
-
-- [x] 结构化标准层：`query`、`item_stack`、`item_list`、`storage`、`give`、`each`、`spawn`、`in_dimension`、`self.*`、`message.*`、`sound.self`、`predicate`、`schedule`、`resource`。
-- [x] 物品组件：名称、Lore、附魔、存储附魔、损伤、无法破坏、稀有度、物品模型、染色、光效覆盖、最大损伤与最大堆叠；`give` 数量按 `最大堆叠数 × 100` 校验。
-- [x] 四态执行上下文（无/任意实体/非玩家实体/玩家）与 `@load`/`@tick`/`@entity`/`@non_player`/`@player` 属性；`data` 类操作只允许非玩家实体。
-- [x] 函数参数、score 返回值、`let` 词法局部变量、稳定假玩家命名、同步调用图递归拒绝。
-- [x] `if`/`while`、`!`/`&&`/`||`、谓词组合、确定求值顺序。
-- [x] 中英文双关键词与同文件混用；关键词表单一来源；两种写法产物逐字节一致。
-- [x] `--deny-raw` 严格模式；零底层命令字符串的便携箱子示例验收。
-- [x] `resource` 声明：26.3 注册表类型限制、编译期 JSON 解析、稳定格式化输出。
-
-命令补全（本次批次）：
-
-- [x] 函数标签：`fn_tag` 声明、`call #tag()`、`schedule #tag()`、嵌套引用与循环引用检查；`function`/`schedule` 的标签成员在编译期检查执行上下文与参数。
-- [x] `return fail`、`return run "命令"`；`return run` 计入 `--deny-raw` 的底层语句统计。
-- [x] `schedule.clear(函数)` 与浮点延迟（`1.5 s` 按原版 `TimeArgument` 换算，拒绝不足 1 刻的延迟）。
-- [x] `effect.give`/`effect.give_infinite`/`effect.clear`，秒数与等级范围检查。
-- [x] `xp.add`/`xp.set` 与作为表达式的 `xp.query`（要求 `limit(1)` 玩家查询）。
-- [x] `clear(玩家查询[, 物品][, 数量])`。
-- [x] `stopwatch.create/restart/remove(id)` 与作为表达式的 `stopwatch.query(id[, 缩放])`。
-- [x] `examples/potion_lab.mcl`：严格模式示例，覆盖以上全部能力并通过 `--deny-raw`。
-
-按玩家绑定与数据槽（本次批次）：
-
-- [x] `objective` 声明：dummy 用户计分板目标，运行期名 `<命名空间>_<名称>`，由 `__mcl/load` 创建；与内部 ABI objective 隔离。
-- [x] `scoreboard.set/reset` 语句与表达式 `scoreboard.get`：持有者支持 `self`/`自身`、`origin`/`投掷者` 与实体查询（读取要求 `limit(1)`）；读取失败为 0，可作未赋值哨兵。
-- [x] `data_slot` 声明：`item_data`（物品堆 `minecraft:custom_data`）与 `entity_data`（26.3 实体通用 `data` 字段）两种来源，编译期校验键与实体类型（物品槽必须配 `minecraft:item`，实体槽拒绝玩家）。
-- [x] `self.deposit/withdraw/remove_data`：容器 `Items` 与数据槽之间搬运；`deposit` 追加且空容器静默跳过，`withdraw` 成功后删除来源槽。
-- [x] `self.set_no_gravity` 与 `self.remove_preserving_items(slot, query)`：带成功校验的容器安全移除（追加成功才清空、容器为空才 `kill`），并补齐 `NoGravity` 实体开关。
-- [x] `teleport(持有者, pos(...) | 单个实体查询)`：`tp @s <坐标>`（支持绝对、`~` 相对）与 `tp @s <实体>`；持有者支持 `self`/`自身`、`origin`/`投掷者` 与查询，落点坐标走世界范围校验。
-- [x] `examples/portable_chest` 改为「仓库」架构：全中文关键字、每人独立编号、矿车按实体计分归属；收起时不销毁也不搬数据，而是把矿车传送到世界边缘的 forceload 屏障盒里，放出时传送回玩家身边，物品始终留在矿车中；通过 `--deny-raw` 与双语翻译自检。
-
-世界与方块（本次批次）：
-
-- [x] 坐标类型：`pos(x, y, z)` 与 `column(x, z)`，支持绝对、`~` 相对与 `^` 局部坐标；`^` 不能与其他写法混用，绝对分量检查世界范围与列坐标 256 区块上限。
-- [x] `block_state("id") { 属性 = "值"; }`：属性字符集、重复声明与 `#` 标签谓词的使用位置都在编译期检查。
-- [x] `set_block`、`fill`、`fill_biome`、`clone`（含跨维度、filtered/masked、force/move、strict）、`place.feature/jigsaw/structure/template`、`forceload.*`。
-- [x] 世界时钟与天气：`time.set/add/pause/resume/rate`、`weather.*`，时间参数按原版 `TimeArgument` 换算。
-- [x] 游戏规则与边界：`gamerule.set`/`gamerule.query`（26.3 `GameRules` 表），`worldborder.*` 与表达式 `worldborder.get()`。
-- [x] 查询表达式：`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(规则)`、`worldborder.get()`。
-- [x] `examples/world_ops.mcl`：覆盖上述能力并通过 `--deny-raw`。
-
-结构化 NBT（本次批次）：
-
-- [x] `nbt { ... }`（中文 `数据`）复合字面量覆盖 26.3 SNBT 的全部 12 种标签类型：字节/短整数/整数/长整数/单精度/双精度（`1b`/`1s`/`1`/`1L`/`1.5f`/`1.5d` 及大小写变体）、字符串、列表、嵌套复合，以及 `[B; 1b]`/`[I; 1]`/`[L; 1L]` 三种整数数组；`true`/`false`（`真`/`假`）按 SNBT 规则是字节 1/0。
-- [x] 解析期静态检查：8/16/32/64 位数值范围、单精度可表示性、数组元素后缀与数组类型匹配（对照 26.3 `SnbtGrammar.ArrayPrefix` 的允许集合）、复合键重复；字符串必须加引号。
-- [x] SNBT 序列化集中在 `codegen/emit::nbt_text`：输出规范化写法（`1b`、`1s`、`1L`、`1.5f`、`1.5d`、`[B;1B]`），字符串与不安全键加引号并转义控制字符。
-- [x] `set_block`/`fill` 支持可选 `nbt { ... }` 方块实体数据，生成 `<block>{<nbt>}` 并位于模式与过滤器之前；可选参数可以任意顺序书写，但模式、过滤器和 `nbt` 各自最多一次。
-- [x] 物品定义新增 `custom_data = nbt { ... };`：`give` 与物品组件文本输出 `minecraft:custom_data`，进度图标的 `ItemStackTemplate` JSON 同步转换。
-- [x] 关键词 `nbt`/`数据` 进入单一关键词表；LSP 悬停说明与 VSCode TextMate 语法同步（新增 `[`/`]` 与数值后缀高亮）。
-- [x] `examples/world_ops.mcl`（箱子/信标方块实体）与 `examples/give_reward.mcl`（物品自定义数据）通过 `--deny-raw`；手册新增 `nbt_tags` 验证示例覆盖全部 12 种标签。
-- [x] 文档构建工具同步：`docs/tools/translate.mjs` 把 NBT 后缀并入数字 token，`nbt { ... }` 块内部按用户数据原样保留（只翻译布尔字面量）。
-- [x] 注意：`s`/`d` 紧贴数字时按 NBT 后缀解析（`1s` 是短整数、`1d` 是双精度），时间单位需要空格或逗号（`1 s`、`time.set(6000, t)`）；手写 `1s` 时间参数现在是编译错误并给出引导。
-
-实体 NBT 与具名标签目录（本次批次）：
-
-- [x] `nbt { ... }` 现在也是语句：生成 `data merge entity @s {...}`，把具名标签（`NoAI`、`Silent`、`CustomName`、`Tags`、`Health`……）合并到当前实体；只允许确定不是玩家的实体上下文，结尾分号可选（物品属性里的 `custom_data = nbt {...};` 仍需要分号）。
-- [x] `spawn("minecraft:zombie") { nbt { ... } ... }`：召唤后的第一条命令就是实体数据合并，借助 `execute summon` 的 `@s` 精确定位新实体，无需选择器。
-- [x] 版本数据生成器雏形：`cargo run --bin generate-version-data` 扫描 `minecraft_client_26.3-rc-2/net/minecraft/world/entity/**`，提取每个类（含 `Display.BlockDisplay` 嵌套类）的 `putX`/`store`/`read` 键与编解码器粗类型，沿 `extends` 求并集，并按 `EntityTypes`/`EntityTypeIds` 映射到 `minecraft:<id>`；当前快照 161 个实体类型、277 个标签；需要时重新运行生成器，用 `git diff data/version` 比对生成物与随附源码。
-- [x] 编译期校验：知道实体类型的上下文（`spawn`、具名查询的 `each`）按该类型的全部标签检查；`@non_player`/`@entity` 等按全体并集检查；未知键报错并给出编辑距离 ≤ 2 的最近候选（`NoAi` → `NoAI`，`无ai` → `` `无AI`（英文 `NoAI`） ``）；已知键按粗类型检查值（数字/布尔、字符串、文本组件、列表、数字列表、字符串列表、复合、整数数组）。
-- [x] 中文别名：`version::entity_nbt::CHINESE_ALIASES` 覆盖 125 个常用标签（`无AI`、`静音`、`自定义名称`、`标签`、`生命`、`无敌`、`发光`、`年龄`……），与关键词表一样保持中英双向一对一（每个英文键只有一个中文别名），在实体 `nbt { ... }` 语句与 `set_block`/`fill` 方块实体数据的顶层键生效，解析期归一化为英文键，与英文写法产物逐字节一致；同键的中英两种写法会按归一化后的键判重。物品 `custom_data` 的键是用户数据，不做替换。手册附录 E 的别名表由 `docs/tools/keywords.mjs` 从编译器源码提取，不会手抄脱节。
-- [x] `examples/portable_chest/main.mcl` 的矿车召唤使用 `数据 { CustomName = "便携箱子"; Silent = true; }`，通过 `--deny-raw` 与双语自检；手册新增 `entity_nbt_demo` 验证示例与「实体 NBT（nbt）」章节。
-- [ ] 尚未覆盖：`ConversionTracker` 这类通过构造参数动态命名的键（`DrowningTracker`/`FreezingTracker`/Player 的 `foodData`）、方块实体 NBT 的键校验、`data` 的 get/remove/modify 与 storage/block 目标；提取器并入 1.1 的 xtask 时补齐。
-
-进度与事件（本次批次）：
-
-- [x] `advancement` 声明：`parent`、`criterion`（`trigger` + `conditions` 原始 JSON）、`requirements = all|any`、`reward`（`function`/`experience`/`loot`/`recipe`）与 `display`（图标、标题、描述、`frame`、`background`、三个展示开关），输出到 `data/<命名空间>/advancement/<名称>.json`，默认值省略、`requirements` 显式生成，产物稳定。
-- [x] 编译期检查：触发器名对照 26.3 `CriteriaTriggers` 注册表的 58 个条目（可省略 `minecraft:` 前缀）、准则重名、`conditions` JSON 语法、根进度的 `background` 规则；`parent`、`reward.function`、`reward.loot`、`reward.recipe` 引用本命名空间声明时要求存在，字符串按外部资源位置处理；`display.icon` 引用 `item` 定义，图标组件完整输出。
-- [x] `advancement.grant/revoke[_through|_from|_until|_everything]`：目标是玩家（`self`/`自身` 要求玩家上下文，查询必须匹配 `minecraft:player`），进度引用本命名空间声明或字符串资源位置，`only` 可带准则名；不计入 `--deny-raw`。
-- [x] 进度声明与 `resource advancement` 同类型同名冲突检查。
-- [x] `examples/portal.mcl`：放置方块（`placed_block`）与进入方块（`enter_block`）两个事件入口，奖励函数用 `advancement.revoke(self, …)` 撤销进度实现可重复触发，并通过 `--deny-raw` 与双语翻译自检。
-- [x] 文档：手册新增进度声明与进度操作章节、附录 D 触发器总表（从编译器源码提取）、`portal.mcl` 示例条目。
-
-结构化 execute（本次批次）：
-
-- [x] `execute` 结构化子句：修饰符 `as(q)`、`at(q)`、`positioned(pos|vec3)`、`rotated(rotation)`、`facing(pos|entity(q), 锚点)`、`align(xyz 子集)`、`anchored(锚点)`、`in("维度")`、`on(关系)`、`summon("实体类型")`；重复修饰符、修饰符写在条件之后、条件写在 store 之后都在编译期报错。
-- [x] `if`/`unless` 条件复用 2.2 的条件族：在修饰符建立的执行上下文里求值为 0/1 标志，再用一条 `execute if score <flag> matches 1 run function` 进入块体；`unless` 生成 `unless score <flag> matches 1`。
-- [x] `store.result/success(持有者, 目标)`、`store.result/success(bossbar, "id", value|max)` 与 `store.data([result|success,] 来源, "路径", 类型[, 缩放])`：store 链包裹块内最后一条命令（可叠加多个目标），条件不成立或块体不运行时按原版语义不写入。
-- [x] `origin` 持有者：计分板与 NBT 目标都通过「临时计分项捕获 + `on origin` 复制」表达，复制由回调触发标志保护，未触发时目标保持原样。
-- [x] 上下文推导：`as` 按查询类型进入玩家/非玩家上下文，`at` 保持不变，`on` 要求当前有实体并放宽为任意实体，`summon` 进入非玩家上下文且类型参与具名 NBT 校验。
-- [x] `store.data` 的实体来源要求 `limit(1)`，`self` 要求非玩家上下文、查询来源检查实体类型、`origin` 走运行期非玩家路径；`store` 的持有者支持 `self`、实体查询与 `origin`；Boss 栏 store 校验资源位置；最后一条语句是控制结构或未声明返回值的函数调用时报错。
-- [x] 旧字符串子句保留为逃生口并继续计入 `--deny-raw`；结构化子句下降为真实命令链，通过严格模式。
-- [x] 关键词：新增 `unless`/除非、`store`/存值，以及子句、实体关系、锚点、store 方法与数据类型的全部中英别名；`execute` 的中文关键词由“原生执行”改为“执行”。
-- [x] 语料与文档：`tests/valid/execute`、`tests/invalid/execute.mcl` 与四个语法负例、双言语料新增结构化 execute；手册新增「结构化执行」章节与 `execute_structured` 验证示例（含真实产物片段）；LSP 悬停、TextMate 高亮与文档翻译表同步。
-
-中文标识符（本次批次）：
-
-- [x] 用户标识符支持中文等 Unicode 字母：计分变量、函数、查询、物品、存储、数据槽、目标、谓词资源、进度、函数标签、参数与局部变量都可直接写中文；ASCII 名仍必须小写，长度限制改为 32 个字符，中英文关键词都是保留字。
-- [x] 编译期内部化（`compiler/rename.rs`）：语义检查之后、代码生成之前，非 ASCII 名字按稳定哈希换成 8 个随机小写字母的别名；同一份源码得到同一批别名，别名在整程序内唯一并避开所有保持原样的 ASCII 标识符与内部固定名，确保不与已有变量冲突；声明与引用共用一份遍历清单，诊断仍显示源码原名。
-- [x] 资源名（`resource`、`advancement`、`fn_tag`）同样接受中文标识符，输出为随机 ASCII 文件名；`advancement` 的准则名也参与内部化。
-- [x] 语料：`tests/valid/chinese_identifiers` 覆盖全部标识符位置与 ASCII 混用（重复构建逐字节一致）；`tests/invalid/chinese_identifiers.mcl` 覆盖中文保留字与大写 ASCII。
-- [x] `examples/beacon_base.mcl`：全中文标识符的信标基座检测示例——`placed_block` 进度监听放置泥土，奖励函数检查泥土下面一层的 3×3 `#minecraft:beacon_base_blocks`，符合则把泥土替换为信标；通过 `--deny-raw`。
-
-26.3 条件格式修复与触发器字段校验（本次批次）：
-
-- [x] 修复示例、语料与手册里的战利品条件判别键：26.3 把内联战利品条件的判别键从 `condition` 改成 `type`，`conditions` 与 `resource predicate` 里的旧写法会让原版加载进度时报 `Failed to parse`（`Caused by: No key type in MapLike[...]`）。涉及 `examples/beacon_base.mcl`、`examples/portal.mcl`、`examples/multi_counter/resources.mcl`、`examples/bounty_hunter/quests.mcl`、`tests/valid/{advancement,chinese_identifiers,conditions,entities}`、`tests/dual/{en,zh}` 与手册示例；实测依据为 NeoForge 26.3 客户端日志（`RegistryDataLoader` 报 `Errors in element bounty_hunter:kill_*`），修复后对照原版 `data/minecraft/advancement/**` 与 `data/minecraft/predicate/**` 逐项核对。
-- [x] 触发器字段快照：`cargo xtask generate-version-data` 新增 `advancement_triggers.json`，从 `CriteriaTriggers.java` 的注册调用与各触发器 `TriggerInstance` 的 `RecordCodecBuilder` 提取条件字段名与粗类型（战利品条件、物品谓词、id/列表、状态属性、范围等）；只扫描 `TriggerInstance` 自己的 CODEC 区域，不把嵌套记录（如 `Slots`）的字段混进来。
-- [x] 编译期校验：`conditions` 的字段名必须属于该触发器（未知字段给出最近候选或可用字段表），战利品条件字段需要谓词资源字符串或带 `type` 的内联条件对象（用旧 `condition` 键时给出针对性诊断）；`resource predicate` 正文必须包含 `type`。
-- [x] 语料：`tests/valid/advancement` 增加 26.3 格式的击杀条件；新增 `tests/invalid/advancement_conditions.mcl`（旧 `condition`、缺 `type`、未知字段、旧式谓词资源四类负例）。
-- [x] `examples/bounty_hunter/`：10 条进度、6 个击杀任务、连杀衰减、三段里程碑与首富播报的「重复型」示例，修复后重新构建并逐项核对产物。
-
-模块系统与循环（本次批次）：
-
-- [x] `import`/`export` 模块系统：`main.mcl` 入口 + 可达图、可选 `namespace`、默认私有 + `export`、整模块 / 选择性 / 别名导入、`mod.mcl` 目录模块、导入环；`name_walk` 统一声明与引用的遍历，模块解析（`src/modules.rs`）先建作用域再改写限定名，最后合并成整程序。
-- [x] 产物布局与兼容：函数 / 资源 / 进度 / 函数标签的限定名用 `/`，直接落到 `data/<命名空间>/<类型>/<模块路径>/...`；计分类名字用 `.`；入口模块保持原名，模块系统不改变单文件项目的函数路径与命名。
-- [x] 诊断：找不到模块（预期文件路径）、选择性导入缺名字（最近候选）、未公开、导入冲突、命名空间不一致、非法模块路径分段；未导入的引用在「找不到函数」等消息里附导入/公开提示。
-- [x] 语料与示例：`tests/valid/modules`（整模块/选择性/别名/目录模块/导入环/跨模块资源、目标、物品、进度、函数标签）、`tests/valid/loops`、`tests/invalid/modules_{missing,private,conflict,unknown_import}`、`tests/invalid/loops.mcl`、`namespace_mismatch` 改为模块项目、`tests/dual` 增加 `helpers.mcl` 与循环、`examples/module_demo`；`tests/corpus.rs` 新增模块产物布局与重复构建一致性断言，invalid 语料改为逐文件 / 逐项目检查。
-- [x] `for <变量> in <起点>..<终点>`（半开区间、表达式边界、常量上限直接比较、空区间消除）与 `break`/`continue`（仅 `for`/`while`，每层循环一个状态计分项）；`if`/`while` 常量条件折叠。
-- [x] 手册：新增「程序结构与模块」「模块与导入」「控制流」重写，`examples/module_demo` 纳入文档构建的双语往返验证；VSCode 语法高亮与 LSP 关键词悬停同步。
-- [x] 修复：模块合并顺序从 `HashSet` 迭代改为 BFS 顺序，消除重复构建的产物差异。
-
-## 三、路线图
+## 三、路线图（未完成）
 
 实施约定：
 
@@ -281,68 +193,38 @@
 - 资源位置、注册表 id、槽位名、枚举与命令权限一律来自版本数据，不凭记忆。
 - 每个阶段结束时：`cargo fmt`、`cargo clippy --all-targets` 零警告；`tests/valid` 语料全部编译通过并核对产物、`tests/invalid` 语料全部被拒绝；`examples/` 至少一个项目通过 `--deny-raw`；同步 `docs/` 下的语言手册（正文 `docs/content/manual.md`，用 `bun docs/tools/build.mjs --self-test` 重新生成并验证）。
 
-### 第 1 阶段：类型系统与版本数据（基础设施）
+### 阶段 1：类型系统与版本数据（基础设施）
 
-- [x] 1.1 版本数据生成器（`cargo xtask generate-version-data`）
-  - 解析 `minecraft_client_26.3-rc-2/` 的 Brigadier 注册（`commands/Commands.java` 与 `server/commands/**`），导出根命令、字面量子命令、重定向、参数类型与 `requires` 权限等级到 `data/version/26.3-rc-2/commands.json`；当前覆盖 101 个根命令，动态构建的子树（`gamerule`、`time` 的时钟子命令等）以一级清单近似。
-  - 从注册表引导代码与 `data/minecraft/**` 导出 id 集合：item、block、entity_type、biome、dimension、damage_type、mob_effect、enchantment、attribute、particle、sound、advancement、recipe、loot_table、predicate、dialog、post_effect、timeline、world_clock、slot、slot_source、worldgen/* 等；同时导出标签注册表清单（16 个顶层注册表与子目录）与数据包资源目录清单（`resource_kinds`）。
-  - 导出枚举表：gamemode、difficulty、display slot、team color、heightmap、anchor、swizzle、声音分类、时间单位、物品槽位。
-  - 输出排序且带 FNV-1a 源摘要，可复现；`cargo xtask check-version-data` 比对快照与随附源码，`tests/corpus.rs` 在每次 `cargo test` 时执行该校验。
-  - 编译器加载快照：资源位置校验从“语法合法”升级为“注册表存在”，未知 id 报错并给出最近候选；`resource` 支持类型改为读取快照。
-  - 待补：动态构建子树的完整树形（`gamerule` 由运行期注册表生成，无法静态枚举）、从 `InventoryMenu`/`SlotRanges` 导出的槽位范围已收录，`slot_source` 无原版条目。
-- [x] 1.2 坐标与向量类型：`pos`（绝对、`~`、`^`）与别名 `block_pos`（绝对整数），`vec3(x, y, z)` 精确坐标（`teleport` 落点）、`vec2(x, z)` 水平精确坐标（`worldborder.center`）、`rotation(yaw, pitch)` 朝向（`teleport` 第三参数）；绝对分量范围、`^` 混用与 `vec2` 的局部坐标拒绝都在编译期检查。
-  - 待补：`xyz` 对齐值属于 `execute align`（2.1），随该阶段一起落地；`~`/`^` 所需的执行位置与朝向上下文在 2.1 的结构化 `execute` 中统一建模。
-- [x] 1.3 文本组件类型：`text("...") { color/bold/italic/underlined/strikethrough/obfuscated }`，以及 `translate`（含 `[参数...]`）、`keybind`、`score`、`selector`、`nbt`（entity/block/storage）与五种 click 事件（`open_url`/`run_command`/`suggest_command`/`copy_to_clipboard`/`change_page`）、`show_text` 悬停；中英文关键词与样式属性，JSON 序列化统一在 `codegen/components.rs`，输出稳定（键排序）。`score` 的目标支持已声明 `objective`（生成 `<命名空间>_<名称>`）或运行期字符串；`nbt` 路径支持下标与引号键。
-- [x] 1.4 结构化 NBT 与路径
-  - [x] `nbt { ... }` 复合字面量：全部 12 种标签类型（数值后缀、字符串、list、嵌套 compound、`[B;]`/`[I;]`/`[L;]` 数组）；解析期范围、数组元素类型与重复键检查；SNBT 输出集中在 `emit::nbt_text`；已接入 `set_block`/`fill` 的方块实体数据与 `item_stack` 的 `custom_data`。
-  - [x] 实体具名标签：`nbt { ... }` 语句生成 `data merge entity @s {...}`；`data/version/26.3-rc-2/entity_nbt.json` 快照（`cargo xtask generate-version-data` 生成，重跑生成器与源码比对）提供按实体类型/并集的键存在性与粗类型检查，未知键给出最近候选；常用标签支持中文别名（125 个，手动附录 E）。方块实体键校验、`ConversionTracker` 这类动态键仍待补。
-  - [x] 绑定访问器的类型化路径：数据槽路径升级为完整 NBT 路径语法（点分键、`[下标]`、引号键），`data` 命令提供 entity/block/storage 三类目标的类型化读写（见 2.4）。
-  - [ ] 原版 SNBT 的其余字面量记法未建模，除表现力无损失：十六进制 `0x`/二进制 `0b` 与下划线分隔（等值十进制可表达）、无符号前缀 `ub`/`us`/`ui`/`ul`（等价于补码负数）、无引号字符串（语言要求引号，输出统一加引号）。
-  - [x] `data` 命令的 get/merge/remove/modify 与 storage/block 目标已随 2.4 落地。
-- [x] 1.5 命令结果表达式：`count(q)`、`data.get(entity/block/storage, 路径)`、`random(1, 6)`、`compute(来源, float|integer, provider[, 缩放])` 与既有 `xp.query(...)`、`stopwatch.query(...)` 等经 `execute store result score` 落入计分，参与现有算术与条件系统。`random` 区间与 `compute` provider 在编译期对照注册表检查。
-- [x] 1.6 函数权限模型：`run`/`return run` 字符串的根命令对照 `commands.json` 校验，固定按 `GAMEMASTER`（2）拒绝越级的 `ADMIN`/`OWNER` 命令并解释权限缺口。结构化语句的权限等级在 7.8 引入越级命令时接入同一机制。
+已完成：1.1–1.6 的主体（记录见 §四），余下为说明性待补。
 
-### 第 2 阶段：补齐现有结构化能力
+剩余：
 
-- [x] 2.1 `execute` 结构化子句与 store
-  - 修饰符：`execute as(q) at(q) positioned(pos) rotated(rot) facing(entity, eyes|feet) align(xyz) anchored(eyes|feet) in("dimension") on(relation) summon("id") { ... }`；重复或冲突的子句编译期报错。
-  - 条件：`execute if/unless <条件> { ... }` 复用 2.2 的条件实现。
-  - store：`store.result(...)`、`store.success(...)`、`store.data(...)`；结果表达式（1.5）隐式生成。
-  - 落地说明：修饰符按书写顺序下降为真实 `execute` 链；条件在修饰符建立的上下文里求值为标志后进入块体；store 链包裹块内最后一条命令（多个 store 可叠加），控制结构尾部与无返回值函数调用会编译报错；`on` 需要实体上下文并放宽为任意实体，`summon` 推导实体类型与 NBT 校验上下文；旧字符串子句仍可用。
-- [x] 2.2 条件族扩展：`if block(pos, block)`、`if blocks(...)`、`if biome(...)`、`if dimension(...)`、`if loaded(pos)`、`if entity(q)`、`if data(...)`、`if items(...)`、`if slots(...)`、`if function(f)`、`if stopwatch(...)`；沿用“原子冻结到临时计分项再组合”的求值策略，保证一次求值与确定顺序。槽位来源在编译期对照 26.3 `SlotRanges` 快照校验，函数条件计入同步调用图递归检查。
-- [x] 2.3 实体查询属性扩展：`type("#tag")` 与否定（`without_type`）、`name`、`scores`、`nbt`、坐标盒 `box` 与 `distance`（与 `within` 取交集合并）、`level`、`gamemode`、`team`、`rotate`、`predicate`、`advancements`；物品谓词支持完整组件文本（`id[...]`）与任意槽位（对照 `SlotRanges` 与 `slot_source` 资源位置）。
-- [x] 2.4 `data` 完整建模：`data.get`（结果表达式）、`data.merge`、`data.remove`、`data.modify`（insert/prepend/append/set/merge）与四种来源（from/string/value/compute）；entity/block/storage 三类目标；实体目标沿用非玩家写保护。
-- [x] 2.5 `item` 完整建模：`item.replace/fill/override/modify`，实体（`limit(1)`）与方块目标、任意槽位（槽位名或 `slot_source` 资源位置）、`with` 引用已声明物品、`from` 跨容器复制与可选修饰器。
-- [x] 2.6 用户计分板：`objective` 声明支持 criteria、显示名（文本组件）、渲染类型（integer/hearts）、数字格式（blank/fixed/styled）与显示槽；`scoreboard.enable/operation/display` 覆盖 `players` 的剩余常用子命令；与内部 ABI objective 隔离。
-- [x] 2.7 消息组件化：`message.all/self/nearest/player` 接受 1.3 的文本组件；纯字符串与末尾颜色参数保留为旧写法；`message.player(<查询>, <组件>)` 新增。
-- [x] 2.8 声音完整参数：`sound.play(sound, source, targets, pos, volume, pitch, min_volume)`，可选参数按原版顺序补齐，保留 `sound.self` 简写。
-- [x] 2.9 `spawn` 完整化：`spawn("id", pos|vec3) { nbt { ... } ... }`；继续拒绝 `noSummon` 类型。初始 NBT 已落地（spawn 体内 `nbt { ... }` → `data merge entity @s`）。
-- [x] 2.10 `function`/`schedule`/`return` 收尾：`#tag` 调用与函数标签声明（9.2）、浮点时间、`schedule.clear`、`return fail`、`return run`；宏参数进阶见 8.3。
+- [ ] 1.1 动态生成的子命令树无法静态枚举（`gamerule` 由运行期注册表构建、`time` 的时钟子命令来自数据驱动），命令快照只能以一级清单近似；`slot_source` 没有原版条目。
+- [ ] 1.4 SNBT 的其余字面量记法：十六进制 `0x`/二进制 `0b` 与下划线分隔、无符号前缀 `ub`/`us`/`ui`/`ul`、无引号字符串。这些写法都有等值替代，属于表现力无损的扩展。
+- [ ] 1.4 动态命名的实体键（`ConversionTracker` 这类由构造参数生成，如 Player 的 `foodData`）与方块实体 NBT 的键校验。
 
-### 第 3 阶段：世界与方块命令族
+### 阶段 2：补齐现有结构化能力
 
-- [x] 3.1 方块状态值：`block_state("minecraft:oak_stairs") { facing = "east"; }`，属性值在编译期检查字符集并拒绝重复声明；`#` 标签谓词用于过滤器。方块实体 `nbt { ... }` 已随 1.4 落地。
-- [x] 3.2 `set_block(pos, block_state[, mode][, nbt { ... }])`，mode 为 `destroy`/`keep`/`replace`/`strict`；方块实体数据写在方块状态之后。
-- [x] 3.3 `fill(from, to, block_state[, mode][, replace filter][, nbt { ... }])`，模式含 `outline`/`hollow`/`destroy`/`strict`；`nbt` 可出现在任意可选参数位置。
-- [x] 3.4 `clone(...)`：同维度与跨维度、`masked`/`filtered`、`force`/`move`/`normal`、`strict`；选项顺序无关，重复报错。
-- [x] 3.5 `fill_biome(from, to, biome [, replace filter])`；过滤器接受 `#` 生物群系标签。
-- [x] 3.6 `place.feature/jigsaw/structure/template(...)`，含 rotation、mirror、integrity、seed、strict；feature 的内联 JSON 未建模。
-- [x] 3.7 `forceload.add/remove/remove_all/query`，绝对范围检查 256 区块上限。
-- [x] 3.8 `time.set/add/pause/resume/rate` 与表达式 `time.query([clock])`、`time.query_gametime()`；时钟以可选参数写在方法调用末尾，生成 `time of <clock> ...`。
-- [x] 3.9 `weather.clear/rain/thunder(duration)`，持续时间按 `TimeArgument` 换算并拒绝不足 1 刻。
-- [x] 3.10 `gamerule.set(name, value)` 与表达式 `gamerule.query(name) -> score`；规则名与值类型对照 26.3 `GameRules` 的静态表（1.1 快照落地前的手工版本）。
-- [x] 3.11 `worldborder.add/set/center/damage_amount/damage_buffer/warning_distance/warning_time` 与表达式 `worldborder.get()`。
-- [x] 3.12 `locate.structure/biome/poi`（仅日志反馈，目标接受 `#` 标签）。
+全部完成（2.1–2.10，记录见 §四），无剩余。
 
-### 第 4 阶段：实体与玩家命令族
+### 阶段 3：世界与方块命令族
 
-- [x] 4.1 `effect.give(targets, effect, seconds[, amplifier][, hide_particles])`、`effect.give_infinite(...)`、`effect.clear(targets[, effect])`；秒数与等级按 26.3 的 `EffectCommands` 范围检查。
+已完成：3.1–3.12 的主体（记录见 §四），3.6 还剩内联 JSON。
+
+剩余：
+
+- [ ] 3.6 `place.feature` 的内联 feature JSON 未建模。
+
+### 阶段 4：实体与玩家命令族
+
+已完成：4.1、4.3、4.4（记录见 §四）。
+
+剩余：
+
 - [ ] 4.2 `enchant(targets, enchantment[, level])`。
-- [x] 4.3 `xp.add`/`xp.set`（points/levels）与 `xp.query` 结果表达式。
-- [x] 4.4 `clear(targets[, item_filter][, max_count])`；目标为玩家查询，数量上限 2147483647。
 - [ ] 4.5 `damage(target, amount[, damage_type][, at pos | by entity [from cause]])`；枚举 damage_type 来自注册表。
 - [ ] 4.6 `attribute` 全子命令：`get`、`base set/get/reset`、`modifier add/remove/value get`。
-- [ ] 4.7 `teleport(targets, pos[, rotation][, facing ...])` 与 `teleport(targets, entity)`；`tp` 为中文 `传送` 的英文别名。
+- [ ] 4.7 `teleport` 收尾：`facing` 与朝向变体（已有的 `pos`/`vec3`、`rotation` 与单个实体查询见 §四）。
 - [ ] 4.8 `ride.mount(target, vehicle)`、`ride.dismount(target)`。
 - [ ] 4.9 `rotate.to(target, rotation)`、`rotate.facing(target, ...)`。
 - [ ] 4.10 `spreadplayers(center, spread, max_range, respect_teams, targets)` 与 `under` 变体。
@@ -355,115 +237,191 @@
 - [ ] 4.17 `team` 全子命令，成员参数接受查询或玩家选择器。
 - [ ] 4.18 `waypoint.list/modify.color/modify.style`。
 
-### 第 5 阶段：物品、战利品与进度
+### 阶段 5：物品、战利品与进度
+
+已完成：5.3（记录见 §四）。
+
+剩余：
 
 - [ ] 5.1 `loot` 全形态：上下文来源（loot table、fish、kill、mine）与投放目标（`give`、`insert`、`replace`、`spawn`）。
 - [ ] 5.2 `slot_source` 声明与 `item` 联动，替代 `give(..., self.item)` 中的内建空槽来源。
-- [x] 5.3 `advancement.grant/revoke`：`only`（含 criterion）、`from`、`until`、`through`、`everything`。
 - [ ] 5.4 `recipe.give/take`（含 `*`）。
-- [ ] 5.5 `clear` 与 `give` 使用 2.3 的完整物品谓词。
+- [ ] 5.5 `clear` 与 `give` 使用完整的物品谓词（实体查询声明中的 `id[...]` 与槽位来源，见 §四）。
 
-### 第 6 阶段：界面与感官
+### 阶段 6：界面与感官
 
-- [ ] 6.1 `title.title/subtitle/actionbar/times/clear/reset`，组件使用 1.3 类型。
+已完成：6.5（随 §四 的 sound 完整参数落地）。
+
+剩余：
+
+- [ ] 6.1 `title.title/subtitle/actionbar/times/clear/reset`，组件使用 §四 的文本组件类型。
 - [ ] 6.2 `bossbar.add/remove/list/set.name/set.color/set.style/set.value/set.max/set.visible/set.players/get`。
 - [ ] 6.3 `dialog.show/clear`，配合 `resource dialog`。
 - [ ] 6.4 `particle(name, pos, delta, speed, count, mode, viewers)`。
-- [ ] 6.5 `playsound` 全参数（在 2.8 基础上补 min_volume 与多目标）。
 - [ ] 6.6 `stopsound(targets[, source][, sound])`。
 - [ ] 6.7 `posteffect.add/clear/list/remove`。
-- [ ] 6.8 `msg`/`teammsg`（低优先，聊天类型命令；`message` 已覆盖常用广播，`emote` 保持不建模）。
+- [ ] 6.8 `msg`/`teammsg`（低优先；`say`/`emote` 已归入等价覆盖）。
 
-### 第 7 阶段：服务器数据与工具
+### 阶段 7：服务器数据与工具
 
-- [ ] 7.1 `random`：`random(1, 6)` 结果表达式、`random.roll`、`random.reset`（sequence 参数受等级限制）。
-- [x] 7.2 `stopwatch.create/query/restart/remove`，query 提供结果表达式。
-- [ ] 7.3 `compute`：default/block/entity 上下文 + float/integer provider。
+已完成：7.2、7.3（记录见 §四）。
+
+剩余：
+
+- [ ] 7.1 `random.roll`/`random.reset`（`random(1, 6)` 结果表达式已完成；sequence 参数受等级限制）。
 - [ ] 7.4 `reload()`、`datapack.enable/disable/list`。
-- [ ] 7.5 `list`、`seed`、`version`、`help`：只读反馈，明确不建模或提供只写日志的语句。
-- [ ] 7.6 `fetchprofile`：工具类，按需提供；`serverpack` 仅在开发构建注册，不进入标准层。
-- [ ] 7.7 `test`：gametest 工具链保持不建模，需要时通过 `run` 在开发构建中使用。
+- [ ] 7.5 `list`：只读反馈，低优先；`seed`/`version`/`help` 归入只读反馈状态，不提供结构化入口，需要时用 `run`（计入 `--deny-raw`）。
+- [ ] 7.6 `fetchprofile`：只读反馈，暂不提供结构化入口；`serverpack` 归入仅开发构建，不进入标准层。
+- [ ] 7.7 `test`：归入测试工具，不提供结构化入口，需要时在开发构建中用 `run`。
 - [ ] 7.8 越级命令策略：`tick`、`debug`、`jfr`、`kick` 等 ADMIN/OWNER 命令在固定的 GAMEMASTER 等级下不可达，不提供结构化入口，只在校验诊断中说明权限缺口。
 
-### 第 8 阶段：语言与工具体验
+### 阶段 8：语言与工具体验
 
-- [x] 8.1 模块/import 系统，替代“同命名空间多文件”的项目模型。
-  - 每个 `.mcl` 文件是一个模块，模块路径是相对项目根目录的路径：`lib/math.mcl` 与 `lib/math/mod.mcl` 都是 `lib/math`；目录输入以 `main.mcl` 为入口，沿 `import` 边加载，入口不可达的 `.mcl` 文件不参与编译。
-  - `namespace` 只在入口模块必需；其他模块省略则继承入口，写了必须与入口一致。顶层声明默认私有，`export` 之后才能被导入；`import lib::math;`、`import lib::{sum, product as mul};`；入口也可以用 `import main;` 被其他模块导入，互相引用（导入环）合法。
-  - 限定名重写：函数、JSON 资源、进度与函数标签用 `模块/名称`（直接映射到 `data/<命名空间>/<类型>/<模块路径>`），计分变量/目标/查询/物品/存储/数据槽用 `模块.名称`（计分板假玩家与目标名不能含 `/`）；入口模块保持原名，模块系统不改变单文件项目的函数路径与命名。
-  - 编译期诊断：找不到模块（给出预期文件路径）、选择性导入不存在的名字（附最近候选）、导入未公开的名字、导入名字冲突、命名空间不一致、模块路径分段非法（关键词 / Windows 保留名 / `__mcl` 前缀）；同名私有声明在不同模块互不冲突，导入与局部同名时局部优先。
-  - 工具链：`name_walk` 成为声明与引用位置的唯一遍历（`rename` 与模块解析共用）；LSP `analyze` 按最近的 `main.mcl` 分组项目；VSCode 语法高亮与 LSP 悬停加入 `import`/`export`/`as`；文档构建工具分别按文件与目录验证示例。
-  - 确定性：模块合并按 BFS 顺序，`builds_are_reproducible` 断言重复构建逐字节一致。
-  - 待补：未导入引用的诊断目前复用「找不到 X」并附导入提示，尚未在符号表里标记“存在但未公开”的候选；不支持包管理、条件导入或跨项目共享模块。
-- [x] 8.2 `for`、`break`/`continue` 与更强的控制流优化。
-  - `for <变量> in <起点>..<终点> { ... }`：半开区间，起止都是表达式；常量终点生成 `matches ..N` 比较，动态终点只求值一次并存入循环上限计分项；常量空区间不生成命令；循环变量是循环体内的局部计分项，兄弟循环可以复用，与参数 / `let` / 全局计分变量重名报错。
-  - `break`/`continue` 只允许出现在 `for`/`while` 内（`each`/`spawn` 会明确报错）；每层循环持有一个状态计分项（1 = continue，2 = break），循环体内可能设置状态的语句之后插入 `execute unless score <state> matches 0 run return 0`，跳转最多影响一层循环。
-  - 优化：`if`/`while` 常量条件按三值逻辑折叠（含 `!`/`&&`/`||` 短路）；`if 1 == 1` 直接展开分支、不分配标志与辅助函数；`while 0 == 1` 与空区间 `for` 完全不生成命令；`while` 改为循环辅助函数每轮求值一次条件并主动调用循环体。
-  - 待补：循环不变量外提、小常量区间展开（unroll）、条件与循环体合并等更强优化未列入计划。
+已完成：8.1、8.2；8.6 的 LSP 与 VSCode 基础（记录见 §四）。
+
+剩余：
+
+- [ ] 8.1 收尾：未导入引用的诊断仍复用「找不到 X」并附导入提示，尚未在符号表标记“存在但未公开”的候选；不支持包管理、条件导入或跨项目共享模块。
 - [ ] 8.3 函数宏高级调用：`function <fn> with <source>` 与 `$(key)` 宏参数，用于文本、坐标与 NBT 动态参数。
   - **评估结论：可以实现，运行时不需要新 ABI，但必须限制类型与调用面。** 26.3 的宏函数就是普通 `.mcfunction`，正文里的 `$(键)` 在调用时做文本替换；调用形式是 `function <fn> {键: "值"}`、`function <fn> with entity <选择器> <路径>`、`with block`、`with storage`。编译器可以把宏参数建模成一种新的形参类别（文本、坐标分量、NBT 片段、整数的十进制文本），在 `run` 字符串、方块 id、坐标、`text()`、`selector()` 等允许动态值的位置写 `$(参数名)`，代码生成时原样写进产物，并把该函数标记为宏函数。
   - 静态检查能覆盖：模板里每个 `$(键)` 都有同名参数、参数表里的每个参数都被使用、同一文件里 `$(...)` 的键名集合一致（宏函数的键在运行期由调用点提供，缺键会在原版加载时报错，因此调用点必须列全）；`with` 的路径语法、目标实体上下文；普通 `call`/`schedule`/`fn_tag` 引用宏函数报错，宏函数形参表不能与计分参数混用。
   - 无法覆盖：替换文本本身。调用点若提供的是运行期表达式（计分变量、NBT 读值），编译器只能退化为“任意文本”，无法保证替换后仍是合法命令；建议这类调用单独统计（计入 `--deny-raw` 的“不安全宏”计数）并在手册里明确标注。
   - 主要技术风险：`with` 的运行期 NBT 只能检查路径与实体类型；宏函数不能返回 score（返回值语义与原生命令一致，需要单独设计）；双语言产物仍可保证逐字节一致，但与手写 `.mcfunction` 没有等价对照，只能用“同一实参 → 同一产物”的回归测试。
-  - 工作量：与 8.1 同量级（解析 + 模板校验 + 调用点代码生成 + 语料与文档），约 800–1200 行改动；建议在 8.1/8.2 的语料与文档稳定后再排期。
-
-- [ ] 8.4 静态命令校验与补全：用 1.1 命令树校验 `run` 字符串的根命令、参数形状与权限等级，在编译期报告不可能加载的命令。
+  - 工作量：与 8.1 同量级（解析 + 模板校验 + 调用点代码生成 + 语料与文档），约 800–1200 行改动。
+- [ ] 8.4 静态命令校验与补全：现有 `run` 校验只覆盖根命令与权限，剩余参数形状校验与补全（结合 1.1 的命令树）。
 - [ ] 8.5 增量构建与源映射：只重建受影响函数，产物与源码行对应。
-- [ ] 8.6 语言服务器与编辑器集成：补全、悬停、跳转、格式化、即时诊断。
-  - [x] `mclang lsp` 语言服务器：UTF-16 位置换算、全文同步、项目级即时诊断、声明与关键词补全（`@`/`#` 上下文）、关键词与声明悬停、跨文件跳转；`analysis::analyze` 提供结构化诊断与符号表。
-  - [x] VSCode 插件 `editors/vscode`：TextMate 语法高亮（中英文关键词表与解析器同步）、语言配置、按 `mclang.server.path`/`target/(release|debug)`/`PATH` 解析可执行文件的语言客户端。
-  - [ ] 剩余：文档格式化、代码操作（快速修复）、点号成员（`self.*`、`effect.*` 等）补全与语义高亮；实体 NBT 键按上下文补全/悬停（依赖 `version::entity_nbt` 快照）。
-- [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收。`docs/index.html` 单页手册（`docs/content/manual.md` + `docs/tools/`）已覆盖声明、语句、世界命令、表达式、编译产物、双语关键词与函数标签、`effect`/`xp`/`clear`、`return fail`/`run`、`schedule.clear` 等章节，示例由真实编译器验证；后续新增能力仍需同步该手册。
+- [ ] 8.6 语言服务器剩余：文档格式化、代码操作（快速修复）、点号成员（`self.*`、`effect.*` 等）补全与语义高亮；实体 NBT 键按上下文补全/悬停。
+- [ ] 8.7 文档与示例：每个阶段同步 `docs/` 与 `examples/`，保持 `--deny-raw` 端到端验收（持续事项）。
 - [ ] 8.8 标准库与内建表达式：随编译器分发一批 Mclang 源码库，并把最热的原语做成内建表达式。
   - **定位**：标准库是「随编译器分发的 Mclang 源码库」，不是运行时黑盒。库源码用 Mclang 写、与用户代码走同一套检查与产物路径，因此 `--deny-raw`、双语逐字节一致、模块可达性裁剪（导入才编译）都自动适用；它不改变本文件开头的标准层判定准则，只是把已有能力组织成可复用、可版本化的模块。
   - **批 0 内建表达式（不占函数、不走 ABI）**：`min(a, b)`、`max(a, b)`、`abs(a)`、`clamp(value, low, high)` 编译为内联计分板命令（复制到临时项 + 条件赋值），与 `random(a, b)` 同属表达式层，参与现有算术与条件。理由：库函数每次调用要付一次 function 调用与每实参 1–2 条绑定命令，热路径原语必须内联；后续按真实需求增补（如 `sign`），不做无边界扩张。
   - **批 1 纯整数与上下文服务（8.8 机制就绪即可做，不依赖 8.3）**：`std::math`（gcd、整数 pow、isqrt、shl/shr、lerp、min3/max3；纯参数函数，不持有状态）、`std::timers`（`@player` 冷却与间隔计时，库自持限定名 objective，例如 `std.timers.expiry` → `<命名空间>_std.timers.expiry`）。注意计分参数是按值传递的，所以「交换两个外部计分项」这类操作不放进库（调用方用 `let` 临时量即可）。
-  - **批 2 参数化与命令面补齐后（依赖 8.3 与第 4–6 阶段）**：`std::storage`（栈/队列/列表；storage id 由宏参数传入，避免固定命名空间跨包冲突）、`std::item`/`std::inventory`（安全给予、空槽查找、容器搬运，依赖 2.5 与 5.x）、`std::text`（消息/标题/动作栏模板，依赖 6.1–6.3）、`std::team`/`std::damage`/`std::world` 按第 4–6 阶段落地情况增补。
+  - **批 2 参数化与命令面补齐后（依赖 8.3 与第 4–6 阶段）**：`std::storage`（栈/队列/列表；storage id 由宏参数传入，避免固定命名空间跨包冲突）、`std::item`/`std::inventory`（安全给予、空槽查找、容器搬运，依赖 §四 的 `item` 建模与 5.x）、`std::text`（消息/标题/动作栏模板，依赖 6.1–6.3）、`std::team`/`std::damage`/`std::world` 按第 4–6 阶段落地情况增补。
   - **机制**：保留导入根 `std`（与入口别名 `main` 同级）：`import std::math;`；库源码随编译器嵌入（仓库 `stdlib/` + 构建期生成 `include_str!` 清单），`--lib <目录>` 可覆盖或扩展，项目内同名 `std/...` 模块优先（便于 fork 或整体替换）。
   - **约束**：库模块禁止自动副作用——不能声明 `@load`/`@tick`，也不能声明 `advancement`（导入即注册事件）；`@player`/`@non_player` 这类只描述调用上下文、由用户显式调用的函数允许。库自持状态一律走模块限定名；批 2 的 storage 交由调用方用宏参数传入。每个模块附独立语料，必须通过 `--deny-raw` 与双语/文档往返；模块头注释写明每条入口的命令数与函数调用成本，以及依赖的版本快照（26.3）。
   - **风险**：库膨胀与过度封装会放大数据包体积与命令链长度（每条入口写性能预算并实测）；版本漂移需要随 `data/version` 快照评审；导出面要保持小，配合选择性导入与 `as` 别名控制冲突。
   - **验收**：`import std::模块` 的最小项目通过 `--deny-raw`；同一调用重复构建逐字节一致；双语翻译产物一致；文档附录从库源码的导出清单自动生成，不手抄。
 
-### 第 9 阶段：数据包内容与资源 schema（非命令）
+### 阶段 9：数据包内容与资源 schema（非命令）
+
+已完成：9.2 的函数标签部分（`fn_tag`，记录见 §四）。
+
+剩余：
 
 - [ ] 9.1 `pack.mcmeta` 完整化：支持文本组件 `description`、`supported_formats` 范围、`overlays`（目录覆盖层）、`filters`（block/allow）、`features.enabled`（特性包）；字段取值来自 1.1 的版本元数据；可选 `pack.png` 图标。
-- [ ] 9.2 标签系统：`tag <注册表> <名称> { values = [...]; replace = 假; required = 真; }` 声明，覆盖 16 个标签注册表与子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等）；条目支持 `#tag` 嵌套、`required` 与 `replace` 语义。
-  - 函数标签：`fn_tag` 声明输出 `data/<ns>/tags/function/<名称>.json`，供 `function #ns:tag` 与 `schedule` 使用；条目支持本命名空间函数、嵌套 `#标签`、外部字符串资源位置与 `replace`，编译期检查引用与循环。`minecraft:load`/`tick` 的生成保留在编译器的内部机制中。
-  - 其他注册表标签：16 个顶层注册表与子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等）尚未建模，`required` 语义也只在函数标签的外部条目上默认保留原版行为。
+- [ ] 9.2 标签系统：`tag <注册表> <名称> { values = [...]; replace = 假; required = 真; }` 声明，覆盖 16 个标签注册表与子目录（`block/mineable`、`item/enchantable`、`item/sulfur_cube_archetype`、`banner_pattern/pattern_item`、`enchantment/exclusive_set`、`villager_trade/<职业>`、`worldgen/biome/has_structure` 等）；条目支持 `#tag` 嵌套、`required` 与 `replace` 语义。函数标签（`fn_tag`）已完成；16 个顶层注册表与子目录尚未建模，`required` 语义也只在函数标签的外部条目上默认保留原版行为。
   - 校验：注册表与条目 id 存在、嵌套标签可解析；默认拒绝写入 `minecraft:` 命名空间，需要时显式放开。
 - [ ] 9.3 资源 schema 化：把 raw JSON 升级为结构化声明，检查字段类型、枚举与未知字段；结构与原始 JSON 可共存，同类型同名称重复声明报错。
-  - 第一批：predicate 条件树、loot_table（pool/entry/condition/function）、item_modifier、advancement（criteria/requirements/display/rewards/parent）。
-    - advancement 已落地：`advancement` 声明含 `parent`/`criterion`（`trigger` + 原始 JSON `conditions`）/`requirements`/`reward`/`display`，触发器名与 26.3 `CriteriaTriggers` 对照，引用（父进度、奖励函数/战利品表/配方、图标）编译期检查；准则的条件树与原始 JSON 共存待做。
+  - 第一批：predicate 条件树、loot_table（pool/entry/condition/function）、item_modifier、advancement（criteria/requirements/display/rewards/parent）。advancement 已落地，准则的条件树待做。
   - 第二批：recipe（配方类型、展示、解锁）、enchantment、damage_type、dialog。
   - 第三批：其余动态注册表（timeline、world_clock、trade_set、villager_trade、trial_spawner、trim_material/pattern、变体与声音变体、test_environment/test_instance 等）。
 - [ ] 9.4 资源引用图：advancement 父级、loot table 与 entry、predicate、item modifier、dialog、tag、function、配方解锁等跨文件与跨命名空间引用解析，未解析引用在编译期报错；已建模类型之间不再依赖字符串。
 - [ ] 9.5 世界生成：按 biome → structure/structure_set → template_pool/processor_list → feature/placed_feature → noise/noise_settings/density_function/carver → dimension_type/world_preset/flat_level_generator_preset 的顺序补齐 schema 与引用校验。worldgen 是全量覆盖中最大的一块，允许按需推进，未建模类型继续使用原始 JSON。
-- [ ] 9.6 二进制 NBT 资源：`structure` 类型输出 `data/<ns>/structure/<名称>.nbt`（基于 1.4 的结构化 NBT 编码），供 `place template` 与结构方块使用。
+- [ ] 9.6 二进制 NBT 资源：`structure` 类型输出 `data/<ns>/structure/<名称>.nbt`（复用已完成的结构化 NBT 编码），供 `place template` 与结构方块使用。
 - [ ] 9.7 打包与分发：`--zip` 输出可直接放入 `datapacks/` 的压缩包；overlay 目录布局；包图标；输出结构与内置特性包对齐。
 - [ ] 9.8 版本迁移与多目标：pack format 升级时的资源与命令迁移报告；结合 1.1 快照支持多目标版本后端。
 
-### 依赖关系与验收
+## 四、已完成能力
 
-- 1.1 是全部注册表校验与补全数据的前提；1.2/1.4 是第 3、4、5 阶段的参数类型前提；1.3 支撑 2.7 与第 6 阶段；1.5 支撑 2.2、4.3、7.1–7.3。
-- 第 3 阶段已按上述形式落地：坐标与方块状态内联在语句参数中，资源位置只做语法检查；游戏规则使用对照 26.3 `GameRules` 的静态表。1.1 快照落地后应把方块、生物群系、结构、时钟与规则表升级为注册表校验；方块实体 NBT 与实体具名标签已随 1.4 落地（实体表由 `generate-version-data` 生成），`place.feature` 内联 JSON 仍等待 1.4 的值类型扩展。
-- 2.1/2.2 的 `execute` 与条件模型是第 3、4、5 阶段的世界/实体命令在非默认上下文中执行的前提。
+按领域归档；每项都通过对应语料与示例验证。§三 的条目完成后移动到这里。
+
+### 4.1 编译器、工具链与文档
+
+- **模块边界**：词法（`src/lexer.rs`）、语法树（`src/ast*`）、解析（`src/parser/`）、语义检查（`src/compiler/validate/`）、代码生成（`src/compiler/codegen/`）、命令行（`src/main.rs`）。
+- **诊断**：带文件名、行列与源码片段，一次返回全部错误；`src/analysis.rs` 为工具侧提供结构化诊断与符号表。
+- **产物**：`pack.mcmeta`、`.mcfunction` 与 load/tick 标签；`.mclang-manifest` 记录输出所有权，重建只清理自己生成的文件。
+- **命令**：`build`/`check` 支持单文件与递归项目目录，检查命名空间一致性。
+- **质量门槛**：`cargo fmt`、`cargo clippy --all-targets` 零警告；`tests/valid`、`tests/invalid` 编译语料；端到端示例。
+- **可复现**：`BTreeMap` 与稳定哈希；`tests/corpus.rs` 断言重复构建逐字节一致。
+- **文档**：`docs/content/manual.md` → `docs/index.html`，`bun docs/tools/build.mjs --self-test` 用真实编译器做双语往返验证。
+- **LSP 与编辑器**：`mclang lsp`（UTF-16 位置换算、全文同步、项目级即时诊断、声明与关键词补全、悬停、跨文件跳转）；VSCode 插件（TextMate 高亮、语言配置、按 `mclang.server.path`/`target/`/`PATH` 解析可执行文件）。
+
+### 4.2 语言核心与类型系统
+
+- **双语关键词**：任意结构都有中英写法、同文件可混用、关键词表单一来源（`src/parser/keywords.rs`）、两种写法产物逐字节一致；中英关键词互为保留字。
+- **中文标识符**：声明名支持 Unicode 字母；编译期按稳定哈希换成 8 个小写字母别名（`compiler/rename.rs`），整程序唯一、避开 ASCII 标识符与内部固定名；`resource`/`advancement`/`fn_tag` 与准则名同样处理；诊断显示源码原名。
+- **控制流**：`if`/`while`（常量条件三值折叠、`!`/`&&`/`||` 短路）、`for <变量> in <起点>..<终点>`（半开区间、动态终点只求值一次、空区间不生成命令）、`break`/`continue`（每层循环一个状态计分项，`each`/`spawn` 内报错）。更强的优化（循环不变量外提、小常量区间展开、条件与循环体合并）明确不列入当前计划。
+- **函数与调用**：参数、score 返回值、`let` 词法局部量、稳定假玩家命名、同步调用图递归拒绝。
+- **`--deny-raw`**：递归拒绝 `run`、字符串 `execute` 与 `return run`；`examples/portable_chest` 零底层命令验收。
+- **坐标与向量**：`pos(x, y, z)`、`column(x, z)`（绝对/`~`/`^`，`^` 不可与其它写法混用，绝对分量检查世界范围与 256 区块上限）、`vec3`（`teleport` 落点）、`vec2`（`worldborder.center`）、`rotation(yaw, pitch)`。
+- **方块状态**：`block_state("id") { 属性 = "值"; }`，属性字符集、重复声明与 `#` 标签谓词的使用位置在编译期检查。
+- **文本组件**：`text`/`translate`（含参数）/`keybind`/`score`/`selector`/`nbt`（entity/block/storage），五种 click 事件与 `show_text` 悬停；`codegen/components.rs` 稳定序列化。
+- **实体查询**：`type("#标签")`/`without_type`、`name`、`scores`、`nbt`、坐标盒 `box`、`distance`（与 `within` 取交）、`level`、`gamemode`、`team`、`rotate`、`predicate`、`advancements`；物品谓词支持完整组件文本（`id[...]`）与任意槽位（对照 `SlotRanges` 与 `slot_source`）。
+- **结构化 NBT**：`nbt { ... }` 覆盖 26.3 SNBT 的全部 12 种标签类型（`1b`/`1s`/`1`/`1L`/`1.5f`/`1.5d`、字符串、列表、嵌套复合、`[B;]`/`[I;]`/`[L;]`），解析期检查数值范围、单精度可表示性、数组元素后缀与重复键，`emit::nbt_text` 规范化输出；已接入 `set_block`/`fill` 的方块实体数据与 `item_stack` 的 `custom_data`。注意：`s`/`d` 紧贴数字时按 NBT 后缀解析，时间单位需要空格或逗号（`1 s`）。
+- **模块系统**：`main.mcl` 入口 + 可达图、可选 `namespace`、默认私有 + `export`、整模块/选择性/别名导入、`mod.mcl` 目录模块、导入环；限定名重写（函数/资源/进度/标签用 `模块/名称`，计分变量/目标/查询/物品/存储/数据槽用 `模块.名称`）；诊断覆盖找不到模块（给出预期路径）、未公开、冲突、命名空间不一致、非法路径分段；合并按 BFS 顺序，重复构建一致。
+
+### 4.3 执行模型与条件
+
+- **四态上下文**（无 / 任意实体 / 非玩家实体 / 玩家）与 `@load`/`@tick`/`@entity`/`@non_player`/`@player`；`data` 类操作只允许非玩家实体。
+- **结构化 `execute`**：`as`/`at`/`positioned`/`rotated`/`facing`/`align`/`anchored`/`in`/`on`/`summon` 修饰符；重复修饰符、修饰符写在条件之后、条件写在 store 之后等在编译期报错；按书写顺序下降为真实 `execute` 链；`as` 推导玩家/非玩家上下文、`on` 要求实体上下文、`summon` 的实体类型参与 NBT 校验；旧字符串子句保留为逃生口并计入 `--deny-raw`。
+- **条件族**：`if`/`unless` 支持计分比较、谓词、`block`/`blocks`/`biome`/`dimension`/`loaded`/`entity`/`data`/`items`/`slots`/`function`/`stopwatch`；原子条件冻结到临时计分项再组合，保证一次求值与确定顺序；函数条件计入同步调用图递归检查。
+- **store**：`store.result/success`（计分、Boss 栏 `value|max`）与 `store.data`（entity/block/storage，实体来源要求 `limit(1)`，`self` 要求非玩家）；store 链包裹块内最后一条命令、可叠加；控制结构尾部与无返回值函数调用报错；`origin` 持有者用临时项捕获 + `on origin` 复制表达。
+- **函数、标签与调度**：`call`、表达式调用、`#tag`；`fn_tag` 声明（嵌套 `#标签`、外部字符串条目、`replace`、编译期环路检查），标签成员在编译期检查执行上下文与参数；`schedule`（整数/浮点时间、`replace`/`append`、`#tag`、`schedule.clear`）；`return`/`return fail`/`return run`。
+- **结果表达式**：`count(q)`、`data.get`、`random(1, 6)`、`compute`、`xp.query`、`stopwatch.query`、`scoreboard.get`、`time.query`/`query_gametime`、`gamerule.query`、`worldborder.get`，经 `execute store result score` 落入计分并参与算术与条件。
+- **函数权限**：`run`/`return run` 的根命令对照 `commands.json`，固定按 GAMEMASTER（2）拒绝 `ADMIN`/`OWNER` 命令并解释权限缺口。
+
+### 4.4 计分板、数据与资源
+
+- **目标与计分板**：`objective` 声明（准则、显示名、渲染类型 integer/hearts、数字格式 blank/fixed/styled、显示槽），运行期名 `<命名空间>_<名称>`，由 `__mcl/load` 创建；与内部 ABI 目标隔离；`scoreboard.set/reset` 与表达式 `get`（持有者 `self`/`origin`/查询，读取要求 `limit(1)`，失败为 0），`scoreboard.enable/operation/display`。
+- **数据槽**：`data_slot` 声明（`item_data` → 物品堆 `minecraft:custom_data`、`entity_data` → 26.3 实体通用 `data` 字段），编译期校验键与实体类型（物品槽必须配 `minecraft:item`，实体槽拒绝玩家）。
+- **容器搬运**：`self.deposit/withdraw/remove_data`（`Items` 与数据槽互搬；追加成功才清空、取回成功才删除来源）、`self.save_items/restore_items`、`self.remove_preserving_items(slot, query)`（带成功校验的安全移除，不掉落物品）、`self.add_tag/remove_tag/set_invulnerable/set_no_gravity/give_item/clear_items/remove`。
+- **`data` 命令**：`data.get`（结果表达式）、`data.merge`、`data.remove`、`data.modify`（insert/prepend/append/set/merge；from/string/value/compute 来源）；entity/block/storage 三类目标；实体目标沿用非玩家写保护。
+- **`item` 命令**：`item.replace/fill/override/modify`；实体（`limit(1)`）与方块目标、任意槽位（槽位名或 `slot_source` 资源位置）、`with` 引用已声明物品、`from` 跨容器复制与可选修饰器。
+- **物品定义**：名称、Lore、附魔、存储附魔、损伤、无法破坏、稀有度、物品模型、染色、光效覆盖、最大损伤、最大堆叠与 `custom_data`；`give` 数量按 `最大堆叠数 × 100` 校验。
+- **JSON 资源**：`resource` 声明（26.3 注册表类型限制、编译期 JSON 解析、稳定格式化）；`predicate`；`advancement` 声明（`parent`/`criterion`（`trigger` + `conditions`）/`requirements`/`reward`/`display`，触发器对照 `CriteriaTriggers` 的 58 项、条件字段对照 `advancement_triggers.json`、26.3 用 `type` 键的内联战利品条件、引用与同名冲突检查）。
+
+### 4.5 世界与方块命令
+
+- `set_block(pos, block_state[, 模式][, nbt])`，模式 destroy/keep/replace/strict。
+- `fill(from, to, block_state[, 模式][, replace 过滤器][, nbt])`，模式含 outline/hollow/destroy/strict；`nbt` 可出现在任意可选参数位置。
+- `clone(...)`：跨维度、masked/filtered、force/move/normal、strict，选项顺序无关、重复报错。
+- `fill_biome(from, to, biome[, replace filter])`，过滤器接受 `#` 生物群系标签。
+- `place.feature/jigsaw/structure/template`，含 rotation、mirror、integrity、seed、strict。
+- `forceload.add/remove/remove_all/query`，绝对范围检查 256 区块上限。
+- `time.set/add/pause/resume/rate` 与表达式 `time.query([clock])`、`time.query_gametime()`；时钟作为可选参数写在末尾，生成 `time of <clock> ...`。
+- `weather.clear/rain/thunder(duration)`，按 `TimeArgument` 换算并拒绝不足 1 刻。
+- `gamerule.set(name, value)` 与表达式 `gamerule.query(name)`；规则名与值类型对照 26.3 `GameRules`。
+- `worldborder.add/set/center/damage_amount/damage_buffer/warning_distance/warning_time` 与表达式 `worldborder.get()`。
+- `locate.structure/biome/poi`（接受 `#` 标签，仅命令反馈）。
+- 示例：`examples/world_ops.mcl` 覆盖以上能力并通过 `--deny-raw`。
+
+### 4.6 实体、玩家与事件
+
+- `spawn("id", pos|vec3) { nbt { ... } ... }`：进入新实体上下文，首条命令通过 `execute summon` 的 `@s` 合并初始 NBT；拒绝 `noSummon` 类型。
+- `nbt { ... }` 语句：生成 `data merge entity @s {...}`；`entity_nbt.json` 快照按实体类型/并集检查键与粗类型，未知键给出编辑距离 ≤ 2 的最近候选；125 个常用标签有中文别名（中英双向一对一，输出逐字节一致）。
+- `give(target, item[, count])`（已声明玩家查询 + `item_stack` 定义）。
+- `clear(玩家查询[, 物品][, 数量])`，数量上限 2147483647。
+- `effect.give/give_infinite/clear`，秒数与等级按 26.3 范围检查。
+- `xp.add/set` 与表达式 `xp.query`（要求 `limit(1)` 玩家查询）。
+- `stopwatch.create/restart/remove` 与表达式 `query([缩放])`（失败写入 0）。
+- `teleport(持有者, pos|vec3[, rotation]，单个实体查询)`：绝对与 `~` 坐标、世界范围校验；持有者支持 `self`/`origin`/查询。
+- `message.all/self/nearest/player` 接受文本组件；纯字符串与末尾颜色参数保留为旧写法。
+- `sound.self` 与 `sound.play(sound, source, targets, pos, volume, pitch, min_volume)`。
+- `advancement.grant/revoke[_through|_from|_until|_everything]`：玩家目标、`only` 可带准则名、引用检查、不计入 `--deny-raw`。
+- 示例：`examples/portable_chest`（全中文标识符、矿车按实体计分归属、forceload 屏障盒）、`potion_lab.mcl`、`give_reward.mcl`、`portal.mcl`、`beacon_base.mcl`、`bounty_hunter/`。
+
+### 4.7 版本数据与快照
+
+- `cargo xtask generate-version-data` 生成 `data/version/26.3-rc-2/`：
+  - `commands.json`：从 `Commands.java` 与 `server/commands/**` 提取的根命令、字面量子命令、重定向、参数与 `requires` 权限等级（快照含 104 个根名，含别名与开发构建命令；§二 按常规命令逐条计 97 个；动态子树以一级清单近似）。
+  - `registries.json`：item/block/entity_type/biome/dimension/damage_type/mob_effect/enchantment/attribute/particle/sound/advancement/recipe/loot_table/predicate/dialog/post_effect/timeline/world_clock/slot/slot_source/worldgen* 等 id 集合，以及标签注册表清单与资源目录清单。
+  - `enums.json`：gamemode、difficulty、显示槽、队伍颜色、heightmap、anchor、swizzle、声音分类、时间单位、物品槽位。
+  - `entity_nbt.json`：扫描 `world/entity/**` 的 `putX`/`store`/`read` 键并沿 `extends` 求并集，当前 161 个实体类型、277 个标签。
+  - `advancement_triggers.json`：`CriteriaTriggers` 各 `TriggerInstance` 的条件字段与粗类型。
+- 输出排序且带 FNV-1a 源摘要，可复现；`cargo xtask check-version-data` 与 `tests/corpus.rs` 比对快照与随附源码。
+- 编译器加载快照：资源位置从“语法合法”升级为“注册表存在”，未知 id 报错并给出最近候选。
+- 26.3 条件格式：内联战利品条件的判别键从 `condition` 改为 `type`（旧写法会在原版加载时报 `No key type in MapLike[...]`），示例、语料与手册已全部修正并对照原版数据核对。
+
+### 4.8 测试语料与示例
+
+- `tests/valid/`：`advancement`、`chinese_identifiers`、`components`、`conditions`、`data_ops`、`effects`、`entities`、`execute`、`expressions`、`language`、`loops`、`modules`、`multifile`、`nbt`、`raw`、`scoreboard`、`world` 等；`tests/dual` 双语往返。
+- `tests/invalid/`：模块、命名空间、语法负例与 `advancement_conditions`、`chinese_identifiers`、`context`、`execute`、`items`、`loops`、`nbt_tags`、`player_nbt`、`recursion`、`stopwatch_*`、`unknown_references`、`world` 等，文件头注释写明期望诊断。
+- `tests/corpus.rs`：语料编译、产物布局、重复构建一致性与版本数据校验。
+
+## 五、依赖关系与验收
+
+- 已完成的基础设施（1.1–1.6）是后续阶段的共同前提：坐标与值类型（1.2/1.4）支撑第 3–5 阶段，文本组件（1.3）支撑第 6 阶段，结果表达式（1.5）支撑 4.3 与 7.1–7.3，权限校验（1.6）用于 `run` 字符串。
+- 第 4–6 阶段的命令依赖已完成的结构化 `execute` 与条件族（见 §四），以便在非默认上下文中执行。
 - 8.8 批 0 无前置；批 1 只需要 8.8 自己的导入根与嵌入机制；批 2 依赖 8.3 的宏参数与第 4–6 阶段被包装的命令面（title/bossbar/particle/team/attribute/loot/item/damage 等），并与 5.x 的物品/战利品结构化入口同步扩充。标准库本身不新增 JSON schema；若未来库要携带 predicate/loot_table 资源，则依赖 9.2/9.3。
-- 9.1/9.2 依赖 1.1 的版本元数据与注册表快照；函数标签部分已经落地，不依赖注册表数据；9.3–9.6 依赖 1.4 的结构化 NBT 与值类型；9.7/9.8 依赖输出层与 1.1 的版本数据。函数标签（9.2）是 2.10 的 `#tag` 调用前提。
+- 9.1/9.2 依赖 1.1 的版本元数据与注册表快照；函数标签部分已落地，不依赖注册表数据；9.3–9.6 依赖 1.4 的结构化 NBT 与值类型；9.7/9.8 依赖输出层与 1.1 的版本数据。
 - 每个阶段的验收：编译器零警告；`examples/` 项目通过 `--deny-raw`；`tests/` 的 mcl 编译语料核对生成的命令与资源文件；中英文关键词产物逐字节一致；文档与手册同步。
-
-## 四、旧待办与设计项映射
-
-| 旧待办或设计项 | 新位置 |
-| --- | --- |
-| 继续建立方块、坐标、玩家、物品、效果、声音、粒子和结构化 NBT 类型 | 1.2–1.4，第 3–6 阶段 |
-| 从 26.3 命令树和注册表生成版本化校验数据 | 1.1 |
-| 从目标 Minecraft 源码导出命令签名，提供静态命令校验和补全数据 | 1.1、8.4 |
-| 增加结构化 NBT 数据类型和数据包资源 schema，使字段错误在编译期出现 | 1.4、9.3–9.5 |
-| 建立中间表示和版本后端，让同一份高层源码选择兼容的 Minecraft 目标 | 9.8 |
-| 模块/import 系统 | 8.1 |
-| 基于 26.3 函数宏的高级调用 | 8.3 |
-| 实体上下文类型、存储/NBT 类型和复合数据 | 1.4、2.4 |
-| `for`、break/continue 和更强的控制流优化 | 8.2 |
-| 增量构建、源映射、语言服务器与编辑器集成 | 8.5、8.6 |
-| 为编辑器提供格式化、补全、跳转、悬停与即时诊断 | 8.6 |
-| 内置标准库与内建表达式（新增设计项） | 8.8 |
