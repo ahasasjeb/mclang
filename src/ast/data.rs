@@ -117,6 +117,7 @@ pub enum PositionValue {
 
 #[derive(Debug)]
 pub enum GiveItem {
+    Inline(Box<ItemStackDecl>),
     Definition(String),
     SelfItem,
 }

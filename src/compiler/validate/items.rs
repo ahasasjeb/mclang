@@ -11,7 +11,9 @@ use super::rules::{valid_entity_tag, valid_resource_location};
 /// `GiveCommand` 允许的数量上限是物品最大堆叠数乘以 100。
 /// 未声明 `max_stack_size` 时物品原型的最小堆叠数是 1，因此保守上限为 100。
 pub(super) fn max_give_count(item: &ItemStackDecl) -> u32 {
-    item.max_stack_size.unwrap_or(1).saturating_mul(100)
+    super::item_components::component_stack_size(item)
+        .unwrap_or(1)
+        .saturating_mul(100)
 }
 
 pub(super) fn validate_give_count(
@@ -38,6 +40,7 @@ pub(super) fn validate_give_count(
 }
 
 pub(super) fn validate_item_stack(item: &ItemStackDecl, diagnostics: &mut Vec<Diagnostic>) {
+    super::item_components::validate_components(item, diagnostics);
     validate_id("item", "物品", &item.item_id, item.span, diagnostics);
     let count_limit = max_give_count(item);
     if item.count == 0 || item.count > count_limit {

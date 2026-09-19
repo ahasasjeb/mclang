@@ -23,6 +23,32 @@ impl Compiler<'_> {
             return Value::Integer(value);
         }
         match &expression.kind {
+            ExprKind::CoreCommand(command) => {
+                let result = self.temporary();
+                commands.push(format!(
+                    "scoreboard players set {result} {} 0",
+                    self.objective
+                ));
+                commands.push(format!(
+                    "execute store result score {result} {} run {}",
+                    self.objective,
+                    self.core_command_text(command)
+                ));
+                Value::Score(result)
+            }
+            ExprKind::EntityCommand(command) => {
+                let result = self.temporary();
+                commands.push(format!(
+                    "scoreboard players set {result} {} 0",
+                    self.objective
+                ));
+                commands.push(format!(
+                    "execute store result score {result} {} run {}",
+                    self.objective,
+                    self.entity_command_text(command)
+                ));
+                Value::Score(result)
+            }
             ExprKind::Integer(value) => Value::Integer(*value),
             ExprKind::Score(name) => Value::Score(self.variable_holder(owner, name)),
             ExprKind::Call {

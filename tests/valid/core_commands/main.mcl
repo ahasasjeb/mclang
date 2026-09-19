@@ -1,0 +1,38 @@
+namespace core_commands;
+query players = entity("minecraft:player") {}
+query mob_one = entity("minecraft:zombie") { limit(1); }
+item pick = item_stack("minecraft:diamond_pickaxe") {}
+resource loot_table treasure = """{"type":"minecraft:chest","pools":[]}""";
+resource recipe crafted = """{"type":"minecraft:crafting_shapeless","ingredients":["minecraft:stone"],"result":{"id":"minecraft:stone"}}""";
+
+fn commands() {
+    reload();
+    recipe.give(players, *);
+    recipe.take(players, crafted);
+    recipe.give(players, "minecraft:stone_pickaxe");
+    datapack.enable("file/example", first);
+    datapack.enable("file/example", last);
+    datapack.enable("file/example", before, "vanilla");
+    datapack.enable("file/example", after, "vanilla");
+    datapack.enable("file/example");
+    datapack.disable("file/example");
+    datapack.list();
+    datapack.list(available);
+    datapack.list(enabled);
+    let roll_result = random.roll(1, 6, "core_commands:dice");
+    let sample = random.value(-10, 10);
+    random.reset("core_commands:dice");
+    random.reset(*);
+    random.reset(*, 42, false, true);
+    random.reset("core_commands:dice", -7, true, false);
+    loot.give(players, loot.table(treasure));
+    loot.insert(pos(0, 64, 0), loot.kill(mob_one));
+    loot.spawn(vec3(~, ~1, ~), loot.mine(pos(0, 63, 0), pick));
+    loot.replace(entity, mob_one, "weapon.mainhand", 1, loot.table("minecraft:chests/simple_dungeon"));
+    loot.replace(block, pos(0, 64, 0), "container.0", loot.fish("minecraft:gameplay/fishing", pos(0, 62, 0)));
+}
+
+@player fn fishing() {
+    loot.give(self, loot.fish("minecraft:gameplay/fishing", pos(~, ~, ~), mainhand));
+    loot.spawn(vec3(~, ~, ~), loot.mine(pos(~, ~-1, ~), offhand));
+}

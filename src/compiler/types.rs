@@ -87,6 +87,8 @@ pub(super) struct StatementSymbols<'a> {
     pub(super) storages: &'a HashSet<&'a str>,
     pub(super) data_slots: &'a HashMap<&'a str, &'a DataSlotDecl>,
     pub(super) predicates: &'a HashSet<&'a str>,
+    pub(super) loot_tables: &'a HashSet<&'a str>,
+    pub(super) recipes: &'a HashSet<&'a str>,
     pub(super) advancements: &'a HashMap<&'a str, &'a AdvancementDecl>,
     pub(super) advancement_resources: &'a HashSet<&'a str>,
     pub(super) function_tags: &'a HashMap<&'a str, &'a FunctionTagDecl>,

@@ -24,6 +24,13 @@ pub struct Slots {
 }
 
 impl Slots {
+    pub fn accepts_single(&self, name: &str) -> bool {
+        self.single.contains(name)
+            || self.ranges.iter().any(|(prefix, count)| {
+                name.strip_prefix(prefix)
+                    .is_some_and(|suffix| suffix.parse::<usize>().is_ok_and(|index| index < *count))
+            })
+    }
     fn from_value(value: Option<&Value>) -> Self {
         let Some(object) = value.and_then(Value::as_object) else {
             return Self::default();

@@ -53,6 +53,7 @@ fn collect_synchronous_calls<'a>(
 ) {
     for statement in statements {
         match &statement.kind {
+            StatementKind::CoreCommand(_) | StatementKind::EntityCommand(_) => {}
             StatementKind::Call { target, arguments } => {
                 match target {
                     CallTarget::Function(function) => {
@@ -201,7 +202,9 @@ fn collect_expr_calls<'a>(expression: &'a Expr, calls: &mut HashSet<&'a str>) {
             collect_expr_calls(left, calls);
             collect_expr_calls(right, calls);
         }
-        ExprKind::Integer(_)
+        ExprKind::CoreCommand(_)
+        | ExprKind::EntityCommand(_)
+        | ExprKind::Integer(_)
         | ExprKind::Score(_)
         | ExprKind::ScoreQuery { .. }
         | ExprKind::XpQuery { .. }

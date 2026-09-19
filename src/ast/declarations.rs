@@ -181,6 +181,7 @@ pub struct ItemStackDecl {
     pub unbreakable: bool,
     /// `custom_data = nbt { ... };`：物品堆的 `minecraft:custom_data` 组件。
     pub custom_data: Option<NbtValue>,
+    pub components: Option<NbtValue>,
     pub span: Span,
 }
 

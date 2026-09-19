@@ -7,6 +7,22 @@ pub(in crate::compiler::validate) fn validate_expr(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     match &expression.kind {
+        ExprKind::CoreCommand(command) => {
+            crate::compiler::validate::core_commands::validate_core_command(
+                command,
+                expression.span,
+                ctx,
+                diagnostics,
+            )
+        }
+        ExprKind::EntityCommand(command) => {
+            crate::compiler::validate::entity_commands::validate_entity_command(
+                command,
+                expression.span,
+                ctx,
+                diagnostics,
+            )
+        }
         ExprKind::Integer(_) => {}
         ExprKind::Score(name) => {
             if !ctx.symbols.scores.contains(name.as_str())

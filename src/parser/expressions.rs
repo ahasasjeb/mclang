@@ -92,6 +92,22 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expr, Diagnostic> {
+        if let Some(root) = self.core_command_root() {
+            let start = self.advance().span;
+            let command = self.core_command(root)?;
+            return Ok(Expr {
+                kind: ExprKind::CoreCommand(Box::new(command)),
+                span: start.merge(self.previous().span),
+            });
+        }
+        if let Some(root) = self.entity_command_root() {
+            let start = self.advance().span;
+            let command = self.entity_command(root)?;
+            return Ok(Expr {
+                kind: ExprKind::EntityCommand(Box::new(command)),
+                span: start.merge(self.previous().span),
+            });
+        }
         let token = self.advance().clone();
         match token.kind {
             TokenKind::Number(number) => {

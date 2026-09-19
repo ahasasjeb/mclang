@@ -2,6 +2,8 @@ use super::*;
 
 #[derive(Debug)]
 pub enum ExprKind {
+    CoreCommand(Box<CoreCommand>),
+    EntityCommand(Box<EntityCommand>),
     Integer(i32),
     Score(String),
     Call {

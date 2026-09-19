@@ -6,9 +6,12 @@
 mod advancement;
 mod collect;
 mod components;
+mod core_commands;
+mod entity_commands;
 mod entity_nbt;
 mod expressions;
 mod functions;
+mod item_components;
 mod items;
 mod recursion;
 mod registry;

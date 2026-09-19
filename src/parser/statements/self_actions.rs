@@ -17,7 +17,9 @@ impl Parser {
             GiveTarget::Query(name)
         };
         self.expect(TokenKind::Comma, "give 目标后需要 `,`")?;
-        let item = if self.take_word("self").is_some() {
+        let item = if self.check_word("item_stack") {
+            GiveItem::Inline(Box::new(self.inline_item_stack()?))
+        } else if self.take_word("self").is_some() {
             self.expect(TokenKind::Dot, "self 后需要 `.`")?;
             let (member, span) = self.ident("self 的物品成员")?;
             if !word_matches(&member, "item") {
@@ -253,7 +255,7 @@ impl Parser {
         self.expect(TokenKind::LeftParen, "clear 后需要 `(`")?;
         let (target, _) = self.ident("clear 目标查询名称")?;
         let item = if self.take(&TokenKind::Comma).is_some() {
-            Some(self.string("clear 需要物品资源位置")?.0)
+            Some(self.item_predicate()?)
         } else {
             None
         };

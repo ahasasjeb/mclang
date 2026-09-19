@@ -6,11 +6,13 @@
 //! 出现，进入 AST 后所有阶段只处理英文规范值。
 
 mod actions;
+mod commands;
 mod table;
 mod values;
 mod world_values;
 
 pub(crate) use actions::*;
+pub(crate) use commands::*;
 pub(crate) use table::*;
 pub(crate) use values::*;
 pub(crate) use world_values::*;

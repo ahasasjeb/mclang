@@ -7,6 +7,22 @@ pub(super) fn validate_statement<'a>(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     match &statement.kind {
+        StatementKind::CoreCommand(command) => {
+            crate::compiler::validate::core_commands::validate_core_command(
+                command,
+                statement.span,
+                ctx,
+                diagnostics,
+            )
+        }
+        StatementKind::EntityCommand(command) => {
+            crate::compiler::validate::entity_commands::validate_entity_command(
+                command,
+                statement.span,
+                ctx,
+                diagnostics,
+            )
+        }
         StatementKind::Run(command) => {
             validate_raw_command(command, statement.span, diagnostics);
         }
@@ -67,7 +83,7 @@ pub(super) fn validate_statement<'a>(
             max_count,
         } => validate_clear_inventory(
             target,
-            item.as_deref(),
+            item.as_ref(),
             *max_count,
             statement.span,
             ctx,

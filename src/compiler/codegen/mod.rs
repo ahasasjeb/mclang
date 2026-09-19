@@ -13,7 +13,9 @@
 mod actions;
 mod advancement;
 mod components;
+mod core_commands;
 mod emit;
+mod entity_commands;
 mod expressions;
 mod names;
 mod statements;

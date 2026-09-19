@@ -7,7 +7,7 @@
 use crate::ast::{
     AdvancementOperation, AdvancementReference, AdvancementScope, DataSlotDecl, DataSlotKind,
     EffectDuration, Expr, GiveItem, GiveTarget, Holder, ItemActionKind, ItemConditionSource,
-    RotationValue, ScoreTarget, SelfAction, TeleportDestination, XpKind, XpOperation,
+    ScoreTarget, SelfAction, TeleportDestination, XpKind, XpOperation,
 };
 
 use super::Compiler;
@@ -26,6 +26,19 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         match item {
+            GiveItem::Inline(item) => {
+                let argument = item_stack_argument(item);
+                let count = count.unwrap_or(item.count);
+                let prefix = match target {
+                    GiveTarget::Query(name) => {
+                        format!("execute {} run ", entity_query_clause(self.query(name)))
+                    }
+                    GiveTarget::Origin => {
+                        "execute on origin if entity @s[type=minecraft:player] run ".to_owned()
+                    }
+                };
+                commands.push(format!("{prefix}give @s {argument} {count}"));
+            }
             GiveItem::Definition(name) => {
                 let item = self
                     .program

@@ -14,8 +14,8 @@ use crate::ast::{
     EffectDuration, EntityQueryDecl, ExecuteClauseKind, ExecuteClauses, ExecuteStoreData,
     ExecuteStoreTarget, Expr, GiveItem, GiveTarget, Holder, ItemActionKind, ItemConditionSource,
     MessageTarget, NbtComponentSource, NbtValue, NbtValueKind, PositionValue, ReturnKind,
-    RotationValue, ScoreTarget, SelfAction, Span, Statement, StatementKind, TeleportDestination,
-    TextComponent, XpOperation,
+    ScoreTarget, SelfAction, Span, Statement, StatementKind, TeleportDestination, TextComponent,
+    XpOperation,
 };
 use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};

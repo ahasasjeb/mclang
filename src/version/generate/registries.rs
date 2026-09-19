@@ -137,6 +137,16 @@ pub fn generate_registries(root: &Path) -> Result<String, String> {
             "register",
         ),
         (
+            "data_component_type",
+            "net/minecraft/core/component/DataComponents.java",
+            "register",
+        ),
+        (
+            "data_component_predicate_type",
+            "net/minecraft/core/component/predicates/DataComponentPredicates.java",
+            "register",
+        ),
+        (
             "particle",
             "net/minecraft/core/particles/ParticleTypes.java",
             "register",

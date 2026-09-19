@@ -15,9 +15,12 @@
 
 mod components;
 mod conditions;
+mod core_commands;
 mod declarations;
+mod entity_commands;
 mod execute;
 mod expressions;
+mod item_predicates;
 mod items;
 pub(crate) mod keywords;
 mod nbt;

@@ -120,6 +120,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
     statements
         .iter()
         .map(|statement| match &statement.kind {
+            ast::StatementKind::CoreCommand(_) | ast::StatementKind::EntityCommand(_) => 0,
             ast::StatementKind::Run(_) => 1,
             ast::StatementKind::Return(ast::ReturnKind::Run(_)) => 1,
             ast::StatementKind::Execute {

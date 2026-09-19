@@ -196,6 +196,8 @@ impl Program {
     }
 }
 
+mod core_commands;
+mod entity_commands;
 mod expressions;
 mod statements;
 

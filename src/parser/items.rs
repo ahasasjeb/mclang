@@ -12,6 +12,20 @@ impl Parser {
         let start = self.expect_word("item")?.span;
         let (name, name_span) = self.ident("物品定义名称")?;
         self.expect(TokenKind::Equal, "物品定义名称后需要 `=`")?;
+        self.item_stack_value(name, name_span, start)
+    }
+
+    pub(super) fn inline_item_stack(&mut self) -> Result<ItemStackDecl, Diagnostic> {
+        let span = self.current().span;
+        self.item_stack_value("__inline".to_owned(), span, span)
+    }
+
+    fn item_stack_value(
+        &mut self,
+        name: String,
+        name_span: Span,
+        start: Span,
+    ) -> Result<ItemStackDecl, Diagnostic> {
         self.expect_word("item_stack")?;
         self.expect(TokenKind::LeftParen, "item_stack 后需要 `(`")?;
         let (item_id, _) = self.string("item_stack 需要物品资源位置")?;
@@ -35,6 +49,7 @@ impl Parser {
         let mut unbreakable = false;
         let mut has_unbreakable = false;
         let mut custom_data = None;
+        let mut components = None;
         while !self.check(&TokenKind::RightBrace) {
             if self.check(&TokenKind::Eof) {
                 return Err(Diagnostic::new("物品定义缺少 `}`", self.current().span));
@@ -47,6 +62,14 @@ impl Parser {
                 ));
             };
             match property_kind {
+                "components" => {
+                    if components.is_some() {
+                        return Err(Diagnostic::new("物品组件只能声明一次", span));
+                    }
+                    self.expect(TokenKind::Equal, "components 后需要 `=`")?;
+                    components = Some(self.nbt_compound("物品组件补丁")?);
+                    self.expect(TokenKind::Semicolon, "物品组件后需要 `;`")?;
+                }
                 "count" => {
                     if has_count {
                         return Err(Diagnostic::new("物品数量只能声明一次", span));
@@ -212,6 +235,7 @@ impl Parser {
             enchantment_glint_override,
             unbreakable,
             custom_data,
+            components,
             span: start.merge(end),
         })
     }

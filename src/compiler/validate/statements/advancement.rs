@@ -145,7 +145,7 @@ pub(super) fn validate_xp_change(
 
 pub(super) fn validate_clear_inventory(
     target: &str,
-    item: Option<&str>,
+    item: Option<&crate::ast::ItemPredicate>,
     max_count: Option<u32>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
@@ -153,7 +153,7 @@ pub(super) fn validate_clear_inventory(
 ) {
     require_player_query(target, span, ctx, diagnostics);
     if let Some(item) = item {
-        validate_id("item", "物品", item, span, diagnostics);
+        super::super::item_components::validate_predicate(item, diagnostics);
     }
     if let Some(max_count) = max_count
         && max_count > i32::MAX as u32

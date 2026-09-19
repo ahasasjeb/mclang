@@ -98,6 +98,7 @@ pub(crate) fn function_tag_property(value: &str) -> Option<&'static str> {
 
 pub(crate) fn item_stack_property(value: &str) -> Option<&'static str> {
     match value {
+        "components" | "组件" => Some("components"),
         "count" | "数量" => Some("count"),
         "custom_name" | "自定义名称" => Some("custom_name"),
         "item_name" | "物品名称" => Some("item_name"),

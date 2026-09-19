@@ -162,6 +162,15 @@ fn item_stack_template_json(item: &ItemStackDecl) -> Value {
         object.insert("count".to_owned(), json!(item.count));
     }
     let mut components = Map::new();
+    if let Some(NbtValue {
+        kind: NbtValueKind::Compound(entries),
+        ..
+    }) = &item.components
+    {
+        for entry in entries {
+            components.insert(entry.key.clone(), nbt_json(&entry.value));
+        }
+    }
     if let Some(custom_name) = &item.custom_name {
         components.insert(
             "minecraft:custom_name".to_owned(),

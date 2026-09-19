@@ -14,7 +14,7 @@ impl Compiler<'_> {
         &self,
         targets: &Holder,
         destination: &TeleportDestination,
-        rotation: Option<&RotationValue>,
+        rotation: Option<&crate::ast::Facing>,
         commands: &mut Vec<String>,
     ) {
         let prefix = self.score_holder_prefix(targets);
@@ -23,7 +23,7 @@ impl Compiler<'_> {
             TeleportDestination::Entity { query, .. } => entity_query_selector(self.query(query)),
         };
         let rotation = rotation
-            .map(|rotation| format!(" {}", world::rotation_text(rotation)))
+            .map(|rotation| format!(" {}", self.facing_text(rotation)))
             .unwrap_or_default();
         commands.push(format!("{prefix}tp @s {destination}{rotation}"));
     }
@@ -134,14 +134,17 @@ impl Compiler<'_> {
     pub(in crate::compiler::codegen) fn compile_clear_inventory(
         &mut self,
         target: &str,
-        item: Option<&str>,
+        item: Option<&crate::ast::ItemPredicate>,
         max_count: Option<u32>,
         commands: &mut Vec<String>,
     ) {
         let query = self.query(target);
         let mut command = "clear @s".to_owned();
         if let Some(item) = item {
-            command.push_str(&format!(" {item}"));
+            command.push_str(&format!(
+                " {}",
+                super::super::emit::item_predicate_text(item)
+            ));
             if let Some(max_count) = max_count {
                 command.push_str(&format!(" {max_count}"));
             }

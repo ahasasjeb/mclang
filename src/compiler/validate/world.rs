@@ -18,7 +18,7 @@ use super::rules::valid_resource_location;
 
 pub(super) use blocks::validate_block_state;
 pub(super) use gamerules::game_rule_exists;
-pub(super) use positions::{validate_block_position, validate_position_value};
+pub(super) use positions::{validate_block_position, validate_position_value, validate_vec2};
 
 use blocks::validate_forceload;
 use border::validate_world_border;

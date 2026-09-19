@@ -30,6 +30,10 @@ pub(super) fn validate_give_statement(
         }
     }
     match item {
+        GiveItem::Inline(item) => {
+            super::super::items::validate_item_stack(item, diagnostics);
+            validate_give_count(item, count, span, count_span, diagnostics);
+        }
         GiveItem::Definition(name) => match ctx.symbols.item_stacks.get(name.as_str()) {
             None => diagnostics.push(Diagnostic::new(format!("找不到物品定义 `{name}`"), span)),
             Some(declaration) => {
@@ -271,19 +275,20 @@ pub(in crate::compiler::validate) fn validate_holder(
 pub(super) fn validate_teleport(
     targets: &Holder,
     destination: &TeleportDestination,
-    rotation: Option<&RotationValue>,
+    rotation: Option<&crate::ast::Facing>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     validate_holder(targets, span, ctx, diagnostics);
-    if let Some(rotation) = rotation
-        && matches!(destination, TeleportDestination::Entity { .. })
-    {
+    if rotation.is_some() && matches!(destination, TeleportDestination::Entity { .. }) {
         diagnostics.push(Diagnostic::new(
             "teleport 跟随实体时不能同时指定朝向：实体的朝向会一并跟随",
-            rotation.span,
+            span,
         ));
+    }
+    if let Some(facing) = rotation {
+        super::super::entity_commands::validate_facing(facing, span, ctx, diagnostics);
     }
     match destination {
         TeleportDestination::Position(position) => {

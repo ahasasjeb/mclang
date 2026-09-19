@@ -70,6 +70,12 @@ fn statement_kind_names(
     context: &NameContext<'_>,
 ) {
     match kind {
+        StatementKind::CoreCommand(command) => {
+            super::core_commands::core_command_names(command, visitor, context)
+        }
+        StatementKind::EntityCommand(command) => {
+            super::entity_commands::entity_command_names(command, visitor, context)
+        }
         StatementKind::Run(_) => {}
         StatementKind::Each { query, body } => {
             visitor(context, NameSite::Reference, NameRole::Query, query);
@@ -135,9 +141,12 @@ fn statement_kind_names(
         StatementKind::Teleport {
             targets,
             destination,
-            ..
+            rotation,
         } => {
             holder_names(targets, visitor, context);
+            if let Some(facing) = rotation {
+                super::entity_commands::facing_names(facing, visitor, context);
+            }
             if let TeleportDestination::Entity { query, .. } = destination {
                 visitor(context, NameSite::Reference, NameRole::Query, query);
             }

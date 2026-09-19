@@ -2,6 +2,8 @@ use super::*;
 
 #[derive(Debug)]
 pub enum StatementKind {
+    CoreCommand(Box<CoreCommand>),
+    EntityCommand(Box<EntityCommand>),
     Run(String),
     Each {
         query: String,
@@ -46,7 +48,7 @@ pub enum StatementKind {
     },
     ClearInventory {
         target: String,
-        item: Option<String>,
+        item: Option<ItemPredicate>,
         max_count: Option<u32>,
     },
     SetBlock {
@@ -188,7 +190,7 @@ pub enum StatementKind {
     Teleport {
         targets: Holder,
         destination: TeleportDestination,
-        rotation: Option<RotationValue>,
+        rotation: Option<Facing>,
     },
     /// `nbt { ... };`（中文 `数据 { ... };`）：把结构化 NBT 合并到当前实体。
     ///

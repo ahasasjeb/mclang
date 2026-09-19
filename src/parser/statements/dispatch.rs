@@ -20,7 +20,17 @@ impl Parser {
 
     pub(super) fn statement(&mut self) -> Result<Statement, Diagnostic> {
         let start = self.current().span;
-        let kind = if self.take_word("each").is_some() {
+        let kind = if let Some(root) = self.core_command_root() {
+            self.advance();
+            let command = self.core_command(root)?;
+            self.expect(TokenKind::Semicolon, "命令调用后需要 `;`")?;
+            StatementKind::CoreCommand(Box::new(command))
+        } else if let Some(root) = self.entity_command_root() {
+            self.advance();
+            let command = self.entity_command(root)?;
+            self.expect(TokenKind::Semicolon, "命令调用后需要 `;`")?;
+            StatementKind::EntityCommand(Box::new(command))
+        } else if self.take_word("each").is_some() {
             self.expect(TokenKind::LeftParen, "each 后需要 `(`")?;
             let (query, _) = self.ident("实体查询名称")?;
             self.expect(TokenKind::RightParen, "查询名称后需要 `)`")?;

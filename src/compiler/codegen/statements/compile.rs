@@ -40,6 +40,10 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         match &statement.kind {
+            StatementKind::CoreCommand(command) => commands.push(self.core_command_text(command)),
+            StatementKind::EntityCommand(command) => {
+                commands.push(self.entity_command_text(command))
+            }
             StatementKind::Run(command) => commands.push(command.clone()),
             StatementKind::Each { query, body } => {
                 self.compile_each(query, body, owner, commands);
@@ -95,7 +99,7 @@ impl Compiler<'_> {
                 target,
                 item,
                 max_count,
-            } => self.compile_clear_inventory(target, item.as_deref(), *max_count, commands),
+            } => self.compile_clear_inventory(target, item.as_ref(), *max_count, commands),
             StatementKind::SetBlock {
                 pos,
                 block,

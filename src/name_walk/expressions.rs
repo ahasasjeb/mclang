@@ -43,6 +43,12 @@ pub(super) fn expression_names(
     context: &NameContext<'_>,
 ) {
     match &mut expression.kind {
+        ExprKind::CoreCommand(command) => {
+            super::core_commands::core_command_names(command, visitor, context)
+        }
+        ExprKind::EntityCommand(command) => {
+            super::entity_commands::entity_command_names(command, visitor, context)
+        }
         ExprKind::Integer(_) => {}
         ExprKind::Score(name) => visitor(context, NameSite::Reference, NameRole::Score, name),
         ExprKind::Call {

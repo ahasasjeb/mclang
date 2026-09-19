@@ -58,7 +58,10 @@ pub(super) fn validate_vec3(position: &Vec3Value, diagnostics: &mut Vec<Diagnost
 }
 
 /// 校验水平精确坐标（`vec2`）的绝对分量。
-pub(super) fn validate_vec2(position: &Vec2Value, diagnostics: &mut Vec<Diagnostic>) {
+pub(in crate::compiler::validate) fn validate_vec2(
+    position: &Vec2Value,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     validate_fractional_axis(
         "X",
         &position.x,

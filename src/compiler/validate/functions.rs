@@ -101,6 +101,18 @@ pub(super) fn validate_function_bodies(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for function in &program.functions {
+        let loot_tables = program
+            .resources
+            .iter()
+            .filter(|r| r.kind == "loot_table")
+            .map(|r| r.name.as_str())
+            .collect();
+        let recipes = program
+            .resources
+            .iter()
+            .filter(|r| r.kind == "recipe")
+            .map(|r| r.name.as_str())
+            .collect();
         let parameters = function
             .parameters
             .iter()
@@ -114,6 +126,8 @@ pub(super) fn validate_function_bodies(
         );
         let mut visible_locals = HashSet::new();
         let symbols = StatementSymbols {
+            loot_tables: &loot_tables,
+            recipes: &recipes,
             scores: &declarations.scores,
             objectives: &declarations.objectives,
             objective_declarations: &declarations.objective_declarations,

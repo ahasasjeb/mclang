@@ -14,6 +14,34 @@ pub(super) fn reference_id(namespace: &str, reference: &AdvancementReference) ->
     }
 }
 
+pub(super) fn item_predicate_text(predicate: &crate::ast::ItemPredicate) -> String {
+    use crate::ast::ItemComponentTestKind;
+    if predicate.clauses.is_empty() {
+        return predicate.item.clone();
+    }
+    let clauses = predicate
+        .clauses
+        .iter()
+        .map(|clause| {
+            clause
+                .iter()
+                .map(|test| {
+                    let prefix = if test.negated { "!" } else { "" };
+                    let suffix = match &test.kind {
+                        ItemComponentTestKind::Present => String::new(),
+                        ItemComponentTestKind::Equal(value) => format!("={}", nbt_text(value)),
+                        ItemComponentTestKind::Match(value) => format!("~{}", nbt_text(value)),
+                    };
+                    format!("{prefix}{}{suffix}", test.id)
+                })
+                .collect::<Vec<_>>()
+                .join("|")
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{}[{clauses}]", predicate.item)
+}
+
 pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
     let mut selector = Vec::new();
     if let Some(tag) = query.entity_type.strip_prefix('#') {
@@ -205,6 +233,19 @@ pub(super) fn entity_query_as_clause(query: &EntityQueryDecl) -> String {
 
 pub(super) fn item_stack_argument(item: &ItemStackDecl) -> String {
     let mut components = Vec::new();
+    if let Some(NbtValue {
+        kind: NbtValueKind::Compound(entries),
+        ..
+    }) = &item.components
+    {
+        for entry in entries {
+            if entry.key.starts_with('!') {
+                components.push(entry.key.clone());
+            } else {
+                components.push(format!("{}={}", entry.key, nbt_text(&entry.value)));
+            }
+        }
+    }
     if let Some(custom_name) = &item.custom_name {
         components.push(format!(
             "minecraft:custom_name={{text:{}}}",

@@ -85,32 +85,32 @@ fn on_sleep() {
 // 击杀赏金：每个怪物一条隐形进度，奖励函数结构完全相同，只有撤销目标与
 // 基础赏金不同。手写需要 6 份进度 JSON、6 个奖励函数和整套计分板 ABI。
 advancement kill_zombie {
-    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}"""; }
+    criterion defeated { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}"""; }
     reward { function = reward_zombie; }
 }
 
 advancement kill_skeleton {
-    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:skeleton"}}}"""; }
+    criterion defeated { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:skeleton"}}}"""; }
     reward { function = reward_skeleton; }
 }
 
 advancement kill_creeper {
-    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:creeper"}}}"""; }
+    criterion defeated { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:creeper"}}}"""; }
     reward { function = reward_creeper; }
 }
 
 advancement kill_enderman {
-    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:enderman"}}}"""; }
+    criterion defeated { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:enderman"}}}"""; }
     reward { function = reward_enderman; }
 }
 
 advancement kill_wither_skeleton {
-    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:wither_skeleton"}}}"""; }
+    criterion defeated { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:wither_skeleton"}}}"""; }
     reward { function = reward_wither_skeleton; }
 }
 
 advancement kill_ender_dragon {
-    criterion kill { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ender_dragon"}}}"""; }
+    criterion defeated { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ender_dragon"}}}"""; }
     reward { function = reward_ender_dragon; }
 }
 

@@ -7,6 +7,102 @@ pub(crate) struct Keyword {
 /// 全部语言关键词。中英文写法都必须全局唯一，测试 `keywords_are_unique` 保证这一点。
 pub(crate) const KEYWORDS: &[Keyword] = &[
     Keyword {
+        english: "item_predicate",
+        chinese: "物品谓词",
+    },
+    Keyword {
+        english: "loot",
+        chinese: "战利品",
+    },
+    Keyword {
+        english: "recipe",
+        chinese: "配方",
+    },
+    Keyword {
+        english: "reload",
+        chinese: "重载",
+    },
+    Keyword {
+        english: "datapack",
+        chinese: "数据包",
+    },
+    Keyword {
+        english: "kill",
+        chinese: "杀死",
+    },
+    Keyword {
+        english: "tag",
+        chinese: "标签",
+    },
+    Keyword {
+        english: "enchant",
+        chinese: "施加附魔",
+    },
+    Keyword {
+        english: "damage",
+        chinese: "伤害",
+    },
+    Keyword {
+        english: "attribute",
+        chinese: "实体属性",
+    },
+    Keyword {
+        english: "ride",
+        chinese: "乘骑",
+    },
+    Keyword {
+        english: "rotate",
+        chinese: "旋转",
+    },
+    Keyword {
+        english: "spreadplayers",
+        chinese: "分散实体",
+    },
+    Keyword {
+        english: "spectate",
+        chinese: "旁观",
+    },
+    Keyword {
+        english: "swing",
+        chinese: "挥动",
+    },
+    Keyword {
+        english: "trigger",
+        chinese: "触发",
+    },
+    Keyword {
+        english: "gamemode",
+        chinese: "游戏模式",
+    },
+    Keyword {
+        english: "defaultgamemode",
+        chinese: "默认游戏模式",
+    },
+    Keyword {
+        english: "difficulty",
+        chinese: "难度",
+    },
+    Keyword {
+        english: "spawnpoint",
+        chinese: "设置出生点",
+    },
+    Keyword {
+        english: "setworldspawn",
+        chinese: "设置世界出生点",
+    },
+    Keyword {
+        english: "team",
+        chinese: "队伍",
+    },
+    Keyword {
+        english: "waypoint",
+        chinese: "路径点",
+    },
+    Keyword {
+        english: "list",
+        chinese: "在线玩家",
+    },
+    Keyword {
         english: "namespace",
         chinese: "命名空间",
     },
