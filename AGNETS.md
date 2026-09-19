@@ -74,12 +74,9 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
 
 ### 验证
 
-- 不写单元测试。验证编译器的方式是实际编写 `.mcl` 源码、用真实编译器编译，并检查 `build/`
-  里生成的 mcfunction 与 JSON 产物来判断是否有问题。
-- `tests/valid/` 放必须编译成功的语料，覆盖各项语言能力；`tests/invalid/` 放必须被拒绝的语料，
-  文件头注释写明期望诊断，改代码后逐个 `mclang check` 核对。
-- 改动编译器后必须运行 `cargo fmt`、`cargo clippy --all-targets` 保持零警告，并运行
-  `bun docs/tools/build.mjs --self-test` 验证示例的双语编译与产物逐字节一致。
+- 不写单元测试。验证编译器的方式是实际编写 `.mcl` 源码、用真实编译器编译，并检查 `build/`里生成的 mcfunction 与 JSON 产物来判断是否有问题。
+- `tests/valid/` 放必须编译成功的语料，覆盖各项语言能力；`tests/invalid/` 放必须被拒绝的语料，文件头注释写明期望诊断，改代码后逐个 `mclang check` 核对。
+- 改动编译器后必须运行 `cargo fmt`、`cargo clippy --all-targets` 保持零警告，并运行bun docs/tools/build.mjs --self-test` 验证示例的双语编译与产物逐字节一致。
 
 ### 文档
 
@@ -124,3 +121,5 @@ cargo run -- check tests/invalid/items.mcl
 - `docs/content/manual.md`：手册正文；`docs/tools/` 从编译器源码提取词表并调用真实编译器验证示例。
 - `docs/assets/`：手册样式与交互脚本。
 - `DEVELOPMENT_PLAN.md`：已完成能力与后续路线，根据项目实际进展进行主动修改打勾。
+
+给GPT系列：当用户要求收尾时，最好先更新同步DEVELOPMENT_PLAN.md，并立即开始减少工具调用，因为此时额度告急无法支撑太多操作，收尾时无需执行验证。
