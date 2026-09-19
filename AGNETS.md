@@ -10,7 +10,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言
   执行上下文分为无、任意实体、非玩家实体和玩家，对应 `@entity`/`@non_player`/`@player` 属性；
   `run`/`execute` 是底层逃生口，`--deny-raw` 可以强制整个项目只用结构化语法。
 - 关键词中英文等价且可混用，两种写法必须生成逐字节相同的产物。
-- 目标版本固定为仓库内 `minecraft_client_26.3-rc-2/` 源码，数据包格式 `121.0`。
+- 目标版本固定为仓库内 `minecraft_client_26.3` 源码，数据包版本 `121.0`。
 - 依赖只有 `serde_json`，Rust edition 2024。
 - 命令行：
   - `mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]`
