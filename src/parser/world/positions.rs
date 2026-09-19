@@ -22,10 +22,13 @@ impl Parser {
         };
         self.expect(TokenKind::LeftParen, "pos 后需要 `(`")?;
         let x = self.coordinate(label)?;
+        self.record_macro_coordinate(&x, MacroCoordinateKind::Horizontal);
         self.expect(TokenKind::Comma, "坐标分量后需要 `,`")?;
         let y = self.coordinate(label)?;
+        self.record_macro_coordinate(&y, MacroCoordinateKind::Vertical);
         self.expect(TokenKind::Comma, "坐标分量后需要 `,`")?;
         let z = self.coordinate(label)?;
+        self.record_macro_coordinate(&z, MacroCoordinateKind::Horizontal);
         let end = self.expect(TokenKind::RightParen, "坐标缺少 `)`")?.span;
         let position = BlockPosition {
             x,
@@ -67,10 +70,13 @@ impl Parser {
         };
         self.expect(TokenKind::LeftParen, "vec3 后需要 `(`")?;
         let x = self.fractional_coordinate(label)?;
+        self.record_macro_coordinate(&x, MacroCoordinateKind::Horizontal);
         self.expect(TokenKind::Comma, "vec3 分量后需要 `,`")?;
         let y = self.fractional_coordinate(label)?;
+        self.record_macro_coordinate(&y, MacroCoordinateKind::Vertical);
         self.expect(TokenKind::Comma, "vec3 分量后需要 `,`")?;
         let z = self.fractional_coordinate(label)?;
+        self.record_macro_coordinate(&z, MacroCoordinateKind::Horizontal);
         let end = self.expect(TokenKind::RightParen, "vec3 缺少 `)`")?.span;
         let position = Vec3Value {
             x,
@@ -105,6 +111,7 @@ impl Parser {
         let z = self.fractional_coordinate(label)?;
         let end = self.expect(TokenKind::RightParen, "vec2 缺少 `)`")?.span;
         for coordinate in [&x, &z] {
+            self.record_macro_coordinate(coordinate, MacroCoordinateKind::Horizontal);
             if coordinate.is_local() {
                 return Err(Diagnostic::new(
                     "vec2 不支持 `^` 局部坐标，请使用绝对坐标或 `~`",
@@ -133,8 +140,10 @@ impl Parser {
         };
         self.expect(TokenKind::LeftParen, "rotation 后需要 `(`")?;
         let yaw = self.fractional_coordinate(label)?;
+        self.record_macro_coordinate(&yaw, MacroCoordinateKind::Angle);
         self.expect(TokenKind::Comma, "rotation 分量后需要 `,`")?;
         let pitch = self.fractional_coordinate(label)?;
+        self.record_macro_coordinate(&pitch, MacroCoordinateKind::Angle);
         let end = self
             .expect(TokenKind::RightParen, "rotation 缺少 `)`")?
             .span;
@@ -153,6 +162,7 @@ impl Parser {
 
     /// 精确坐标分量：`coordinate` 的小数版本。
     fn fractional_coordinate(&mut self, label: &str) -> Result<Coordinate, Diagnostic> {
+        if let Some(value) = self.macro_coordinate(false)? { return Ok(value); }
         if let Some(token) = self.take(&TokenKind::Tilde) {
             let offset = self.coordinate_offset(label, &token)?;
             return Ok(Coordinate::Relative(format!("~{offset}")));
@@ -197,6 +207,7 @@ impl Parser {
         let z = self.coordinate(label)?;
         let end = self.expect(TokenKind::RightParen, "列坐标缺少 `)`")?.span;
         for coordinate in [&x, &z] {
+            self.record_macro_coordinate(coordinate, MacroCoordinateKind::Horizontal);
             if coordinate.is_local() {
                 return Err(Diagnostic::new(
                     "forceload 的列坐标不支持 `^` 局部坐标，请使用绝对坐标或 `~`",
@@ -230,6 +241,7 @@ impl Parser {
 
     /// 一个坐标分量：绝对整数、`~[±数]` 或 `^[±数]`。
     fn coordinate(&mut self, label: &str) -> Result<Coordinate, Diagnostic> {
+        if let Some(value) = self.macro_coordinate(true)? { return Ok(value); }
         if let Some(token) = self.take(&TokenKind::Tilde) {
             let offset = self.coordinate_offset(label, &token)?;
             return Ok(Coordinate::Relative(format!("~{offset}")));

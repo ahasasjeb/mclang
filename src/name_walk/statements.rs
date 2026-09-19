@@ -70,6 +70,10 @@ fn statement_kind_names(
     context: &NameContext<'_>,
 ) {
     match kind {
+        StatementKind::MacroCall { target, arguments } => {
+            call_target_names(target, visitor, context);
+            if let MacroArguments::With { source, .. } = arguments { nbt_source_names(source, visitor, context); }
+        }
         StatementKind::CoreCommand(command) => {
             super::core_commands::core_command_names(command, visitor, context)
         }
@@ -94,11 +98,11 @@ fn statement_kind_names(
         }
         StatementKind::EffectGive { target, .. }
         | StatementKind::EffectClear { target, .. }
-        | StatementKind::XpChange { target, .. }
-        | StatementKind::ClearInventory { target, .. } => {
+        | StatementKind::XpChange { target, .. } => {
             visitor(context, NameSite::Reference, NameRole::Query, target);
         }
         StatementKind::StopwatchAction { .. } => {}
+        StatementKind::ClearInventory { target, .. } => { if let Some(target) = target { holder_names(target, visitor, context); } }
         StatementKind::PlaySound { targets, .. } => {
             if let Some(targets) = targets {
                 visitor(context, NameSite::Reference, NameRole::Query, targets);
@@ -115,9 +119,7 @@ fn statement_kind_names(
             expression_names(value, visitor, context);
         }
         StatementKind::Schedule { target, .. } => call_target_names(target, visitor, context),
-        StatementKind::ScheduleClear { function } => {
-            visitor(context, NameSite::Reference, NameRole::Function, function);
-        }
+        StatementKind::ScheduleClear { target } => call_target_names(target, visitor, context),
         StatementKind::Assign { target, value, .. } => {
             visitor(context, NameSite::Reference, NameRole::Score, target);
             expression_names(value, visitor, context);

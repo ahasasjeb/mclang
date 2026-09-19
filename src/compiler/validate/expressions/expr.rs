@@ -131,9 +131,9 @@ pub(in crate::compiler::validate) fn validate_expr(
             }
         }
         ExprKind::Random { min, max } => {
-            if min > max {
+            if !(1..i64::from(i32::MAX)).contains(&(i64::from(*max) - i64::from(*min))) {
                 diagnostics.push(Diagnostic::new(
-                    format!("random 的最小值 {min} 不能大于最大值 {max}"),
+                    format!("random 的范围 {min}..{max} 必须至少包含两个整数，且上下界之差小于 2147483647"),
                     expression.span,
                 ));
             }

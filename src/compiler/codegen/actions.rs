@@ -30,6 +30,7 @@ impl Compiler<'_> {
                 let argument = item_stack_argument(item);
                 let count = count.unwrap_or(item.count);
                 let prefix = match target {
+                    GiveTarget::SelfEntity => String::new(),
                     GiveTarget::Query(name) => {
                         format!("execute {} run ", entity_query_clause(self.query(name)))
                     }
@@ -49,6 +50,7 @@ impl Compiler<'_> {
                 let argument = item_stack_argument(item);
                 let count = count.unwrap_or(item.count);
                 match target {
+                    GiveTarget::SelfEntity => commands.push(format!("give @s {argument} {count}")),
                     GiveTarget::Query(name) => {
                         let query = self
                             .program
@@ -94,6 +96,7 @@ impl Compiler<'_> {
         commands.push(format!("tag @s add {tag}"));
         commands.push(format!("scoreboard players set {flag} {objective} 0"));
         match target {
+            GiveTarget::SelfEntity => commands.push(format!("execute store success score {flag} {objective} run {replace}")),
             GiveTarget::Origin => commands.push(format!(
                 "execute on origin if entity @s[type=minecraft:player] store success score {flag} {objective} run {replace}"
             )),

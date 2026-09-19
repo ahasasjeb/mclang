@@ -162,7 +162,7 @@ impl Parser {
             self.expect(TokenKind::Comma, "物品条件来源后需要 `,`")?;
             let (slots, slots_span) = self.string("if items 需要槽位字符串")?;
             self.expect(TokenKind::Comma, "if items 槽位后需要 `,`")?;
-            let (item, item_span) = self.string("if items 需要物品谓词字符串")?;
+            let item = self.item_predicate()?;
             let end = self
                 .expect(TokenKind::RightParen, "items 条件缺少 `)`")?
                 .span;
@@ -171,7 +171,6 @@ impl Parser {
                 slots,
                 slots_span,
                 item,
-                item_span,
                 span: start.span.merge(end),
             });
         }

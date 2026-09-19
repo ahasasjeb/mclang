@@ -3,7 +3,7 @@ use super::*;
 impl Coordinate {
     pub fn text(&self) -> &str {
         match self {
-            Self::Absolute(text) | Self::Relative(text) | Self::Local(text) => text,
+            Self::Macro(text) | Self::Absolute(text) | Self::Relative(text) | Self::Local(text) => text,
         }
     }
 
@@ -15,7 +15,7 @@ impl Coordinate {
     pub fn absolute_integer(&self) -> Option<i32> {
         match self {
             Self::Absolute(text) => text.parse().ok(),
-            Self::Relative(_) | Self::Local(_) => None,
+            Self::Macro(_) | Self::Relative(_) | Self::Local(_) => None,
         }
     }
 }

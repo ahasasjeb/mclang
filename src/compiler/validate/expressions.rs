@@ -144,17 +144,11 @@ pub(super) fn validate_condition(
             slots,
             slots_span,
             item,
-            item_span,
             ..
         } => {
             validate_item_condition_source(source, condition_span(condition), ctx, diagnostics);
             validate_slot_source(slots, *slots_span, diagnostics);
-            if !valid_item_predicate(item) {
-                diagnostics.push(Diagnostic::new(
-                    format!("`{item}` 不是有效的物品谓词（物品 id、`#标签` 或带组件过滤器的 id）"),
-                    *item_span,
-                ));
-            }
+            super::item_components::validate_predicate(item, diagnostics);
         }
         Condition::Slots {
             source,
@@ -166,15 +160,23 @@ pub(super) fn validate_condition(
             validate_slot_source(slots, *slots_span, diagnostics);
         }
         Condition::Function { target, span } => match target {
+            CallTarget::External(id) => super::macros::validate_external_function(id, *span, diagnostics),
             CallTarget::Function(name) => match ctx.symbols.functions.get(name.as_str()) {
                 None => diagnostics.push(Diagnostic::new(format!("找不到函数 `{name}`；如果它来自其他模块，请确认对方声明了 `export`，并在本模块 `import` 它"), *span)),
                 Some(signature) => {
+                    if signature.parameters != 0 { diagnostics.push(Diagnostic::new(format!("函数条件 `{name}` 不能引用需要参数的函数"), *span)); }
                     validate_call_context(name, *signature, *span, ctx, diagnostics);
                 }
             },
             CallTarget::Tag(tag) => {
                 if !ctx.symbols.function_tags.contains_key(tag.as_str()) {
                     diagnostics.push(Diagnostic::new(format!("找不到函数标签 `#{tag}`"), *span));
+                }
+                for name in super::tags::reachable_functions(tag, ctx.symbols.function_tags) {
+                    if let Some(signature) = ctx.symbols.functions.get(name) {
+                        if signature.parameters != 0 { diagnostics.push(Diagnostic::new(format!("函数条件标签 `#{tag}` 中的 `{name}` 需要参数"), *span)); }
+                        validate_call_context(name, *signature, *span, ctx, diagnostics);
+                    }
                 }
             }
         },
@@ -238,15 +240,6 @@ pub(super) fn validate_slot_source(slots: &str, span: Span, diagnostics: &mut Ve
 }
 
 /// 物品谓词：物品 id、`#标签`，可带 `[组件过滤器]`。
-fn valid_item_predicate(text: &str) -> bool {
-    if text.is_empty() || text.contains(char::is_whitespace) {
-        return false;
-    }
-    let base = text.strip_prefix('#').unwrap_or(text);
-    let location = base.split('[').next().unwrap_or(base);
-    super::rules::valid_resource_location(location)
-}
-
 /// `compute` 的公共校验（表达式与 `data.modify` 的 compute 来源共用）。
 #[allow(clippy::too_many_arguments)]
 pub(super) fn validate_compute(

@@ -141,6 +141,7 @@ pub(super) fn call_target_names(
     context: &NameContext<'_>,
 ) {
     match target {
+        CallTarget::External(_) => {},
         CallTarget::Function(name) => {
             visitor(context, NameSite::Reference, NameRole::Function, name);
         }

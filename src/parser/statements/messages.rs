@@ -167,10 +167,10 @@ impl Parser {
             ));
         }
         self.expect(TokenKind::LeftParen, "schedule.clear 后需要 `(`")?;
-        let (function, _) = self.ident("被清除调度的函数名称")?;
+        let target = self.call_target("被清除调度的函数名称")?;
         self.expect(TokenKind::RightParen, "schedule.clear 缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "schedule.clear 后需要 `;`")?;
-        Ok(StatementKind::ScheduleClear { function })
+        Ok(StatementKind::ScheduleClear { target })
     }
 
     /// 读取 `[符号]<数值><单位>`，换算为游戏刻并生成规范化文本。
@@ -244,6 +244,7 @@ impl Parser {
     }
 
     pub(in crate::parser) fn call_target(&mut self, label: &str) -> Result<CallTarget, Diagnostic> {
+        if matches!(self.current().kind, TokenKind::String(_)) { return Ok(CallTarget::External(self.string(label)?.0)); }
         if self.take(&TokenKind::Hash).is_some() {
             let (name, _) = self.ident("函数标签名称")?;
             Ok(CallTarget::Tag(name))

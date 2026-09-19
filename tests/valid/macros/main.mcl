@@ -1,0 +1,24 @@
+namespace macro_test;
+import helpers;
+query players = entity("minecraft:player") {}
+score active = 1;
+fn_tag greetings { value(welcome); value(公告); }
+
+macro fn welcome(text label, integer x, decimal z) {
+    message.all(text("Hello $(label)"));
+    teleport(players, vec3(macro(x), 64, macro(z)));
+    if active == 1 {
+        message.all(text("$(label) arrived"));
+    }
+    for index in 0..2 {
+        message.all(text("$(label)"));
+    }
+}
+
+fn invoke() {
+    call welcome(nbt { label = "Alex"; x = 5; z = 0.5d; });
+    call #greetings(nbt { label = "Steve"; x = 6; z = 1.5d; 标题 = "Welcome"; });
+    call "external:plain"();
+    call "#external:tag"(nbt { note = "test"; });
+    schedule "external:plain"() after 1 s;
+}

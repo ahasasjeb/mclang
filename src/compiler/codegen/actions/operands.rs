@@ -133,12 +133,11 @@ impl Compiler<'_> {
 
     pub(in crate::compiler::codegen) fn compile_clear_inventory(
         &mut self,
-        target: &str,
+        target: &Option<Holder>,
         item: Option<&crate::ast::ItemPredicate>,
         max_count: Option<u32>,
         commands: &mut Vec<String>,
     ) {
-        let query = self.query(target);
         let mut command = "clear @s".to_owned();
         if let Some(item) = item {
             command.push_str(&format!(
@@ -149,10 +148,8 @@ impl Compiler<'_> {
                 command.push_str(&format!(" {max_count}"));
             }
         }
-        commands.push(format!(
-            "execute {} run {command}",
-            entity_query_clause(query)
-        ));
+        let prefix = target.as_ref().map(|target| self.score_holder_prefix(target)).unwrap_or_default();
+        commands.push(format!("{prefix}{command}"));
     }
 
     pub(in crate::compiler::codegen) fn query(&self, name: &str) -> &crate::ast::EntityQueryDecl {

@@ -70,6 +70,7 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         let name = match target {
+            CallTarget::External(id) => id.clone(),
             CallTarget::Function(function) => format!("{}:{function}", self.program.namespace),
             CallTarget::Tag(tag) => format!("#{}:{tag}", self.program.namespace),
         };

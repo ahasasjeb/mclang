@@ -10,6 +10,7 @@ pub(super) fn validate_give_statement(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     match target {
+        GiveTarget::SelfEntity => super::super::entity_commands::entity_target(&Holder::SelfEntity, false, true, span, ctx, diagnostics),
         GiveTarget::Query(name) => match ctx.symbols.queries.get(name.as_str()) {
             None => diagnostics.push(Diagnostic::new(format!("找不到实体查询 `{name}`"), span)),
             Some(query) if query.entity_type != "minecraft:player" => {

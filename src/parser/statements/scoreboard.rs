@@ -114,7 +114,7 @@ impl Parser {
                 TeleportDestination::Entity { query, query_span }
             };
         let rotation = if self.take(&TokenKind::Comma).is_some() {
-            Some(if self.take_word("facing").is_some() {
+            Some(if self.take_command_word("facing") {
                 self.command_facing()?
             } else {
                 Facing::Rotation(self.rotation_value("传送朝向")?)

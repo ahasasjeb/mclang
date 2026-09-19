@@ -267,8 +267,7 @@ pub enum Condition {
         source: ItemConditionSource,
         slots: String,
         slots_span: Span,
-        item: String,
-        item_span: Span,
+        item: ItemPredicate,
         span: Span,
     },
     /// `if slots(来源, 槽位)`：槽位里是否有物品。

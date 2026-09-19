@@ -18,6 +18,7 @@ mod emit;
 mod entity_commands;
 mod expressions;
 mod names;
+mod macros;
 mod statements;
 mod world;
 
@@ -83,6 +84,7 @@ impl<'a> Compiler<'a> {
             let commands = self.compile_block(&function.body, &function.name);
             self.functions.insert(function.name.clone(), commands);
         }
+        self.finish_macros();
 
         let load_functions = self
             .program

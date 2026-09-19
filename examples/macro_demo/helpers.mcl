@@ -1,0 +1,3 @@
+export macro fn 公告(text 标题) {
+    message.all(text("$(标题)"));
+}

@@ -36,6 +36,10 @@ pub(super) fn validate_entity_command(
         } => {
             entity_target(target, false, false, span, ctx, diagnostics);
             validate_id("enchantment", "附魔", enchantment, span, diagnostics);
+            if let Some(maximum) = crate::version::snapshot::snapshot().enchantment_max_level(enchantment)
+                && u64::from(level.unwrap_or(1)) > maximum {
+                diagnostics.push(Diagnostic::new(format!("附魔 `{enchantment}` 的最高等级为 {maximum}"), span));
+            }
             if level.is_some_and(|v| v > i32::MAX as u32) {
                 diagnostics.push(Diagnostic::new("附魔等级不能超过 2147483647", span));
             }

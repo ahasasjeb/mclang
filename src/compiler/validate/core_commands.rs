@@ -89,7 +89,7 @@ pub(super) fn validate_core_command(
                     }
                 }
             }
-            match source {
+            match source.as_ref() {
                 LootSource::Table(table) => {
                     validate_resource_ref(table, "loot_table", ctx.symbols.loot_tables, diagnostics)
                 }

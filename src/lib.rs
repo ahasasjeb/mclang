@@ -112,7 +112,7 @@ pub fn build_file(
 fn raw_statement_count(functions: &[ast::Function]) -> usize {
     functions
         .iter()
-        .map(|function| raw_count_in_block(&function.body))
+        .map(|function| raw_count_in_block(&function.body) + usize::from(function.macro_signature.as_ref().is_some_and(|s| s.parameters.iter().any(|p| p.kind == ast::MacroType::Nbt))))
         .sum()
 }
 
@@ -120,6 +120,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
     statements
         .iter()
         .map(|statement| match &statement.kind {
+            ast::StatementKind::MacroCall { arguments, .. } => usize::from(matches!(arguments, ast::MacroArguments::With { .. })),
             ast::StatementKind::CoreCommand(_) | ast::StatementKind::EntityCommand(_) => 0,
             ast::StatementKind::Run(_) => 1,
             ast::StatementKind::Return(ast::ReturnKind::Run(_)) => 1,

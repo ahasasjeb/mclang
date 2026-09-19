@@ -7,6 +7,7 @@ pub(super) fn validate_statement<'a>(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     match &statement.kind {
+        StatementKind::MacroCall { target, arguments } => crate::compiler::validate::macros::validate_macro_call(target, arguments, statement.span, ctx, diagnostics),
         StatementKind::CoreCommand(command) => {
             crate::compiler::validate::core_commands::validate_core_command(
                 command,
@@ -139,6 +140,10 @@ pub(super) fn validate_statement<'a>(
             validate_return(kind, locals, statement.span, ctx, diagnostics);
         }
         StatementKind::Call { target, arguments } => match target {
+            CallTarget::External(id) => {
+                crate::compiler::validate::macros::validate_external_function(id, statement.span, diagnostics);
+                if !arguments.is_empty() { diagnostics.push(Diagnostic::new("外部函数不接受计分 ABI 参数；请使用 nbt 宏参数", statement.span)); }
+            }
             CallTarget::Function(function) => {
                 validate_call(
                     function,
@@ -154,6 +159,7 @@ pub(super) fn validate_statement<'a>(
             }
         },
         StatementKind::Schedule { target, .. } => match target {
+            CallTarget::External(id) => crate::compiler::validate::macros::validate_external_function(id, statement.span, diagnostics),
             CallTarget::Function(function) => {
                 validate_schedule(function, statement.span, ctx, diagnostics);
             }
@@ -161,9 +167,11 @@ pub(super) fn validate_statement<'a>(
                 validate_tag_schedule(tag, statement.span, ctx, diagnostics);
             }
         },
-        StatementKind::ScheduleClear { function } => {
-            validate_schedule(function, statement.span, ctx, diagnostics);
-        }
+        StatementKind::ScheduleClear { target } => match target {
+            CallTarget::Function(function) => validate_schedule(function, statement.span, ctx, diagnostics),
+            CallTarget::External(id) if !id.starts_with('#') => crate::compiler::validate::macros::validate_external_function(id, statement.span, diagnostics),
+            _ => diagnostics.push(Diagnostic::new("schedule.clear 只接受函数资源位置，原版不能清除 #标签 调度", statement.span)),
+        },
         StatementKind::Assign {
             target,
             operation,

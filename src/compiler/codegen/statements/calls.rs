@@ -47,6 +47,7 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         match target {
+            CallTarget::External(id) => commands.push(format!("function {id}")),
             CallTarget::Function(function) => {
                 self.bind_arguments(function, arguments, owner, commands);
                 commands.push(format!("function {}:{function}", self.program.namespace));

@@ -25,11 +25,11 @@ use border::validate_world_border;
 use gamerules::validate_game_rule;
 
 /// 水平坐标范围，对应 `Level.isInWorldBoundsHorizontal` 的半开区间。
-const HORIZONTAL_MIN: i32 = -30_000_000;
-const HORIZONTAL_MAX: i32 = 29_999_999;
+pub(super) const HORIZONTAL_MIN: i32 = -30_000_000;
+pub(super) const HORIZONTAL_MAX: i32 = 29_999_999;
 /// 垂直坐标范围，对应 `DimensionType.MIN_Y..=MAX_Y`。
-const VERTICAL_MIN: i32 = -2032;
-const VERTICAL_MAX: i32 = 2031;
+pub(super) const VERTICAL_MIN: i32 = -2032;
+pub(super) const VERTICAL_MAX: i32 = 2031;
 /// `WorldBorderCommand` 的边长与中心限制。
 const BORDER_MAX_SIZE: f64 = 59_999_968.0;
 const BORDER_MAX_CENTER: f64 = 29_999_984.0;

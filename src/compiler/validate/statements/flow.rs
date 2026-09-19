@@ -37,6 +37,7 @@ pub(super) fn validate_call<'a>(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     if let Some(signature) = ctx.symbols.functions.get(function) {
+        if signature.is_macro { diagnostics.push(Diagnostic::new(format!("宏函数 `{function}` 需要 nbt 参数或 with 来源，不能使用计分实参调用"), span)); }
         if arguments.len() != signature.parameters {
             diagnostics.push(Diagnostic::new(
                 format!(

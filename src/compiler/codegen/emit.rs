@@ -178,6 +178,7 @@ fn parse_range(text: &str) -> Option<(Option<f64>, Option<f64>)> {
 
 /// 物品过滤器到谓词文本：`id[组件...]`，`count`/`custom_name` 合并进组件列表。
 pub(super) fn item_filter_predicate(item: &ItemFilter) -> String {
+    let predicate = item_predicate_text(&item.item_id);
     let mut components = Vec::new();
     if let Some(custom_name) = &item.custom_name {
         components.push(format!(
@@ -189,19 +190,19 @@ pub(super) fn item_filter_predicate(item: &ItemFilter) -> String {
         components.push(format!("minecraft:count={count}"));
     }
     if components.is_empty() {
-        return item.item_id.clone();
+        return predicate;
     }
     let extra = components.join(",");
-    match item.item_id.rfind('[') {
-        Some(open) if item.item_id.ends_with(']') => {
-            let inner = &item.item_id[open + 1..item.item_id.len() - 1];
+    match predicate.rfind('[') {
+        Some(open) if predicate.ends_with(']') => {
+            let inner = &predicate[open + 1..predicate.len() - 1];
             if inner.is_empty() {
-                format!("{}[{extra}]", &item.item_id[..open])
+                format!("{}[{extra}]", &predicate[..open])
             } else {
-                format!("{}[{inner},{extra}]", &item.item_id[..open])
+                format!("{}[{inner},{extra}]", &predicate[..open])
             }
         }
-        _ => format!("{}[{extra}]", item.item_id),
+        _ => format!("{predicate}[{extra}]"),
     }
 }
 

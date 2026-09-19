@@ -40,6 +40,7 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         match &statement.kind {
+            StatementKind::MacroCall { target, arguments } => commands.push(self.macro_call_text(target, arguments)),
             StatementKind::CoreCommand(command) => commands.push(self.core_command_text(command)),
             StatementKind::EntityCommand(command) => {
                 commands.push(self.entity_command_text(command))

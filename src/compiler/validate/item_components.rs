@@ -2,8 +2,12 @@ use super::registry::{validate_id, validate_id_or_tag};
 use crate::{ast::*, diagnostic::Diagnostic};
 
 pub(super) fn validate_predicate(predicate: &ItemPredicate, diagnostics: &mut Vec<Diagnostic>) {
-    if predicate.item != "*" {
-        validate_id_or_tag("item", "物品", &predicate.item, predicate.span, diagnostics);
+    let base = predicate.item.split('[').next().unwrap_or(&predicate.item);
+    if base != "*" {
+        validate_id_or_tag("item", "物品", base, predicate.span, diagnostics);
+    }
+    if predicate.item.contains('[') && !super::items::valid_item_predicate(&predicate.item) {
+        diagnostics.push(Diagnostic::new("物品谓词的组件过滤器不完整；建议使用 item_predicate 结构化条件", predicate.span));
     }
     for test in predicate.clauses.iter().flatten() {
         let registry = if matches!(test.kind, ItemComponentTestKind::Match(_)) {
@@ -11,7 +15,9 @@ pub(super) fn validate_predicate(predicate: &ItemPredicate, diagnostics: &mut Ve
         } else {
             "data_component_type"
         };
-        if test.id != "minecraft:count" {
+        let component_existence = matches!(test.kind, ItemComponentTestKind::Match(_))
+            && crate::version::snapshot::snapshot().registry_contains("data_component_type", &test.id) == Some(true);
+        if test.id != "minecraft:count" && !component_existence {
             validate_id(registry, "组件条件", &test.id, test.span, diagnostics);
         }
     }
@@ -51,7 +57,7 @@ pub(super) fn validate_components(item: &ItemStackDecl, diagnostics: &mut Vec<Di
     }
     for entry in entries {
         let removed = entry.key.starts_with('!');
-        let id = entry.key.trim_start_matches('!');
+        let id = entry.key.strip_prefix('!').unwrap_or(&entry.key);
         validate_id(
             "data_component_type",
             "物品组件",
@@ -68,7 +74,7 @@ pub(super) fn validate_components(item: &ItemStackDecl, diagnostics: &mut Vec<Di
         if removed {
             if !matches!(&entry.value.kind, NbtValueKind::Compound(v) if v.is_empty()) {
                 diagnostics.push(Diagnostic::new(
-                    "删除组件使用 \"!minecraft:组件\": {}，不接受组件值",
+                    "删除组件使用 \"!minecraft:组件\" = {};，不接受组件值",
                     entry.value.span,
                 ));
             }

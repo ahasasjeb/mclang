@@ -1,0 +1,77 @@
+namespace entity_commands;
+query players = entity("minecraft:player") {}
+query player_one = entity("minecraft:player") { limit(1); }
+query mob_one = entity("minecraft:zombie") { limit(1); }
+query mobs = entity("minecraft:zombie") {}
+objective request { criteria = "trigger"; }
+
+fn commands() {
+    kill(mobs);
+    tag.add(mobs, "test");
+    tag.remove(mobs, "test");
+    let tags = tag.list(mobs);
+    enchant(players, "minecraft:sharpness", 3);
+    damage(mob_one, 1.5, "minecraft:arrow", by player_one from player_one);
+    damage(mob_one, 2, "minecraft:generic", at vec3(~, ~1, ~));
+    attribute.base.set(mob_one, "minecraft:max_health", 40);
+    attribute.base.reset(mob_one, "minecraft:max_health");
+    let health = attribute.get(mob_one, "minecraft:max_health", 10);
+    let base_health = attribute.base.get(mob_one, "minecraft:max_health");
+    attribute.modifier.add(mob_one, "minecraft:max_health", "entity_commands:bonus", 2, add_value);
+    let modifier = attribute.modifier.value.get(mob_one, "minecraft:max_health", "entity_commands:bonus");
+    attribute.modifier.remove(mob_one, "minecraft:max_health", "entity_commands:bonus");
+    ride.mount(player_one, mob_one);
+    ride.dismount(player_one);
+    rotate.to(mob_one, rotation(~10, 0));
+    rotate.facing(mob_one, player_one, eyes);
+    rotate.facing(mob_one, vec3(0, 64, 0));
+    teleport(players, pos(0, 64, 0), facing mob_one, eyes);
+    spreadplayers(vec2(0, 0), 4, 32, true, players, under 100);
+    spectate(mob_one, player_one);
+    swing(mobs, offhand, stab, 2 s);
+    gamemode(adventure, players);
+    defaultgamemode(survival);
+    difficulty(hard);
+    let mode = difficulty();
+    spawnpoint(players, pos(0, 64, 0), rotation(90, 0));
+    setworldspawn(pos(0, 64, 0), rotation(90, 0));
+    team.add("red", text("Red"));
+    team.join("red", players);
+    team.modify.display_name("red", text("Team"));
+    team.modify.color("red", red);
+    team.modify.friendly_fire("red", false);
+    team.modify.see_friendly_invisibles("red", true);
+    team.modify.nametag_visibility("red", hide_for_other_teams);
+    team.modify.death_message_visibility("red", never);
+    team.modify.collision_rule("red", push_other_teams);
+    team.modify.prefix("red", text("[R]"));
+    team.modify.suffix("red", text("!"));
+    team.modify.color("red", reset);
+    team.list("red");
+    team.list();
+    team.leave(players);
+    team.join("red", "OfflinePlayer");
+    team.empty("red");
+    team.remove("red");
+    waypoint.list();
+    waypoint.modify.color(mob_one, gold);
+    waypoint.modify.color.hex(mob_one, "ABCDEF");
+    waypoint.modify.color.reset(mob_one);
+    waypoint.modify.style.set(mob_one, "minecraft:default");
+    waypoint.modify.style.reset(mob_one);
+    list(true);
+}
+
+@player fn sender_defaults() {
+    swing();
+    spectate();
+    gamemode(survival);
+    spawnpoint();
+    team.join("red");
+    trigger(request);
+    trigger(request, add, 2);
+    trigger(request, set, -1);
+    kill();
+}
+
+

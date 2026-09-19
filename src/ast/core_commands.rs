@@ -23,7 +23,7 @@ pub enum CoreCommand {
     },
     Loot {
         target: LootTarget,
-        source: LootSource,
+        source: Box<LootSource>,
     },
 }
 

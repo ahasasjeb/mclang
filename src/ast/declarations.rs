@@ -152,7 +152,7 @@ impl EntitySort {
 #[derive(Debug)]
 pub struct ItemFilter {
     pub slot: String,
-    pub item_id: String,
+    pub item_id: ItemPredicate,
     pub count: Option<u32>,
     pub custom_name: Option<String>,
     pub span: Span,
@@ -347,6 +347,7 @@ pub struct Function {
     pub name: String,
     pub name_span: Span,
     pub parameters: Vec<Parameter>,
+    pub macro_signature: Option<MacroSignature>,
     pub returns_score: bool,
     pub attributes: Vec<Attribute>,
     pub body: Vec<Statement>,
@@ -373,6 +374,7 @@ pub enum Attribute {
 /// 文本已经规范化为 Minecraft 参数写法（`~1`、`^`、`-3.5`），代码生成直接转发。
 #[derive(Clone, Debug)]
 pub enum Coordinate {
+    Macro(String),
     Absolute(String),
     Relative(String),
     Local(String),

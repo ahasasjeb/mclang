@@ -3,6 +3,7 @@
 mod actions;
 mod core_commands;
 mod data;
+mod macros;
 mod declarations;
 mod entity_commands;
 mod execute;
@@ -16,6 +17,7 @@ mod text;
 pub use actions::*;
 pub use core_commands::*;
 pub use data::*;
+pub use macros::*;
 pub use declarations::*;
 pub use entity_commands::*;
 pub use execute::*;

@@ -102,6 +102,8 @@ const PROPERTY_FAMILIES = [
 /** 只在后面跟 `(` 时按函数名翻译的表：`facing(...)` 是 execute 子句，
  * `facing = "south"` 却是方块状态属性，不能混用同一张表。 */
 const CALL_FAMILIES = ["execute_clause"];
+const COMMAND_RECEIVERS = new Set(["tag", "attribute", "ride", "rotate", "team", "waypoint", "datapack", "recipe", "loot", "random"]);
+const COMMAND_CALLS = new Set(["kill", "enchant", "damage", "spreadplayers", "spectate", "swing", "trigger", "gamemode", "defaultgamemode", "difficulty", "spawnpoint", "setworldspawn", "list", "reload", "teleport", "has", "equals", "matches"]);
 
 /** 调用实参里允许出现的枚举值表，键是规范化的“接收者.方法”或裸函数名。 */
 const CALL_VALUE_CONTEXTS = {
@@ -147,6 +149,7 @@ const LOOSE_VALUE_FAMILIES = [
   "template_rotation",
   "template_mirror",
   "strict_word",
+  "command_value",
 ];
 
 export function buildTranslator(data) {
@@ -211,6 +214,7 @@ export function buildTranslator(data) {
       ...PROPERTY_FAMILIES,
       ...CALL_FAMILIES,
       ...Object.values(RECEIVER_FAMILIES),
+      "command_value",
     ]) {
       const { forward, backward } = indexOf(family);
       if (forward.has(word)) return word;
@@ -223,17 +227,25 @@ export function buildTranslator(data) {
   const calleeName = (tokens, openIndex) => {
     const method = previousSignificant(tokens, openIndex);
     if (!method || method.type !== "ident") return null;
-    const dot = previousSignificant(tokens, method.index);
-    if (dot?.text === ".") {
+    const parts = [method.text];
+    let current = method;
+    while (previousSignificant(tokens, current.index)?.text === ".") {
+      const dot = previousSignificant(tokens, current.index);
       const receiver = previousSignificant(tokens, dot.index);
-      if (receiver?.type === "ident") return `${receiver.text}.${method.text}`;
+      if (receiver?.type !== "ident") break;
+      parts.unshift(receiver.text);
+      current = receiver;
     }
-    return method.text;
+    return parts.join(".");
   };
 
   const canonicalCallee = (tokens, openIndex) => {
     const raw = calleeName(tokens, openIndex);
     if (!raw) return null;
+    const parts = raw.split(".");
+    if (COMMAND_RECEIVERS.has(canonicalWord(parts[0]) ?? parts[0])) {
+      return parts.map(part => canonicalWord(part) ?? part).join(".");
+    }
     const [head, tail] = raw.includes(".") ? raw.split(".") : [raw, null];
     const receiver = canonicalWord(head) ?? head;
     if (tail === null) return receiver;
@@ -286,6 +298,14 @@ export function buildTranslator(data) {
 
     if (previous?.text === ".") {
       const receiver = previousSignificant(tokens, previous.index);
+      let root = receiver;
+      while (root && previousSignificant(tokens, root.index)?.text === ".") {
+        const dot = previousSignificant(tokens, root.index);
+        root = previousSignificant(tokens, dot.index);
+      }
+      if (COMMAND_RECEIVERS.has(canonicalWord(root?.text))) {
+        return rewrite(word, "command_value", target) ?? lookupKeywords(word, target);
+      }
       const family = receiver ? RECEIVER_FAMILIES[receiver.text] : undefined;
       if (family) {
         const rewritten = rewrite(word, family, target);
@@ -303,6 +323,11 @@ export function buildTranslator(data) {
 
     // 函数调用位置：声明属性与 execute 子句都写在这。
     if (next?.text === "(") {
+      const canonical = canonicalWord(word);
+      if (COMMAND_CALLS.has(canonical) || COMMAND_RECEIVERS.has(canonical)) {
+        const rewritten = lookupKeywords(word, target) ?? rewrite(word, "command_value", target);
+        if (rewritten) return rewritten;
+      }
       for (const family of [...PROPERTY_FAMILIES, ...CALL_FAMILIES]) {
         const rewritten = rewrite(word, family, target);
         if (rewritten) return rewritten;
@@ -332,6 +357,10 @@ export function buildTranslator(data) {
     // 枚举值只在取值位置翻译，避免命中同名标识符。
     const frame = frames[index];
     if (frame && frame !== "{") {
+      if (COMMAND_RECEIVERS.has(frame.split(".")[0]) || COMMAND_CALLS.has(frame)) {
+        const rewritten = rewrite(word, "command_value", target) ?? rewrite(word, "text_color", target);
+        if (rewritten) return rewritten;
+      }
       for (const family of CALL_VALUE_CONTEXTS[frame] ?? []) {
         const rewritten = rewrite(word, family, target);
         if (rewritten) return rewritten;

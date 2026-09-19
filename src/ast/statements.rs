@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug)]
 pub enum StatementKind {
+    MacroCall { target: CallTarget, arguments: MacroArguments },
     CoreCommand(Box<CoreCommand>),
     EntityCommand(Box<EntityCommand>),
     Run(String),
@@ -47,7 +48,7 @@ pub enum StatementKind {
         id: String,
     },
     ClearInventory {
-        target: String,
+        target: Option<Holder>,
         item: Option<ItemPredicate>,
         max_count: Option<u32>,
     },
@@ -154,7 +155,7 @@ pub enum StatementKind {
         mode: ScheduleMode,
     },
     ScheduleClear {
-        function: String,
+        target: CallTarget,
     },
     Assign {
         target: String,

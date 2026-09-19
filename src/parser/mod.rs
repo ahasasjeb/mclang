@@ -22,6 +22,7 @@ mod execute;
 mod expressions;
 mod item_predicates;
 mod items;
+mod macros;
 pub(crate) mod keywords;
 mod nbt;
 mod statements;
@@ -34,7 +35,7 @@ use crate::lexer::{Token, TokenKind};
 use keywords::{keyword_alias, word_matches};
 
 pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
-    Parser { tokens, cursor: 0 }
+    Parser { tokens, cursor: 0, active_macro_parameters: std::collections::HashMap::new(), active_macro_uses: Vec::new(), active_macro_coordinates: Vec::new() }
         .program()
         .map_err(|error| vec![error])
 }
@@ -42,6 +43,9 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
 struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
+    active_macro_parameters: std::collections::HashMap<String, MacroType>,
+    active_macro_uses: Vec<(String, Span)>,
+    active_macro_coordinates: Vec<(String, MacroCoordinateKind)>,
 }
 
 impl Parser {

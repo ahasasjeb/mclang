@@ -144,14 +144,15 @@ pub(super) fn validate_xp_change(
 }
 
 pub(super) fn validate_clear_inventory(
-    target: &str,
+    target: &Option<Holder>,
     item: Option<&crate::ast::ItemPredicate>,
     max_count: Option<u32>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    require_player_query(target, span, ctx, diagnostics);
+    if let Some(Holder::Query(name, _)) = target { require_player_query(name, span, ctx, diagnostics); }
+    else { super::super::entity_commands::entity_target(target.as_ref().unwrap_or(&Holder::SelfEntity), false, true, span, ctx, diagnostics); }
     if let Some(item) = item {
         super::super::item_components::validate_predicate(item, diagnostics);
     }

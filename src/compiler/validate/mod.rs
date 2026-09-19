@@ -13,6 +13,7 @@ mod expressions;
 mod functions;
 mod item_components;
 mod items;
+mod macros;
 mod recursion;
 mod registry;
 pub(super) mod rules;

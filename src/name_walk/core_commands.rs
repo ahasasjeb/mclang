@@ -23,7 +23,7 @@ pub(super) fn core_command_names(
                 LootTarget::Replace { target, .. } => item_source_names(target, visitor, context),
                 _ => {}
             }
-            match source {
+            match source.as_mut() {
                 LootSource::Table(table) => {
                     reference_names(table, NameRole::Resource, visitor, context)
                 }

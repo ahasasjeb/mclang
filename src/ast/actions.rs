@@ -225,6 +225,7 @@ impl XpKind {
 /// 被调用或被调度的目标：本命名空间函数或 `#` 函数标签。
 #[derive(Debug)]
 pub enum CallTarget {
+    External(String),
     Function(String),
     Tag(String),
 }
@@ -278,6 +279,7 @@ impl AdvancementScope {
 
 #[derive(Debug)]
 pub enum GiveTarget {
+    SelfEntity,
     Query(String),
     Origin,
 }

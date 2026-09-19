@@ -303,7 +303,7 @@ impl Parser {
                     if item_id.is_some() {
                         return Err(Diagnostic::new("item.id 只能声明一次", span));
                     }
-                    item_id = Some(self.string("item.id 需要物品类型字符串")?.0);
+                    item_id = Some(self.item_predicate()?);
                 }
                 "count" => {
                     if count.is_some() {

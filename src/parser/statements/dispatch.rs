@@ -70,10 +70,7 @@ impl Parser {
             self.expect(TokenKind::Semicolon, "命令后需要 `;`")?;
             StatementKind::Run(command)
         } else if self.take_word("call").is_some() {
-            let target = self.call_target("被调用函数名称")?;
-            let arguments = self.call_arguments()?;
-            self.expect(TokenKind::Semicolon, "函数调用后需要 `;`")?;
-            StatementKind::Call { target, arguments }
+            self.function_call_statement()?
         } else if self.take_word("schedule").is_some() {
             self.schedule_statement()?
         } else if self.take_word("if").is_some() {

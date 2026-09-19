@@ -6,6 +6,16 @@ use crate::lexer::TokenKind;
 mod teams;
 
 impl Parser {
+    pub(in crate::parser) fn take_command_word(&mut self, word: &str) -> bool {
+        if self.check_word(word) || matches!(&self.current().kind, TokenKind::Ident(value) if super::keywords::command_value(value) == Some(word)) {
+            self.advance(); true
+        } else { false }
+    }
+
+    fn expect_command_word(&mut self, word: &str) -> Result<(), Diagnostic> {
+        if self.take_command_word(word) { Ok(()) }
+        else { Err(Diagnostic::new(format!("这里需要 `{word}`"), self.current().span)) }
+    }
     pub(in crate::parser) fn command_boolean(&mut self) -> Result<bool, Diagnostic> {
         let (value, span) = self.ident("布尔值 true/false")?;
         match super::keywords::boolean_word(&value) {
@@ -252,9 +262,9 @@ impl Parser {
             if self.take_word("at").is_some() {
                 Some(DamageOrigin::At(self.position_value("伤害位置")?))
             } else {
-                self.expect_word("by")?;
+                self.expect_command_word("by")?;
                 let entity = self.holder("直接伤害实体")?;
-                let cause = if self.take_word("from").is_some() {
+                let cause = if self.take_command_word("from") {
                     Some(self.holder("间接伤害实体")?)
                 } else {
                     None
@@ -359,7 +369,7 @@ impl Parser {
         self.command_comma()?;
         let target = self.holder("散布目标")?;
         let under = if self.command_optional_comma() {
-            self.expect_word("under")?;
+            self.expect_command_word("under")?;
             Some(self.signed("散布最高高度")?)
         } else {
             None

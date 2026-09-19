@@ -10,7 +10,8 @@ use crate::parser::keywords::{
 impl Parser {
     pub(super) fn give_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::LeftParen, "give 后需要 `(`")?;
-        let target = if self.take_word("origin").is_some() {
+        let target = if self.take_word("self").is_some() { GiveTarget::SelfEntity }
+        else if self.take_word("origin").is_some() {
             GiveTarget::Origin
         } else {
             let (name, _) = self.ident("give 需要玩家查询名称或 origin/投掷者")?;
@@ -253,7 +254,7 @@ impl Parser {
 
     pub(super) fn clear_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::LeftParen, "clear 后需要 `(`")?;
-        let (target, _) = self.ident("clear 目标查询名称")?;
+        let target = if self.check(&TokenKind::RightParen) { None } else { Some(self.holder("clear 目标")?) };
         let item = if self.take(&TokenKind::Comma).is_some() {
             Some(self.item_predicate()?)
         } else {

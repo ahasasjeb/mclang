@@ -129,6 +129,7 @@ pub(crate) fn slot_name(value: &str) -> Option<&'static str> {
 /// `resource` 声明允许把常用资源类型写成中文。
 pub(crate) fn resource_kind(value: &str) -> Option<&'static str> {
     match value {
+        "recipe" | "配方" => Some("recipe"),
         "predicate" | "谓词" => Some("predicate"),
         _ => None,
     }

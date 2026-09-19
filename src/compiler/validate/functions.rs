@@ -14,6 +14,7 @@ pub(super) fn validate_function_declaration(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let mut parameters = HashSet::new();
+    super::macros::validate_macro_declaration(function, diagnostics);
     for parameter in &function.parameters {
         validate_identifier("参数", &parameter.name, parameter.span, diagnostics);
         if !parameters.insert(parameter.name.as_str()) {
@@ -101,6 +102,7 @@ pub(super) fn validate_function_bodies(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for function in &program.functions {
+        let function_declarations = program.functions.iter().map(|f| (f.name.as_str(), f)).collect();
         let loot_tables = program
             .resources
             .iter()
@@ -126,6 +128,7 @@ pub(super) fn validate_function_bodies(
         );
         let mut visible_locals = HashSet::new();
         let symbols = StatementSymbols {
+            function_declarations: &function_declarations,
             loot_tables: &loot_tables,
             recipes: &recipes,
             scores: &declarations.scores,

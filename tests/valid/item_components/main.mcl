@@ -1,0 +1,25 @@
+namespace item_components;
+query players = entity("minecraft:player") {}
+item tool = item_stack("minecraft:diamond_pickaxe") {
+    components = nbt {
+        "minecraft:custom_data" = { owner = "Alex"; };
+        "minecraft:enchantment_glint_override" = true;
+        "!minecraft:damage" = {};
+    };
+}
+fn inventory() {
+    give(players, item_stack("minecraft:stone") {
+        components = nbt {
+            "minecraft:max_stack_size" = 99;
+            "minecraft:custom_data" = { group = "building"; };
+        };
+    }, 9900);
+    give(players, tool);
+    clear(players, item_predicate("*") {
+        has("minecraft:custom_data");
+        !has("minecraft:damage") || equals("minecraft:damage", 0);
+        matches("minecraft:custom_data", nbt { owner = "Alex"; });
+        matches("minecraft:count", nbt { min = 1; max = 64; });
+    }, 0);
+    clear(players, "#minecraft:logs", 10);
+}

@@ -1,0 +1,15 @@
+namespace macro_sources;
+query one = entity("minecraft:player") { limit(1); }
+macro fn show(text label) { message.all(text("$(label)")); }
+fn invoke() {
+    call show with(storage, "macro_sources:args");
+    call show with(storage, "macro_sources:args", "payload");
+    call show with(block, pos(0, 64, 0), "data");
+    call show with(entity, one, "data");
+}
+macro fn merge_payload(nbt payload, resource storage_id) {
+    run "data merge storage $(storage_id) $(payload)";
+}
+fn invoke_payload() {
+    call merge_payload(nbt { payload = { value = 3; }; storage_id = "macro_sources:data"; });
+}

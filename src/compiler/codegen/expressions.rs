@@ -372,8 +372,8 @@ impl Compiler<'_> {
                 ..
             } => self.compile_atomic_condition(
                 format!(
-                    "items {} {slots} {item}",
-                    self.item_condition_source_text(source)
+                    "items {} {slots} {}",
+                    self.item_condition_source_text(source), super::emit::item_predicate_text(item)
                 ),
                 commands,
             ),
@@ -383,6 +383,7 @@ impl Compiler<'_> {
             ),
             Condition::Function { target, .. } => {
                 let target = match target {
+                    CallTarget::External(id) => id.clone(),
                     CallTarget::Function(name) => format!("{}:{name}", self.program.namespace),
                     CallTarget::Tag(tag) => format!("#{}:{tag}", self.program.namespace),
                 };

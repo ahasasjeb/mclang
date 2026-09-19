@@ -305,15 +305,7 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
                 item.span,
             ));
         }
-        if !valid_item_predicate(&item.item_id) {
-            diagnostics.push(Diagnostic::new(
-                format!(
-                    "`{}` 不是有效的物品谓词（物品 id、`#标签` 或带组件过滤器的 id）",
-                    item.item_id
-                ),
-                item.span,
-            ));
-        }
+        super::item_components::validate_predicate(&item.item_id, diagnostics);
         if item.count.is_some_and(|count| count == 0 || count > 99) {
             diagnostics.push(Diagnostic::new("item.count 必须是 1 到 99", item.span));
         }

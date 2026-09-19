@@ -254,7 +254,14 @@ pub fn generate_registries(root: &Path) -> Result<String, String> {
         resource_kinds.insert(kind.to_string());
     }
 
+    let mut enchantment_max_levels = BTreeMap::new();
+    for id in registries.get("enchantment").into_iter().flatten() {
+        let path = format!("data/minecraft/enchantment/{}.json", id.trim_start_matches("minecraft:"));
+        let json: Value = serde_json::from_str(&extractor.read(&path)?).map_err(|e| format!("{path}: {e}"))?;
+        if let Some(level) = json.get("max_level").and_then(Value::as_u64) { enchantment_max_levels.insert(id.clone(), level); }
+    }
     let mut root_object = Map::new();
+    root_object.insert("enchantment_max_levels".into(), json!(enchantment_max_levels));
     root_object.insert("source".into(), json!(SOURCE_DIR));
     root_object.insert("digest".into(), json!(extractor.finish()));
     root_object.insert(
