@@ -103,16 +103,18 @@
 
 版本数据生成器建议补一份机器可读命令可用性文件，记录根命令、别名、注册条件、权限节点和可执行叶；命令覆盖统计由该文件校验。
 
-## 5. 建议内置标准库
+## 5. 内置标准库
+
+已提供源码内嵌的 `std::math`、`std::state`、`std::time`、`std::random`。编译器与内存分析入口均按显式 import 加载；无需项目本地库文件，严格模式可用。示例见 `examples/stdlib_demo/`，有效语料见 `tests/valid/stdlib/`。导入时不会自动创建 tick/load 逻辑。后续模块按数据包需求逐步扩展。
 
 | 模块 | 建议内容 |
 | --- | --- |
-| `std/math` | `abs`、`min/max`、`clamp`、`sign`、`gcd/lcm`、整数 `pow`、`isqrt`、floor_div/mod helper。 |
-| `std/bool` / `std/state` | 0/1 规范化、toggle、latch、rising_edge、falling_edge、once。 |
-| `std/time` | tick/second 换算、deadline、elapsed、interval、cooldown、debounce。 |
+| `std/math` | 已有 `abs`、`min/max`、`clamp`、`sign`；待补 `gcd/lcm`、整数 `pow`、`isqrt`、floor_div/mod helper。 |
+| `std/state` | 已有 0/1 规范化、toggle、latch、rising_edge、falling_edge；待补 once。 |
+| `std/time` | 已有 tick/second 换算、interval、cooldown ready、remaining；待补 deadline、elapsed、debounce。 |
 | `std/debug` | `assert`、条件 assert、score/NBT dump、日志和 trace marker。 |
 | `std/test` | assertion、fixture setup/teardown、GameTest helper、失败上下文。 |
-| `std/random` | chance、weighted choice、shuffle index、range helper。 |
+| `std/random` | 已有百分比与千分比 chance；待补 weighted choice、shuffle index、range helper。 |
 | `std/storage` | typed get/set/remove、list push/pop、stack/queue、小型 map 约定。 |
 | `std/entity` | 单实体选择、存在性、nearest、临时 tag、origin helper。 |
 | `std/inventory` | give-or-drop、检测/计数/移动槽位、容器搬运、保存/恢复模板。 |
@@ -121,7 +123,7 @@
 | `std/collections` | 基于 storage 的 list/stack/queue/set-like 约定。 |
 | `std/fixed` | 定点数乘除、比例和百分比。 |
 
-标准库模块以显式调用为主；导入模块时不自动创建 tick/load 逻辑。需要内部 objective、tag 或 storage 时使用编译器保留命名空间。
+后续需要内部 objective、tag 或 storage 的模块应使用编译器保留命名空间。
 
 ## 6. 工具链功能
 

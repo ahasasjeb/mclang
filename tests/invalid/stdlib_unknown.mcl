@@ -1,0 +1,5 @@
+// expect: 找不到内置模块 `std/unknown`
+namespace stdlib_unknown;
+import std::unknown;
+
+fn main() {}

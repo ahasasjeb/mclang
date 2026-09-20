@@ -131,7 +131,7 @@ pub(super) fn validate_identifier(
             format!("函数名 `{name}` 会与 Windows 设备名冲突"),
             span,
         ));
-    } else if name.split(['/', '.']).any(reserved_word) {
+    } else if name.rsplit(['/', '.']).next().is_some_and(reserved_word) {
         diagnostics.push(Diagnostic::new(
             format!("`{name}` 含有保留字，不能用作{kind}名"),
             span,

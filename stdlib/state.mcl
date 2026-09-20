@@ -1,0 +1,43 @@
+// Boolean helpers interpret zero as false and every other score as true.
+export fn normalize(value) -> score {
+    let result = 1;
+    if value == 0 {
+        result = 0;
+    }
+    return result;
+}
+
+export fn toggle(value) -> score {
+    let result = 0;
+    if value == 0 {
+        result = 1;
+    }
+    return result;
+}
+
+export fn latch(previous, signal) -> score {
+    let result = 0;
+    if previous != 0 {
+        result = 1;
+    }
+    if signal != 0 {
+        result = 1;
+    }
+    return result;
+}
+
+export fn rising_edge(previous, current) -> score {
+    let result = 0;
+    if previous == 0 && current != 0 {
+        result = 1;
+    }
+    return result;
+}
+
+export fn falling_edge(previous, current) -> score {
+    let result = 0;
+    if previous != 0 && current == 0 {
+        result = 1;
+    }
+    return result;
+}

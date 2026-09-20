@@ -1,0 +1,34 @@
+// A Minecraft tick is 1/20 second at the normal game rate.
+export fn seconds_to_ticks(seconds) -> score {
+    return seconds * 20;
+}
+
+export fn ticks_to_seconds(ticks) -> score {
+    return ticks / 20;
+}
+
+// Use a strictly positive period. The caller keeps last_tick and updates it on fire.
+export fn interval_due(now_tick, last_tick, period) -> score {
+    let result = 0;
+    if period > 0 && now_tick - last_tick >= period {
+        result = 1;
+    }
+    return result;
+}
+
+// A cooldown is ready on and after its deadline.
+export fn cooldown_ready(now_tick, deadline_tick) -> score {
+    let result = 0;
+    if now_tick >= deadline_tick {
+        result = 1;
+    }
+    return result;
+}
+
+export fn remaining(now_tick, deadline_tick) -> score {
+    let result = 0;
+    if now_tick < deadline_tick {
+        result = deadline_tick - now_tick;
+    }
+    return result;
+}

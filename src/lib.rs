@@ -7,6 +7,7 @@ mod lsp;
 mod modules;
 mod name_walk;
 mod parser;
+mod stdlib;
 pub mod version;
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
@@ -250,6 +251,21 @@ fn read_project(path: &Path) -> Result<LoadedSources, String> {
             continue;
         };
         for import in imports {
+            if import.path.first().is_some_and(|segment| segment == "std") {
+                if let Some(text) = stdlib::source(&import.path) {
+                    let target = stdlib::virtual_path(&directory, &import.path[1]);
+                    if !indices.contains_key(&target) {
+                        let target_index = sources.len();
+                        indices.insert(target.clone(), target_index);
+                        sources.push(SourceFile {
+                            path: target.clone(),
+                            text: text.to_owned(),
+                        });
+                        queue.push_back(target);
+                    }
+                }
+                continue;
+            }
             let Some(target) = module_file(&directory, &import.path) else {
                 continue;
             };

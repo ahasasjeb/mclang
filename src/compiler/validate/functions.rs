@@ -23,7 +23,7 @@ pub(super) fn validate_function_declaration(
                 parameter.span,
             ));
         }
-        if scores.contains(parameter.name.as_str()) {
+        if !function.name.starts_with("std/") && scores.contains(parameter.name.as_str()) {
             diagnostics.push(Diagnostic::new(
                 format!("参数 `{}` 与全局计分变量重名", parameter.name),
                 parameter.span,
@@ -102,6 +102,13 @@ pub(super) fn validate_function_bodies(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for function in &program.functions {
+        // Embedded std modules cannot see project globals, so their local names
+        // must not be constrained by unrelated project-level score declarations.
+        let local_scores = if function.name.starts_with("std/") {
+            HashSet::new()
+        } else {
+            declarations.scores.clone()
+        };
         let function_declarations = program
             .functions
             .iter()
@@ -130,12 +137,7 @@ pub(super) fn validate_function_bodies(
             .iter()
             .map(|parameter| parameter.name.as_str())
             .collect::<HashSet<_>>();
-        collect_local_declarations(
-            &function.body,
-            &declarations.scores,
-            &parameters,
-            diagnostics,
-        );
+        collect_local_declarations(&function.body, &local_scores, &parameters, diagnostics);
         let mut visible_locals = HashSet::new();
         let symbols = StatementSymbols {
             function_declarations: &function_declarations,

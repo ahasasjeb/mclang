@@ -19,6 +19,12 @@ pub(super) fn module_segments(path: &Path, root: &Path) -> Option<Vec<String>> {
     if stem != "mod" {
         segments.push(stem.to_owned());
     }
+    if segments
+        .first()
+        .is_some_and(|segment| segment == "__mcl_std")
+    {
+        segments[0] = "std".to_owned();
+    }
     Some(segments)
 }
 

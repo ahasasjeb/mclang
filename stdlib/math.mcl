@@ -1,0 +1,51 @@
+// Integer helpers for scoreboard values. Arithmetic follows Minecraft's 32-bit scores.
+export fn abs(value) -> score {
+    let result = value;
+    if value < 0 {
+        result = -value;
+    }
+    return result;
+}
+
+export fn min(left, right) -> score {
+    let result = right;
+    if left < right {
+        result = left;
+    }
+    return result;
+}
+
+export fn max(left, right) -> score {
+    let result = right;
+    if left > right {
+        result = left;
+    }
+    return result;
+}
+
+// Reversed bounds are treated as an empty range and return low.
+export fn clamp(value, low, high) -> score {
+    let result = value;
+    if low > high {
+        result = low;
+    } else {
+        if value < low {
+            result = low;
+        }
+        if value > high {
+            result = high;
+        }
+    }
+    return result;
+}
+
+export fn sign(value) -> score {
+    let result = 0;
+    if value < 0 {
+        result = -1;
+    }
+    if value > 0 {
+        result = 1;
+    }
+    return result;
+}

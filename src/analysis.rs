@@ -93,12 +93,21 @@ pub struct ProjectAnalysis {
 
 /// 对一组源文件做词法、语法、模块解析与语义检查，返回全部诊断与已声明的符号。
 pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
-    let (programs, mut diagnostics) = parse_all(sources);
-    let symbols = collect_symbols(sources, &programs);
+    let mut expanded = sources
+        .iter()
+        .map(|source| SourceFile {
+            path: source.path.clone(),
+            text: source.text.clone(),
+        })
+        .collect::<Vec<_>>();
+    let mut groups = project_groups(sources);
+    add_standard_modules(&mut expanded, &mut groups);
+    let (programs, mut diagnostics) = parse_all(&expanded);
+    let symbols = collect_symbols(&expanded, &programs);
 
     if diagnostics.is_empty() {
         let mut remaining = programs;
-        for (root, members) in project_groups(sources) {
+        for (root, members) in groups {
             let mut group = Vec::new();
             let mut rest = Vec::new();
             for (index, program) in remaining.drain(..) {
@@ -109,7 +118,7 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
                 }
             }
             remaining = rest;
-            match crate::modules::resolve(group, sources, root) {
+            match crate::modules::resolve(group, &expanded, root) {
                 Ok(mut program) => {
                     if let Err(mut errors) = compile(
                         &mut program,
@@ -128,7 +137,7 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
     let diagnostics = diagnostics
         .into_iter()
         .filter_map(|diagnostic| {
-            let source = sources.get(diagnostic.span.source)?;
+            let source = expanded.get(diagnostic.span.source)?;
             Some(FileDiagnostic {
                 path: source.path.clone(),
                 message: diagnostic.message,
@@ -139,6 +148,37 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
     ProjectAnalysis {
         diagnostics,
         symbols,
+    }
+}
+
+/// Mirror the CLI's embedded-module loading for unsaved editor buffers.
+fn add_standard_modules(sources: &mut Vec<SourceFile>, groups: &mut [(usize, HashSet<usize>)]) {
+    for (root, members) in groups {
+        let Some(directory) = sources[*root].path.parent().map(|path| path.to_path_buf()) else {
+            continue;
+        };
+        let mut imported = std::collections::BTreeSet::new();
+        for index in members.iter().copied() {
+            let Ok(tokens) = lex(&sources[index].text, index) else {
+                continue;
+            };
+            let Ok(program) = parse(tokens) else {
+                continue;
+            };
+            for import in program.imports {
+                if let Some(text) = crate::stdlib::source(&import.path) {
+                    imported.insert((import.path[1].clone(), text));
+                }
+            }
+        }
+        for (module, text) in imported {
+            let index = sources.len();
+            sources.push(SourceFile {
+                path: crate::stdlib::virtual_path(&directory, &module),
+                text: text.to_owned(),
+            });
+            members.insert(index);
+        }
     }
 }
 

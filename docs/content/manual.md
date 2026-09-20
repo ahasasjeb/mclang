@@ -185,6 +185,41 @@ export fn product(left, right) -> score {
 
 `examples/module_demo` 由文档构建与回归测试实际编译：`sum` 的产物是 `data/module_demo/function/lib/math/sum.mcfunction`，函数在数据包里的名字就是 `module_demo:lib/math/sum`；`__mcl` 下的辅助函数同样带模块路径，例如 `__mcl/lib/math/sum/0`。
 
+### 内置标准库 {#basics-stdlib}
+
+标准库随编译器提供，项目里无需复制库文件。用普通 `import std::模块::{函数, ...};` 显式导入；只会把入口可达的模块加入数据包，导入一个模块会生成该模块的全部公开函数，但不会自动注册 `@load` 或 `@tick`。`std` 路径保留给内置模块，项目不能用自己的 `std/` 文件覆盖它。函数名和模块名是 API 标识符，不随中英文关键词切换。
+
+| 模块 | 导出函数 | 典型用途 |
+| --- | --- | --- |
+| `std::math` | `abs`、`min`、`max`、`clamp`、`sign` | 限制计分范围、处理伤害和方向 |
+| `std::state` | `normalize`、`toggle`、`latch`、`rising_edge`、`falling_edge` | 开关、一次性触发与状态变化检测 |
+| `std::time` | `seconds_to_ticks`、`ticks_to_seconds`、`interval_due`、`cooldown_ready`、`remaining` | 周期任务、冷却与倒计时 |
+| `std::random` | `chance`、`chance_per_mille` | 按百分比或千分比触发事件 |
+
+```mcl title="标准库导入（examples/stdlib_demo）" fragment
+import std::state::{toggle};
+import std::time::{interval_due, seconds_to_ticks};
+import std::random::{chance};
+
+score ticks = 0;
+score last_pulse = 0;
+score enabled = 0;
+
+@tick
+fn tick() {
+    ticks += 1;
+    if interval_due(ticks, last_pulse, seconds_to_ticks(5)) == 1 {
+        last_pulse = ticks;
+        enabled = toggle(enabled);
+    }
+    if enabled != 0 && chance(5) == 1 {
+        message.all("Event", green);
+    }
+}
+```
+
+所有函数使用 32 位计分整数。布尔函数把 0 视为假、其他值视为真，并返回 0 或 1；`rising_edge` 和 `falling_edge` 的调用方需要保存上一刻的状态。时间函数使用每秒 20 刻的换算，`interval_due` 的周期必须大于 0，调用方在触发后更新 `last_tick`。`chance` 接受 0–100，`chance_per_mille` 接受 0–1000，超出范围时分别按 0 或必定触发处理。`clamp` 的下界高于上界时返回下界。计分运算仍遵循原版 32 位行为，调用方应避免乘法及时间差溢出。
+
 ### 中英关键词
 
 下表只是示例，完整对照见[附录 A](#appendix-keywords)：

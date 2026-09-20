@@ -1,0 +1,27 @@
+// Percent outside 0..100 is clamped to the nearest certain outcome.
+export fn chance(percent) -> score {
+    let result = 0;
+    if percent >= 100 {
+        result = 1;
+    }
+    if percent > 0 && percent < 100 {
+        if random(1, 100) <= percent {
+            result = 1;
+        }
+    }
+    return result;
+}
+
+// Per-mille chance gives finer control without floating-point scores.
+export fn chance_per_mille(rate) -> score {
+    let result = 0;
+    if rate >= 1000 {
+        result = 1;
+    }
+    if rate > 0 && rate < 1000 {
+        if random(1, 1000) <= rate {
+            result = 1;
+        }
+    }
+    return result;
+}

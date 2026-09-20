@@ -39,6 +39,7 @@
 <a class="lvl-3" href="#sec-注释-字符串与数字">注释、字符串与数字</a>
 <a class="lvl-3" href="#sec-程序结构与模块">程序结构与模块</a>
 <a class="lvl-3" href="#basics-modules">模块与导入</a>
+<a class="lvl-3" href="#basics-stdlib">内置标准库</a>
 <a class="lvl-3" href="#sec-中英关键词">中英关键词</a>
 <a class="lvl-3" href="#basics-identifiers">中文标识符</a>
 <a class="lvl-3" href="#basics-nbt">结构化 NBT（nbt）</a>
@@ -271,6 +272,54 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
     <span class="tok-kw">返回</span> <span class="tok-ident">left</span> * <span class="tok-ident">right</span>;
 }</code></pre></figure>
 <p><code>examples/module_demo</code> 由文档构建与回归测试实际编译：<code>sum</code> 的产物是 <code>data/module_demo/function/lib/math/sum.mcfunction</code>，函数在数据包里的名字就是 <code>module_demo:lib/math/sum</code>；<code>__mcl</code> 下的辅助函数同样带模块路径，例如 <code>__mcl/lib/math/sum/0</code>。</p>
+<h3 id="basics-stdlib">内置标准库</h3>
+<p>标准库随编译器提供，项目里无需复制库文件。用普通 <code>import std::模块::{函数, ...};</code> 显式导入；只会把入口可达的模块加入数据包，导入一个模块会生成该模块的全部公开函数，但不会自动注册 <code class="kw"><span class="kw-en">@load</span><span class="kw-zh">@加载</span></code> 或 <code class="kw"><span class="kw-en">@tick</span><span class="kw-zh">@每刻</span></code>。<code>std</code> 路径保留给内置模块，项目不能用自己的 <code>std/</code> 文件覆盖它。函数名和模块名是 API 标识符，不随中英文关键词切换。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>模块</th><th>导出函数</th><th>典型用途</th></tr></thead>
+<tbody>
+<tr><td><code>std::math</code></td><td><code>abs</code>、<code>min</code>、<code>max</code>、<code>clamp</code>、<code>sign</code></td><td>限制计分范围、处理伤害和方向</td></tr>
+<tr><td><code>std::state</code></td><td><code>normalize</code>、<code>toggle</code>、<code>latch</code>、<code>rising_edge</code>、<code>falling_edge</code></td><td>开关、一次性触发与状态变化检测</td></tr>
+<tr><td><code>std::time</code></td><td><code>seconds_to_ticks</code>、<code>ticks_to_seconds</code>、<code>interval_due</code>、<code>cooldown_ready</code>、<code>remaining</code></td><td>周期任务、冷却与倒计时</td></tr>
+<tr><td><code>std::random</code></td><td><code>chance</code>、<code>chance_per_mille</code></td><td>按百分比或千分比触发事件</td></tr>
+</tbody></table></div>
+<figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">标准库导入（examples/stdlib_demo）</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">import</span> <span class="tok-ident">std</span>::<span class="tok-ident">state</span>::{<span class="tok-ident">toggle</span>};
+<span class="tok-kw">import</span> <span class="tok-ident">std</span>::<span class="tok-kw">time</span>::{<span class="tok-ident">interval_due</span>, <span class="tok-ident">seconds_to_ticks</span>};
+<span class="tok-kw">import</span> <span class="tok-ident">std</span>::<span class="tok-kw">random</span>::{<span class="tok-ident">chance</span>};
+
+<span class="tok-kw">score</span> <span class="tok-ident">ticks</span> = 0;
+<span class="tok-kw">score</span> <span class="tok-ident">last_pulse</span> = 0;
+<span class="tok-kw">score</span> <span class="tok-lit">enabled</span> = 0;
+
+<span class="tok-attr">@</span><span class="tok-attr">tick</span>
+<span class="tok-kw">fn</span> <span class="tok-fn">tick</span>() {
+    <span class="tok-ident">ticks</span> += 1;
+    <span class="tok-kw">if</span> <span class="tok-fn">interval_due</span>(<span class="tok-ident">ticks</span>, <span class="tok-ident">last_pulse</span>, <span class="tok-fn">seconds_to_ticks</span>(5)) == 1 {
+        <span class="tok-ident">last_pulse</span> = <span class="tok-ident">ticks</span>;
+        <span class="tok-lit">enabled</span> = <span class="tok-fn">toggle</span>(<span class="tok-lit">enabled</span>);
+    }
+    <span class="tok-kw">if</span> <span class="tok-lit">enabled</span> != 0 &amp;&amp; <span class="tok-fn">chance</span>(5) == 1 {
+        <span class="tok-kw">message</span>.<span class="tok-method">all</span>(<span class="tok-str">&quot;Event&quot;</span>, <span class="tok-lit">green</span>);
+    }
+}</code><code class="kw-zh"><span class="tok-kw">导入</span> <span class="tok-ident">std</span>::<span class="tok-ident">state</span>::{<span class="tok-ident">toggle</span>};
+<span class="tok-kw">导入</span> <span class="tok-ident">std</span>::<span class="tok-kw">time</span>::{<span class="tok-ident">interval_due</span>, <span class="tok-ident">seconds_to_ticks</span>};
+<span class="tok-kw">导入</span> <span class="tok-ident">std</span>::<span class="tok-kw">random</span>::{<span class="tok-ident">chance</span>};
+
+<span class="tok-kw">计分</span> <span class="tok-ident">ticks</span> = 0;
+<span class="tok-kw">计分</span> <span class="tok-ident">last_pulse</span> = 0;
+<span class="tok-kw">计分</span> <span class="tok-lit">enabled</span> = 0;
+
+<span class="tok-attr">@</span><span class="tok-attr">每刻</span>
+<span class="tok-kw">函数</span> <span class="tok-fn">tick</span>() {
+    <span class="tok-ident">ticks</span> += 1;
+    <span class="tok-kw">如果</span> <span class="tok-fn">interval_due</span>(<span class="tok-ident">ticks</span>, <span class="tok-ident">last_pulse</span>, <span class="tok-fn">seconds_to_ticks</span>(5)) == 1 {
+        <span class="tok-ident">last_pulse</span> = <span class="tok-ident">ticks</span>;
+        <span class="tok-lit">enabled</span> = <span class="tok-fn">toggle</span>(<span class="tok-lit">enabled</span>);
+    }
+    <span class="tok-kw">如果</span> <span class="tok-lit">enabled</span> != 0 &amp;&amp; <span class="tok-fn">chance</span>(5) == 1 {
+        <span class="tok-kw">消息</span>.<span class="tok-method">全部</span>(<span class="tok-str">&quot;Event&quot;</span>, <span class="tok-lit">绿色</span>);
+    }
+}</code></pre></figure>
+<p>所有函数使用 32 位计分整数。布尔函数把 0 视为假、其他值视为真，并返回 0 或 1；<code>rising_edge</code> 和 <code>falling_edge</code> 的调用方需要保存上一刻的状态。时间函数使用每秒 20 刻的换算，<code>interval_due</code> 的周期必须大于 0，调用方在触发后更新 <code>last_tick</code>。<code>chance</code> 接受 0–100，<code>chance_per_mille</code> 接受 0–1000，超出范围时分别按 0 或必定触发处理。<code>clamp</code> 的下界高于上界时返回下界。计分运算仍遵循原版 32 位行为，调用方应避免乘法及时间差溢出。</p>
 <h3 id="sec-中英关键词">中英关键词</h3>
 <p>下表只是示例，完整对照见<a href="#appendix-keywords">附录 A</a>：</p>
 <div class="table-wrap"><table>

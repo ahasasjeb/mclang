@@ -1,0 +1,23 @@
+// Built-in modules compile from embedded sources with no project-local std files.
+namespace stdlib_test;
+
+import std::math::{abs, min, max, clamp, sign};
+import std::state::{normalize, toggle, latch, rising_edge, falling_edge};
+import std::time::{seconds_to_ticks, ticks_to_seconds, interval_due, cooldown_ready, remaining};
+import std::random::{chance, chance_per_mille};
+
+score result = 0;
+score value = 0;
+score percent = 0;
+score seconds = 0;
+
+fn exercise() {
+    result = abs(-7) + min(2, 3) + max(2, 3);
+    result += clamp(12, 0, 10) + sign(-1);
+    result += normalize(-9) + toggle(1) + latch(0, 5);
+    result += rising_edge(0, 3) + falling_edge(-1, 0);
+    result += seconds_to_ticks(2) + ticks_to_seconds(40);
+    result += interval_due(80, 0, 20) + cooldown_ready(80, 60);
+    result += remaining(80, 100);
+    result += chance(25) + chance_per_mille(250);
+}

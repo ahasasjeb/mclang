@@ -1,0 +1,30 @@
+// Explicit imports pull only these standard-library modules into the pack.
+namespace stdlib_demo;
+
+import std::math::{abs, clamp, sign};
+import std::state::{rising_edge, toggle};
+import std::time::{interval_due, seconds_to_ticks};
+import std::random::{chance};
+
+score ticks = 0;
+score last_pulse = 0;
+score enabled = 0;
+score previous_enabled = 0;
+score direction = 0;
+
+@tick
+fn tick() {
+    ticks += 1;
+    if interval_due(ticks, last_pulse, seconds_to_ticks(5)) == 1 {
+        last_pulse = ticks;
+        enabled = toggle(enabled);
+        if rising_edge(previous_enabled, enabled) == 1 {
+            message.all("Timer enabled", green);
+        }
+        previous_enabled = enabled;
+    }
+    if enabled != 0 && chance(5) == 1 {
+        direction = sign(-ticks);
+        direction = clamp(abs(direction), 0, 1);
+    }
+}

@@ -68,7 +68,16 @@ pub(crate) fn resolve(
         let Some(segments) = module_segments(&source.path, directory) else {
             continue;
         };
-        for segment in &segments {
+        if segments.first().is_some_and(|segment| segment == "std")
+            && !crate::stdlib::is_virtual_path(&source.path, directory)
+        {
+            diagnostics.push(Diagnostic::new(
+                "项目不能定义 `std` 模块：这个路径保留给内置标准库",
+                first_span(program),
+            ));
+        }
+        let builtin = crate::stdlib::is_virtual_path(&source.path, directory);
+        for segment in segments.iter().filter(|_| !builtin) {
             let span = first_span(program);
             if segment.starts_with("__mcl") {
                 diagnostics.push(Diagnostic::new(
@@ -131,13 +140,22 @@ pub(crate) fn resolve(
                 Some(target) => targets.push((*target, import.path_span)),
                 None => {
                     let location = import.path.join("/");
-                    diagnostics.push(Diagnostic::new(
+                    let message = if import.path.first().is_some_and(|part| part == "std") {
+                        format!(
+                            "找不到内置模块 `{key}`：可用模块为 {}",
+                            crate::stdlib::MODULES
+                                .iter()
+                                .map(|name| format!("std::{name}"))
+                                .collect::<Vec<_>>()
+                                .join("、")
+                        )
+                    } else {
                         format!(
                             "找不到模块 `{key}`：预期文件 `{location}.mcl` 或 `{location}/mod.mcl`\
                              （相对项目根目录）"
-                        ),
-                        import.path_span,
-                    ));
+                        )
+                    };
+                    diagnostics.push(Diagnostic::new(message, import.path_span));
                 }
             }
         }

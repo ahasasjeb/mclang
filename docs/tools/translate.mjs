@@ -412,17 +412,41 @@ export function buildTranslator(data) {
     return opaque;
   };
 
+  // Import paths and exported names are identifiers, even when they spell a
+  // keyword such as `time` or `random`. Only `import` and alias `as` are syntax.
+  const importNameTokens = (tokens) => {
+    const opaque = new Set();
+    let inImport = false;
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      if (!inImport) {
+        if (token.type === "ident" && canonicalWord(token.text) === "import") {
+          inImport = true;
+        }
+        continue;
+      }
+      if (token.text === ";") {
+        inImport = false;
+      } else if (token.type === "ident" && canonicalWord(token.text) !== "as") {
+        opaque.add(index);
+      }
+    }
+    return opaque;
+  };
+
   /** 翻译一段代码；`relaxed` 供正文行内代码使用（时间单位等不要求上下文）。 */
   const translate = (code, target, options = {}) => {
     const tokens = tokenize(code);
     const frames = computeFrames(tokens);
-    const opaque = nbtBodyTokens(tokens);
+    const nbtOpaque = nbtBodyTokens(tokens);
+    const importOpaque = importNameTokens(tokens);
     const relaxed = options.relaxed === true;
     return tokens
       .map((token, index) => {
         if (token.type !== "ident") return token.text;
+        if (importOpaque.has(index)) return token.text;
         // NBT 块内部只翻译布尔字面量（`真`/`假`），键名与字符串是用户数据。
-        if (opaque.has(index)) {
+        if (nbtOpaque.has(index)) {
           return rewrite(token.text, "boolean_word", target) ?? token.text;
         }
         return translateWord(tokens, frames, index, target, relaxed) ?? token.text;
