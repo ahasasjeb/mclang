@@ -1,0 +1,8 @@
+// 期望诊断：首领栏最大值至少为 1，数值不能超过 32 位；资源位置合法。
+namespace bad_ui;
+fn bad() {
+    bossbar.set.max("bad_ui:task", 0);
+    bossbar.set.value("bad_ui:task", 2147483648);
+    bossbar.remove("BAD ID");
+    let result = bossbar.get("BAD ID", value);
+}

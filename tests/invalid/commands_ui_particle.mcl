@@ -1,0 +1,7 @@
+// 期望诊断：dust 缺少 scale、未知字段、速度非负、粒子观众必须是玩家。
+namespace bad_ui;
+query mobs = entity("minecraft:zombie") {}
+fn bad() {
+    particle("minecraft:dust", nbt { color = 123; wrong = 1; });
+    particle("minecraft:flame", vec3(~, ~, ~), vec3(0, 0, 0), -1, 1, normal, mobs);
+}

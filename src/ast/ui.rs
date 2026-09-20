@@ -2,38 +2,68 @@ use super::*;
 
 #[derive(Debug)]
 pub enum UiCommand {
-    Title { targets: Holder, action: TitleAction },
+    Title {
+        targets: Holder,
+        action: TitleAction,
+    },
     BossBar(BossBarAction),
-    Dialog { targets: Holder, dialog: Option<String> },
-    Particle(ParticleCommand),
-    StopSound { targets: Holder, source: Option<String>, sound: Option<String> },
+    Dialog {
+        targets: Holder,
+        dialog: Option<AdvancementReference>,
+    },
+    Particle(Box<ParticleCommand>),
+    StopSound {
+        targets: Holder,
+        source: Option<String>,
+        sound: Option<String>,
+    },
     PostEffect(PostEffectAction),
-    PrivateMessage { targets: Holder, message: String },
+    PrivateMessage {
+        targets: Holder,
+        message: String,
+    },
     TeamMessage(String),
 }
 
 #[derive(Debug)]
 pub enum TitleAction {
-    Text { channel: TitleChannel, component: TextComponent },
-    Times { fade_in: String, stay: String, fade_out: String },
+    Text {
+        channel: TitleChannel,
+        component: Box<TextComponent>,
+    },
+    Times {
+        fade_in: String,
+        stay: String,
+        fade_out: String,
+    },
     Clear,
     Reset,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum TitleChannel { Title, Subtitle, Actionbar }
+pub enum TitleChannel {
+    Title,
+    Subtitle,
+    Actionbar,
+}
 
 #[derive(Debug)]
 pub enum BossBarAction {
-    Add { id: String, name: TextComponent },
+    Add {
+        id: String,
+        name: Box<TextComponent>,
+    },
     Remove(String),
     List,
-    Set { id: String, property: BossBarProperty },
+    Set {
+        id: String,
+        property: BossBarProperty,
+    },
 }
 
 #[derive(Debug)]
 pub enum BossBarProperty {
-    Name(TextComponent),
+    Name(Box<TextComponent>),
     Color(String),
     Style(String),
     Value(u32),
@@ -43,12 +73,20 @@ pub enum BossBarProperty {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum BossBarQuery { Value, Max, Visible, Players }
+pub enum BossBarQuery {
+    Value,
+    Max,
+    Visible,
+    Players,
+}
 
 impl BossBarQuery {
     pub fn command_name(self) -> &'static str {
         match self {
-            Self::Value => "value", Self::Max => "max", Self::Visible => "visible", Self::Players => "players",
+            Self::Value => "value",
+            Self::Max => "max",
+            Self::Visible => "visible",
+            Self::Players => "players",
         }
     }
 }

@@ -10,7 +10,7 @@
 手写 `.mcfunction` 时，一个“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、`execute as`/`at` 上下文、函数标签、`tellraw` 的 JSON 和 `give` 的物品组件语法。Mclang 把源码分成了明确的层：
 
 - **声明层**：`namespace`、`score`、`objective`、`query`、`item`、`storage`、`data_slot`、`resource`、`fn_tag`、`fn`，编译器检查重名、类型与资源位置。
-- **语句层**：`execute`、`each`、`spawn`、`give`、`self.*`、`message.*`、`effect.*`、`xp.*`、`scoreboard.*`、`teleport`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都是独立 AST 节点。
+- **语句层**：`execute`、`each`、`spawn`、`give`、`self.*`、`message.*`、`title.*`、`bossbar.*`、`dialog.*`、`particle`、`stopsound`、`posteffect.*`、`effect.*`、`xp.*`、`scoreboard.*`、`teleport`、`schedule`、`if`/`while` 以及 `set_block`、`fill`、`clone` 等世界命令，每条都有结构化 AST 表示。
 - **表达式层**：整数、计分值、带返回值的函数调用与 `scoreboard.get`、`xp.query`、`stopwatch.query`、`time.query`、`gamerule.query`、`worldborder.get` 等查询表达式。
 - **逃生口**：`run`、字符串形式的 `execute` 与 `return run` 接受原生命令文本，`--deny-raw` 可以强制项目完全停留在标准层。
 
@@ -1050,6 +1050,56 @@ sound.self("minecraft:block.note_block.pling", master);
 sound.play("minecraft:block.note_block.pling", master, nearby, vec3(0.5, 64, 0.5), 0.5, 1.5);
 ```
 
+### 标题、Boss 栏与对话框
+
+```mcl title="语法" fragment
+title.title(<玩家目标>, <文本组件或字符串>);
+title.subtitle(<玩家目标>, <文本组件或字符串>);
+title.actionbar(<玩家目标>, <文本组件或字符串>);
+title.times(<玩家目标>, <淡入时间>, <停留时间>, <淡出时间>);
+title.clear(<玩家目标>);
+title.reset(<玩家目标>);
+
+bossbar.add("<资源位置>", <文本组件或字符串>);
+bossbar.remove("<资源位置>");
+bossbar.list();
+bossbar.set.name("<资源位置>", <文本组件或字符串>);
+bossbar.set.color("<资源位置>", pink|blue|red|green|yellow|purple|white);
+bossbar.set.style("<资源位置>", progress|notched_6|notched_10|notched_12|notched_20);
+bossbar.set.value("<资源位置>", <非负整数>);
+bossbar.set.max("<资源位置>", <正整数>);
+bossbar.set.visible("<资源位置>", true|false);
+bossbar.set.players("<资源位置>"[, <玩家目标>]);
+let current = bossbar.get("<资源位置>", value|max|visible|players);
+
+dialog.show(<玩家目标>, <已声明对话框名称> | "<外部对话框资源位置>");
+dialog.clear(<玩家目标>);
+```
+
+玩家目标可以是玩家查询，或在 `@player` 函数及玩家上下文中使用 `self`。需要操作来源实体时，在 `execute on origin` 块中使用 `self`。`title.times` 使用 `t`/`s`/`d` 时间单位，三个值均可为 0。Boss 栏颜色和样式来自 26.3 的枚举快照；`get` 是整数表达式，读取当前值、上限、可见状态（0/1）或在线玩家数。`bossbar.set.players(id)` 清空玩家列表。`dialog.show` 可以直接写 `resource dialog` 的声明名，也可写完整资源位置引用原版或外部对话框。
+
+### 粒子、停止声音与后处理
+
+```mcl title="语法" fragment
+particle("<粒子资源位置>"[, nbt { <粒子选项> }][, <坐标>[, vec3(<偏移X>, <偏移Y>, <偏移Z>), <速度>, <数量>[, normal|force[, <玩家目标>]]]]);
+stopsound(<玩家目标>[, <声音分类>|*[, "<声音资源位置>"]]);
+posteffect.add(<玩家目标>, "<后处理效果资源位置>");
+posteffect.clear(<玩家目标>);
+posteffect.list(<单个玩家目标>);
+posteffect.remove(<玩家目标>, "<后处理效果资源位置>");
+```
+
+`particle` 的可选参数顺序与原版一致；只写位置时省略偏移、速度和数量，要指定观众则必须先给出模式。选项使用结构化 SNBT，编译器按 26.3 的粒子 codec 检查内建粒子的必需字段、字段名和基本类型；例如 `dust` 需要 `color` 与 `scale`，普通 `flame` 不接受选项。速度和数量必须非负。`stopsound(players, *, "minecraft:...")` 表示不限声音分类。`posteffect.list` 需要 `limit(1)` 查询，后处理效果的自定义资源包资产由资源包提供。
+
+### 私聊与队伍聊天
+
+```mcl title="语法" fragment
+msg(<玩家目标>, "<单行消息>");
+teammsg("<单行消息>");
+```
+
+`msg` 生成原版私聊命令（`tell`、`w` 是原版别名）；`teammsg` 生成队伍聊天命令（`tm` 是别名），要求实体执行上下文，运行时发送者必须属于队伍。两者使用原版 `MessageArgument` 的纯文本消息；需要文本组件与样式时使用 `message.player`。
+
 ### 状态效果（effect）
 
 ```mcl title="语法" fragment
@@ -1858,6 +1908,7 @@ cargo run -- check examples/multi_counter --deny-raw
 | `give_reward.mcl` | 查询标签排除、类型化 `give` 与物品组件 |
 | `potion_lab.mcl` | 效果、经验、清空、秒表、函数标签与小数调度 |
 | `world_ops.mcl` | 方块、生物群系、复制、放置、区块加载、时间、天气、规则与边界 |
+| `ui_commands.mcl` | Boss 栏、标题、粒子、停止声音、后处理与私聊 |
 | `portal.mcl` | 进度声明、`placed_block` / `enter_block` 触发器与可重复触发的 `advancement.revoke` |
 | `portable_chest/` | 多文件模块、用户计分板、`teleport` 仓库、屏障盒与按玩家绑定的箱子 |
 | `multi_counter/` | 多文件模块、带返回值函数、资源 predicate 与调度心跳 |

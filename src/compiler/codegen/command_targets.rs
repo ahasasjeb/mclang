@@ -14,6 +14,12 @@ impl Compiler<'_> {
         })
     }
 
+    pub(super) fn ui_command(&mut self, command: &UiCommand, owner: &str) -> String {
+        self.capture_command_targets(&ui_holders(command), owner, |c| {
+            c.compile_ui_command(command)
+        })
+    }
+
     /// Invoke a multi-target command once: an `each` loop would change tag
     /// intersections, loot rolls and result counts. Preserve failure after cleanup.
     pub(super) fn capture_command_targets(
@@ -95,6 +101,27 @@ impl Compiler<'_> {
         let path = self.next_helper_path(owner);
         self.functions.insert(path.clone(), commands);
         format!("function {}:{path}", self.program.namespace)
+    }
+}
+
+fn ui_holders(command: &UiCommand) -> Vec<&Holder> {
+    match command {
+        UiCommand::Title { targets, .. }
+        | UiCommand::Dialog { targets, .. }
+        | UiCommand::StopSound { targets, .. }
+        | UiCommand::PrivateMessage { targets, .. } => vec![targets],
+        UiCommand::BossBar(BossBarAction::Set {
+            property: BossBarProperty::Players(Some(targets)),
+            ..
+        }) => vec![targets],
+        UiCommand::Particle(particle) => particle.viewers.iter().collect(),
+        UiCommand::PostEffect(action) => match action {
+            PostEffectAction::Add { targets, .. }
+            | PostEffectAction::Remove { targets, .. }
+            | PostEffectAction::Clear(targets)
+            | PostEffectAction::List(targets) => vec![targets],
+        },
+        UiCommand::BossBar(_) | UiCommand::TeamMessage(_) => Vec::new(),
     }
 }
 

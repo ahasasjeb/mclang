@@ -273,9 +273,15 @@ fn ui_command_names(
             },
             _ => {}
         },
-        UiCommand::Dialog { targets, .. }
-        | UiCommand::StopSound { targets, .. }
-        | UiCommand::PrivateMessage { targets, .. } => holder_names(targets, visitor, context),
+        UiCommand::Dialog { targets, dialog } => {
+            holder_names(targets, visitor, context);
+            if let Some(dialog) = dialog {
+                reference_names(dialog, NameRole::Resource, visitor, context);
+            }
+        }
+        UiCommand::StopSound { targets, .. } | UiCommand::PrivateMessage { targets, .. } => {
+            holder_names(targets, visitor, context)
+        }
         UiCommand::Particle(particle) => {
             if let Some(viewers) = &mut particle.viewers {
                 holder_names(viewers, visitor, context);

@@ -102,8 +102,8 @@ const PROPERTY_FAMILIES = [
 /** 只在后面跟 `(` 时按函数名翻译的表：`facing(...)` 是 execute 子句，
  * `facing = "south"` 却是方块状态属性，不能混用同一张表。 */
 const CALL_FAMILIES = ["execute_clause"];
-const COMMAND_RECEIVERS = new Set(["tag", "attribute", "ride", "rotate", "team", "waypoint", "datapack", "recipe", "loot", "random"]);
-const COMMAND_CALLS = new Set(["kill", "enchant", "damage", "spreadplayers", "spectate", "swing", "trigger", "gamemode", "defaultgamemode", "difficulty", "spawnpoint", "setworldspawn", "list", "reload", "teleport", "has", "equals", "matches"]);
+const COMMAND_RECEIVERS = new Set(["tag", "attribute", "ride", "rotate", "team", "waypoint", "datapack", "recipe", "loot", "random", "title", "bossbar", "dialog", "posteffect"]);
+const COMMAND_CALLS = new Set(["kill", "enchant", "damage", "spreadplayers", "spectate", "swing", "trigger", "gamemode", "defaultgamemode", "difficulty", "spawnpoint", "setworldspawn", "list", "reload", "teleport", "has", "equals", "matches", "particle", "stopsound", "msg", "teammsg"]);
 
 /** 调用实参里允许出现的枚举值表，键是规范化的“接收者.方法”或裸函数名。 */
 const CALL_VALUE_CONTEXTS = {
@@ -113,6 +113,7 @@ const CALL_VALUE_CONTEXTS = {
   "message.self": ["text_color"],
   "message.nearest": ["text_color"],
   "sound.self": ["sound_source"],
+  stopsound: ["sound_source"],
   "xp.add": ["xp_kind"],
   "xp.set": ["xp_kind"],
   "xp.query": ["xp_kind"],
@@ -304,7 +305,7 @@ export function buildTranslator(data) {
         root = previousSignificant(tokens, dot.index);
       }
       if (COMMAND_RECEIVERS.has(canonicalWord(root?.text))) {
-        return rewrite(word, "command_value", target) ?? lookupKeywords(word, target);
+        return rewrite(word, "command_value", target) ?? rewrite(word, "ui_value", target) ?? lookupKeywords(word, target);
       }
       const family = receiver ? RECEIVER_FAMILIES[receiver.text] : undefined;
       if (family) {
@@ -325,7 +326,7 @@ export function buildTranslator(data) {
     if (next?.text === "(") {
       const canonical = canonicalWord(word);
       if (COMMAND_CALLS.has(canonical) || COMMAND_RECEIVERS.has(canonical)) {
-        const rewritten = lookupKeywords(word, target) ?? rewrite(word, "command_value", target);
+        const rewritten = lookupKeywords(word, target) ?? rewrite(word, "command_value", target) ?? rewrite(word, "ui_value", target);
         if (rewritten) return rewritten;
       }
       for (const family of [...PROPERTY_FAMILIES, ...CALL_FAMILIES]) {
@@ -358,7 +359,9 @@ export function buildTranslator(data) {
     const frame = frames[index];
     if (frame && frame !== "{") {
       if (COMMAND_RECEIVERS.has(frame.split(".")[0]) || COMMAND_CALLS.has(frame)) {
-        const rewritten = rewrite(word, "command_value", target) ?? rewrite(word, "text_color", target);
+        const rewritten = rewrite(word, "command_value", target) ??
+          (frame.startsWith("bossbar.") || frame.startsWith("title.") || frame === "particle" ? rewrite(word, "ui_value", target) : null) ??
+          rewrite(word, "text_color", target);
         if (rewritten) return rewritten;
       }
       for (const family of CALL_VALUE_CONTEXTS[frame] ?? []) {

@@ -25,6 +25,7 @@ const ALIAS_GROUPS = [
   ["resource_kind", "资源类型别名", "`resource` 声明可用的中文类型写法；其余类型写英文。"],
   ["self_method", "self 方法", "执行上下文要求：`@entity` 任意实体、`@non_player` 非玩家实体、`@player` 玩家。"],
   ["message_target", "消息目标", "`message.*` 的三种目标。"],
+  ["ui_value", "界面命令方法与取值", "`title`、`bossbar`、`dialog` 与粒子模式的专用中英文写法。"],
   ["effect_method", "effect 方法", "状态效果操作。"],
   ["xp_method", "xp 方法", "经验值操作；`query` 只能出现在表达式里。"],
   ["xp_kind", "xp 类型", "`xp` 语句与 `xp.query` 的第二个实参。"],

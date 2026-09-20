@@ -123,3 +123,19 @@
     消息.玩家(players, 计分(自身, "runtime_objective"));
 }
 
+函数 ui() {
+    Boss栏.添加("dual:sample", "Sample");
+    Boss栏.设置.颜色("dual:sample", 粉色);
+    令 bar_value = Boss栏.取("dual:sample", 数值);
+    屏幕标题.动作栏(players, "Ready");
+    粒子("minecraft:flame");
+    停止声音(players, 音乐);
+    对话框.清除(players);
+    后处理效果.添加(players, "minecraft:blur");
+    私聊(players, "Hello");
+}
+
+@玩家 函数 ui_team() {
+    队伍消息("Hello team");
+}
+

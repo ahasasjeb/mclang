@@ -64,6 +64,28 @@ fn native_command_shapes_and_macro_forwarding() {
                 "clear @s *[minecraft:custom_data,!minecraft:damage|minecraft:damage=0,minecraft:custom_data~{owner:\"Alex\"},minecraft:count~{min:1,max:64}] 0",
             ],
         ),
+        (
+            "ui_commands",
+            "display",
+            &[
+                "title @e[type=minecraft:player] title {\"bold\":true,\"color\":\"gold\",\"text\":\"欢迎\"}",
+                "title @e[type=minecraft:player] times 10t 3s 1s",
+                "bossbar set ui_commands:task players",
+                "run bossbar get ui_commands:task players",
+                "dialog show @e[type=minecraft:player] ui_commands:links",
+            ],
+        ),
+        (
+            "ui_commands",
+            "sensory",
+            &[
+                "particle minecraft:dust{color:16711680,scale:1.0f} ~ ~1 ~ 0.1 0.2 0.1 0.05 12 force @e[type=minecraft:player]",
+                "stopsound @e[type=minecraft:player] * minecraft:entity.player.levelup",
+                "posteffect list @e[type=minecraft:player,limit=1]",
+                "msg @e[type=minecraft:player,limit=1] 任务已更新",
+            ],
+        ),
+        ("ui_commands", "personal", &["teammsg 集合！"]),
     ];
     for (fixture, function, expected) in cases {
         let output = root.join("target/command-outputs").join(fixture);
@@ -86,6 +108,14 @@ fn native_command_shapes_and_macro_forwarding() {
         build_file(&root.join("tests/valid").join(fixture), &output, &options).unwrap();
         assert_eq!(before, files(&output), "{fixture} 重复构建必须一致");
     }
+    let ui_files = files(&root.join("target/command-outputs/ui_commands"));
+    let ui_text = ui_files
+        .values()
+        .map(|bytes| String::from_utf8_lossy(bytes))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(ui_text.contains("run title @e[scores={"));
+    assert!(ui_text.contains("run posteffect add @e[scores={"));
     let output = root.join("target/command-outputs/macros");
     let options = BuildOptions {
         description: "宏产物验收".to_owned(),

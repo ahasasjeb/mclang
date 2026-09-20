@@ -298,14 +298,34 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         english: "sound",
         chinese: "声音",
     },
-    Keyword { english: "title", chinese: "屏幕标题" },
-    Keyword { english: "bossbar", chinese: "首领栏" },
-    Keyword { english: "dialog", chinese: "对话框" },
-    Keyword { english: "particle", chinese: "粒子" },
-    Keyword { english: "stopsound", chinese: "停止声音" },
-    Keyword { english: "posteffect", chinese: "后处理效果" },
-    Keyword { english: "msg", chinese: "私聊" },
-    Keyword { english: "teammsg", chinese: "队伍消息" },
+    Keyword {
+        english: "title",
+        chinese: "屏幕标题",
+    },
+    Keyword {
+        english: "dialog",
+        chinese: "对话框",
+    },
+    Keyword {
+        english: "particle",
+        chinese: "粒子",
+    },
+    Keyword {
+        english: "stopsound",
+        chinese: "停止声音",
+    },
+    Keyword {
+        english: "posteffect",
+        chinese: "后处理效果",
+    },
+    Keyword {
+        english: "msg",
+        chinese: "私聊",
+    },
+    Keyword {
+        english: "teammsg",
+        chinese: "队伍消息",
+    },
     Keyword {
         english: "effect",
         chinese: "效果",

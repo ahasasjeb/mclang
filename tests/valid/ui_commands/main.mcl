@@ -1,0 +1,63 @@
+// 26.3 显示、声音与界面命令；产物应只包含结构化命令。
+namespace ui_commands;
+
+query players = entity("minecraft:player") {}
+query one = entity("minecraft:player") { limit(1); }
+query armed = entity("minecraft:player") {
+    item("weapon.mainhand") { id = "minecraft:diamond_sword"; }
+}
+
+resource dialog links = """{"type":"minecraft:server_links","title":{"text":"链接"},"external_title":{"text":"链接"}}""";
+
+fn display() {
+    title.title(players, text("欢迎") { color = "gold"; bold = true; });
+    title.subtitle(players, translate("menu.singleplayer"));
+    title.actionbar(players, "状态已更新");
+    title.actionbar(armed, "持剑玩家");
+    title.times(players, 10 t, 3 s, 1 s);
+    title.clear(players);
+    title.reset(players);
+
+    bossbar.add("ui_commands:task", text("任务") { color = "yellow"; });
+    bossbar.set.name("ui_commands:task", "阶段一");
+    bossbar.set.color("ui_commands:task", purple);
+    bossbar.set.style("ui_commands:task", notched_10);
+    bossbar.set.value("ui_commands:task", 4);
+    bossbar.set.max("ui_commands:task", 10);
+    bossbar.set.visible("ui_commands:task", true);
+    bossbar.set.players("ui_commands:task", players);
+    bossbar.set.players("ui_commands:task");
+    let value = bossbar.get("ui_commands:task", value);
+    let maximum = bossbar.get("ui_commands:task", max);
+    let visible = bossbar.get("ui_commands:task", visible);
+    let audience = bossbar.get("ui_commands:task", players);
+    bossbar.list();
+    bossbar.remove("ui_commands:task");
+
+    dialog.show(players, links);
+    dialog.clear(players);
+}
+
+fn sensory() {
+    particle("minecraft:flame");
+    particle("minecraft:cloud", vec3(~, ~1, ~));
+    particle("minecraft:dust", nbt { color = 16711680; scale = 1.0f; }, vec3(~, ~1, ~), vec3(0.1, 0.2, 0.1), 0.05, 12, force, players);
+    particle("minecraft:block", nbt { block_state = "minecraft:stone"; }, vec3(~, ~, ~), vec3(0, 0, 0), 0, 1, normal, one);
+    particle("minecraft:trail", nbt { target = [1.0d, 2.0d, 3.0d]; color = 65280; duration = 20; });
+    stopsound(players);
+    stopsound(players, music);
+    stopsound(players, *, "minecraft:entity.player.levelup");
+    stopsound(players, master, "minecraft:entity.player.levelup");
+    posteffect.add(players, "minecraft:blur");
+    posteffect.add(armed, "minecraft:blur");
+    posteffect.list(one);
+    posteffect.remove(players, "minecraft:blur");
+    posteffect.clear(players);
+    msg(one, "任务已更新");
+}
+
+@player fn personal() {
+    title.actionbar(self, "个人状态");
+    dialog.show(self, "minecraft:server_links");
+    teammsg("集合！");
+}

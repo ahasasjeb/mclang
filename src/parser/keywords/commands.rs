@@ -71,21 +71,6 @@ pub(crate) fn command_value(value: &str) -> Option<&'static str> {
         "nametag_visibility" | "名称可见性" => Some("nametag_visibility"),
         "death_message_visibility" | "死亡消息可见性" => Some("death_message_visibility"),
         "collision_rule" | "碰撞规则" => Some("collision_rule"),
-        "subtitle" | "副标题" => Some("subtitle"),
-        "actionbar" | "动作栏" => Some("actionbar"),
-        "times" | "显示时间" => Some("times"),
-        "max" | "最大值" => Some("max"),
-        "visible" | "可见" => Some("visible"),
-        "players" | "玩家列表" => Some("players"),
-        "pink" | "粉色" => Some("pink"),
-        "purple" | "紫色" => Some("purple"),
-        "progress" | "进度" => Some("progress"),
-        "notched_6" | "六格" => Some("notched_6"),
-        "notched_10" | "十格" => Some("notched_10"),
-        "notched_12" | "十二格" => Some("notched_12"),
-        "notched_20" | "二十格" => Some("notched_20"),
-        "show" | "显示" => Some("show"),
-        "force" | "强制" => Some("force"),
         "always" | "总是" => Some("always"),
         "never" | "从不" => Some("never"),
         "hide_for_other_teams" | "对其他队伍隐藏" => Some("hide_for_other_teams"),
@@ -93,5 +78,29 @@ pub(crate) fn command_value(value: &str) -> Option<&'static str> {
         "push_own_team" | "碰撞本队" => Some("push_own_team"),
         "push_other_teams" | "碰撞其他队伍" => Some("push_other_teams"),
         _ => super::text_color(value),
+    }
+}
+
+/// 界面命令的子命令与取值；单独成表，避免文档双语翻译把 `players`
+/// 这样的普通查询名当成全局命令枚举。
+pub(crate) fn ui_value(value: &str) -> Option<&'static str> {
+    match value {
+        "subtitle" | "副标题" => Some("subtitle"),
+        "name" | "名称" => Some("name"),
+        "actionbar" | "动作栏" => Some("actionbar"),
+        "times" | "显示时间" => Some("times"),
+        "max" | "最大值" => Some("max"),
+        "visible" | "可见" => Some("visible"),
+        "players" | "玩家列表" => Some("players"),
+        "pink" | "粉色" => Some("pink"),
+        "purple" | "紫色" => Some("purple"),
+        "progress" | "连续进度条" => Some("progress"),
+        "notched_6" | "六格" => Some("notched_6"),
+        "notched_10" | "十格" => Some("notched_10"),
+        "notched_12" | "十二格" => Some("notched_12"),
+        "notched_20" | "二十格" => Some("notched_20"),
+        "show" | "显示对话框" => Some("show"),
+        "force" | "强制" => Some("force"),
+        _ => None,
     }
 }

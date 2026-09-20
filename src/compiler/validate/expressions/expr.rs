@@ -116,7 +116,10 @@ pub(in crate::compiler::validate) fn validate_expr(
         ExprKind::GameTimeQuery | ExprKind::WorldBorderSize => {}
         ExprKind::BossBarGet { id, .. } => {
             if !super::super::rules::valid_resource_location(id) {
-                diagnostics.push(Diagnostic::new(format!("`{id}` 不是有效的首领栏资源位置"), expression.span));
+                diagnostics.push(Diagnostic::new(
+                    format!("`{id}` 不是有效的首领栏资源位置"),
+                    expression.span,
+                ));
             }
         }
         ExprKind::GameRuleQuery { name } => {

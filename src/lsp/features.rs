@@ -84,7 +84,7 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ),
     (
         "bossbar",
-        "Boss 栏资源引用：`store.result/success(bossbar, \"id\", value|max)` 写当前值或上限。",
+        "Boss 栏操作：`bossbar.add/set.*/remove/list`；`bossbar.get(\"id\", value|max|visible|players)` 返回整数。",
     ),
     ("else", "条件分支的否定分支。"),
     ("while", "条件循环。"),
@@ -114,6 +114,19 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "向玩家发送文本消息：`message.all/self/nearest/player` 接受文本组件或字符串。",
     ),
     ("sound", "播放声音。"),
+    (
+        "title",
+        "向玩家发送标题、副标题或动作栏文本，并设置显示时间。",
+    ),
+    ("dialog", "向玩家显示或清除数据包对话框。"),
+    (
+        "particle",
+        "生成粒子；可指定结构化 NBT 选项、坐标、扩散、速度、数量和观众。",
+    ),
+    ("stopsound", "按声音分类和资源位置停止玩家正在播放的声音。"),
+    ("posteffect", "添加、清除、列出或移除玩家的后处理效果。"),
+    ("msg", "向玩家查询结果发送原版私聊文本。"),
+    ("teammsg", "向当前实体所属队伍发送原版队伍聊天文本。"),
     ("effect", "状态效果操作。"),
     ("xp", "经验值操作。"),
     ("clear", "清空查询玩家的物品。"),

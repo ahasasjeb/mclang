@@ -139,9 +139,10 @@ impl Compiler<'_> {
             ExprKind::WorldBorderSize => {
                 self.capture_result("worldborder get".to_owned(), commands)
             }
-            ExprKind::BossBarGet { id, property } => {
-                self.capture_result(format!("bossbar get {id} {}", property.command_name()), commands)
-            }
+            ExprKind::BossBarGet { id, property } => self.capture_result(
+                format!("bossbar get {id} {}", property.command_name()),
+                commands,
+            ),
             ExprKind::Count { query, .. } => {
                 let target = self.temporary();
                 let selector = entity_query_selector(self.query(query));

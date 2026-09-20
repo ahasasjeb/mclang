@@ -125,3 +125,19 @@ fn rich() {
     message.nearest(16, text("附近") { italic = true; }, aqua);
     message.player(players, score(self, "runtime_objective"));
 }
+
+fn ui() {
+    bossbar.add("dual:sample", "Sample");
+    bossbar.set.color("dual:sample", pink);
+    let bar_value = bossbar.get("dual:sample", value);
+    title.actionbar(players, "Ready");
+    particle("minecraft:flame");
+    stopsound(players, music);
+    dialog.clear(players);
+    posteffect.add(players, "minecraft:blur");
+    msg(players, "Hello");
+}
+
+@player fn ui_team() {
+    teammsg("Hello team");
+}

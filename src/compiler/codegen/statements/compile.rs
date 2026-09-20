@@ -215,7 +215,7 @@ impl Compiler<'_> {
                 commands.push(self.compile_message(target, component));
             }
             StatementKind::UiCommand(command) => {
-                commands.push(self.compile_ui_command(command));
+                commands.push(self.ui_command(command, owner));
             }
             StatementKind::PlaySound {
                 sound,

@@ -119,6 +119,12 @@ pub(super) fn validate_function_bodies(
             .filter(|r| r.kind == "recipe")
             .map(|r| r.name.as_str())
             .collect();
+        let dialogs = program
+            .resources
+            .iter()
+            .filter(|r| r.kind == "dialog")
+            .map(|r| r.name.as_str())
+            .collect();
         let parameters = function
             .parameters
             .iter()
@@ -135,6 +141,7 @@ pub(super) fn validate_function_bodies(
             function_declarations: &function_declarations,
             loot_tables: &loot_tables,
             recipes: &recipes,
+            dialogs: &dialogs,
             scores: &declarations.scores,
             objectives: &declarations.objectives,
             objective_declarations: &declarations.objective_declarations,

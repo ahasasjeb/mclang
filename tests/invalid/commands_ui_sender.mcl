@@ -1,0 +1,6 @@
+// 期望诊断：self 需要玩家上下文；teammsg 需要实体上下文。
+namespace bad_ui;
+fn bad() {
+    title.actionbar(self, "无玩家");
+    teammsg("无发送者");
+}

@@ -183,18 +183,27 @@ impl Parser {
         self.expect(TokenKind::Dot, "名称后需要 `.`")?;
         let (method, method_span) = self.ident("名称方法")?;
         let span = start_span.merge(method_span);
-        if word_matches(&receiver, "bossbar") && word_matches(&method, "get") {
+        if word_matches(&receiver, "bossbar")
+            && (word_matches(&method, "get")
+                || super::keywords::command_value(&method) == Some("get"))
+        {
             self.expect(TokenKind::LeftParen, "bossbar.get 后需要 `(`")?;
             let id = self.string("bossbar.get 需要首领栏资源位置")?.0;
             self.command_comma()?;
-            let property = match self.command_choice(&["value", "max", "visible", "players"])?.as_str() {
+            let property = match self
+                .command_choice(&["value", "max", "visible", "players"])?
+                .as_str()
+            {
                 "value" => BossBarQuery::Value,
                 "max" => BossBarQuery::Max,
                 "visible" => BossBarQuery::Visible,
                 _ => BossBarQuery::Players,
             };
             self.expect(TokenKind::RightParen, "bossbar.get 调用缺少 `)`")?;
-            return Ok(Expr { kind: ExprKind::BossBarGet { id, property }, span: start_span.merge(self.previous().span) });
+            return Ok(Expr {
+                kind: ExprKind::BossBarGet { id, property },
+                span: start_span.merge(self.previous().span),
+            });
         }
         if word_matches(&receiver, "xp") && word_matches(&method, "query") {
             self.expect(TokenKind::LeftParen, "xp.query 后需要 `(`")?;

@@ -206,6 +206,9 @@ impl Parser {
         if let Some(value) = super::keywords::command_value(&word) {
             return Ok(value.to_owned());
         }
+        if let Some(value) = super::keywords::ui_value(&word) {
+            return Ok(value.to_owned());
+        }
         Ok(super::keywords::KEYWORDS
             .iter()
             .find(|k| word_matches(&word, k.english))

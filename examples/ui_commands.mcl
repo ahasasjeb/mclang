@@ -1,0 +1,22 @@
+// 显示任务进度，并给附近玩家播放反馈。
+namespace ui_commands;
+
+query nearby = entity("minecraft:player") { within(32); }
+
+@load fn setup() {
+    bossbar.add("ui_commands:progress", text("探索进度") { color = "aqua"; });
+    bossbar.set.color("ui_commands:progress", blue);
+    bossbar.set.style("ui_commands:progress", notched_10);
+    bossbar.set.max("ui_commands:progress", 10);
+}
+
+fn announce() {
+    bossbar.set.players("ui_commands:progress", nearby);
+    bossbar.set.value("ui_commands:progress", 4);
+    title.title(nearby, text("发现新区域") { color = "gold"; });
+    title.times(nearby, 10 t, 2 s, 10 t);
+    particle("minecraft:happy_villager", vec3(~, ~1, ~), vec3(0.5, 0.5, 0.5), 0, 20, normal, nearby);
+    stopsound(nearby, music);
+    posteffect.add(nearby, "minecraft:blur");
+    msg(nearby, "探索进度已更新");
+}

@@ -1,0 +1,11 @@
+// 期望诊断：界面目标查询必须匹配 minecraft:player；list 需要 limit(1)；本地对话框必须声明。
+namespace bad_ui;
+query mobs = entity("minecraft:zombie") {}
+query players = entity("minecraft:player") {}
+fn bad() {
+    title.title(mobs, "错误");
+    dialog.clear(mobs);
+    dialog.show(players, missing_dialog);
+    posteffect.list(players);
+    stopsound(mobs);
+}

@@ -19,9 +19,9 @@
 
 | 状态 | 数量 | 含义 |
 | --- | --- | --- |
-| 完成 | 53 | 结构化语法覆盖该命令的常规数据包用法，编译期检查完整 |
+| 完成 | 61 | 结构化语法覆盖该命令的常规数据包用法，编译期检查完整 |
 | 部分 | 0 | 已有结构化入口，子命令或参数面存在明确缺口 |
-| 缺失 | 8 | 没有结构化入口，只能写 `run` 字符串或完全不可用 |
+| 缺失 | 0 | 没有结构化入口，只能写 `run` 字符串或完全不可用 |
 | 不可达 | 21 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 等价覆盖 | 2 | 没有独立结构化入口，但用途已由其他结构化语句覆盖 |
 | 只读反馈 | 4 | 只向命令来源输出信息，不改变世界状态 |
@@ -37,7 +37,7 @@
 | 3 世界与方块命令族 | 12/12 | — |
 | 4 实体与玩家命令族 | 18/18 | — |
 | 5 物品、战利品与进度 | 4/5 | slot_source 声明 |
-| 6 界面与感官 | 1/8 | title、bossbar、particle、dialog、msg 等 |
+| 6 界面与感官 | 8/8 | — |
 | 7 服务器数据与工具 | 5/8 | 只读反馈、测试工具与越级命令策略的剩余说明 |
 | 8 语言与工具体验 | 3/8（8.6 部分） | 参数形状校验、增量构建、标准库 |
 | 9 数据包内容与资源 schema | 0/8（9.2 函数标签已完成） | 注册表标签、资源 schema、worldgen、打包 |
@@ -131,17 +131,17 @@
 
 | 命令 | 原版形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
-| `bossbar` | add/remove/list/set（name/color/style/value/max/visible/players）/get | 缺失 | 6.2 |
-| `title` | title/subtitle/actionbar/times/clear/reset | 缺失 | 6.1 |
+| `bossbar` | add/remove/list/set（name/color/style/value/max/visible/players）/get | 完成 | `bossbar.add/remove/list/set.*`；`get` 为 value/max/visible/players 整数表达式（6.2） |
+| `title` | title/subtitle/actionbar/times/clear/reset | 完成 | `title.*` 全部子命令，文本组件与 TimeArgument 时间（6.1） |
 | `tellraw` | `<players> <component>` | 完成 | `message.all/self/nearest/player` 接受文本组件（样式、click/hover、translate/keybind/score/selector/nbt）；纯字符串与末尾颜色保留为旧写法 |
 | `say` | `<message>` | 等价覆盖 | `message.all` 已覆盖广播文本 |
-| `msg`（`tell`、`w`） | `<players> <message>` | 缺失 | 私聊，低优先（6.8） |
-| `teammsg`（`tm`） | `<message>` | 缺失 | 队伍聊天，低优先（6.8） |
-| `particle` | `<name> [pos] [delta] [speed] [count] [force\|normal] [viewers]` | 缺失 | 6.4 |
+| `msg`（`tell`、`w`） | `<players> <message>` | 完成 | `msg(玩家目标, 单行文本)`；别名由原版命令重定向（6.8） |
+| `teammsg`（`tm`） | `<message>` | 完成 | `teammsg(单行文本)`，要求实体上下文（6.8） |
+| `particle` | `<name> [pos] [delta] [speed] [count] [force\|normal] [viewers]` | 完成 | `particle(...)` 覆盖所有可选参数；结构化 NBT 选项按内建粒子 codec 字段检查（6.4） |
 | `playsound` | `<sound> [source] [targets] [pos] [volume] [pitch] [minVolume]` | 完成 | `sound.self` 与 `sound.play(sound, source, targets, pos, volume, pitch, min_volume)` |
-| `stopsound` | `<targets> [*\|source] [sound]` | 缺失 | 6.6 |
-| `posteffect` | add/clear/list/remove | 缺失 | 6.7 |
-| `dialog` | show/clear | 缺失 | 6.3；`resource dialog` 已能写数据 |
+| `stopsound` | `<targets> [*\|source] [sound]` | 完成 | `stopsound(玩家目标[, 分类或 *[, 声音]])`（6.6） |
+| `posteffect` | add/clear/list/remove | 完成 | `posteffect.add/clear/list/remove`，list 要求单玩家（6.7） |
+| `dialog` | show/clear | 完成 | `dialog.show/clear`，声明名引用会检查 `resource dialog` 存在并参与模块名称重写（6.3） |
 
 
 ### 2.6 数据包内容（非命令）
@@ -211,17 +211,7 @@
 
 ### 阶段 6：界面与感官
 
-已完成：6.5（随 §四 的 sound 完整参数落地）。
-
-剩余：
-
-- [ ] 6.1 `title.title/subtitle/actionbar/times/clear/reset`，组件使用 §四 的文本组件类型。
-- [ ] 6.2 `bossbar.add/remove/list/set.name/set.color/set.style/set.value/set.max/set.visible/set.players/get`。
-- [ ] 6.3 `dialog.show/clear`，配合 `resource dialog`。
-- [ ] 6.4 `particle(name, pos, delta, speed, count, mode, viewers)`。
-- [ ] 6.6 `stopsound(targets[, source][, sound])`。
-- [ ] 6.7 `posteffect.add/clear/list/remove`。
-- [ ] 6.8 `msg`/`teammsg`（低优先；`say`/`emote` 已归入等价覆盖）。
+已完成：6.1–6.8（见 §四）。
 
 ### 阶段 7：服务器数据与工具
 
@@ -379,6 +369,13 @@
 - **物品组件与谓词（5.5）**：give 的内联 item_stack、components NBT 补丁和组件删除；clear 的标签/通配/存在/相等/子谓词/取反/任选条件；结构化 item_predicate 共用于查询与 execute if items。组件名和附魔等级来自新增版本数据。复杂组件 codec/schema 的字段级检查仍归阶段 9.3。
 - **结果与目标捕获**：新增命令可获取原生整数结果。带物品条件的查询先记录到编译器内部计分目标，再执行一次多目标命令；清理不覆盖结果或成功状态，也不把内部标签混入 tag.list。
 - **验收语料**：`tests/valid/{entity_commands,core_commands,item_components,macros,macro_sources}`；对应命令/宏负例包含期望诊断；`tests/command_outputs.rs` 检查真实产物、宏辅助函数转发、重复构建和严格模式。示例为 `entity_commands.mcl`、`core_commands.mcl`、`item_components.mcl`、`macro_demo/`，手册及双语翻译工具同步。
+
+### 4.10 显示、声音与界面命令（6.1–6.8）
+
+- **标题与 Boss 栏**：`title.title/subtitle/actionbar/times/clear/reset` 使用现有文本组件和 `TimeArgument`；`bossbar.add/remove/list/set.name/color/style/value/max/visible/players` 覆盖全部子命令，颜色和样式从 26.3 `BossEvent` 提取进枚举快照，`bossbar.get(id, value|max|visible|players)` 作为整数结果表达式。
+- **对话框与视觉效果**：`dialog.show/clear` 接受玩家目标；show 支持已声明的 `resource dialog` 名称或外部资源位置，声明名在编译期检查并参与模块重写；`particle` 支持附加 SNBT 选项、位置、偏移、速度、数量、强制模式和观众，内建粒子的必需选项、字段名与基本数值形状按 `ParticleTypes` 和各选项 codec 检查；`posteffect.add/clear/list/remove` 中 `list` 要求单玩家。
+- **声音与聊天**：`stopsound` 支持全部声音分类、`*` 与可选声音 id；`msg`/`teammsg` 使用原版单行消息参数，队伍聊天要求实体发送者上下文。`tell`/`w`/`tm` 由原版重定向到对应命令。
+- **验收**：`tests/valid/ui_commands`、`tests/invalid/commands_ui_*`、`tests/dual` 与 `examples/ui_commands.mcl`；生成的每条命令对照随附的 `TitleCommand`、`BossBarCommands`、`DialogCommand`、`ParticleCommand`、`StopSoundCommand`、`PostEffectCommand`、`MsgCommand`、`TeamMsgCommand`。
 
 ## 五、依赖关系与验收
 

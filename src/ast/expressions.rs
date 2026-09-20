@@ -35,7 +35,10 @@ pub enum ExprKind {
     },
     /// `worldborder.get()`：世界边界边长。
     WorldBorderSize,
-    BossBarGet { id: String, property: BossBarQuery },
+    BossBarGet {
+        id: String,
+        property: BossBarQuery,
+    },
     /// `count(查询)`：查询命中的实体数量。
     Count {
         query: String,

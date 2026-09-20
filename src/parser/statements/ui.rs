@@ -6,9 +6,18 @@ use crate::parser::Parser;
 
 impl Parser {
     pub(super) fn ui_command_root(&self) -> Option<&'static str> {
-        ["title", "bossbar", "dialog", "particle", "stopsound", "posteffect", "msg", "teammsg"]
-            .into_iter()
-            .find(|root| self.check_word(root))
+        [
+            "title",
+            "bossbar",
+            "dialog",
+            "particle",
+            "stopsound",
+            "posteffect",
+            "msg",
+            "teammsg",
+        ]
+        .into_iter()
+        .find(|root| self.check_word(root))
     }
 
     pub(super) fn ui_command(&mut self, root: &str) -> Result<UiCommand, Diagnostic> {
@@ -22,7 +31,7 @@ impl Parser {
             "title" => self.title_command(&method)?,
             "bossbar" => self.bossbar_command(&method)?,
             "dialog" => self.dialog_command(&method)?,
-            "particle" => UiCommand::Particle(self.particle_command()?),
+            "particle" => UiCommand::Particle(Box::new(self.particle_command()?)),
             "stopsound" => self.stopsound_command()?,
             "posteffect" => self.posteffect_command(&method)?,
             "msg" => {
@@ -49,7 +58,10 @@ impl Parser {
                     "subtitle" => TitleChannel::Subtitle,
                     _ => TitleChannel::Actionbar,
                 };
-                TitleAction::Text { channel, component }
+                TitleAction::Text {
+                    channel,
+                    component: Box::new(component),
+                }
             }
             "times" => {
                 self.command_comma()?;
@@ -58,7 +70,11 @@ impl Parser {
                 let stay = self.time_argument(0, "标题停留时间")?;
                 self.command_comma()?;
                 let fade_out = self.time_argument(0, "标题淡出时间")?;
-                TitleAction::Times { fade_in, stay, fade_out }
+                TitleAction::Times {
+                    fade_in,
+                    stay,
+                    fade_out,
+                }
             }
             "clear" => TitleAction::Clear,
             "reset" => TitleAction::Reset,
@@ -73,21 +89,26 @@ impl Parser {
                 let id = self.string("首领栏资源位置")?.0;
                 self.command_comma()?;
                 let name = self.text_component_or_string("首领栏名称")?;
-                BossBarAction::Add { id, name }
+                BossBarAction::Add {
+                    id,
+                    name: Box::new(name),
+                }
             }
             "remove" => BossBarAction::Remove(self.string("首领栏资源位置")?.0),
             "list" => BossBarAction::List,
-            "set_name" | "set_color" | "set_style" | "set_value" | "set_max"
-            | "set_visible" | "set_players" => {
+            "set_name" | "set_color" | "set_style" | "set_value" | "set_max" | "set_visible"
+            | "set_players" => {
                 let id = self.string("首领栏资源位置")?.0;
                 let property = if method == "set_players" && self.check(&TokenKind::RightParen) {
                     BossBarProperty::Players(None)
                 } else {
                     self.command_comma()?;
                     match method {
-                        "set_name" => BossBarProperty::Name(self.text_component_or_string("首领栏名称")?),
-                        "set_color" => BossBarProperty::Color(self.command_choice(&["pink", "blue", "red", "green", "yellow", "purple", "white"])?),
-                        "set_style" => BossBarProperty::Style(self.command_choice(&["progress", "notched_6", "notched_10", "notched_12", "notched_20"])?),
+                        "set_name" => BossBarProperty::Name(Box::new(
+                            self.text_component_or_string("首领栏名称")?,
+                        )),
+                        "set_color" => BossBarProperty::Color(self.command_word()?),
+                        "set_style" => BossBarProperty::Style(self.command_word()?),
                         "set_value" => BossBarProperty::Value(self.unsigned("首领栏数值")?),
                         "set_max" => BossBarProperty::Max(self.unsigned("首领栏最大值")?),
                         "set_visible" => BossBarProperty::Visible(self.command_boolean()?),
@@ -107,7 +128,7 @@ impl Parser {
         let dialog = match method {
             "show" => {
                 self.command_comma()?;
-                Some(self.string("对话框资源位置")?.0)
+                Some(self.advancement_reference("对话框")?)
             }
             "clear" => None,
             _ => return self.unknown_command_method("dialog", method),
@@ -141,16 +162,22 @@ impl Parser {
             self.command_comma()?;
             count = Some(self.unsigned("粒子数量")?);
             if self.command_optional_comma() {
-                force = Some(match self.command_choice(&["force", "normal"] )?.as_str() {
-                    "force" => true,
-                    _ => false,
-                });
+                force = Some(self.command_choice(&["force", "normal"])? == "force");
                 if self.command_optional_comma() {
                     viewers = Some(self.holder("粒子观众")?);
                 }
             }
         }
-        Ok(ParticleCommand { name, options, position, delta, speed, count, force, viewers })
+        Ok(ParticleCommand {
+            name,
+            options,
+            position,
+            delta,
+            speed,
+            count,
+            force,
+            viewers,
+        })
     }
 
     fn stopsound_command(&mut self) -> Result<UiCommand, Diagnostic> {
@@ -159,13 +186,22 @@ impl Parser {
         let mut sound = None;
         if self.command_optional_comma() {
             if self.take(&TokenKind::Star).is_none() {
-                source = Some(self.command_word()?);
+                let source_word = self.command_word()?;
+                source = Some(
+                    crate::parser::keywords::sound_source(&source_word)
+                        .unwrap_or(&source_word)
+                        .to_owned(),
+                );
             }
             if self.command_optional_comma() {
                 sound = Some(self.string("声音资源位置")?.0);
             }
         }
-        Ok(UiCommand::StopSound { targets, source, sound })
+        Ok(UiCommand::StopSound {
+            targets,
+            source,
+            sound,
+        })
     }
 
     fn posteffect_command(&mut self, method: &str) -> Result<UiCommand, Diagnostic> {
@@ -174,8 +210,11 @@ impl Parser {
             "add" | "remove" => {
                 self.command_comma()?;
                 let effect = self.string("后处理效果资源位置")?.0;
-                if method == "add" { PostEffectAction::Add { targets, effect } }
-                else { PostEffectAction::Remove { targets, effect } }
+                if method == "add" {
+                    PostEffectAction::Add { targets, effect }
+                } else {
+                    PostEffectAction::Remove { targets, effect }
+                }
             }
             "clear" => PostEffectAction::Clear(targets),
             "list" => PostEffectAction::List(targets),
