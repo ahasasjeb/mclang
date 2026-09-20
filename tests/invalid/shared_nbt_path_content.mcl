@@ -1,0 +1,5 @@
+// expect: NBT 匹配条件缺少值
+namespace invalid_path_content;
+@load fn example() {
+    message.all(nbt(storage, "invalid_path_content:data", "Items[{id:}].count"));
+}

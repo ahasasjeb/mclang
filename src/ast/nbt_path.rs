@@ -41,6 +41,18 @@ impl NbtPath {
                 _ => return Err("节点之间需要 `.`，列表节点需要 `[...]`"),
             }
         }
+        for node in &nodes {
+            let filter = match node {
+                NbtPathNode::Member {
+                    filter: Some(filter),
+                    ..
+                }
+                | NbtPathNode::MatchElement(filter)
+                | NbtPathNode::MatchRoot(filter) => filter,
+                _ => continue,
+            };
+            super::snbt_match::validate_compound(filter)?;
+        }
         Ok(Self { nodes })
     }
 }

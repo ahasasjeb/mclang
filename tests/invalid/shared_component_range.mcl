@@ -1,0 +1,7 @@
+// expect: 组件 `minecraft:attack_range.max_reach` 的值不符合 26.3 codec 的类型或范围
+namespace invalid_component_range;
+item sample = item_stack("minecraft:diamond_sword") {
+    components = nbt {
+        "minecraft:attack_range" = { max_reach = 65.0f; };
+    };
+}

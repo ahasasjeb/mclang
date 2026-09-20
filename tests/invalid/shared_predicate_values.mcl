@@ -1,0 +1,8 @@
+// expect: firework_explosion.shape 的值不符合 26.3 codec
+namespace invalid_predicate_values;
+query players = entity("minecraft:player") {}
+fn example() {
+    clear(players, item_predicate("*") {
+        matches("minecraft:firework_explosion", nbt { shape = "rocket"; });
+    }, 0);
+}

@@ -1,0 +1,8 @@
+// expect: damage 子谓词的 min 不能大于 max
+namespace invalid_predicate_range;
+query players = entity("minecraft:player") {}
+fn example() {
+    clear(players, item_predicate("*") {
+        matches("minecraft:damage", nbt { damage = { min = 12; max = 4; }; });
+    }, 0);
+}

@@ -1,6 +1,9 @@
 use super::registry::{validate_id, validate_id_or_tag};
 use crate::{ast::*, diagnostic::Diagnostic};
 
+mod predicate_values;
+use predicate_values::validate_predicate_value;
+
 pub(super) fn validate_predicate(predicate: &ItemPredicate, diagnostics: &mut Vec<Diagnostic>) {
     let base = predicate.item.split('[').next().unwrap_or(&predicate.item);
     if base != "*" {
@@ -121,7 +124,10 @@ pub(super) fn validate_component_value(
             Some(ValueSchema::Integer(0, i32::MAX))
         }
         "minecraft:enchantment_glint_override" => Some(ValueSchema::Boolean),
-        "minecraft:unbreakable" | "minecraft:intangible_projectile" => Some(ValueSchema::Unit),
+        "minecraft:unbreakable"
+        | "minecraft:intangible_projectile"
+        | "minecraft:glider"
+        | "minecraft:waxed" => Some(ValueSchema::Unit),
         "minecraft:minimum_attack_charge" => Some(ValueSchema::Float(0.0, 1.0)),
         "minecraft:potion_duration_scale" => Some(ValueSchema::Float(0.0, f32::MAX as f64)),
         "minecraft:dyed_color" => Some(ValueSchema::RgbColor),
@@ -141,6 +147,10 @@ pub(super) fn validate_component_value(
         }
         "minecraft:food" => Some(ValueSchema::Compound(FOOD_FIELDS)),
         "minecraft:use_cooldown" => Some(ValueSchema::Compound(COOLDOWN_FIELDS)),
+        "minecraft:use_effects" => Some(ValueSchema::Compound(USE_EFFECTS_FIELDS)),
+        "minecraft:weapon" => Some(ValueSchema::Compound(WEAPON_FIELDS)),
+        "minecraft:attack_range" => Some(ValueSchema::Compound(ATTACK_RANGE_FIELDS)),
+        "minecraft:enchantable" => Some(ValueSchema::Compound(ENCHANTABLE_FIELDS)),
         _ => None,
     };
     if let Some(schema) = schema {
@@ -199,6 +209,72 @@ const COOLDOWN_FIELDS: &[SchemaField] = &[
         required: false,
     },
 ];
+const USE_EFFECTS_FIELDS: &[SchemaField] = &[
+    SchemaField {
+        name: "can_sprint",
+        schema: ValueSchema::Boolean,
+        required: false,
+    },
+    SchemaField {
+        name: "interact_vibrations",
+        schema: ValueSchema::Boolean,
+        required: false,
+    },
+    SchemaField {
+        name: "speed_multiplier",
+        schema: ValueSchema::Float(0.0, 1.0),
+        required: false,
+    },
+];
+const WEAPON_FIELDS: &[SchemaField] = &[
+    SchemaField {
+        name: "item_damage_per_attack",
+        schema: ValueSchema::Integer(0, i32::MAX),
+        required: false,
+    },
+    SchemaField {
+        name: "disable_blocking_for_seconds",
+        schema: ValueSchema::Float(0.0, f32::MAX as f64),
+        required: false,
+    },
+];
+const ATTACK_RANGE_FIELDS: &[SchemaField] = &[
+    SchemaField {
+        name: "min_reach",
+        schema: ValueSchema::Float(0.0, 64.0),
+        required: false,
+    },
+    SchemaField {
+        name: "max_reach",
+        schema: ValueSchema::Float(0.0, 64.0),
+        required: false,
+    },
+    SchemaField {
+        name: "min_creative_reach",
+        schema: ValueSchema::Float(0.0, 64.0),
+        required: false,
+    },
+    SchemaField {
+        name: "max_creative_reach",
+        schema: ValueSchema::Float(0.0, 64.0),
+        required: false,
+    },
+    SchemaField {
+        name: "hitbox_margin",
+        schema: ValueSchema::Float(0.0, 1.0),
+        required: false,
+    },
+    SchemaField {
+        name: "mob_factor",
+        schema: ValueSchema::Float(0.0, 2.0),
+        required: false,
+    },
+];
+const ENCHANTABLE_FIELDS: &[SchemaField] = &[SchemaField {
+    name: "value",
+    schema: ValueSchema::Integer(1, i32::MAX),
+    required: true,
+}];
 
 fn validate_schema(
     label: &str,
@@ -305,74 +381,6 @@ fn numeric(value: &NbtValue) -> Option<f64> {
         NbtValueKind::Float(value) => Some(f64::from(value)),
         NbtValueKind::Double(value) => Some(value),
         _ => None,
-    }
-}
-
-fn validate_predicate_value(id: &str, value: &NbtValue, diagnostics: &mut Vec<Diagnostic>) {
-    let fields = match id {
-        "minecraft:count" => Some(&["min", "max"][..]),
-        "minecraft:damage" => Some(&["damage", "durability"][..]),
-        "minecraft:potion_contents" => Some(&["potions", "effects"][..]),
-        _ => None,
-    };
-    if id == "minecraft:custom_data" && !matches!(value.kind, NbtValueKind::Compound(_)) {
-        diagnostics.push(Diagnostic::new(
-            "custom_data 子谓词需要复合 NBT",
-            value.span,
-        ));
-    }
-    let Some(fields) = fields else { return };
-    let NbtValueKind::Compound(entries) = &value.kind else {
-        diagnostics.push(Diagnostic::new(
-            format!("子谓词 `{id}` 需要复合字段"),
-            value.span,
-        ));
-        return;
-    };
-    for entry in entries {
-        if !fields.contains(&entry.key.as_str()) {
-            diagnostics.push(Diagnostic::new(
-                format!("子谓词 `{id}` 没有字段 `{}`", entry.key),
-                entry.key_span,
-            ));
-        } else if id == "minecraft:count" || id == "minecraft:damage" {
-            validate_integer_bounds(id, &entry.value, diagnostics);
-        }
-    }
-    if id == "minecraft:count" {
-        let min = entries
-            .iter()
-            .find(|entry| entry.key == "min")
-            .and_then(|entry| int(&entry.value));
-        let max = entries
-            .iter()
-            .find(|entry| entry.key == "max")
-            .and_then(|entry| int(&entry.value));
-        if min.zip(max).is_some_and(|(min, max)| min > max) {
-            diagnostics.push(Diagnostic::new(
-                "count 子谓词的 min 不能大于 max",
-                value.span,
-            ));
-        }
-    }
-}
-
-fn validate_integer_bounds(id: &str, value: &NbtValue, diagnostics: &mut Vec<Diagnostic>) {
-    let valid = int(value).is_some()
-        || matches!(&value.kind, NbtValueKind::Compound(entries) if entries.iter().all(|entry| matches!(entry.key.as_str(), "min" | "max") && int(&entry.value).is_some()));
-    if !valid {
-        diagnostics.push(Diagnostic::new(
-            format!("子谓词 `{id}` 的范围需要整数或 min/max 整数字段"),
-            value.span,
-        ));
-    }
-}
-
-fn int(value: &NbtValue) -> Option<i32> {
-    if let NbtValueKind::Int(value) = value.kind {
-        Some(value)
-    } else {
-        None
     }
 }
 

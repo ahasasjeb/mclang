@@ -791,7 +791,7 @@ let <name> = data.get(<目标>, "<路径>");
 | `string(<目标>, "<路径>"[, <起始>[, <结束>]])` | `string <目标> <路径> …` | 读取后转成字符串 |
 | `compute(<上下文>, float\|integer, "<provider>"[, <缩放>])` | `compute …` | 用上下文 provider 计算数值 |
 
-`data.get` 是表达式，经 `execute store result` 落入计分项；读取失败或非数值时为 0。NBT 路径会解析成成员、带引号成员、`[0]`/`[-1]` 下标、`[]` 全列表、`[{...}]` 列表元素匹配、`成员{...}` 与根级 `{...}` 匹配节点，命令中仍保留原路径文本。
+`data.get` 是表达式，经 `execute store result` 落入计分项；读取失败或非数值时为 0。NBT 路径会解析成成员、带引号成员、`[0]`/`[-1]` 下标、`[]` 全列表、`[{...}]` 列表元素匹配、`成员{...}` 与根级 `{...}` 匹配节点。匹配复合中的 SNBT 会检查键值、逗号、列表和嵌套结构；命令中仍保留原路径文本。
 
 ```mcl title="示例" fragment
 data.merge(entity, self, nbt { CustomName = "仓库"; Tags = ["a"]; });
@@ -2019,9 +2019,9 @@ test.create("demo:new_test", 5, 4, 7);
 
 ### 任意物品组件与结构化谓词
 
-物品定义和 `give` 的内联 `item_stack(...) { ... }` 都支持 `components = nbt { ... };`。键是组件资源位置，值使用结构化 NBT；删除组件写成 `"!minecraft:组件" = {};`。组件名对照 26.3 注册表，重复设置、与已有具名属性冲突会报错。常用组件还检查整数/浮点范围、布尔值、资源位置、稀有度枚举、文本列表、附魔级别以及 `food`、`use_cooldown` 的必需和可选字段。其余复杂组件仍由原版 codec 在加载时检查。
+物品定义和 `give` 的内联 `item_stack(...) { ... }` 都支持 `components = nbt { ... };`。键是组件资源位置，值使用结构化 NBT；删除组件写成 `"!minecraft:组件" = {};`。组件名对照 26.3 注册表，重复设置、与已有具名属性冲突会报错。常用组件还检查整数/浮点范围、布尔值、资源位置、稀有度枚举、文本列表、附魔级别以及 `food`、`use_cooldown`、`use_effects`、`weapon`、`attack_range`、`enchantable` 的字段。其余复杂组件仍由原版 codec 在加载时检查。
 
-`item_predicate("id/#tag/*") { ... }` 可用于 `clear`、`if items` 和查询的 `item(...){ id = ...; }`。`has` 检查存在，`equals` 检查组件完整相等，`matches` 使用组件子谓词；前缀 `!` 取反，`||` 连接任选条件，不同分号分隔的条件必须全部满足。`minecraft:count` 是原版提供的数量伪组件；`count`、`damage`、`potion_contents` 的常用子谓词字段会检查名称和范围结构。
+`item_predicate("id/#tag/*") { ... }` 可用于 `clear`、`if items` 和查询的 `item(...){ id = ...; }`。`has` 检查存在，`equals` 检查组件完整相等，`matches` 使用组件子谓词；前缀 `!` 取反，`||` 连接任选条件，不同分号分隔的条件必须全部满足。`minecraft:count` 是原版提供的数量伪组件；`count`、`damage`、`potion_contents`、`enchantments`、`stored_enchantments`、`trim`、`firework_explosion`、`written_book_content`、`jukebox_playable`、`villager/variant` 的常用字段会检查值类型、资源引用与范围。整数范围可写单个整数或 `nbt { min = ...; max = ...; }`，`min` 不能大于 `max`。
 
 ```mcl title="item_predicates.mcl" verify id=item_predicates
 namespace item_predicates;

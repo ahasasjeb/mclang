@@ -40,17 +40,17 @@
 | --- | --- | --- |
 | 资源位置 / 注册表引用 | 较高 | 统一资源引用类型；覆盖普通资源与 tag 引用。 |
 | 实体选择器 | 较高 | 已补正向类型互斥、区间交集与玩家上下文诊断；后续让版本数据提供 option 形状。 |
-| NBT / SNBT | 较高 | 补 round-trip 测试；把 SNBT 语法校验和资源 codec 字段校验分开。 |
+| NBT / SNBT | 较高 | 结构化 NBT 已校验并序列化；NBT path 匹配复合现检查 SNBT 键值与嵌套结构。继续补 round-trip 语料及完整数值语法。 |
 | TextComponent | 较高 | 已补 `object` 的 atlas/player、click `show_dialog/custom`、hover `show_item/show_entity`；后续扩展 item 组件补丁与 player profile。 |
-| 物品组件 | 部分 | 已按 26.3 codec 检查常用字段类型、范围、枚举、资源引用、`food`/`use_cooldown` 嵌套结构；继续覆盖其余组件。 |
-| 物品谓词 | 部分 | 已补 `count`、`damage`、`potion_contents` 常用字段；继续覆盖其余子谓词 schema。 |
+| 物品组件 | 部分 | 已按 26.3 codec 检查常用字段类型、范围、枚举、资源引用及 `food`、`use_cooldown`、`use_effects`、`weapon`、`attack_range`、`enchantable` 结构；继续覆盖其余组件。 |
+| 物品谓词 | 部分 | 已校验 `count`、`damage`、`potion_contents`、附魔、纹饰、烟花、成书、唱片和村民类型的常用字段、引用与区间；继续覆盖集合等复杂子谓词。 |
 | 方块状态 | 较高 | 已从 26.3 方块模型资产生成逐方块属性取值快照；继续补不影响模型的状态属性。 |
 | 粒子 options | 较高 | 已按 ParticleType codec 检查必需字段、类型、范围和常用嵌套结构；继续扩展特殊粒子。 |
-| NBT path | 较高 | 已建成员、索引、全列表、列表匹配、成员/根复合匹配 AST；继续加强匹配复合里的 SNBT 内容校验。 |
+| NBT path | 较高 | 已建成员、索引、全列表、列表匹配、成员/根复合匹配 AST；匹配复合现检查 SNBT 键值、列表与嵌套结构，继续覆盖完整数值及内置运算语法。 |
 | MessageArgument | 已完成 | `msg`/`teammsg`/`say`/`me` 使用独立消息类型与单行校验，和 TextComponent 分离。 |
 | 坐标 / 旋转 / 时间 / 范围 | 较高 | 统一 value type 与范围检查接口。 |
 
-本轮新增 `examples/shared_arguments.mcl` 与有效/无效 `.mcl` 语料；版本快照新增 `block_states.json`，由 `cargo xtask generate-version-data` 重建。
+共享参数示例在 `examples/shared_arguments.mcl`，有效/无效语料在 `tests/valid/shared_arguments` 与 `tests/invalid/shared_*`。方块状态快照位于 `block_states.json`，由 `cargo xtask generate-version-data` 重建。本轮扩充了物品组件、物品子谓词与 NBT path 匹配复合的检查。
 
 ## 3. 数据包资源能力
 

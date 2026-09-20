@@ -8,6 +8,10 @@ item sample = item_stack("minecraft:diamond_sword") {
         "minecraft:enchantment_glint_override" = true;
         "minecraft:food" = { nutrition = 2; saturation = 0.5f; can_always_eat = false; };
         "minecraft:use_cooldown" = { seconds = 1.5f; cooldown_group = "shared_arguments:sample"; };
+        "minecraft:use_effects" = { can_sprint = true; speed_multiplier = 0.8f; };
+        "minecraft:weapon" = { item_damage_per_attack = 2; };
+        "minecraft:attack_range" = { max_reach = 4.0f; };
+        "minecraft:enchantable" = { value = 12; };
         "minecraft:enchantments" = { "minecraft:sharpness" = 3; };
     };
 }
@@ -20,6 +24,7 @@ item sample = item_stack("minecraft:diamond_sword") {
     message.all(text("对话框") { click = show_dialog("shared_arguments:menu"); });
     message.all(text("自定义") { click = custom("shared_arguments:open", nbt { page = 1; }); });
     message.all(nbt(storage, "shared_arguments:data", "Items[{id:'minecraft:stone'}].count"));
+    message.all(nbt(storage, "shared_arguments:data", "Items[{components:{'minecraft:custom_data':{group:'building',},},}].count"));
     message.all(nbt(storage, "shared_arguments:data", "Items[-1].count"));
     message.all(nbt(storage, "shared_arguments:list", "[0].id"));
     particle("minecraft:block", nbt { block_state = { id = "minecraft:oak_stairs"; properties = { facing = "north"; }; }; });
@@ -29,5 +34,8 @@ item sample = item_stack("minecraft:diamond_sword") {
         equals("minecraft:max_stack_size", 1);
         matches("minecraft:count", nbt { min = 1; max = 64; });
         matches("minecraft:damage", nbt { damage = { min = 0; max = 20; }; });
+        matches("minecraft:firework_explosion", nbt { shape = "star"; has_trail = true; });
+        matches("minecraft:potion_contents", nbt { potions = "minecraft:water"; effects = { size = { min = 0; max = 8; }; }; });
+        matches("minecraft:enchantments", [{ enchantments = "minecraft:sharpness"; levels = { min = 1; max = 5; }; }]);
     }, 0);
 }

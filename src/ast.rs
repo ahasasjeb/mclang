@@ -12,6 +12,7 @@ mod item_predicates;
 mod macros;
 mod message;
 mod nbt_path;
+mod snbt_match;
 mod spans;
 mod statements;
 mod text;
