@@ -47,6 +47,9 @@ pub fn generate_enums(root: &Path) -> Result<String, String> {
             "public enum SoundSource",
         ),
     );
+    let boss_event = extractor.read("net/minecraft/world/BossEvent.java")?;
+    enums.insert("bossbar_color".into(), enum_literals(&boss_event, "public static enum BossBarColor"));
+    enums.insert("bossbar_style".into(), enum_literals(&boss_event, "public static enum BossBarOverlay"));
     enums.insert(
         "anchor".into(),
         enum_literals(

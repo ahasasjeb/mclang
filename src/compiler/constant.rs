@@ -34,6 +34,7 @@ pub(super) fn constant_value(expression: &Expr) -> Option<i32> {
         | ExprKind::GameTimeQuery
         | ExprKind::GameRuleQuery { .. }
         | ExprKind::WorldBorderSize
+        | ExprKind::BossBarGet { .. }
         | ExprKind::Count { .. }
         | ExprKind::Random { .. }
         | ExprKind::DataGet { .. }

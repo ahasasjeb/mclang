@@ -83,6 +83,7 @@ pub(super) fn expression_names(
         | ExprKind::GameTimeQuery
         | ExprKind::GameRuleQuery { .. }
         | ExprKind::WorldBorderSize
+        | ExprKind::BossBarGet { .. }
         | ExprKind::Random { .. } => {}
     }
 }

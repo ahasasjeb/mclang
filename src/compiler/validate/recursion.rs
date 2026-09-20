@@ -149,6 +149,7 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::SelfAction(_)
             | StatementKind::Message { .. }
             | StatementKind::PlaySound { .. }
+            | StatementKind::UiCommand(_)
             | StatementKind::AdvancementAction { .. }
             | StatementKind::Schedule { .. }
             | StatementKind::ScheduleClear { .. }
@@ -227,6 +228,7 @@ fn collect_expr_calls<'a>(expression: &'a Expr, calls: &mut HashSet<&'a str>) {
         | ExprKind::GameTimeQuery
         | ExprKind::GameRuleQuery { .. }
         | ExprKind::WorldBorderSize
+        | ExprKind::BossBarGet { .. }
         | ExprKind::Count { .. }
         | ExprKind::Random { .. }
         | ExprKind::DataGet { .. }

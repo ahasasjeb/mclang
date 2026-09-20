@@ -182,6 +182,7 @@ fn statement_kind_names(
             }
             component_names(component, visitor, context);
         }
+        StatementKind::UiCommand(command) => ui_command_names(command, visitor, context),
         StatementKind::AdvancementAction {
             targets,
             advancement,
@@ -248,6 +249,45 @@ fn statement_kind_names(
         | StatementKind::GameRuleSet { .. }
         | StatementKind::WorldBorder(_)
         | StatementKind::Locate { .. } => {}
+    }
+}
+
+fn ui_command_names(
+    command: &mut UiCommand,
+    visitor: &mut impl FnMut(&NameContext<'_>, NameSite, NameRole, &mut String),
+    context: &NameContext<'_>,
+) {
+    match command {
+        UiCommand::Title { targets, action } => {
+            holder_names(targets, visitor, context);
+            if let TitleAction::Text { component, .. } = action {
+                component_names(component, visitor, context);
+            }
+        }
+        UiCommand::BossBar(action) => match action {
+            BossBarAction::Add { name, .. } => component_names(name, visitor, context),
+            BossBarAction::Set { property, .. } => match property {
+                BossBarProperty::Name(name) => component_names(name, visitor, context),
+                BossBarProperty::Players(Some(targets)) => holder_names(targets, visitor, context),
+                _ => {}
+            },
+            _ => {}
+        },
+        UiCommand::Dialog { targets, .. }
+        | UiCommand::StopSound { targets, .. }
+        | UiCommand::PrivateMessage { targets, .. } => holder_names(targets, visitor, context),
+        UiCommand::Particle(particle) => {
+            if let Some(viewers) = &mut particle.viewers {
+                holder_names(viewers, visitor, context);
+            }
+        }
+        UiCommand::PostEffect(action) => match action {
+            PostEffectAction::Add { targets, .. }
+            | PostEffectAction::Remove { targets, .. }
+            | PostEffectAction::Clear(targets)
+            | PostEffectAction::List(targets) => holder_names(targets, visitor, context),
+        },
+        UiCommand::TeamMessage(_) => {}
     }
 }
 

@@ -5,3 +5,4 @@ mod dispatch;
 mod messages;
 mod scoreboard;
 mod self_actions;
+mod ui;

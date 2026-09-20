@@ -65,6 +65,11 @@ impl Parser {
             self.message_statement()?
         } else if self.take_word("sound").is_some() {
             self.sound_statement()?
+        } else if let Some(root) = self.ui_command_root() {
+            self.advance();
+            let command = self.ui_command(root)?;
+            self.expect(TokenKind::Semicolon, "界面命令后需要 `;`")?;
+            StatementKind::UiCommand(Box::new(command))
         } else if self.take_word("run").is_some() {
             let (command, _) = self.command_string("run")?;
             self.expect(TokenKind::Semicolon, "命令后需要 `;`")?;

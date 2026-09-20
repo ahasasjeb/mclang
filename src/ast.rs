@@ -13,6 +13,7 @@ mod macros;
 mod spans;
 mod statements;
 mod text;
+mod ui;
 
 pub use actions::*;
 pub use core_commands::*;
@@ -27,3 +28,4 @@ pub use macros::*;
 pub use spans::*;
 pub use statements::*;
 pub use text::*;
+pub use ui::*;

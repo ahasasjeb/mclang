@@ -37,6 +37,7 @@ mod flow;
 mod queries;
 mod statement;
 mod tags;
+mod ui;
 
 pub(super) use entities::{validate_holder, validate_score_target};
 pub(super) use queries::{require_player_query, validate_stopwatch_id};
@@ -49,6 +50,7 @@ use flow::*;
 use queries::*;
 use statement::validate_statement;
 use tags::*;
+use ui::*;
 
 /// 遍历函数体时保持不变的校验环境。
 #[derive(Clone, Copy)]

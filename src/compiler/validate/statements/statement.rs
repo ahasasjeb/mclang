@@ -101,6 +101,9 @@ pub(super) fn validate_statement<'a>(
         StatementKind::Message { target, component } => {
             validate_message(target, component, statement.span, ctx, diagnostics);
         }
+        StatementKind::UiCommand(command) => {
+            validate_ui_command(command, statement.span, ctx, diagnostics);
+        }
         StatementKind::PlaySound {
             sound,
             source,

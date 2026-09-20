@@ -133,6 +133,7 @@ pub enum StatementKind {
         target: MessageTarget,
         component: TextComponent,
     },
+    UiCommand(Box<UiCommand>),
     PlaySound {
         sound: String,
         source: String,

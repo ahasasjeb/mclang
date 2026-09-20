@@ -1,9 +1,25 @@
 {
-  "digest": "fnv1a64:4bb2d25e1991ae62",
+  "digest": "fnv1a64:b734b25baec13f93",
   "enums": {
     "anchor": [
       "feet",
       "eyes"
+    ],
+    "bossbar_color": [
+      "pink",
+      "blue",
+      "red",
+      "green",
+      "yellow",
+      "purple",
+      "white"
+    ],
+    "bossbar_style": [
+      "progress",
+      "notched_6",
+      "notched_10",
+      "notched_12",
+      "notched_20"
     ],
     "difficulty": [
       "peaceful",

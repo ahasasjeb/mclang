@@ -175,6 +175,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::SelfAction(_)
             | ast::StatementKind::Message { .. }
             | ast::StatementKind::PlaySound { .. }
+            | ast::StatementKind::UiCommand(_)
             | ast::StatementKind::Call { .. }
             | ast::StatementKind::Let { .. }
             | ast::StatementKind::Schedule { .. }

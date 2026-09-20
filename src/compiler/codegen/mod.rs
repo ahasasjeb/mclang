@@ -22,6 +22,7 @@ mod macros;
 mod names;
 mod statements;
 mod world;
+mod ui;
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
