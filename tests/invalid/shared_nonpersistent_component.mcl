@@ -1,0 +1,7 @@
+// expect: 没有持久化 codec
+namespace invalid_nonpersistent;
+item sample = item_stack("minecraft:stone") {
+    components = nbt {
+        "minecraft:creative_slot_lock" = {};
+    };
+}

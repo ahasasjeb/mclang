@@ -1,0 +1,5 @@
+// expect: 属性 `facing` 不接受 `up`
+namespace invalid_block_state;
+@load fn example() {
+    set_block(pos(0, 64, 0), block_state("minecraft:oak_stairs") { facing = "up"; });
+}

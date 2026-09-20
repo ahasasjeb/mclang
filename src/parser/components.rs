@@ -9,8 +9,8 @@
 //! ```
 
 use crate::ast::{
-    ClickEvent, ItemConditionSource, NbtComponentSource, ObjectiveRef, SelectorValue,
-    TextComponent, TextComponentKind, TextStyle,
+    ClickEvent, HoverEvent, ItemConditionSource, NbtComponentSource, ObjectContent, ObjectiveRef,
+    SelectorValue, TextComponent, TextComponentKind, TextStyle,
 };
 use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
@@ -25,6 +25,7 @@ struct StyleBlock {
     interpret: Option<bool>,
     plain: Option<bool>,
     separator: Option<Box<TextComponent>>,
+    fallback: Option<Box<TextComponent>>,
 }
 
 impl Parser {
@@ -105,6 +106,59 @@ impl Parser {
             let block = self.text_style_block()?;
             return Ok(Some(self.build_component(
                 TextComponentKind::Keybind(key),
+                block,
+                start.span.merge(end),
+                false,
+            )?));
+        }
+        if let Some(start) = self.take_word("object") {
+            self.expect(TokenKind::LeftParen, "object 后需要 `(`")?;
+            let (kind, kind_span) = self.ident("object 类型需要 atlas 或 player")?;
+            let mut object = match kind.as_str() {
+                "atlas" | "图集" => {
+                    self.expect(TokenKind::Comma, "atlas 后需要 `,`")?;
+                    let (sprite, _) = self.string("atlas 需要 sprite 资源位置")?;
+                    let atlas = if self.take(&TokenKind::Comma).is_some() {
+                        Some(self.string("atlas 图集资源位置")?.0)
+                    } else {
+                        None
+                    };
+                    ObjectContent::Atlas {
+                        atlas,
+                        sprite,
+                        fallback: None,
+                    }
+                }
+                "player" | "玩家" => {
+                    self.expect(TokenKind::Comma, "player 后需要 `,`")?;
+                    let (name, _) = self.string("player 需要玩家名称")?;
+                    let hat = if self.take(&TokenKind::Comma).is_some() {
+                        self.boolean_value("player 帽子开关")?
+                    } else {
+                        true
+                    };
+                    ObjectContent::Player {
+                        name,
+                        hat,
+                        fallback: None,
+                    }
+                }
+                _ => {
+                    return Err(Diagnostic::new(
+                        format!("未知 object 类型 `{kind}`，可用 atlas（图集）或 player（玩家）"),
+                        kind_span,
+                    ));
+                }
+            };
+            let end = self.expect(TokenKind::RightParen, "object 缺少 `)`")?.span;
+            let mut block = self.text_style_block()?;
+            let fallback = block.fallback.take();
+            match &mut object {
+                ObjectContent::Atlas { fallback: slot, .. }
+                | ObjectContent::Player { fallback: slot, .. } => *slot = fallback,
+            }
+            return Ok(Some(self.build_component(
+                TextComponentKind::Object(object),
                 block,
                 start.span.merge(end),
                 false,
@@ -249,6 +303,9 @@ impl Parser {
                 }
             }
         }
+        if block.fallback.is_some() {
+            return Err(Diagnostic::new("fallback 只适用于 object 组件", span));
+        }
         Ok(TextComponent {
             kind,
             style: block.style,
@@ -279,7 +336,7 @@ impl Parser {
             let Some(property) = text_style_property(&name) else {
                 return Err(Diagnostic::new(
                     format!(
-                        "未知文本样式属性 `{name}`，可用 color、bold、italic、underlined、strikethrough、obfuscated、click、hover，nbt 组件还支持 interpret、plain、separator"
+                        "未知文本样式属性 `{name}`，可用 color、bold、italic、underlined、strikethrough、obfuscated、click、hover、fallback，nbt 组件还支持 interpret、plain、separator"
                     ),
                     span,
                 ));
@@ -321,7 +378,14 @@ impl Parser {
                     if block.style.hover.is_some() {
                         return Err(Diagnostic::new("重复设置样式属性 hover", span));
                     }
-                    block.style.hover = Some(Box::new(self.text_component("悬停内容")?));
+                    block.style.hover = Some(self.hover_event()?);
+                }
+                "fallback" => {
+                    if block.fallback.is_some() {
+                        return Err(Diagnostic::new("重复设置样式属性 fallback", span));
+                    }
+                    block.fallback =
+                        Some(Box::new(self.text_component_or_string("object 回退内容")?));
                 }
                 "interpret" | "plain" => {
                     let value = self.boolean_value("nbt 组件开关")?;
@@ -355,7 +419,7 @@ impl Parser {
         let Some(action) = click_action(&action) else {
             return Err(Diagnostic::new(
                 format!(
-                    "未知点击事件 `{action}`，可用 open_url、run_command、suggest_command、copy_to_clipboard、change_page"
+                    "未知点击事件 `{action}`，可用 open_url、run_command、suggest_command、copy_to_clipboard、change_page、show_dialog、custom"
                 ),
                 span,
             ));
@@ -378,13 +442,55 @@ impl Parser {
                 let (value, _) = self.string("copy_to_clipboard 需要文本字符串")?;
                 ClickEvent::CopyToClipboard(value)
             }
-            _ => {
+            "show_dialog" => {
+                ClickEvent::ShowDialog(self.string("show_dialog 需要对话框资源位置")?.0)
+            }
+            "custom" => {
+                let (id, _) = self.string("custom 需要事件资源位置")?;
+                let payload = if self.take(&TokenKind::Comma).is_some() {
+                    self.take_word("nbt");
+                    Some(self.nbt_value()?)
+                } else {
+                    None
+                };
+                ClickEvent::Custom { id, payload }
+            }
+            "change_page" => {
                 let page = self.unsigned("change_page 需要页号")?;
                 ClickEvent::ChangePage(page)
             }
+            _ => unreachable!("click_action 只返回已知动作"),
         };
         self.expect(TokenKind::RightParen, "点击事件缺少 `)`")?;
         Ok(event)
+    }
+
+    fn hover_event(&mut self) -> Result<HoverEvent, Diagnostic> {
+        if self.take_word("show_item").is_some() {
+            self.expect(TokenKind::LeftParen, "show_item 后需要 `(`")?;
+            let (id, _) = self.string("show_item 需要物品资源位置")?;
+            let count = if self.take(&TokenKind::Comma).is_some() {
+                Some(self.unsigned("show_item 数量")?)
+            } else {
+                None
+            };
+            self.expect(TokenKind::RightParen, "show_item 缺少 `)`")?;
+            return Ok(HoverEvent::Item { id, count });
+        }
+        if self.take_word("show_entity").is_some() {
+            self.expect(TokenKind::LeftParen, "show_entity 后需要 `(`")?;
+            let (id, _) = self.string("show_entity 需要实体类型资源位置")?;
+            self.expect(TokenKind::Comma, "show_entity 类型后需要 `,`")?;
+            let (uuid, _) = self.string("show_entity 需要 UUID")?;
+            let name = if self.take(&TokenKind::Comma).is_some() {
+                Some(Box::new(self.text_component_or_string("show_entity 名称")?))
+            } else {
+                None
+            };
+            self.expect(TokenKind::RightParen, "show_entity 缺少 `)`")?;
+            return Ok(HoverEvent::Entity { id, uuid, name });
+        }
+        Ok(HoverEvent::Text(Box::new(self.text_component("悬停内容")?)))
     }
 
     /// 布尔字面量：`true`/`false` 与中文 `真`/`假`。

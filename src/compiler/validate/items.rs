@@ -155,6 +155,22 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
             }
         };
         validate_entity_type(value, span, diagnostics);
+        match filter {
+            EntityTypeFilter::Include(value, _) => diagnostics.push(Diagnostic::new(
+                format!(
+                    "查询 `{}` 已由 entity(\"{}\") 指定正向类型，不能再添加 type(\"{value}\")",
+                    query.name, query.entity_type
+                ),
+                span,
+            )),
+            EntityTypeFilter::Exclude(value, _) if value == &query.entity_type => {
+                diagnostics.push(Diagnostic::new(
+                    format!("查询 `{}` 同时包含并排除实体类型 `{value}`", query.name),
+                    span,
+                ))
+            }
+            EntityTypeFilter::Exclude(_, _) => {}
+        }
     }
     let mut tags = HashSet::new();
     for tag in query.tags.iter().chain(&query.excluded_tags) {
@@ -250,6 +266,18 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
             query.span,
         ));
     }
+    if let (Some(distance), Some(within)) = (&query.distance, query.within)
+        && valid_float_range(distance)
+        && !ranges_intersect(distance, &format!("..{within}"))
+    {
+        diagnostics.push(Diagnostic::new(
+            format!(
+                "查询 `{}` 的 distance `{distance}` 与 within `{within}` 没有交集",
+                query.name
+            ),
+            query.span,
+        ));
+    }
     if let Some(level) = &query.level
         && !valid_int_range(level)
     {
@@ -263,6 +291,18 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
     {
         diagnostics.push(Diagnostic::new(
             format!("`{gamemode}` 不是有效的游戏模式"),
+            query.span,
+        ));
+    }
+    if query.entity_type != "minecraft:player"
+        && !query.entity_type.starts_with('#')
+        && (query.level.is_some() || query.gamemode.is_some())
+    {
+        diagnostics.push(Diagnostic::new(
+            format!(
+                "查询 `{}` 的 level/gamemode 只能用于玩家，当前实体类型是 `{}`",
+                query.name, query.entity_type
+            ),
             query.span,
         ));
     }
@@ -338,21 +378,67 @@ fn validate_entity_type(value: &str, span: Span, diagnostics: &mut Vec<Diagnosti
 
 /// 选择器区间：`5`、`..5`、`5..`、`5..10` 与小数版本。
 pub(super) fn valid_int_range(text: &str) -> bool {
-    valid_range(text, |value| value.parse::<i64>().is_ok())
+    parse_range(text, |value| value.parse::<i64>().ok()).is_some()
 }
 
 pub(super) fn valid_float_range(text: &str) -> bool {
-    valid_range(text, |value| value.parse::<f64>().is_ok())
+    parse_range(text, |value| {
+        value
+            .parse::<f64>()
+            .ok()
+            .filter(|number| number.is_finite())
+    })
+    .is_some()
 }
 
-fn valid_range(text: &str, parse: impl Fn(&str) -> bool) -> bool {
+fn parse_range<T: PartialOrd>(
+    text: &str,
+    parse: impl Fn(&str) -> Option<T>,
+) -> Option<(Option<T>, Option<T>)> {
     if let Some((low, high)) = text.split_once("..") {
-        let low_ok = low.is_empty() || parse(low);
-        let high_ok = high.is_empty() || parse(high);
-        low_ok && high_ok && !(low.is_empty() && high.is_empty())
+        if low.is_empty() && high.is_empty() {
+            return None;
+        }
+        let low = if low.is_empty() {
+            None
+        } else {
+            Some(parse(low)?)
+        };
+        let high = if high.is_empty() {
+            None
+        } else {
+            Some(parse(high)?)
+        };
+        if low
+            .as_ref()
+            .zip(high.as_ref())
+            .is_some_and(|(low, high)| low > high)
+        {
+            return None;
+        }
+        Some((low, high))
     } else {
-        parse(text)
+        let value = parse(text)?;
+        Some((Some(value), Some(parse(text)?)))
     }
+}
+
+fn ranges_intersect(left: &str, right: &str) -> bool {
+    let (left_min, left_max) = match parse_range(left, |part| part.parse::<f64>().ok()) {
+        Some(range) => range,
+        None => return false,
+    };
+    let (right_min, right_max) = match parse_range(right, |part| part.parse::<f64>().ok()) {
+        Some(range) => range,
+        None => return false,
+    };
+    let min = left_min
+        .unwrap_or(f64::NEG_INFINITY)
+        .max(right_min.unwrap_or(f64::NEG_INFINITY));
+    let max = left_max
+        .unwrap_or(f64::INFINITY)
+        .min(right_max.unwrap_or(f64::INFINITY));
+    min <= max
 }
 
 /// 物品谓词：物品 id、`#标签`，可带 `[组件过滤器]`。

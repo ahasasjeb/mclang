@@ -475,6 +475,18 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "按键",
     },
     Keyword {
+        english: "object",
+        chinese: "对象内容",
+    },
+    Keyword {
+        english: "show_item",
+        chinese: "展示物品",
+    },
+    Keyword {
+        english: "show_entity",
+        chinese: "展示实体",
+    },
+    Keyword {
         english: "selector",
         chinese: "选择器",
     },

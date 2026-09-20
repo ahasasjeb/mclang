@@ -1,0 +1,6 @@
+// expect: 没有交集
+namespace invalid_selector;
+query empty = entity("minecraft:player") {
+    distance("10..20");
+    within(5);
+}

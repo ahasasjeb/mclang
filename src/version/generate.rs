@@ -13,6 +13,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+mod block_states;
 mod commands;
 mod enums;
 mod extract;
@@ -20,6 +21,7 @@ mod registries;
 mod text;
 mod triggers;
 
+pub use block_states::generate_block_states;
 pub use commands::generate_commands;
 pub use enums::generate_enums;
 pub use registries::generate_registries;
@@ -54,6 +56,10 @@ pub fn generate_all(repo_root: &Path) -> Result<Vec<Output>, String> {
         Output {
             name: "commands.json",
             contents: generate_commands(&source)?,
+        },
+        Output {
+            name: "block_states.json",
+            contents: generate_block_states(&source)?,
         },
         Output {
             name: "entity_nbt.json",

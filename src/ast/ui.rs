@@ -20,9 +20,9 @@ pub enum UiCommand {
     PostEffect(PostEffectAction),
     PrivateMessage {
         targets: Holder,
-        message: String,
+        message: MessageArgument,
     },
-    TeamMessage(String),
+    TeamMessage(MessageArgument),
 }
 
 #[derive(Debug)]

@@ -41,8 +41,8 @@ impl Parser {
             }),
             "version" => CoreCommand::Version,
             "seed" => CoreCommand::Seed,
-            "say" => CoreCommand::Say(self.string("say 需要消息文本")?.0),
-            "me" => CoreCommand::Me(self.string("me 需要动作文本")?.0),
+            "say" => CoreCommand::Say(self.message_argument("say 消息")?),
+            "me" => CoreCommand::Me(self.message_argument("me 动作消息")?),
             "fetchprofile" => CoreCommand::FetchProfile(self.fetch_profile_command(&method)?),
             "test" => CoreCommand::Test(self.test_command(&method)?),
             "recipe" => {

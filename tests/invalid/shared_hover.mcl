@@ -1,0 +1,5 @@
+// expect: show_item 的数量必须在 1 到 99 之间
+namespace invalid_hover;
+@load fn example() {
+    message.all(text("错误") { hover = show_item("minecraft:stone", 0); });
+}

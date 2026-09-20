@@ -242,7 +242,7 @@ fn item_stack_template_json(item: &ItemStackDecl) -> Value {
 }
 
 /// NBT 值到 JSON 的转换：数据包 JSON 里的 `custom_data` 直接写成 JSON 结构。
-fn nbt_json(value: &NbtValue) -> Value {
+pub(super) fn nbt_json(value: &NbtValue) -> Value {
     match &value.kind {
         NbtValueKind::Byte(value) => json!(value),
         NbtValueKind::Short(value) => json!(value),

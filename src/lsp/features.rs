@@ -37,7 +37,7 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ),
     (
         "scoreboard",
-        "计分板读写：`scoreboard.set(持有者, 目标, 值)`、`scoreboard.reset(持有者, 目标)`，`scoreboard.get(持有者, 目标)` 是表达式。",
+        "计分板读写与运行期设置：`scoreboard.set/reset/get`，以及 `scoreboard.objectives.*`、`scoreboard.players.*`。",
     ),
     (
         "query",
@@ -74,7 +74,10 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
         "声明函数标签，供 `call #标签()` 与 schedule 使用。",
     ),
     ("let", "声明只在当前函数体内可见的局部变量。"),
-    ("return", "结束函数：返回计分值、`fail` 或 `run` 原生命令。"),
+    (
+        "return",
+        "结束函数：返回计分值、`fail`，或用 `return run` 返回结构化命令的结果。",
+    ),
     ("fail", "`return fail`：让调用方看到这次执行失败。"),
     ("if", "条件分支；`execute` 里是“条件成立才执行”的子句。"),
     ("unless", "`execute` 的条件子句：条件不成立才执行。"),
@@ -131,6 +134,13 @@ const KEYWORD_DOCS: &[(&str, &str)] = &[
     ("xp", "经验值操作。"),
     ("clear", "清空查询玩家的物品。"),
     ("stopwatch", "秒表操作。"),
+    ("help", "列出命令帮助，或查询指定命令路径。"),
+    ("version", "输出当前游戏版本。"),
+    ("seed", "输出当前世界的种子。"),
+    ("say", "使用原生 say 命令广播消息。"),
+    ("me", "使用原生 me 命令发送动作消息。"),
+    ("fetchprofile", "按玩家名、UUID 或单实体读取档案。"),
+    ("test", "运行、定位、验证和管理 GameTest 测试实例。"),
     ("run", "原生命令逃生口：执行未结构化的命令文本。"),
     (
         "execute",

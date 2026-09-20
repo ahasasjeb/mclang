@@ -3,8 +3,8 @@
 use serde_json::{Map, Value, json};
 
 use crate::ast::{
-    ClickEvent, Holder, MessageTarget, NbtComponentSource, ObjectiveRef, SelectorValue,
-    TextComponent, TextComponentKind,
+    ClickEvent, Holder, HoverEvent, MessageTarget, NbtComponentSource, ObjectContent, ObjectiveRef,
+    SelectorValue, TextComponent, TextComponentKind,
 };
 
 use super::Compiler;
@@ -49,6 +49,34 @@ impl Compiler<'_> {
             TextComponentKind::Keybind(key) => {
                 object.insert("keybind".to_owned(), json!(key));
             }
+            TextComponentKind::Object(content) => match content {
+                ObjectContent::Atlas {
+                    atlas,
+                    sprite,
+                    fallback,
+                } => {
+                    object.insert("object".to_owned(), json!("atlas"));
+                    object.insert("sprite".to_owned(), json!(sprite));
+                    if let Some(atlas) = atlas {
+                        object.insert("atlas".to_owned(), json!(atlas));
+                    }
+                    if let Some(fallback) = fallback {
+                        object.insert("fallback".to_owned(), self.component_json(fallback));
+                    }
+                }
+                ObjectContent::Player {
+                    name,
+                    hat,
+                    fallback,
+                } => {
+                    object.insert("object".to_owned(), json!("player"));
+                    object.insert("player".to_owned(), json!(name));
+                    object.insert("hat".to_owned(), json!(hat));
+                    if let Some(fallback) = fallback {
+                        object.insert("fallback".to_owned(), self.component_json(fallback));
+                    }
+                }
+            },
             TextComponentKind::Score {
                 holder, objective, ..
             } => {
@@ -122,13 +150,26 @@ impl Compiler<'_> {
             object.insert("click_event".to_owned(), click_event_json(click));
         }
         if let Some(hover) = &component.style.hover {
-            object.insert(
-                "hover_event".to_owned(),
-                json!({
-                    "action": "show_text",
-                    "value": self.component_json(hover),
-                }),
-            );
+            let event = match hover {
+                HoverEvent::Text(value) => {
+                    json!({"action": "show_text", "value": self.component_json(value)})
+                }
+                HoverEvent::Item { id, count } => {
+                    let mut event = json!({"action": "show_item", "id": id});
+                    if let Some(count) = count {
+                        event["count"] = json!(count);
+                    }
+                    event
+                }
+                HoverEvent::Entity { id, uuid, name } => {
+                    let mut event = json!({"action": "show_entity", "id": id, "uuid": uuid});
+                    if let Some(name) = name {
+                        event["name"] = self.component_json(name);
+                    }
+                    event
+                }
+            };
+            object.insert("hover_event".to_owned(), event);
         }
         Value::Object(object)
     }
@@ -158,5 +199,13 @@ fn click_event_json(click: &ClickEvent) -> Value {
             json!({"action": "copy_to_clipboard", "value": value})
         }
         ClickEvent::ChangePage(page) => json!({"action": "change_page", "page": page}),
+        ClickEvent::ShowDialog(dialog) => json!({"action": "show_dialog", "dialog": dialog}),
+        ClickEvent::Custom { id, payload } => {
+            let mut event = json!({"action": "custom", "id": id});
+            if let Some(payload) = payload {
+                event["payload"] = super::advancement::nbt_json(payload);
+            }
+            event
+        }
     }
 }

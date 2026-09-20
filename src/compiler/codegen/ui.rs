@@ -77,9 +77,9 @@ impl Compiler<'_> {
                 ),
             },
             UiCommand::PrivateMessage { targets, message } => {
-                format!("msg {} {message}", self.component_holder(targets))
+                format!("msg {} {}", self.component_holder(targets), message.text)
             }
-            UiCommand::TeamMessage(message) => format!("teammsg {message}"),
+            UiCommand::TeamMessage(message) => format!("teammsg {}", message.text),
         }
     }
 

@@ -12,8 +12,8 @@ impl Compiler<'_> {
             CoreCommand::Help(command) => format!("help{}", optional(command.as_ref())),
             CoreCommand::Version => "version".to_owned(),
             CoreCommand::Seed => "seed".to_owned(),
-            CoreCommand::Say(message) => format!("say {message}"),
-            CoreCommand::Me(action) => format!("me {action}"),
+            CoreCommand::Say(message) => format!("say {}", message.text),
+            CoreCommand::Me(action) => format!("me {}", action.text),
             CoreCommand::FetchProfile(target) => match target {
                 FetchProfileTarget::Name(name) => format!("fetchprofile name {name}"),
                 FetchProfileTarget::Id(id) => format!("fetchprofile id {id}"),

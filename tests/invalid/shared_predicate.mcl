@@ -1,0 +1,8 @@
+// expect: count 子谓词的 min 不能大于 max
+namespace invalid_predicate;
+query players = entity("minecraft:player") {}
+fn example() {
+    clear(players, item_predicate("*") {
+        matches("minecraft:count", nbt { min = 4; max = 1; });
+    }, 0);
+}

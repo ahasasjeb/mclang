@@ -1,13 +1,25 @@
 //! 文本组件（1.3）的语义检查：颜色、本地化键、选择器、NBT 路径与事件。
 
 use crate::ast::{
-    ClickEvent, Holder, NbtComponentSource, ObjectiveRef, SelectorValue, TextComponent,
-    TextComponentKind,
+    ClickEvent, Holder, HoverEvent, MessageArgument, NbtComponentSource, ObjectContent,
+    ObjectiveRef, SelectorValue, TextComponent, TextComponentKind,
 };
 use crate::diagnostic::Diagnostic;
 
 use super::rules::valid_resource_location;
 use super::statements::ValidationContext;
+
+pub(super) fn validate_message_argument(
+    message: &MessageArgument,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if message.text.trim().is_empty() || message.text.contains(['\n', '\r', '\0']) {
+        diagnostics.push(Diagnostic::new(
+            "聊天消息必须是非空的单行文本",
+            message.span,
+        ));
+    }
+}
 
 /// 校验整个组件树。
 pub(super) fn validate_component(
@@ -27,10 +39,74 @@ pub(super) fn validate_component(
         validate_click(click, component.span, diagnostics);
     }
     if let Some(hover) = &component.style.hover {
-        validate_component(hover, ctx, diagnostics);
+        match hover {
+            HoverEvent::Text(value) => validate_component(value, ctx, diagnostics),
+            HoverEvent::Item { id, count } => {
+                super::registry::validate_id("item", "悬停物品", id, component.span, diagnostics);
+                if count.is_some_and(|count| !(1..=99).contains(&count)) {
+                    diagnostics.push(Diagnostic::new(
+                        "show_item 的数量必须在 1 到 99 之间",
+                        component.span,
+                    ));
+                }
+            }
+            HoverEvent::Entity { id, uuid, name } => {
+                super::registry::validate_id(
+                    "entity_type",
+                    "悬停实体",
+                    id,
+                    component.span,
+                    diagnostics,
+                );
+                if !valid_uuid(uuid) {
+                    diagnostics.push(Diagnostic::new(
+                        format!("show_entity 的 `{uuid}` 不是有效的 UUID"),
+                        component.span,
+                    ));
+                }
+                if let Some(name) = name {
+                    validate_component(name, ctx, diagnostics);
+                }
+            }
+        }
     }
     match &component.kind {
         TextComponentKind::Text(_) => {}
+        TextComponentKind::Object(content) => match content {
+            ObjectContent::Atlas {
+                atlas,
+                sprite,
+                fallback,
+            } => {
+                for id in atlas.iter().chain(std::iter::once(sprite)) {
+                    if !valid_resource_location(id) {
+                        diagnostics.push(Diagnostic::new(
+                            format!("object 图集资源位置 `{id}` 无效"),
+                            component.span,
+                        ));
+                    }
+                }
+                if let Some(fallback) = fallback {
+                    validate_component(fallback, ctx, diagnostics);
+                }
+            }
+            ObjectContent::Player { name, fallback, .. } => {
+                if name.is_empty()
+                    || name.len() > 16
+                    || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                {
+                    diagnostics.push(Diagnostic::new(
+                        format!(
+                            "object 玩家名称 `{name}` 需要 1 到 16 个 ASCII 字母、数字或下划线"
+                        ),
+                        component.span,
+                    ));
+                }
+                if let Some(fallback) = fallback {
+                    validate_component(fallback, ctx, diagnostics);
+                }
+            }
+        },
         TextComponentKind::Keybind(key) => {
             if !valid_translation_key(key) {
                 diagnostics.push(Diagnostic::new(
@@ -98,9 +174,9 @@ pub(super) fn validate_component(
             plain,
             separator,
         } => {
-            if !valid_nbt_component_path(path) {
+            if let Err(reason) = crate::ast::NbtPath::parse(path) {
                 diagnostics.push(Diagnostic::new(
-                    format!("`{path}` 不是有效的 NBT 路径"),
+                    format!("`{path}` 不是有效的 NBT 路径：{reason}"),
                     *path_span,
                 ));
             }
@@ -185,7 +261,34 @@ fn validate_click(click: &ClickEvent, span: crate::ast::Span, diagnostics: &mut 
                 diagnostics.push(Diagnostic::new("change_page 的页号从 1 开始", span));
             }
         }
+        ClickEvent::ShowDialog(dialog) => {
+            if !valid_resource_location(dialog) {
+                diagnostics.push(Diagnostic::new(
+                    format!("show_dialog 的 `{dialog}` 不是有效的对话框资源位置"),
+                    span,
+                ));
+            }
+        }
+        ClickEvent::Custom { id, .. } => {
+            if !valid_resource_location(id) {
+                diagnostics.push(Diagnostic::new(
+                    format!("custom 的 `{id}` 不是有效的资源位置"),
+                    span,
+                ));
+            }
+        }
     }
+}
+
+fn valid_uuid(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(index, byte)| {
+            if [8, 13, 18, 23].contains(&index) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
 }
 
 /// 16 个颜色名或 `#rrggbb`。
@@ -209,31 +312,7 @@ fn valid_translation_key(key: &str) -> bool {
         })
 }
 
-/// NBT 组件路径：点分、允许列表下标与引号键，括号必须配对。
+/// 数据与文本组件共用的 NBT path 语法。
 pub(super) fn valid_nbt_component_path(path: &str) -> bool {
-    if path.is_empty() || path.len() > 1024 || path.starts_with('.') || path.ends_with('.') {
-        return false;
-    }
-    let mut depth = 0i32;
-    let mut quote: Option<char> = None;
-    for character in path.chars() {
-        if let Some(opening) = quote {
-            if character == opening {
-                quote = None;
-            }
-            continue;
-        }
-        match character {
-            '"' | '\'' => quote = Some(character),
-            '[' | '{' => depth += 1,
-            ']' | '}' => {
-                depth -= 1;
-                if depth < 0 {
-                    return false;
-                }
-            }
-            _ => {}
-        }
-    }
-    depth == 0 && quote.is_none()
+    crate::ast::NbtPath::parse(path).is_ok()
 }

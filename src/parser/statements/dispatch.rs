@@ -133,6 +133,7 @@ impl Parser {
                     if !matches!(
                         command.kind,
                         StatementKind::CoreCommand(_)
+                            | StatementKind::MacroCall { .. }
                             | StatementKind::EntityCommand(_)
                             | StatementKind::UiCommand(_)
                             | StatementKind::ScoreboardCommand(_)
@@ -171,6 +172,10 @@ impl Parser {
                             | StatementKind::DataModify { .. }
                             | StatementKind::ItemAction { .. }
                             | StatementKind::AdvancementAction { .. }
+                            | StatementKind::Call { .. }
+                            | StatementKind::Schedule { .. }
+                            | StatementKind::ScheduleClear { .. }
+                            | StatementKind::Execute { .. }
                     ) {
                         return Err(Diagnostic::new(
                             "return run 后需要一条结构化命令，例如 `say(\"完成\");`",

@@ -25,6 +25,15 @@ pub(super) fn validate_predicate(predicate: &ItemPredicate, diagnostics: &mut Ve
         if test.id != "minecraft:count" && !component_existence {
             validate_id(registry, "组件条件", &test.id, test.span, diagnostics);
         }
+        match &test.kind {
+            ItemComponentTestKind::Present => {}
+            ItemComponentTestKind::Equal(value) => {
+                validate_component_value(&test.id, value, diagnostics)
+            }
+            ItemComponentTestKind::Match(value) => {
+                validate_predicate_value(&test.id, value, diagnostics)
+            }
+        }
     }
 }
 
@@ -70,6 +79,17 @@ pub(super) fn validate_components(item: &ItemStackDecl, diagnostics: &mut Vec<Di
             entry.value.span,
             diagnostics,
         );
+        if matches!(
+            id,
+            "minecraft:creative_slot_lock"
+                | "minecraft:additional_trade_cost"
+                | "minecraft:map_post_processing"
+        ) {
+            diagnostics.push(Diagnostic::new(
+                format!("物品组件 `{id}` 在 26.3 没有持久化 codec，不能写入数据包"),
+                entry.key_span,
+            ));
+        }
         if !seen.insert(id.to_owned()) {
             diagnostics.push(Diagnostic::new(
                 format!("物品组件 `{id}` 重复赋值或与具名属性冲突"),
@@ -89,20 +109,270 @@ pub(super) fn validate_components(item: &ItemStackDecl, diagnostics: &mut Vec<Di
     }
 }
 
-fn validate_component_value(id: &str, value: &NbtValue, diagnostics: &mut Vec<Diagnostic>) {
-    let range = match id {
-        "minecraft:max_stack_size" => Some((1, 99)),
-        "minecraft:max_damage" => Some((1, i32::MAX)),
-        "minecraft:damage" | "minecraft:repair_cost" => Some((0, i32::MAX)),
+pub(super) fn validate_component_value(
+    id: &str,
+    value: &NbtValue,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let schema = match id {
+        "minecraft:max_stack_size" => Some(ValueSchema::Integer(1, 99)),
+        "minecraft:max_damage" => Some(ValueSchema::Integer(1, i32::MAX)),
+        "minecraft:damage" | "minecraft:repair_cost" | "minecraft:map_id" => {
+            Some(ValueSchema::Integer(0, i32::MAX))
+        }
+        "minecraft:enchantment_glint_override" => Some(ValueSchema::Boolean),
+        "minecraft:unbreakable" | "minecraft:intangible_projectile" => Some(ValueSchema::Unit),
+        "minecraft:minimum_attack_charge" => Some(ValueSchema::Float(0.0, 1.0)),
+        "minecraft:potion_duration_scale" => Some(ValueSchema::Float(0.0, f32::MAX as f64)),
+        "minecraft:dyed_color" => Some(ValueSchema::RgbColor),
+        "minecraft:item_model"
+        | "minecraft:tooltip_style"
+        | "minecraft:note_block_sound"
+        | "minecraft:break_sound"
+        | "minecraft:damage_type" => Some(ValueSchema::Resource),
+        "minecraft:rarity" => Some(ValueSchema::Rarity),
+        "minecraft:custom_data" | "minecraft:bucket_entity_data" => {
+            Some(ValueSchema::Compound(&[]))
+        }
+        "minecraft:custom_name" | "minecraft:item_name" => Some(ValueSchema::Text),
+        "minecraft:lore" => Some(ValueSchema::TextList),
+        "minecraft:enchantments" | "minecraft:stored_enchantments" => {
+            Some(ValueSchema::Enchantments)
+        }
+        "minecraft:food" => Some(ValueSchema::Compound(FOOD_FIELDS)),
+        "minecraft:use_cooldown" => Some(ValueSchema::Compound(COOLDOWN_FIELDS)),
         _ => None,
     };
-    if let Some((min, max)) = range
-        && !matches!(value.kind, NbtValueKind::Int(v) if (min..=max).contains(&v))
-    {
+    if let Some(schema) = schema {
+        validate_schema(id, value, schema, diagnostics);
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ValueSchema {
+    Integer(i32, i32),
+    Float(f64, f64),
+    Boolean,
+    Unit,
+    Resource,
+    Rarity,
+    RgbColor,
+    Text,
+    TextList,
+    Enchantments,
+    Compound(&'static [SchemaField]),
+}
+
+#[derive(Clone, Copy)]
+struct SchemaField {
+    name: &'static str,
+    schema: ValueSchema,
+    required: bool,
+}
+
+const FOOD_FIELDS: &[SchemaField] = &[
+    SchemaField {
+        name: "nutrition",
+        schema: ValueSchema::Integer(0, i32::MAX),
+        required: true,
+    },
+    SchemaField {
+        name: "saturation",
+        schema: ValueSchema::Float(-f32::MAX as f64, f32::MAX as f64),
+        required: true,
+    },
+    SchemaField {
+        name: "can_always_eat",
+        schema: ValueSchema::Boolean,
+        required: false,
+    },
+];
+const COOLDOWN_FIELDS: &[SchemaField] = &[
+    SchemaField {
+        name: "seconds",
+        schema: ValueSchema::Float(f64::MIN_POSITIVE, f32::MAX as f64),
+        required: true,
+    },
+    SchemaField {
+        name: "cooldown_group",
+        schema: ValueSchema::Resource,
+        required: false,
+    },
+];
+
+fn validate_schema(
+    label: &str,
+    value: &NbtValue,
+    schema: ValueSchema,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let valid = match schema {
+        ValueSchema::Integer(min, max) => {
+            matches!(value.kind, NbtValueKind::Int(number) if (min..=max).contains(&number))
+        }
+        ValueSchema::Float(min, max) => {
+            numeric(value).is_some_and(|number| number.is_finite() && (min..=max).contains(&number))
+        }
+        ValueSchema::Boolean => matches!(value.kind, NbtValueKind::Byte(0 | 1)),
+        ValueSchema::Unit => {
+            matches!(&value.kind, NbtValueKind::Compound(entries) if entries.is_empty())
+        }
+        ValueSchema::Resource => {
+            matches!(&value.kind, NbtValueKind::String(id) if super::rules::valid_resource_location(id))
+        }
+        ValueSchema::Rarity => {
+            matches!(&value.kind, NbtValueKind::String(name) if matches!(name.as_str(), "common" | "uncommon" | "rare" | "epic"))
+        }
+        ValueSchema::RgbColor => {
+            matches!(value.kind, NbtValueKind::Int(number) if (0..=0x00ff_ffff).contains(&number))
+                || matches!(&value.kind, NbtValueKind::List(channels) if channels.len() == 3 && channels.iter().all(|channel| numeric(channel).is_some_and(|number| number.is_finite())))
+        }
+        ValueSchema::Text => {
+            matches!(
+                value.kind,
+                NbtValueKind::String(_) | NbtValueKind::Compound(_)
+            ) || matches!(&value.kind, NbtValueKind::List(parts) if !parts.is_empty() && parts.iter().all(|part| matches!(part.kind, NbtValueKind::String(_) | NbtValueKind::Compound(_))))
+        }
+        ValueSchema::TextList => {
+            matches!(&value.kind, NbtValueKind::List(lines) if lines.len() <= 256 && lines.iter().all(|line| matches!(line.kind, NbtValueKind::String(_) | NbtValueKind::Compound(_))))
+        }
+        ValueSchema::Enchantments => {
+            if let NbtValueKind::Compound(entries) = &value.kind {
+                for entry in entries {
+                    validate_id(
+                        "enchantment",
+                        "附魔",
+                        &entry.key,
+                        entry.key_span,
+                        diagnostics,
+                    );
+                    validate_schema(
+                        &format!("{label}.{}", entry.key),
+                        &entry.value,
+                        ValueSchema::Integer(1, 255),
+                        diagnostics,
+                    );
+                }
+                true
+            } else {
+                false
+            }
+        }
+        ValueSchema::Compound(fields) => {
+            if let NbtValueKind::Compound(entries) = &value.kind {
+                if !fields.is_empty() {
+                    for field in fields {
+                        if field.required && !entries.iter().any(|entry| entry.key == field.name) {
+                            diagnostics.push(Diagnostic::new(
+                                format!("组件 `{label}` 缺少字段 `{}`", field.name),
+                                value.span,
+                            ));
+                        }
+                    }
+                    for entry in entries {
+                        if let Some(field) = fields.iter().find(|field| field.name == entry.key) {
+                            validate_schema(
+                                &format!("{label}.{}", entry.key),
+                                &entry.value,
+                                field.schema,
+                                diagnostics,
+                            );
+                        } else {
+                            diagnostics.push(Diagnostic::new(
+                                format!("组件 `{label}` 没有字段 `{}`", entry.key),
+                                entry.key_span,
+                            ));
+                        }
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        }
+    };
+    if !valid {
         diagnostics.push(Diagnostic::new(
-            format!("组件 `{id}` 必须是 {min} 到 {max} 之间的整数"),
+            format!("组件 `{label}` 的值不符合 26.3 codec 的类型或范围"),
             value.span,
         ));
+    }
+}
+
+fn numeric(value: &NbtValue) -> Option<f64> {
+    match value.kind {
+        NbtValueKind::Int(value) => Some(f64::from(value)),
+        NbtValueKind::Float(value) => Some(f64::from(value)),
+        NbtValueKind::Double(value) => Some(value),
+        _ => None,
+    }
+}
+
+fn validate_predicate_value(id: &str, value: &NbtValue, diagnostics: &mut Vec<Diagnostic>) {
+    let fields = match id {
+        "minecraft:count" => Some(&["min", "max"][..]),
+        "minecraft:damage" => Some(&["damage", "durability"][..]),
+        "minecraft:potion_contents" => Some(&["potions", "effects"][..]),
+        _ => None,
+    };
+    if id == "minecraft:custom_data" && !matches!(value.kind, NbtValueKind::Compound(_)) {
+        diagnostics.push(Diagnostic::new(
+            "custom_data 子谓词需要复合 NBT",
+            value.span,
+        ));
+    }
+    let Some(fields) = fields else { return };
+    let NbtValueKind::Compound(entries) = &value.kind else {
+        diagnostics.push(Diagnostic::new(
+            format!("子谓词 `{id}` 需要复合字段"),
+            value.span,
+        ));
+        return;
+    };
+    for entry in entries {
+        if !fields.contains(&entry.key.as_str()) {
+            diagnostics.push(Diagnostic::new(
+                format!("子谓词 `{id}` 没有字段 `{}`", entry.key),
+                entry.key_span,
+            ));
+        } else if id == "minecraft:count" || id == "minecraft:damage" {
+            validate_integer_bounds(id, &entry.value, diagnostics);
+        }
+    }
+    if id == "minecraft:count" {
+        let min = entries
+            .iter()
+            .find(|entry| entry.key == "min")
+            .and_then(|entry| int(&entry.value));
+        let max = entries
+            .iter()
+            .find(|entry| entry.key == "max")
+            .and_then(|entry| int(&entry.value));
+        if min.zip(max).is_some_and(|(min, max)| min > max) {
+            diagnostics.push(Diagnostic::new(
+                "count 子谓词的 min 不能大于 max",
+                value.span,
+            ));
+        }
+    }
+}
+
+fn validate_integer_bounds(id: &str, value: &NbtValue, diagnostics: &mut Vec<Diagnostic>) {
+    let valid = int(value).is_some()
+        || matches!(&value.kind, NbtValueKind::Compound(entries) if entries.iter().all(|entry| matches!(entry.key.as_str(), "min" | "max") && int(&entry.value).is_some()));
+    if !valid {
+        diagnostics.push(Diagnostic::new(
+            format!("子谓词 `{id}` 的范围需要整数或 min/max 整数字段"),
+            value.span,
+        ));
+    }
+}
+
+fn int(value: &NbtValue) -> Option<i32> {
+    if let NbtValueKind::Int(value) = value.kind {
+        Some(value)
+    } else {
+        None
     }
 }
 

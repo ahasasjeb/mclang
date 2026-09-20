@@ -211,6 +211,11 @@ impl Parser {
         }
     }
 
+    fn message_argument(&mut self, label: &str) -> Result<MessageArgument, Diagnostic> {
+        let (text, span) = self.string(&format!("{label}需要单行消息字符串"))?;
+        Ok(MessageArgument { text, span })
+    }
+
     fn expect_word(&mut self, word: &str) -> Result<Token, Diagnostic> {
         if self.check_word(word) {
             Ok(self.advance().clone())

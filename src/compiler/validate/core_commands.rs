@@ -15,9 +15,10 @@ pub(super) fn validate_core_command(
     match command {
         CoreCommand::Reload => {}
         CoreCommand::Version | CoreCommand::Seed => {}
+        CoreCommand::Say(value) | CoreCommand::Me(value) => {
+            super::components::validate_message_argument(value, diagnostics);
+        }
         CoreCommand::Help(Some(value))
-        | CoreCommand::Say(value)
-        | CoreCommand::Me(value)
         | CoreCommand::FetchProfile(FetchProfileTarget::Name(value)) => {
             if value.trim().is_empty() || value.contains(['\n', '\r', '\0']) {
                 diagnostics.push(Diagnostic::new("命令文本不能为空或包含换行/NUL", span));

@@ -1,5 +1,7 @@
 use crate::ast::{BlockStateValue, ColumnPosition, ForceLoadOperation, Span};
 use crate::diagnostic::Diagnostic;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::OnceLock;
 
 use super::super::registry::validate_id;
 use super::super::rules::valid_resource_location;
@@ -30,6 +32,9 @@ pub(crate) fn validate_block_state(
     } else {
         validate_id("block", "方块", &block.id, block.span, diagnostics);
     }
+    let known = block_properties()
+        .get(&block.id)
+        .filter(|properties| !properties.is_empty());
     for property in &block.properties {
         if !valid_block_property_name(&property.name) {
             diagnostics.push(Diagnostic::new(
@@ -46,7 +51,54 @@ pub(crate) fn validate_block_state(
                 property.span,
             ));
         }
+        if let Some(known) = known {
+            if let Some(values) = known.get(&property.name) {
+                if !values.contains(&property.value) {
+                    diagnostics.push(Diagnostic::new(
+                        format!(
+                            "方块 `{}` 的属性 `{}` 不接受 `{}`；可用 {}",
+                            block.id,
+                            property.name,
+                            property.value,
+                            values
+                                .iter()
+                                .map(|value| format!("`{value}`"))
+                                .collect::<Vec<_>>()
+                                .join("、")
+                        ),
+                        property.span,
+                    ));
+                }
+            } else if property.name == "waterlogged" {
+                if !matches!(property.value.as_str(), "true" | "false") {
+                    diagnostics.push(Diagnostic::new(
+                        format!("方块 `{}` 的 waterlogged 只能是 true 或 false", block.id),
+                        property.span,
+                    ));
+                }
+            } else {
+                diagnostics.push(Diagnostic::new(
+                    format!("方块 `{}` 没有已知属性 `{}`", block.id, property.name),
+                    property.span,
+                ));
+            }
+        }
     }
+}
+
+type BlockProperties = BTreeMap<String, BTreeMap<String, BTreeSet<String>>>;
+static BLOCK_PROPERTIES: OnceLock<BlockProperties> = OnceLock::new();
+
+fn block_properties() -> &'static BlockProperties {
+    BLOCK_PROPERTIES.get_or_init(|| {
+        let source = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/data/version/26.3-rc-2/block_states.json"
+        ));
+        let document: serde_json::Value =
+            serde_json::from_str(source).expect("方块状态快照必须是 JSON");
+        serde_json::from_value(document["blocks"].clone()).expect("方块状态快照的 blocks 类型无效")
+    })
 }
 
 fn valid_block_property_name(name: &str) -> bool {

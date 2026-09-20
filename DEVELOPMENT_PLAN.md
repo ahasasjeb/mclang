@@ -5,33 +5,24 @@
 统计口径：只统计 Java Edition 26.3 中按默认函数权限等级 2 可从数据包函数调用的命令族。管理员、OWNER、开发构建和 IDE 条件命令不计入完成度；原始命令字符串不计结构化覆盖。
 
 - 命令族：68
-- 已完成：59
-- 部分完成：2
-- 未实现：7
-- 结构化覆盖：59/68（约 86.8%）
+- 已完成：68
+- 部分完成：0
+- 未实现：0
+- 结构化覆盖：68/68（100%）
 
 ### 1.1 已完成
 
-`advancement`, `attribute`, `bossbar`, `clear`, `clone`, `compute`, `damage`, `data`, `datapack`, `defaultgamemode`, `dialog`, `difficulty`, `effect`, `enchant`, `execute`, `experience`, `fill`, `fillbiome`, `forceload`, `function`, `gamemode`, `gamerule`, `give`, `item`, `kill`, `list`, `locate`, `loot`, `msg`, `particle`, `place`, `playsound`, `posteffect`, `random`, `recipe`, `reload`, `ride`, `rotate`, `schedule`, `setblock`, `setworldspawn`, `spawnpoint`, `spectate`, `spreadplayers`, `stopsound`, `stopwatch`, `summon`, `swing`, `tag`, `team`, `teammsg`, `teleport`, `tellraw`, `time`, `title`, `trigger`, `waypoint`, `weather`, `worldborder`。
+`advancement`, `attribute`, `bossbar`, `clear`, `clone`, `compute`, `damage`, `data`, `datapack`, `defaultgamemode`, `dialog`, `difficulty`, `effect`, `enchant`, `execute`, `experience`, `fetchprofile`, `fill`, `fillbiome`, `forceload`, `function`, `gamemode`, `gamerule`, `give`, `help`, `item`, `kill`, `list`, `locate`, `loot`, `me`, `msg`, `particle`, `place`, `playsound`, `posteffect`, `random`, `recipe`, `reload`, `return`, `ride`, `rotate`, `say`, `schedule`, `scoreboard`, `seed`, `setblock`, `setworldspawn`, `spawnpoint`, `spectate`, `spreadplayers`, `stopsound`, `stopwatch`, `summon`, `swing`, `tag`, `team`, `teammsg`, `teleport`, `tellraw`, `test`, `time`, `title`, `trigger`, `version`, `waypoint`, `weather`, `worldborder`。
 
-### 1.2 部分完成
+### 1.2 本轮补全
 
-| 命令 | 缺口 |
-| --- | --- |
-| `return` | `return run <command>` 仍依赖原始命令字符串，需要结构化命令节点。 |
-| `scoreboard` | 补 `objectives list/remove/modify`，包括 `displayname`、`displayautoupdate`、numberformat/rendertype；补 `players list/add/remove/display name/display numberformat`。 |
+- `return run` 可接结构化命令语句；字符串形式仍作为兼容入口，并计入严格模式的 raw 统计。
+- `scoreboard` 补齐运行期 objectives list/remove/modify 与 players list/add/remove/reset/display name/numberformat；目标声明仍负责 load 时创建。
+- `fetchprofile`、`help`、`test`、`version`、`seed`、`me`、`say` 已有结构化入口；`test` 覆盖数据包可调用分支，IDE-only export 分支不计。
 
 ### 1.3 未实现
 
-| 命令 | 需要实现 |
-| --- | --- |
-| `fetchprofile` | `name`、`id`、`entity`。 |
-| `help` | 数据包可调用的命令入口。 |
-| `test` | `run`、`runmultiple`、`runthese`、`runclosest`、`runthat`、`runfailed`、`verify`、`locate`、reset/clear、`stop`、`pos`、`create`；IDE-only export 分支不计。 |
-| `version` | 零参数入口。 |
-| `seed` | 零参数入口。 |
-| `me` | 原生命令入口，不用 `message.all` 代替。 |
-| `say` | 原生命令入口。 |
+本统计口径内无未实现的命令族。
 
 ### 1.4 别名
 
@@ -48,16 +39,18 @@
 | 能力 | 当前状态 | 计划 |
 | --- | --- | --- |
 | 资源位置 / 注册表引用 | 较高 | 统一资源引用类型；覆盖普通资源与 tag 引用。 |
-| 实体选择器 | 较高 | 补互斥条件、上下文诊断，并让版本数据提供 option 形状。 |
+| 实体选择器 | 较高 | 已补正向类型互斥、区间交集与玩家上下文诊断；后续让版本数据提供 option 形状。 |
 | NBT / SNBT | 较高 | 补 round-trip 测试；把 SNBT 语法校验和资源 codec 字段校验分开。 |
-| TextComponent | 部分 | 补 `object` 内容、click `show_dialog/custom`、hover `show_item/show_entity`。 |
-| 物品组件 | 部分 | 根据 26.3 component codec 补字段类型、范围、枚举、资源引用与嵌套结构校验。 |
-| 物品谓词 | 部分 | 根据 component predicate codec 补字段 schema。 |
-| 方块状态 | 部分 | 按具体方块校验 property 名和值。 |
-| 粒子 options | 部分 | 根据 ParticleType codec 建字段 schema。 |
-| NBT path | 部分 | 建结构化 AST，覆盖成员、索引、列表元素、match compound 等常用形式。 |
-| MessageArgument | 部分 | 建独立 Message 类型，避免与 TextComponent、普通字符串混用。 |
+| TextComponent | 较高 | 已补 `object` 的 atlas/player、click `show_dialog/custom`、hover `show_item/show_entity`；后续扩展 item 组件补丁与 player profile。 |
+| 物品组件 | 部分 | 已按 26.3 codec 检查常用字段类型、范围、枚举、资源引用、`food`/`use_cooldown` 嵌套结构；继续覆盖其余组件。 |
+| 物品谓词 | 部分 | 已补 `count`、`damage`、`potion_contents` 常用字段；继续覆盖其余子谓词 schema。 |
+| 方块状态 | 较高 | 已从 26.3 方块模型资产生成逐方块属性取值快照；继续补不影响模型的状态属性。 |
+| 粒子 options | 较高 | 已按 ParticleType codec 检查必需字段、类型、范围和常用嵌套结构；继续扩展特殊粒子。 |
+| NBT path | 较高 | 已建成员、索引、全列表、列表匹配、成员/根复合匹配 AST；继续加强匹配复合里的 SNBT 内容校验。 |
+| MessageArgument | 已完成 | `msg`/`teammsg`/`say`/`me` 使用独立消息类型与单行校验，和 TextComponent 分离。 |
 | 坐标 / 旋转 / 时间 / 范围 | 较高 | 统一 value type 与范围检查接口。 |
+
+本轮新增 `examples/shared_arguments.mcl` 与有效/无效 `.mcl` 语料；版本快照新增 `block_states.json`，由 `cargo xtask generate-version-data` 重建。
 
 ## 3. 数据包资源能力
 

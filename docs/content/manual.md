@@ -337,7 +337,6 @@ score penalty = -5;
 
 ```mcl title="语法" fragment
 query <name> = entity("<实体类型或 #标签>") {
-    type("<实体类型或 #标签>");
     without_type("<实体类型或 #标签>");
     tag("<实体标签>");
     without_tag("<实体标签>");
@@ -366,11 +365,11 @@ query <name> = entity("<实体类型或 #标签>") {
 }
 ```
 
-查询是一段可复用的选择器。除 `tag`/`type`/`scores` 可以出现多次外，其余属性各只能出现一次；`distance` 与 `within` 会合并成同一个 `distance` 区间。`item` 过滤器的槽位是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0` …）或 `slot_source` 资源位置，`id` 可以是物品 id、`#标签` 或带 `[组件过滤器]` 的谓词。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear`、`count` 与条件里被引用。
+查询是一段可复用的选择器。`entity(...)` 已指定正向实体类型，因此 `type(...)` 会报互斥诊断；可用 `without_type(...)` 排除其它类型。`tag`、`without_tag`、`without_type` 和 `scores` 可以重复，其余属性各只能出现一次；`distance` 与 `within` 会合并成同一个区间，交集为空时报错。区间不接受倒置边界或非有限小数；`level`、`gamemode` 仅适用于玩家查询。`item` 过滤器的槽位是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0` …）或 `slot_source` 资源位置，`id` 可以是物品 id、`#标签` 或带 `[组件过滤器]` 的谓词。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear`、`count` 与条件里被引用。
 
 | 属性 | 生成的参数 | 中文写法 |
 | --- | --- | --- |
-| `type("#tag")` / `without_type("id")` | `type=#tag` / `type=!id` | `实体类型(...)` / `排除类型(...)` |
+| `without_type("id")` | `type=!id` | `排除类型(...)` |
 | `tag("t")` | `tag=t` | `标签("t")` |
 | `without_tag("t")` | `tag=!t` | `排除标签("t")` |
 | `limit(3)` | `limit=3` | `上限(3)` |
@@ -792,7 +791,7 @@ let <name> = data.get(<目标>, "<路径>");
 | `string(<目标>, "<路径>"[, <起始>[, <结束>]])` | `string <目标> <路径> …` | 读取后转成字符串 |
 | `compute(<上下文>, float\|integer, "<provider>"[, <缩放>])` | `compute …` | 用上下文 provider 计算数值 |
 
-`data.get` 是表达式，经 `execute store result` 落入计分项；读取失败或非数值时为 0。NBT 路径支持 `.` 分段、`[下标]` 与引号键。
+`data.get` 是表达式，经 `execute store result` 落入计分项；读取失败或非数值时为 0。NBT 路径会解析成成员、带引号成员、`[0]`/`[-1]` 下标、`[]` 全列表、`[{...}]` 列表元素匹配、`成员{...}` 与根级 `{...}` 匹配节点，命令中仍保留原路径文本。
 
 ```mcl title="示例" fragment
 data.merge(entity, self, nbt { CustomName = "仓库"; Tags = ["a"]; });
@@ -1007,6 +1006,8 @@ message.player(everyone, translate("chat.type.text", [selector("@s"), text("加�
 text("<文本>") { <样式> }
 translate("<本地化键>"[, [<组件>, ...]]) { <样式> }
 keybind("<按键名>") { <样式> }
+object(atlas, "<sprite 资源位置>"[, "<atlas 资源位置>"]) { fallback = <文本组件或字符串>; <样式> }
+object(player, "<玩家名>"[, <帽子布尔值>]) { fallback = <文本组件或字符串>; <样式> }
 score(<持有者>, <已声明目标> | "<运行期目标>") { <样式> }
 selector("<选择器>" | <查询>) { <样式> }
 nbt(entity, <持有者>, "<路径>") { <样式> }
@@ -1020,11 +1021,12 @@ nbt(storage, "<存储资源位置>", "<路径>") { <样式> }
 | --- | --- | --- |
 | `color`/`颜色` | 16 个颜色名、中文颜色名或 `"#rrggbb"` | `"color"` |
 | `bold`/`粗体`、`italic`/`斜体`、`underlined`/`下划线`、`strikethrough`/`删除线`、`obfuscated`/`混淆` | `true`/`false`（`真`/`假`） | 对应的布尔字段 |
-| `click`/`点击` | `open_url("https://…")`、`run_command("/…")`、`suggest_command("/…")`、`copy_to_clipboard("…")`、`change_page(<页号>)` | `"click_event"` |
-| `hover`/`悬停` | 任意文本组件 | `"hover_event": {"action":"show_text","value":…}`；悬停内容里不能再写 `hover` |
+| `click`/`点击` | `open_url("https://…")`、`run_command("/…")`、`suggest_command("/…")`、`copy_to_clipboard("…")`、`change_page(<页号>)`、`show_dialog("<对话框 id>")`、`custom("<事件 id>"[, nbt { ... }])` | `"click_event"` |
+| `hover`/`悬停` | 文本组件、`show_item("<物品 id>"[, <数量>])`、`show_entity("<实体类型 id>", "<UUID>"[, <名称组件或字符串>])` | 生成 `show_text`、`show_item` 或 `show_entity` 的 `"hover_event"` |
+| `fallback`/`回退` | 仅 `object` 组件，可取组件或字符串 | 对象无法解析时使用的 `"fallback"` |
 | `interpret`/`解释`、`plain`/`纯文本`、`separator`/`分隔符` | 仅 `nbt` 组件 | `"interpret"`、`"plain"`、`"separator"`，`interpret` 与 `plain` 不能同时为真 |
 
-`score` 的目标写已声明的 `objective` 名称时生成 `<命名空间>_<名称>`，写字符串时原样使用。`nbt` 路径支持 `.` 分段、`[0]` 下标与引号键。`selector` 的字符串必须是 `@a`、`@e[...]` 这类选择器。
+`score` 的目标写已声明的 `objective` 名称时生成 `<命名空间>_<名称>`，写字符串时原样使用。`nbt` 路径使用上面的共用节点语法。`selector` 的字符串必须是 `@a`、`@e[...]` 这类选择器。
 
 ```mcl title="示例" fragment
 message.all(text("你好") {
@@ -1089,7 +1091,7 @@ posteffect.list(<单个玩家目标>);
 posteffect.remove(<玩家目标>, "<后处理效果资源位置>");
 ```
 
-`particle` 的可选参数顺序与原版一致；只写位置时省略偏移、速度和数量，要指定观众则必须先给出模式。选项使用结构化 SNBT，编译器按 26.3 的粒子 codec 检查内建粒子的必需字段、字段名和基本类型；例如 `dust` 需要 `color` 与 `scale`，普通 `flame` 不接受选项。速度和数量必须非负。`stopsound(players, *, "minecraft:...")` 表示不限声音分类。`posteffect.list` 需要 `limit(1)` 查询，后处理效果的自定义资源包资产由资源包提供。
+`particle` 的可选参数顺序与原版一致；只写位置时省略偏移、速度和数量，要指定观众则必须先给出模式。选项使用结构化 SNBT，编译器按 26.3 的粒子 codec 检查内建粒子的必需字段、字段名、基本类型以及方块状态、物品堆和振动目的地的常用嵌套字段；例如 `dust` 需要 `color` 与 `scale`，普通 `flame` 不接受选项。速度和数量必须非负。`stopsound(players, *, "minecraft:...")` 表示不限声音分类。`posteffect.list` 需要 `limit(1)` 查询，后处理效果的自定义资源包资产由资源包提供。
 
 ### 私聊与队伍聊天
 
@@ -1098,7 +1100,7 @@ msg(<玩家目标>, "<单行消息>");
 teammsg("<单行消息>");
 ```
 
-`msg` 生成原版私聊命令（`tell`、`w` 是原版别名）；`teammsg` 生成队伍聊天命令（`tm` 是别名），要求实体执行上下文，运行时发送者必须属于队伍。两者使用原版 `MessageArgument` 的纯文本消息；需要文本组件与样式时使用 `message.player`。
+`msg` 生成原版私聊命令（`tell`、`w` 是原版别名）；`teammsg` 生成队伍聊天命令（`tm` 是别名），要求实体执行上下文，运行时发送者必须属于队伍。`msg`、`teammsg`、`say`、`me` 的消息参数使用独立的 `MessageArgument` 类型，只接受非空单行字符串；需要 JSON 文本组件与样式时使用 `message.player`。
 
 ### 状态效果（effect）
 
@@ -1392,7 +1394,7 @@ $ cargo run -- check raw_escape.mcl --deny-raw
 
 需要小数坐标时写 `vec3(<x>, <y>, <z>)`（精确坐标，如传送落点），水平两分量用 `vec2(<x>, <z>)`（如 `worldborder.center` 的另一种写法）；两者的绝对分量允许小数，范围与方块坐标一致。`vec2` 不支持 `^`。
 
-方块写成 `block_state("<命名空间:方块>") { <属性> = "<值>"; }`（中文 `方块状态(...)`），属性块可省略；属性名只能是小写字母、数字与下划线，属性值只能是小写字母、数字与 `_ . + -`。`block_state("#标签")` 是方块谓词，只能用在 `fill` 的替换过滤器与 `clone` 的 `filtered` 选项里，也不能带属性。
+方块写成 `block_state("<命名空间:方块>") { <属性> = "<值>"; }`（中文 `方块状态(...)`），属性块可省略；属性名只能是小写字母、数字与下划线，属性值只能是小写字母、数字与 `_ . + -`。对 26.3 内建方块，编译器依据随附的方块模型状态快照检查能从模型提取的属性和值；模型不含属性表的方块暂不做逐字段检查，模型中不可见的 `waterlogged` 暂按布尔值保守检查。自定义方块没有随附状态表，只做字符检查。`block_state("#标签")` 是方块谓词，只能用在 `fill` 的替换过滤器与 `clone` 的 `filtered` 选项里，也不能带属性。
 
 ```mcl title="语法" fragment
 set_block(<位置>, <方块状态>[, destroy | keep | replace | strict][, nbt { ... }]);
@@ -2017,9 +2019,9 @@ test.create("demo:new_test", 5, 4, 7);
 
 ### 任意物品组件与结构化谓词
 
-物品定义和 `give` 的内联 `item_stack(...) { ... }` 都支持 `components = nbt { ... };`。键是组件资源位置，值使用结构化 NBT；删除组件写成 `"!minecraft:组件" = {};`。组件名对照 26.3 注册表，重复设置、与已有具名属性冲突以及常用数值范围会报错。复杂组件内部 schema 属于资源 schema 阶段，最终由原版 codec 检查。
+物品定义和 `give` 的内联 `item_stack(...) { ... }` 都支持 `components = nbt { ... };`。键是组件资源位置，值使用结构化 NBT；删除组件写成 `"!minecraft:组件" = {};`。组件名对照 26.3 注册表，重复设置、与已有具名属性冲突会报错。常用组件还检查整数/浮点范围、布尔值、资源位置、稀有度枚举、文本列表、附魔级别以及 `food`、`use_cooldown` 的必需和可选字段。其余复杂组件仍由原版 codec 在加载时检查。
 
-`item_predicate("id/#tag/*") { ... }` 可用于 `clear`、`if items` 和查询的 `item(...){ id = ...; }`。`has` 检查存在，`equals` 检查组件完整相等，`matches` 使用组件子谓词；前缀 `!` 取反，`||` 连接任选条件，不同分号分隔的条件必须全部满足。`minecraft:count` 是原版提供的数量伪组件。
+`item_predicate("id/#tag/*") { ... }` 可用于 `clear`、`if items` 和查询的 `item(...){ id = ...; }`。`has` 检查存在，`equals` 检查组件完整相等，`matches` 使用组件子谓词；前缀 `!` 取反，`||` 连接任选条件，不同分号分隔的条件必须全部满足。`minecraft:count` 是原版提供的数量伪组件；`count`、`damage`、`potion_contents` 的常用子谓词字段会检查名称和范围结构。
 
 ```mcl title="item_predicates.mcl" verify id=item_predicates
 namespace item_predicates;

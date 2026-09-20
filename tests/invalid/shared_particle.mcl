@@ -1,0 +1,5 @@
+// expect: 粒子 `minecraft:item` 的选项类型或数值不符合 26.3 codec
+namespace invalid_particle;
+@load fn example() {
+    particle("minecraft:item", nbt { item = { count = 0; }; });
+}

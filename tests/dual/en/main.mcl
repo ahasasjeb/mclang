@@ -149,6 +149,9 @@ fn remaining_commands() {
     say("Ready");
     me("checks pack");
     test.runclosest(1, false);
+    test.run("dual:sample");
+    test.stop();
+    fetchprofile.id("8667ba71-b85a-4004-af54-457a9734eed7");
     scoreboard.objectives.list();
     scoreboard.objectives.modify.displayname(progress, "Points");
     scoreboard.players.add(players, progress, 1);

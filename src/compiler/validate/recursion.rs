@@ -120,11 +120,13 @@ fn collect_synchronous_calls<'a>(
             StatementKind::Assign { value, .. } | StatementKind::Let { value, .. } => {
                 collect_expr_calls(value, calls)
             }
-            StatementKind::Return(kind) => {
-                if let crate::ast::ReturnKind::Value(value) = kind {
-                    collect_expr_calls(value, calls);
+            StatementKind::Return(kind) => match kind {
+                crate::ast::ReturnKind::Value(value) => collect_expr_calls(value, calls),
+                crate::ast::ReturnKind::Command(command) => {
+                    collect_synchronous_calls(std::slice::from_ref(command.as_ref()), tags, calls);
                 }
-            }
+                _ => {}
+            },
             StatementKind::Run(_)
             | StatementKind::Give { .. }
             | StatementKind::EffectGive { .. }

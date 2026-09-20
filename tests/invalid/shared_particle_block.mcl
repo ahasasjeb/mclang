@@ -1,0 +1,5 @@
+// expect: 属性 `facing` 不接受 `up`
+namespace invalid_particle_block;
+@load fn example() {
+    particle("minecraft:block", nbt { block_state = { id = "minecraft:oak_stairs"; properties = { facing = "up"; }; }; });
+}

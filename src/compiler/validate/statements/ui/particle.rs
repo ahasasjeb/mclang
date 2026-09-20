@@ -137,7 +137,10 @@ fn validate_field(id: &str, kind: FieldType, value: &NbtValue, diagnostics: &mut
         FieldType::Float => number(value)
             .is_some_and(|number| number.is_finite() && number.abs() <= f32::MAX as f64),
         FieldType::Scale => number(value).is_some_and(|number| (0.01..=4.0).contains(&number)),
-        FieldType::RgbColor => integer(value).is_some() || numeric_vector(value, 3),
+        FieldType::RgbColor => {
+            integer(value).is_some_and(|number| (0..=0x00ff_ffff).contains(&number))
+                || numeric_vector(value, 3)
+        }
         FieldType::ArgbColor => integer(value).is_some() || numeric_vector(value, 4),
         FieldType::Vec3 => numeric_vector(value, 3),
         FieldType::Block | FieldType::Item => match &value.kind {
@@ -155,7 +158,13 @@ fn validate_field(id: &str, kind: FieldType, value: &NbtValue, diagnostics: &mut
                 );
                 true
             }
-            NbtValueKind::Compound(_) => true,
+            NbtValueKind::Compound(entries) => {
+                if matches!(kind, FieldType::Block) {
+                    validate_block_state(entries, diagnostics)
+                } else {
+                    validate_item_stack(entries, value.span, diagnostics)
+                }
+            }
             _ => false,
         },
         FieldType::Destination => validate_destination(value, diagnostics),
@@ -166,6 +175,113 @@ fn validate_field(id: &str, kind: FieldType, value: &NbtValue, diagnostics: &mut
             value.span,
         ));
     }
+}
+
+fn validate_block_state(
+    entries: &[crate::ast::NbtEntry],
+    diagnostics: &mut Vec<Diagnostic>,
+) -> bool {
+    let Some(id) = entries.iter().find(|entry| entry.key == "id") else {
+        return false;
+    };
+    let NbtValueKind::String(id_value) = &id.value.kind else {
+        return false;
+    };
+    let mut state = crate::ast::BlockStateValue {
+        id: id_value.clone(),
+        properties: Vec::new(),
+        span: id.value.span,
+    };
+    for entry in entries {
+        match entry.key.as_str() {
+            "id" => {}
+            "properties" => {
+                if let NbtValueKind::Compound(properties) = &entry.value.kind {
+                    for property in properties {
+                        if let NbtValueKind::String(value) = &property.value.kind {
+                            state.properties.push(crate::ast::BlockProperty {
+                                name: property.key.clone(),
+                                value: value.clone(),
+                                span: property.key_span.merge(property.value.span),
+                            });
+                        } else {
+                            diagnostics.push(Diagnostic::new(
+                                format!("粒子方块属性 `{}` 需要字符串值", property.key),
+                                property.value.span,
+                            ));
+                        }
+                    }
+                } else {
+                    diagnostics.push(Diagnostic::new(
+                        "粒子方块 properties 需要字符串值的复合字段",
+                        entry.value.span,
+                    ));
+                }
+            }
+            _ => diagnostics.push(Diagnostic::new(
+                format!("粒子方块没有字段 `{}`", entry.key),
+                entry.key_span,
+            )),
+        }
+    }
+    super::super::super::world::validate_block_state(&state, false, diagnostics);
+    true
+}
+
+fn validate_item_stack(
+    entries: &[crate::ast::NbtEntry],
+    _span: Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> bool {
+    let Some(id) = entries.iter().find(|entry| entry.key == "id") else {
+        return false;
+    };
+    let NbtValueKind::String(id_value) = &id.value.kind else {
+        return false;
+    };
+    validate_id("item", "粒子物品", id_value, id.value.span, diagnostics);
+    for entry in entries {
+        match entry.key.as_str() {
+            "id" => {}
+            "count" => {
+                if !matches!(entry.value.kind, NbtValueKind::Int(count) if (1..=99).contains(&count))
+                {
+                    diagnostics.push(Diagnostic::new(
+                        "粒子物品 count 必须是 1 到 99 的整数",
+                        entry.value.span,
+                    ));
+                }
+            }
+            "components" => {
+                if let NbtValueKind::Compound(components) = &entry.value.kind {
+                    for component in components {
+                        validate_id(
+                            "data_component_type",
+                            "粒子物品组件",
+                            &component.key,
+                            component.key_span,
+                            diagnostics,
+                        );
+                        super::super::super::item_components::validate_component_value(
+                            &component.key,
+                            &component.value,
+                            diagnostics,
+                        );
+                    }
+                } else {
+                    diagnostics.push(Diagnostic::new(
+                        "粒子物品 components 需要复合字段",
+                        entry.value.span,
+                    ));
+                }
+            }
+            _ => diagnostics.push(Diagnostic::new(
+                format!("粒子物品没有字段 `{}`", entry.key),
+                entry.key_span,
+            )),
+        }
+    }
+    true
 }
 
 fn integer(value: &NbtValue) -> Option<i64> {
@@ -214,6 +330,14 @@ fn validate_destination(value: &NbtValue, diagnostics: &mut Vec<Diagnostic>) -> 
             value.span,
         ));
         return false;
+    }
+    for entry in entries {
+        if !matches!(entry.key.as_str(), "type" | "pos") {
+            diagnostics.push(Diagnostic::new(
+                format!("振动粒子 destination 没有字段 `{}`", entry.key),
+                entry.key_span,
+            ));
+        }
     }
     true
 }

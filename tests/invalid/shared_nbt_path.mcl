@@ -1,0 +1,5 @@
+// expect: 列表下标需要有符号整数
+namespace invalid_path;
+@load fn example() {
+    message.all(nbt(storage, "invalid_path:data", "Items[abc].count"));
+}

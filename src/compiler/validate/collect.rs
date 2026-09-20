@@ -139,11 +139,29 @@ fn validate_objective_component(component: &TextComponent, diagnostics: &mut Vec
         ));
     }
     if let Some(hover) = &component.style.hover {
-        validate_objective_component(hover, diagnostics);
+        match hover {
+            HoverEvent::Text(value) => validate_objective_component(value, diagnostics),
+            HoverEvent::Entity {
+                name: Some(name), ..
+            } => {
+                validate_objective_component(name, diagnostics);
+            }
+            HoverEvent::Item { .. } | HoverEvent::Entity { name: None, .. } => {}
+        }
     }
     if let TextComponentKind::Translate { args, .. } = &component.kind {
         for arg in args {
             validate_objective_component(arg, diagnostics);
+        }
+    }
+    if let TextComponentKind::Object(object) = &component.kind {
+        let fallback = match object {
+            ObjectContent::Atlas { fallback, .. } | ObjectContent::Player { fallback, .. } => {
+                fallback
+            }
+        };
+        if let Some(fallback) = fallback {
+            validate_objective_component(fallback, diagnostics);
         }
     }
 }

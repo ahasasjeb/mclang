@@ -95,6 +95,16 @@ pub(super) fn component_names(
 ) {
     match &mut component.kind {
         TextComponentKind::Text(_) | TextComponentKind::Keybind(_) => {}
+        TextComponentKind::Object(object) => {
+            let fallback = match object {
+                ObjectContent::Atlas { fallback, .. } | ObjectContent::Player { fallback, .. } => {
+                    fallback
+                }
+            };
+            if let Some(fallback) = fallback {
+                component_names(fallback, visitor, context);
+            }
+        }
         TextComponentKind::Translate { args, .. } => {
             for arg in args {
                 component_names(arg, visitor, context);
@@ -122,7 +132,15 @@ pub(super) fn component_names(
         }
     }
     if let Some(hover) = &mut component.style.hover {
-        component_names(hover, visitor, context);
+        match hover {
+            HoverEvent::Text(value) => component_names(value, visitor, context),
+            HoverEvent::Entity {
+                name: Some(name), ..
+            } => {
+                component_names(name, visitor, context);
+            }
+            HoverEvent::Item { .. } | HoverEvent::Entity { name: None, .. } => {}
+        }
     }
 }
 

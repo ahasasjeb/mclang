@@ -8,13 +8,18 @@ impl Parser {
     ) -> Result<FetchProfileTarget, Diagnostic> {
         Ok(match method {
             "name" => FetchProfileTarget::Name(self.string("玩家名称")?.0),
-            "id" => FetchProfileTarget::Id(self.string("玩家 UUID")?.0),
+            "id" | "标识" => FetchProfileTarget::Id(self.string("玩家 UUID")?.0),
             "entity" => FetchProfileTarget::Entity(self.holder("档案实体")?),
             _ => return self.unknown_command_method("fetchprofile", method),
         })
     }
 
     pub(super) fn test_command(&mut self, method: &str) -> Result<TestCommand, Diagnostic> {
+        let method = match method {
+            "运行测试" => "run",
+            "停止测试" => "stop",
+            other => other,
+        };
         Ok(match method {
             "run" | "runthese" | "runclosest" | "runthat" | "runfailed" => {
                 self.test_run_command(method)?

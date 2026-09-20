@@ -1,0 +1,9 @@
+// expect: 组件 `minecraft:food` 没有字段 `mystery`
+namespace invalid_components;
+item sample = item_stack("minecraft:stone") {
+    components = nbt {
+        "minecraft:max_stack_size" = 100;
+        "minecraft:food" = { nutrition = -1; saturation = 0.5f; mystery = 1; };
+        "minecraft:rarity" = "legendary";
+    };
+}

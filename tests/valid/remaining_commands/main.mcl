@@ -63,3 +63,17 @@ fn commands() {
 fn result() -> score {
     return run test.runthese();
 }
+
+fn updated_score() -> score {
+    return run scoreboard.set(one, points, scoreboard.get(one, points) + 1);
+}
+
+fn forwarded() -> score {
+    return run call result();
+}
+
+fn executed() -> score {
+    return run execute {
+        say("测试已启动");
+    }
+}

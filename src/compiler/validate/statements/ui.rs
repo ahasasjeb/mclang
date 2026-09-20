@@ -63,13 +63,13 @@ pub(super) fn validate_ui_command(
         },
         UiCommand::PrivateMessage { targets, message } => {
             player_target(targets, false, span, ctx, diagnostics);
-            validate_chat_message(message, span, diagnostics);
+            super::super::components::validate_message_argument(message, diagnostics);
         }
         UiCommand::TeamMessage(message) => {
             if !ctx.context.is_entity() {
                 diagnostics.push(Diagnostic::new("teammsg 需要实体执行上下文", span));
             }
-            validate_chat_message(message, span, diagnostics);
+            super::super::components::validate_message_argument(message, diagnostics);
         }
     }
 }
@@ -182,11 +182,5 @@ fn validate_particle(
     }
     if let Some(viewers) = &particle.viewers {
         player_target(viewers, false, span, ctx, diagnostics);
-    }
-}
-
-fn validate_chat_message(message: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
-    if message.trim().is_empty() || message.contains(['\n', '\r']) {
-        diagnostics.push(Diagnostic::new("聊天消息必须是非空的单行文本", span));
     }
 }

@@ -37,10 +37,10 @@ impl Parser {
             "msg" => {
                 let targets = self.holder("私聊目标")?;
                 self.command_comma()?;
-                let message = self.string("私聊消息")?.0;
+                let message = self.message_argument("私聊消息")?;
                 UiCommand::PrivateMessage { targets, message }
             }
-            "teammsg" => UiCommand::TeamMessage(self.string("队伍消息")?.0),
+            "teammsg" => UiCommand::TeamMessage(self.message_argument("队伍消息")?),
             _ => unreachable!(),
         };
         self.expect(TokenKind::RightParen, "界面命令缺少 `)`")?;

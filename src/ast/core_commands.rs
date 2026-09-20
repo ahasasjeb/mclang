@@ -6,8 +6,8 @@ pub enum CoreCommand {
     Help(Option<String>),
     Version,
     Seed,
-    Say(String),
-    Me(String),
+    Say(MessageArgument),
+    Me(MessageArgument),
     FetchProfile(FetchProfileTarget),
     Test(TestCommand),
     Recipe {

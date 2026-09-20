@@ -120,6 +120,7 @@ pub(crate) fn text_style_property(value: &str) -> Option<&'static str> {
         "obfuscated" | "混淆" => Some("obfuscated"),
         "click" | "点击" => Some("click"),
         "hover" | "悬停" => Some("hover"),
+        "fallback" | "回退" => Some("fallback"),
         "interpret" | "解释" => Some("interpret"),
         "plain" | "纯文本" => Some("plain"),
         "separator" | "分隔符" => Some("separator"),
@@ -135,6 +136,8 @@ pub(crate) fn click_action(value: &str) -> Option<&'static str> {
         "suggest_command" | "建议命令" => Some("suggest_command"),
         "copy_to_clipboard" | "复制到剪贴板" => Some("copy_to_clipboard"),
         "change_page" | "翻页" => Some("change_page"),
+        "show_dialog" | "显示对话框" => Some("show_dialog"),
+        "custom" | "自定义事件" => Some("custom"),
         _ => None,
     }
 }

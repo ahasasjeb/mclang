@@ -22,6 +22,8 @@ pub enum TextComponentKind {
     },
     /// `keybind("key.jump")`：按键名。
     Keybind(String),
+    /// 26.3 object 内容：图集 sprite 或玩家头像。
+    Object(ObjectContent),
     /// `score(持有者, 目标)`：计分板分数。目标可以是已声明的 `objective`
     /// 名称，也可以是字符串形式的运行期目标名。
     Score {
@@ -39,6 +41,20 @@ pub enum TextComponentKind {
         interpret: bool,
         plain: bool,
         separator: Option<Box<TextComponent>>,
+    },
+}
+
+#[derive(Debug)]
+pub enum ObjectContent {
+    Atlas {
+        atlas: Option<String>,
+        sprite: String,
+        fallback: Option<Box<TextComponent>>,
+    },
+    Player {
+        name: String,
+        hat: bool,
+        fallback: Option<Box<TextComponent>>,
     },
 }
 
@@ -78,7 +94,21 @@ pub struct TextStyle {
     pub strikethrough: Option<bool>,
     pub obfuscated: Option<bool>,
     pub click: Option<ClickEvent>,
-    pub hover: Option<Box<TextComponent>>,
+    pub hover: Option<HoverEvent>,
+}
+
+#[derive(Debug)]
+pub enum HoverEvent {
+    Text(Box<TextComponent>),
+    Item {
+        id: String,
+        count: Option<u32>,
+    },
+    Entity {
+        id: String,
+        uuid: String,
+        name: Option<Box<TextComponent>>,
+    },
 }
 
 /// 点击事件（26.3 的 `click_event`）。
@@ -89,6 +119,11 @@ pub enum ClickEvent {
     SuggestCommand(String),
     CopyToClipboard(String),
     ChangePage(u32),
+    ShowDialog(String),
+    Custom {
+        id: String,
+        payload: Option<NbtValue>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
