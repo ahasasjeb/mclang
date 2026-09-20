@@ -19,8 +19,8 @@
 
 | 状态 | 数量 | 含义 |
 | --- | --- | --- |
-| 完成 | 52 | 结构化语法覆盖该命令的常规数据包用法，编译期检查完整 |
-| 部分 | 1 | 已有结构化入口，子命令或参数面存在明确缺口 |
+| 完成 | 53 | 结构化语法覆盖该命令的常规数据包用法，编译期检查完整 |
+| 部分 | 0 | 已有结构化入口，子命令或参数面存在明确缺口 |
 | 缺失 | 8 | 没有结构化入口，只能写 `run` 字符串或完全不可用 |
 | 不可达 | 21 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 等价覆盖 | 2 | 没有独立结构化入口，但用途已由其他结构化语句覆盖 |
@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | 1 类型系统与版本数据 | 6/6（余说明性待补） | 动态子命令树与动态 NBT 键、SNBT 备选记法 |
 | 2 补齐现有结构化能力 | 10/10 | — |
-| 3 世界与方块命令族 | 12/12 | `place.feature` 内联 JSON |
+| 3 世界与方块命令族 | 12/12 | — |
 | 4 实体与玩家命令族 | 18/18 | — |
 | 5 物品、战利品与进度 | 4/5 | slot_source 声明 |
 | 6 界面与感官 | 1/8 | title、bossbar、particle、dialog、msg 等 |
@@ -119,7 +119,7 @@
 | `fill` | `<from> <to> <block> [mode\|replace filter\|keep]` | 完成 | `fill(from, to, block_state[, 模式][, replace 过滤器][, nbt { ... }])` |
 | `clone` | 同/跨维度 + masked/filtered/force/move/normal/strict | 完成 | `clone(起点, 终点, 目标[, 选项...])`，选项顺序无关、重复报错 |
 | `fillbiome` | `<from> <to> <biome> [replace filter]` | 完成 | `fill_biome(from, to, "生物群系"[, replace, "过滤器"])` |
-| `place` | feature/jigsaw/structure/template | 部分 | `place.feature/jigsaw/structure/template`；feature 的内联 JSON 未建模（3.6） |
+| `place` | feature/jigsaw/structure/template | 完成 | `place.feature/jigsaw/structure/template`；feature 接受注册表 ID 或结构化内联 SNBT（3.6） |
 | `forceload` | add/remove/query | 完成 | `forceload.add/remove/remove_all/query`，绝对范围检查 256 区块上限 |
 | `time` | set/add/pause/resume/rate/query + `of <clock>` | 完成 | `time.set/add/pause/resume/rate(..., [时钟])`；`time.query([时钟])` 与 `time.query_gametime()` 是表达式 |
 | `weather` | clear/rain/thunder [duration] | 完成 | `weather.clear/rain/thunder([持续时间])` |
@@ -195,11 +195,7 @@
 
 ### 阶段 3：世界与方块命令族
 
-已完成：3.1–3.12 的主体（记录见 §四），3.6 还剩内联 JSON。
-
-剩余：
-
-- [ ] 3.6 `place.feature` 的内联 feature JSON 未建模。
+全部完成（3.1–3.12，记录见 §四），无剩余。
 
 ### 阶段 4：实体与玩家命令族
 
@@ -332,7 +328,7 @@
 - `fill(from, to, block_state[, 模式][, replace 过滤器][, nbt])`，模式含 outline/hollow/destroy/strict；`nbt` 可出现在任意可选参数位置。
 - `clone(...)`：跨维度、masked/filtered、force/move/normal、strict，选项顺序无关、重复报错。
 - `fill_biome(from, to, biome[, replace filter])`，过滤器接受 `#` 生物群系标签。
-- `place.feature/jigsaw/structure/template`，含 rotation、mirror、integrity、seed、strict。
+- `place.feature/jigsaw/structure/template`，含 rotation、mirror、integrity、seed、strict。`place.feature` 接受地物 ID 或 `nbt { type = "minecraft:..."; ... }` 内联对象；后者按 26.3 的 `Feature.DIRECT_CODEC` 顶层形状生成 SNBT，校验 `type` 对照源码生成的 `feature_type` 注册表，并拒绝旧式 `config` 包裹层。
 - `forceload.add/remove/remove_all/query`，绝对范围检查 256 区块上限。
 - `time.set/add/pause/resume/rate` 与表达式 `time.query([clock])`、`time.query_gametime()`；时钟作为可选参数写在末尾，生成 `time of <clock> ...`。
 - `weather.clear/rain/thunder(duration)`，按 `TimeArgument` 换算并拒绝不足 1 刻。

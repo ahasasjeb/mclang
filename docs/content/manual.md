@@ -1334,7 +1334,7 @@ set_block(<位置>, <方块状态>[, destroy | keep | replace | strict][, nbt { 
 fill(<起点>, <终点>, <方块状态>[, replace | outline | hollow | destroy | strict | keep][, <替换过滤器>][, nbt { ... }]);
 fill_biome(<起点>, <终点>, "<生物群系>"[, replace, "<生物群系或标签>"]);
 clone(<起点>, <终点>, <目标位置>[, <选项>...]);
-place.feature("<地物>"[, <位置>]);
+place.feature("<地物>" | nbt { type = "<地物类型>"; <类型字段>... }[, <位置>]);
 place.structure("<结构>"[, <位置>]);
 place.jigsaw("<模板池>", "<拼图目标>", <最大深度>[, <位置>]);
 place.template("<模板>", <位置>[, <旋转>[, <镜像>[, <完整度>[, <随机种子>[, strict]]]]]);
@@ -1383,6 +1383,7 @@ locate.poi("<兴趣点或标签>");
 - `clone` 的选项可以任意顺序书写，但每类最多一次：过滤方式是 `replace`（默认）、`masked` 或 `filtered <方块谓词>`；复制模式是 `normal`（默认）、`force` 或 `move`；`strict` 是一个标志；跨维度写成 `from_dimension("<维度>")` 与 `to_dimension("<维度>")`（中文 `起始维度`/`目标维度`）。输出顺序固定为 `from`、坐标、`to`、过滤、模式、`strict`。
 - `fill` 的替换过滤器只能与 `replace` 模式一起使用。
 - `set_block` 与 `fill` 的 `nbt { ... }` 是方块实体数据（见[结构化 NBT](#basics-nbt)），写在方块状态之后、模式与过滤器之前；可选参数可以任意顺序书写，但模式、过滤器和 `nbt` 各自最多一次。
+- `place.feature` 的字符串形式引用 26.3 的地物注册表；内联形式使用结构化 `nbt { ... }`，编译为原版 `ResourceOrIdArgument.feature` 接受的 SNBT 对象。顶层必须有 `type`，其值是 26.3 注册的地物类型（例如 `minecraft:simple_block`）；该类型的字段直接与 `type` 并列，不能放进旧式 `config` 包裹层。编译器检查类型名和 NBT 语法，具体类型的内部字段仍由原版 `Feature.DIRECT_CODEC` 在命令加载时解码。
 - `place.jigsaw` 的最大深度是 1 到 20；`place.template` 的完整度是 0.0 到 1.0，旋转是 `none`、`clockwise_90`、`180`、`counterclockwise_90`，镜像是 `none`、`left_right`、`front_back`；要写后面的可选参数必须按顺序补齐前面的。
 - 时间参数是“数字 + 单位”，单位 `t`/`s`/`d`（刻/秒/天），括号里可写逗号：`time.set(6000, t)`、`worldborder.set(1000, 5 s)`、`after 1.5 s`。`time.set` 的最小值是 0，`time.add` 允许负数，`weather` 持续时间至少 1 刻。注意 `s` 与 `d` 紧贴数字时是 NBT 后缀（`1s` 是短整数，`1d` 是双精度），时间单位要用空格或逗号分开。
 - `forceload` 用列坐标 `column(<x>, <z>)`（中文 `列坐标(...)`），不支持 `^`；一次 `add`/`remove` 影响的范围最多 256 个区块。
@@ -1412,6 +1413,7 @@ fn prepare() {
 
     // 地物、结构、拼图与模板。
     place.feature("minecraft:oak", pos(0, 64, 20));
+    place.feature(nbt { type = "minecraft:simple_block"; to_place = { id = "minecraft:stone"; }; }, pos(1, 64, 20));
     place.structure("minecraft:village_plains", pos(32, 64, 20));
     place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
     place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);

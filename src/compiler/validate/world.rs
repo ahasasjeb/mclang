@@ -7,6 +7,7 @@
 
 mod blocks;
 mod border;
+mod features;
 mod gamerules;
 mod positions;
 
@@ -22,6 +23,7 @@ pub(super) use positions::{validate_block_position, validate_position_value, val
 
 use blocks::validate_forceload;
 use border::validate_world_border;
+use features::validate_place_feature;
 use gamerules::validate_game_rule;
 
 /// 水平坐标范围，对应 `Level.isInWorldBoundsHorizontal` 的半开区间。
@@ -88,13 +90,7 @@ pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut 
             }
         }
         StatementKind::PlaceFeature { feature, pos } => {
-            validate_id_or_tag(
-                "worldgen/feature",
-                "地物",
-                feature,
-                statement.span,
-                diagnostics,
-            );
+            validate_place_feature(feature, statement.span, diagnostics);
             if let Some(pos) = pos {
                 validate_block_position(pos, diagnostics);
             }

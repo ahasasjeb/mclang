@@ -1,0 +1,3 @@
+// expect: 未知地物类型 `bad:custom`
+namespace bad;
+fn main() { place.feature(nbt { type = "bad:custom"; }); }

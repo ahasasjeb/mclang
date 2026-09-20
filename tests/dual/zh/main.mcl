@@ -24,6 +24,7 @@
 @加载
 函数 load() {
     消息.全部("loaded", 绿色);
+    放置.地物(数据 { type = "minecraft:no_op"; });
 }
 
 @每刻

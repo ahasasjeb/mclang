@@ -239,19 +239,21 @@ impl Parser {
         };
         self.expect(TokenKind::LeftParen, "place 方法后需要 `(`")?;
         let kind = match method {
-            "feature" | "structure" => {
-                let label = if method == "feature" {
-                    "place.feature 需要地物资源位置字符串"
+            "feature" => {
+                let feature = if self.check_word("nbt") {
+                    PlaceFeatureSource::Inline(self.nbt_compound("place.feature 的内联地物")?)
                 } else {
-                    "place.structure 需要结构资源位置字符串"
+                    let (id, _) =
+                        self.string("place.feature 需要地物资源位置字符串或 nbt { ... }")?;
+                    PlaceFeatureSource::Registered(id)
                 };
-                let (id, _) = self.string(label)?;
                 let pos = self.optional_position()?;
-                if method == "feature" {
-                    StatementKind::PlaceFeature { feature: id, pos }
-                } else {
-                    StatementKind::PlaceStructure { structure: id, pos }
-                }
+                StatementKind::PlaceFeature { feature, pos }
+            }
+            "structure" => {
+                let (structure, _) = self.string("place.structure 需要结构资源位置字符串")?;
+                let pos = self.optional_position()?;
+                StatementKind::PlaceStructure { structure, pos }
             }
             "jigsaw" => {
                 let (pool, _) = self.string("place.jigsaw 需要模板池资源位置字符串")?;

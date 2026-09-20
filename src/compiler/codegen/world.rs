@@ -5,9 +5,9 @@
 
 use crate::ast::{
     BlockPosition, BlockStateValue, CloneFilter, CloneMode, ColumnPosition, FillMode,
-    ForceLoadOperation, GameRuleValue, NbtValue, PositionValue, RotationValue, SetBlockMode,
-    TemplateMirror, TemplateRotation, TimeOperation, Vec2Value, Vec3Value, WeatherKind,
-    WorldBorderOperation,
+    ForceLoadOperation, GameRuleValue, NbtValue, PlaceFeatureSource, PositionValue, RotationValue,
+    SetBlockMode, TemplateMirror, TemplateRotation, TimeOperation, Vec2Value, Vec3Value,
+    WeatherKind, WorldBorderOperation,
 };
 
 use super::emit::nbt_text;
@@ -184,7 +184,14 @@ pub(super) fn clone_command(options: &CloneOptions<'_>) -> String {
     command
 }
 
-pub(super) fn place_feature_command(feature: &str, pos: Option<&BlockPosition>) -> String {
+pub(super) fn place_feature_command(
+    feature: &PlaceFeatureSource,
+    pos: Option<&BlockPosition>,
+) -> String {
+    let feature = match feature {
+        PlaceFeatureSource::Registered(id) => id.clone(),
+        PlaceFeatureSource::Inline(nbt) => nbt_text(nbt),
+    };
     match pos {
         Some(pos) => format!("place feature {feature} {}", position_text(pos)),
         None => format!("place feature {feature}"),

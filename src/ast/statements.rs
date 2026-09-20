@@ -88,7 +88,7 @@ pub enum StatementKind {
         strict: bool,
     },
     PlaceFeature {
-        feature: String,
+        feature: PlaceFeatureSource,
         pos: Option<BlockPosition>,
     },
     PlaceJigsaw {
@@ -265,6 +265,12 @@ pub enum StatementKind {
     /// `continue`：进入最近一层 `for`/`while` 的下一次迭代。
     Continue,
     Return(ReturnKind),
+}
+
+#[derive(Debug)]
+pub enum PlaceFeatureSource {
+    Registered(String),
+    Inline(NbtValue),
 }
 
 /// `setblock` 的方块放置模式，对应原版可选字面量。

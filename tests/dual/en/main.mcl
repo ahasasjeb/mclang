@@ -27,6 +27,7 @@ resource predicate lucky = """{"type":"minecraft:random_chance","chance":0.5}"""
 @load
 fn load() {
     message.all("loaded", green);
+    place.feature(nbt { type = "minecraft:no_op"; });
 }
 
 @tick

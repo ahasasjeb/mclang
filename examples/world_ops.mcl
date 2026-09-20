@@ -22,6 +22,10 @@ fn prepare() {
 
     // 地物、结构与模板。
     place.feature("minecraft:oak", pos(0, 64, 20));
+    place.feature(nbt {
+        type = "minecraft:simple_block";
+        to_place = { id = "minecraft:stone"; };
+    }, pos(1, 64, 20));
     place.structure("minecraft:village_plains", pos(32, 64, 20));
     place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
     place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);

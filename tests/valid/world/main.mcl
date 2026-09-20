@@ -30,6 +30,11 @@ fn build() {
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), filtered, block_state("#minecraft:logs"), move);
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
     place.feature("minecraft:oak", pos(0, 64, 0));
+    place.feature(nbt { type = "minecraft:no_op"; });
+    place.feature(nbt {
+        type = "minecraft:simple_block";
+        to_place = { id = "minecraft:stone"; };
+    }, pos(1, 64, 0));
     place.structure("minecraft:village_plains");
     place.structure("minecraft:village_plains", pos(32, 64, 32));
     place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(48, 64, 48));

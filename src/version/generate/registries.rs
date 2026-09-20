@@ -212,6 +212,11 @@ pub fn generate_registries(root: &Path) -> Result<String, String> {
             "net/minecraft/advancements/triggers/CriteriaTriggers.java",
             "register",
         ),
+        (
+            "feature_type",
+            "net/minecraft/world/level/levelgen/feature/FeatureTypes.java",
+            "Registry.register",
+        ),
     ];
     for (kind, relative, call) in code_sources {
         for id in extractor.read_ids(relative, call)? {
