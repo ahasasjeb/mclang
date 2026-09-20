@@ -178,6 +178,7 @@ fn entity_holders(command: &EntityCommand) -> Vec<&Holder> {
 fn core_holders(command: &CoreCommand) -> Vec<&Holder> {
     let mut holders = Vec::new();
     match command {
+        CoreCommand::FetchProfile(FetchProfileTarget::Entity(holder)) => holders.push(holder),
         CoreCommand::Recipe { target, .. } => holders.push(target),
         CoreCommand::Loot { target, source } => {
             match target {

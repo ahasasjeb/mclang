@@ -151,7 +151,12 @@ impl Parser {
         };
         Ok(match kind {
             "blank" => NumberFormat::Blank,
-            "styled" => NumberFormat::Styled,
+            "styled" => {
+                self.expect(TokenKind::LeftParen, "styled 后需要 `(`")?;
+                let style = self.string("styled 需要 JSON 样式对象")?.0;
+                self.expect(TokenKind::RightParen, "styled 后需要 `)`")?;
+                NumberFormat::Styled(style)
+            }
             _ => {
                 self.expect(TokenKind::LeftParen, "fixed 后需要 `(`")?;
                 let component = self.text_component_or_string("fixed 显示内容")?;

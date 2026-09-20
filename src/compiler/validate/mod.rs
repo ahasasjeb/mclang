@@ -17,6 +17,7 @@ mod macros;
 mod recursion;
 mod registry;
 pub(super) mod rules;
+mod scoreboard;
 mod statements;
 mod tags;
 mod world;

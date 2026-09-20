@@ -11,6 +11,9 @@ pub(super) fn core_command_names(
     context: &NameContext<'_>,
 ) {
     match command {
+        CoreCommand::FetchProfile(FetchProfileTarget::Entity(target)) => {
+            holder_names(target, visitor, context);
+        }
         CoreCommand::Recipe { target, recipe, .. } => {
             holder_names(target, visitor, context);
             if let Some(recipe) = recipe {

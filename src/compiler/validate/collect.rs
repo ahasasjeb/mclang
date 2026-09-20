@@ -89,6 +89,11 @@ pub(super) fn collect_objectives<'a>(
         if let Some(NumberFormat::Fixed(component)) = &objective.number_format {
             validate_objective_component(component, diagnostics);
         }
+        if let Some(NumberFormat::Styled(style)) = &objective.number_format
+            && !serde_json::from_str::<serde_json::Value>(style).is_ok_and(|v| v.is_object())
+        {
+            diagnostics.push(Diagnostic::new("styled 需要 JSON 样式对象", objective.span));
+        }
     }
     objectives
 }

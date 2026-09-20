@@ -20,6 +20,7 @@ mod entity_commands;
 mod expressions;
 mod macros;
 mod names;
+mod scoreboard;
 mod statements;
 mod ui;
 mod world;
@@ -124,8 +125,10 @@ impl<'a> Compiler<'a> {
                 Some(NumberFormat::Blank) => commands.push(format!(
                     "scoreboard objectives modify {runtime} numberformat blank"
                 )),
-                Some(NumberFormat::Styled) => commands.push(format!(
-                    "scoreboard objectives modify {runtime} numberformat styled"
+                Some(NumberFormat::Styled(style)) => commands.push(format!(
+                    "scoreboard objectives modify {runtime} numberformat styled {}",
+                    serde_json::from_str::<serde_json::Value>(style)
+                        .expect("validated objective style JSON")
                 )),
                 Some(NumberFormat::Fixed(component)) => commands.push(format!(
                     "scoreboard objectives modify {runtime} numberformat fixed {}",

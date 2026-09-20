@@ -5,7 +5,7 @@
 // 验证：
 //   cargo run -- build tests/valid/raw -o build/tests/raw
 //   cargo run -- build tests/valid/raw -o build/tests/raw --deny-raw   # 应当失败
-// 重点检查 build/tests/raw/data/raw_test/function/say.mcfunction
+// 重点检查 build/tests/raw/data/raw_test/function/raw_say.mcfunction
 // 与 gametime.mcfunction 的命令拼接。
 namespace raw_test;
 
@@ -16,7 +16,7 @@ fn announce() {
     }
 }
 
-fn say() {
+fn raw_say() {
     run "say raw statement";
 }
 

@@ -284,6 +284,9 @@ impl Compiler<'_> {
                     None => commands.push(format!("scoreboard objectives setdisplay {slot}")),
                 }
             }
+            StatementKind::ScoreboardCommand(command) => {
+                commands.push(self.scoreboard_command(command, owner));
+            }
             StatementKind::Teleport {
                 targets,
                 destination,

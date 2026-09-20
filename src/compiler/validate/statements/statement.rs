@@ -280,6 +280,14 @@ pub(super) fn validate_statement<'a>(
                 ));
             }
         }
+        StatementKind::ScoreboardCommand(command) => {
+            crate::compiler::validate::scoreboard::validate_scoreboard_command(
+                command,
+                statement.span,
+                ctx,
+                diagnostics,
+            );
+        }
         StatementKind::Teleport {
             targets,
             destination,

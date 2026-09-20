@@ -5,7 +5,7 @@ use super::*;
 pub enum NumberFormat {
     Blank,
     Fixed(Box<TextComponent>),
-    Styled,
+    Styled(String),
 }
 
 /// 数据槽的来源：实体自带数据或物品堆自定义数据。

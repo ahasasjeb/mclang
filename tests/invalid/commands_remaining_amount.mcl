@@ -1,0 +1,7 @@
+// expect: 不能小于 0
+namespace invalid_remaining;
+objective points;
+query one = entity("minecraft:player") { limit(1); }
+fn bad() {
+    scoreboard.players.add(one, points, -1);
+}

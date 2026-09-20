@@ -139,3 +139,19 @@
     队伍消息("Hello team");
 }
 
+函数 remaining_commands() {
+    帮助();
+    版本();
+    世界种子();
+    广播("Ready");
+    动作消息("checks pack");
+    测试命令.运行最近(1, 假);
+    计分板.目标集.列出();
+    计分板.目标集.修改.显示名(progress, "Points");
+    计分板.玩家分数.添加(players, progress, 1);
+}
+
+函数 remaining_result() -> score {
+    返回 原生命令 广播("Done");
+}
+

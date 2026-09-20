@@ -14,6 +14,36 @@ pub(super) fn validate_core_command(
 ) {
     match command {
         CoreCommand::Reload => {}
+        CoreCommand::Version | CoreCommand::Seed => {}
+        CoreCommand::Help(Some(value))
+        | CoreCommand::Say(value)
+        | CoreCommand::Me(value)
+        | CoreCommand::FetchProfile(FetchProfileTarget::Name(value)) => {
+            if value.trim().is_empty() || value.contains(['\n', '\r', '\0']) {
+                diagnostics.push(Diagnostic::new("命令文本不能为空或包含换行/NUL", span));
+            }
+        }
+        CoreCommand::Help(None) => {}
+        CoreCommand::FetchProfile(FetchProfileTarget::Id(id)) => {
+            let valid = id.len() == 36
+                && id.chars().enumerate().all(|(index, c)| {
+                    if [8, 13, 18, 23].contains(&index) {
+                        c == '-'
+                    } else {
+                        c.is_ascii_hexdigit()
+                    }
+                });
+            if !valid {
+                diagnostics.push(Diagnostic::new(
+                    format!("fetchprofile.id 的 `{id}` 不是有效的 UUID"),
+                    span,
+                ));
+            }
+        }
+        CoreCommand::FetchProfile(FetchProfileTarget::Entity(target)) => {
+            entity_target(target, true, false, span, ctx, diagnostics);
+        }
+        CoreCommand::Test(command) => validate_test_command(command, span, diagnostics),
         CoreCommand::Recipe { target, recipe, .. } => {
             entity_target(target, false, true, span, ctx, diagnostics);
             if let Some(recipe) = recipe {
@@ -116,6 +146,49 @@ pub(super) fn validate_core_command(
                 }
             }
         }
+    }
+}
+
+fn validate_test_command(command: &TestCommand, span: Span, diagnostics: &mut Vec<Diagnostic>) {
+    let selector = match command {
+        TestCommand::Run { tests, .. } => tests.as_deref(),
+        TestCommand::RunMultiple { tests, .. }
+        | TestCommand::Verify(tests)
+        | TestCommand::Locate(tests) => Some(tests.as_str()),
+        _ => None,
+    };
+    if let Some(selector) = selector
+        && (selector.is_empty()
+            || !selector.chars().all(|c| {
+                c.is_ascii_lowercase()
+                    || c.is_ascii_digit()
+                    || matches!(c, '_' | '-' | '.' | '/' | ':' | '*' | '?')
+            }))
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("测试实例选择式 `{selector}` 只能包含资源位置字符、`*` 和 `?`"),
+            span,
+        ));
+    }
+    match command {
+        TestCommand::Create { id, .. } if !super::rules::valid_resource_location(id) => {
+            diagnostics.push(Diagnostic::new(
+                format!("test.create 的 `{id}` 不是有效的资源位置"),
+                span,
+            ));
+        }
+        TestCommand::Pos(Some(name))
+            if name.is_empty()
+                || !name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | '+')) =>
+        {
+            diagnostics.push(Diagnostic::new(
+                format!("test.pos 的变量名 `{name}` 不是有效的命令单词"),
+                span,
+            ));
+        }
+        _ => {}
     }
 }
 

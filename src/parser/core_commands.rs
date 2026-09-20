@@ -1,18 +1,32 @@
 use super::Parser;
 use crate::{ast::*, diagnostic::Diagnostic, lexer::TokenKind};
 
+mod remaining;
+
 impl Parser {
     pub(super) fn core_command_root(&self) -> Option<&'static str> {
-        ["reload", "recipe", "datapack", "loot", "random"]
-            .into_iter()
-            .find(|root| {
-                self.check_word(root)
-                    && (*root != "random" || self.peek_kind(1).kind == TokenKind::Dot)
-            })
+        [
+            "reload",
+            "recipe",
+            "datapack",
+            "loot",
+            "random",
+            "help",
+            "version",
+            "seed",
+            "say",
+            "me",
+            "fetchprofile",
+            "test",
+        ]
+        .into_iter()
+        .find(|root| {
+            self.check_word(root) && (*root != "random" || self.peek_kind(1).kind == TokenKind::Dot)
+        })
     }
 
     pub(super) fn core_command(&mut self, root: &str) -> Result<CoreCommand, Diagnostic> {
-        let method = if root != "reload" {
+        let method = if !["reload", "help", "version", "seed", "say", "me"].contains(&root) {
             self.command_method()?
         } else {
             String::new()
@@ -20,6 +34,17 @@ impl Parser {
         self.expect(TokenKind::LeftParen, "命令需要 `(`")?;
         let command = match root {
             "reload" => CoreCommand::Reload,
+            "help" => CoreCommand::Help(if self.check(&TokenKind::RightParen) {
+                None
+            } else {
+                Some(self.string("help 需要命令路径字符串")?.0)
+            }),
+            "version" => CoreCommand::Version,
+            "seed" => CoreCommand::Seed,
+            "say" => CoreCommand::Say(self.string("say 需要消息文本")?.0),
+            "me" => CoreCommand::Me(self.string("me 需要动作文本")?.0),
+            "fetchprofile" => CoreCommand::FetchProfile(self.fetch_profile_command(&method)?),
+            "test" => CoreCommand::Test(self.test_command(&method)?),
             "recipe" => {
                 if !["give", "take"].contains(&method.as_str()) {
                     return self.unknown_command_method(root, &method);

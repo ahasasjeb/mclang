@@ -31,6 +31,34 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "重载",
     },
     Keyword {
+        english: "help",
+        chinese: "帮助",
+    },
+    Keyword {
+        english: "version",
+        chinese: "版本",
+    },
+    Keyword {
+        english: "seed",
+        chinese: "世界种子",
+    },
+    Keyword {
+        english: "say",
+        chinese: "广播",
+    },
+    Keyword {
+        english: "me",
+        chinese: "动作消息",
+    },
+    Keyword {
+        english: "fetchprofile",
+        chinese: "获取档案",
+    },
+    Keyword {
+        english: "test",
+        chinese: "测试命令",
+    },
+    Keyword {
         english: "datapack",
         chinese: "数据包",
     },

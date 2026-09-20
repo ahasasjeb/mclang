@@ -1,0 +1,65 @@
+// 26.3 剩余原生命令与运行期计分板操作。
+namespace remaining_commands;
+
+query one = entity("minecraft:player") { limit(1); }
+objective points;
+
+fn commands() {
+    help();
+    help("scoreboard objectives");
+    version();
+    seed();
+    say("服务器已就绪");
+    me("检查数据包");
+    fetchprofile.name("Steve");
+    fetchprofile.id("8667ba71-b85a-4004-af54-457a9734eed7");
+    fetchprofile.entity(one);
+
+    test.run("remaining_commands:basic");
+    test.run("*:basic", 3, true, 1, 8);
+    test.runmultiple("*", 2);
+    test.runthese();
+    test.runclosest(2, false);
+    test.runthat();
+    test.runfailed(true, 2, false, 0, 8);
+    test.verify("remaining_commands:basic");
+    test.locate("remaining_commands:basic");
+    test.resetclosest();
+    test.resetthese();
+    test.resetthat();
+    test.clearthat();
+    test.clearthese();
+    test.clearall();
+    test.clearall(300);
+    test.stop();
+    test.pos();
+    test.pos("origin_pos");
+    test.create("remaining_commands:new_test");
+    test.create("remaining_commands:cube", 5);
+    test.create("remaining_commands:room", 5, 4, 7);
+
+    scoreboard.objectives.list();
+    scoreboard.objectives.modify.displayname(points, text("积分") { color = "gold"; });
+    scoreboard.objectives.modify.displayautoupdate(points, true);
+    scoreboard.objectives.modify.rendertype(points, hearts);
+    scoreboard.objectives.modify.numberformat(points, blank);
+    scoreboard.objectives.modify.numberformat(points, fixed("分"));
+    scoreboard.objectives.modify.numberformat(points, styled("{\"color\":\"green\"}"));
+    scoreboard.objectives.modify.numberformat(points);
+    scoreboard.players.list();
+    scoreboard.players.list(one);
+    scoreboard.players.add(one, points, 2);
+    scoreboard.players.remove(one, points, 1);
+    scoreboard.players.display.name(one, points, "冠军");
+    scoreboard.players.display.name(one, points);
+    scoreboard.players.numberformat(one, points, blank);
+    scoreboard.players.numberformat(one, points, fixed("点"));
+    scoreboard.players.numberformat(one, points, styled("{\"color\":\"red\"}"));
+    scoreboard.players.numberformat(one, points);
+    scoreboard.players.reset(one);
+    scoreboard.objectives.remove(points);
+}
+
+fn result() -> score {
+    return run test.runthese();
+}

@@ -124,9 +124,61 @@ impl Parser {
                 self.expect(TokenKind::Semicolon, "return fail 后需要 `;`")?;
                 ReturnKind::Fail
             } else if self.take_word("run").is_some() {
-                let (command, _) = self.command_string("return run")?;
-                self.expect(TokenKind::Semicolon, "return run 后需要 `;`")?;
-                ReturnKind::Run(command)
+                if matches!(self.current().kind, TokenKind::String(_)) {
+                    let (command, _) = self.command_string("return run")?;
+                    self.expect(TokenKind::Semicolon, "return run 后需要 `;`")?;
+                    ReturnKind::Run(command)
+                } else {
+                    let command = self.statement()?;
+                    if !matches!(
+                        command.kind,
+                        StatementKind::CoreCommand(_)
+                            | StatementKind::EntityCommand(_)
+                            | StatementKind::UiCommand(_)
+                            | StatementKind::ScoreboardCommand(_)
+                            | StatementKind::ScoreboardDisplay { .. }
+                            | StatementKind::ScoreSet { .. }
+                            | StatementKind::ScoreReset { .. }
+                            | StatementKind::ScoreboardEnable { .. }
+                            | StatementKind::ScoreboardOperation { .. }
+                            | StatementKind::Give { .. }
+                            | StatementKind::EffectGive { .. }
+                            | StatementKind::EffectClear { .. }
+                            | StatementKind::XpChange { .. }
+                            | StatementKind::StopwatchAction { .. }
+                            | StatementKind::ClearInventory { .. }
+                            | StatementKind::SetBlock { .. }
+                            | StatementKind::Fill { .. }
+                            | StatementKind::FillBiome { .. }
+                            | StatementKind::Clone { .. }
+                            | StatementKind::PlaceFeature { .. }
+                            | StatementKind::PlaceJigsaw { .. }
+                            | StatementKind::PlaceStructure { .. }
+                            | StatementKind::PlaceTemplate { .. }
+                            | StatementKind::ForceLoad(_)
+                            | StatementKind::TimeAction { .. }
+                            | StatementKind::Weather { .. }
+                            | StatementKind::GameRuleSet { .. }
+                            | StatementKind::WorldBorder(_)
+                            | StatementKind::Locate { .. }
+                            | StatementKind::SelfAction(_)
+                            | StatementKind::Message { .. }
+                            | StatementKind::PlaySound { .. }
+                            | StatementKind::Teleport { .. }
+                            | StatementKind::NbtMerge { .. }
+                            | StatementKind::DataMerge { .. }
+                            | StatementKind::DataRemove { .. }
+                            | StatementKind::DataModify { .. }
+                            | StatementKind::ItemAction { .. }
+                            | StatementKind::AdvancementAction { .. }
+                    ) {
+                        return Err(Diagnostic::new(
+                            "return run 后需要一条结构化命令，例如 `say(\"完成\");`",
+                            command.span,
+                        ));
+                    }
+                    ReturnKind::Command(Box::new(command))
+                }
             } else {
                 let value = self.expression()?;
                 self.expect(TokenKind::Semicolon, "return 表达式后需要 `;`")?;

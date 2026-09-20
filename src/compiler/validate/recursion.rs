@@ -158,6 +158,7 @@ fn collect_synchronous_calls<'a>(
             | StatementKind::ScoreboardEnable { .. }
             | StatementKind::ScoreboardOperation { .. }
             | StatementKind::ScoreboardDisplay { .. }
+            | StatementKind::ScoreboardCommand(_)
             | StatementKind::DataMerge { .. }
             | StatementKind::DataRemove { .. }
             | StatementKind::DataModify { .. }

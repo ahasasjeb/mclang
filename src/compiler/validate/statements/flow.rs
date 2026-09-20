@@ -16,6 +16,10 @@ pub(super) fn validate_return<'a>(
     match (ctx.return_rules.returns_score, kind) {
         (true, ReturnKind::Value(value)) => validate_expr(value, locals, ctx, diagnostics),
         (_, ReturnKind::Run(command)) => validate_raw_command(command, span, diagnostics),
+        (_, ReturnKind::Command(command)) => {
+            let mut nested_locals = locals.clone();
+            super::statement::validate_statement(command, &mut nested_locals, ctx, diagnostics);
+        }
         (true, ReturnKind::Fail) => {}
         (true, ReturnKind::Void) => diagnostics.push(Diagnostic::new(
             "返回 score 的函数需要 `return <表达式>;`、`return run \"命令\";` 或 `return fail;`",

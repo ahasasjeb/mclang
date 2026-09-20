@@ -1,0 +1,5 @@
+// expect: 不是有效的 UUID
+namespace invalid_remaining;
+fn bad() {
+    fetchprofile.id("missing-uuid");
+}

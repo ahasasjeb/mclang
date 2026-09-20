@@ -94,6 +94,20 @@ impl Compiler<'_> {
             ReturnKind::Void => commands.push("return 0".to_owned()),
             ReturnKind::Fail => commands.push("return fail".to_owned()),
             ReturnKind::Run(command) => commands.push(format!("return run {command}")),
+            ReturnKind::Command(command) => {
+                let mut nested = Vec::new();
+                self.compile_statement(command, owner, &mut nested);
+                if nested.len() == 1 {
+                    commands.push(format!("return run {}", nested.pop().unwrap()));
+                } else {
+                    let helper = self.next_helper_path(owner);
+                    self.functions.insert(helper.clone(), nested);
+                    commands.push(format!(
+                        "return run function {}:{helper}",
+                        self.program.namespace
+                    ));
+                }
+            }
             ReturnKind::Value(expression) => match self.compile_expr(expression, owner, commands) {
                 Value::Integer(value) => commands.push(format!("return {value}")),
                 Value::Score(score) => commands.push(format!(

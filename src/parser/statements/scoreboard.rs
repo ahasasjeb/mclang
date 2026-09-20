@@ -11,6 +11,12 @@ impl Parser {
     pub(super) fn scoreboard_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::Dot, "scoreboard 后需要 `.`")?;
         let (method, method_span) = self.ident("scoreboard 方法")?;
+        if matches!(method.as_str(), "objectives" | "目标集") {
+            return self.scoreboard_objectives_command();
+        }
+        if matches!(method.as_str(), "players" | "玩家分数") {
+            return self.scoreboard_players_command();
+        }
         let Some(method) = scoreboard_method(&method) else {
             return Err(Diagnostic::new(
                 format!("未知 scoreboard 方法 `{method}`"),

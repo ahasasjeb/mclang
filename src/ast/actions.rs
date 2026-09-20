@@ -237,6 +237,7 @@ pub enum ReturnKind {
     Value(Expr),
     Fail,
     Run(String),
+    Command(Box<Statement>),
 }
 
 /// `advancement grant/revoke` 的操作。

@@ -1,0 +1,19 @@
+// 运行期计分板设置，以及 26.3 的信息和 GameTest 命令。
+namespace remaining_demo;
+
+objective wins { display_name = "胜场"; }
+query winner = entity("minecraft:player") { limit(1); }
+
+fn announce() {
+    version();
+    seed();
+    say("开始新一轮测试");
+    scoreboard.players.add(winner, wins, 1);
+    scoreboard.players.display.name(winner, wins, text("冠军") { color = "gold"; });
+    scoreboard.players.numberformat(winner, wins, fixed("胜"));
+    test.run("remaining_demo:round_trip");
+}
+
+fn inspect() -> score {
+    return run scoreboard.players.list(winner);
+}

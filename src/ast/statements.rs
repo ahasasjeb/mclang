@@ -191,6 +191,7 @@ pub enum StatementKind {
         slot_span: Span,
         objective: Option<(String, Span)>,
     },
+    ScoreboardCommand(Box<ScoreboardCommand>),
     /// `teleport(持有者, 坐标或实体查询[, rotation(朝向)]);`：把实体移动到目标位置。
     Teleport {
         targets: Holder,
@@ -266,6 +267,47 @@ pub enum StatementKind {
     /// `continue`：进入最近一层 `for`/`while` 的下一次迭代。
     Continue,
     Return(ReturnKind),
+}
+
+#[derive(Debug)]
+pub enum ScoreboardCommand {
+    ObjectivesList,
+    ObjectivesRemove((String, Span)),
+    ObjectivesModify {
+        objective: (String, Span),
+        change: ObjectiveChange,
+    },
+    PlayersList(Option<Holder>),
+    PlayersResetAll(Holder),
+    PlayersChange {
+        target: ScoreTarget,
+        add: bool,
+        amount: i32,
+    },
+    PlayersDisplayName {
+        target: ScoreTarget,
+        name: Option<Box<TextComponent>>,
+    },
+    PlayersNumberFormat {
+        target: ScoreTarget,
+        format: ScoreNumberFormat,
+    },
+}
+
+#[derive(Debug)]
+pub enum ObjectiveChange {
+    DisplayName(Box<TextComponent>),
+    DisplayAutoUpdate(bool),
+    RenderType(String),
+    NumberFormat(ScoreNumberFormat),
+}
+
+#[derive(Debug)]
+pub enum ScoreNumberFormat {
+    Reset,
+    Blank,
+    Fixed(Box<TextComponent>),
+    Styled(String),
 }
 
 #[derive(Debug)]

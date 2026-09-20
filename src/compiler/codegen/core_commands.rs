@@ -9,6 +9,19 @@ impl Compiler<'_> {
     pub(super) fn core_command_text(&self, command: &CoreCommand) -> String {
         match command {
             CoreCommand::Reload => "reload".to_owned(),
+            CoreCommand::Help(command) => format!("help{}", optional(command.as_ref())),
+            CoreCommand::Version => "version".to_owned(),
+            CoreCommand::Seed => "seed".to_owned(),
+            CoreCommand::Say(message) => format!("say {message}"),
+            CoreCommand::Me(action) => format!("me {action}"),
+            CoreCommand::FetchProfile(target) => match target {
+                FetchProfileTarget::Name(name) => format!("fetchprofile name {name}"),
+                FetchProfileTarget::Id(id) => format!("fetchprofile id {id}"),
+                FetchProfileTarget::Entity(holder) => {
+                    format!("fetchprofile entity {}", self.component_holder(holder))
+                }
+            },
+            CoreCommand::Test(command) => test_command_text(command),
             CoreCommand::Recipe {
                 give,
                 target,
@@ -123,6 +136,43 @@ impl Compiler<'_> {
                         .expect("validated item")
                 )
             ),
+        }
+    }
+}
+
+fn test_command_text(command: &TestCommand) -> String {
+    match command {
+        TestCommand::Run {
+            method,
+            tests,
+            only_required,
+            times,
+            until_failed,
+            rotation,
+            per_row,
+        } => format!(
+            "test {method}{}{}{}{}{}{}",
+            optional(tests.as_ref()),
+            optional(only_required.as_ref()),
+            optional(times.as_ref()),
+            optional(until_failed.as_ref()),
+            optional(rotation.as_ref()),
+            optional(per_row.as_ref()),
+        ),
+        TestCommand::RunMultiple { tests, amount } => {
+            format!("test runmultiple {tests}{}", optional(amount.as_ref()))
+        }
+        TestCommand::Verify(tests) => format!("test verify {tests}"),
+        TestCommand::Locate(tests) => format!("test locate {tests}"),
+        TestCommand::Simple(method) => format!("test {method}"),
+        TestCommand::ClearAll(radius) => format!("test clearall{}", optional(radius.as_ref())),
+        TestCommand::Pos(variable) => format!("test pos{}", optional(variable.as_ref())),
+        TestCommand::Create { id, dimensions } => {
+            let dimensions = dimensions
+                .iter()
+                .map(|v| format!(" {v}"))
+                .collect::<String>();
+            format!("test create {id}{dimensions}")
         }
     }
 }

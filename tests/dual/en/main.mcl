@@ -141,3 +141,19 @@ fn ui() {
 @player fn ui_team() {
     teammsg("Hello team");
 }
+
+fn remaining_commands() {
+    help();
+    version();
+    seed();
+    say("Ready");
+    me("checks pack");
+    test.runclosest(1, false);
+    scoreboard.objectives.list();
+    scoreboard.objectives.modify.displayname(progress, "Points");
+    scoreboard.players.add(players, progress, 1);
+}
+
+fn remaining_result() -> score {
+    return run say("Done");
+}

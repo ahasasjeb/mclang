@@ -1,0 +1,6 @@
+// expect: styled 需要 JSON 样式对象
+namespace invalid_remaining;
+objective points;
+fn bad() {
+    scoreboard.objectives.modify.numberformat(points, styled("[]"));
+}

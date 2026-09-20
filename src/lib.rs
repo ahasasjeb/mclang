@@ -133,6 +133,9 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             ast::StatementKind::CoreCommand(_) | ast::StatementKind::EntityCommand(_) => 0,
             ast::StatementKind::Run(_) => 1,
             ast::StatementKind::Return(ast::ReturnKind::Run(_)) => 1,
+            ast::StatementKind::Return(ast::ReturnKind::Command(command)) => {
+                raw_count_in_block(std::slice::from_ref(command.as_ref()))
+            }
             ast::StatementKind::Execute {
                 clauses: ast::ExecuteClauses::Raw(_),
                 body,
@@ -186,6 +189,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
             | ast::StatementKind::ScoreboardEnable { .. }
             | ast::StatementKind::ScoreboardOperation { .. }
             | ast::StatementKind::ScoreboardDisplay { .. }
+            | ast::StatementKind::ScoreboardCommand(_)
             | ast::StatementKind::DataMerge { .. }
             | ast::StatementKind::DataRemove { .. }
             | ast::StatementKind::DataModify { .. }

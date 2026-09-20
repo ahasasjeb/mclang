@@ -146,6 +146,9 @@ fn statement_kind_names(
                 visitor(context, NameSite::Reference, NameRole::Objective, name);
             }
         }
+        StatementKind::ScoreboardCommand(command) => {
+            scoreboard_command_names(command, visitor, context);
+        }
         StatementKind::Teleport {
             targets,
             destination,
@@ -234,6 +237,9 @@ fn statement_kind_names(
         StatementKind::Return(ReturnKind::Value(value)) => {
             expression_names(value, visitor, context)
         }
+        StatementKind::Return(ReturnKind::Command(command)) => {
+            statement_kind_names(&mut command.kind, visitor, context);
+        }
         StatementKind::Return(_) => {}
         StatementKind::SetBlock { .. }
         | StatementKind::Fill { .. }
@@ -249,6 +255,57 @@ fn statement_kind_names(
         | StatementKind::GameRuleSet { .. }
         | StatementKind::WorldBorder(_)
         | StatementKind::Locate { .. } => {}
+    }
+}
+
+fn scoreboard_command_names(
+    command: &mut ScoreboardCommand,
+    visitor: &mut impl FnMut(&NameContext<'_>, NameSite, NameRole, &mut String),
+    context: &NameContext<'_>,
+) {
+    match command {
+        ScoreboardCommand::ObjectivesRemove((name, _)) => {
+            visitor(context, NameSite::Reference, NameRole::Objective, name);
+        }
+        ScoreboardCommand::ObjectivesModify { objective, change } => {
+            visitor(
+                context,
+                NameSite::Reference,
+                NameRole::Objective,
+                &mut objective.0,
+            );
+            match change {
+                ObjectiveChange::DisplayName(component) => {
+                    component_names(component, visitor, context)
+                }
+                ObjectiveChange::NumberFormat(ScoreNumberFormat::Fixed(component)) => {
+                    component_names(component, visitor, context);
+                }
+                _ => {}
+            }
+        }
+        ScoreboardCommand::PlayersList(Some(holder))
+        | ScoreboardCommand::PlayersResetAll(holder) => holder_names(holder, visitor, context),
+        ScoreboardCommand::PlayersChange { target, .. }
+        | ScoreboardCommand::PlayersDisplayName { target, .. }
+        | ScoreboardCommand::PlayersNumberFormat { target, .. } => {
+            score_target_names(target, visitor, context);
+            match command {
+                ScoreboardCommand::PlayersDisplayName {
+                    name: Some(name), ..
+                } => {
+                    component_names(name, visitor, context);
+                }
+                ScoreboardCommand::PlayersNumberFormat {
+                    format: ScoreNumberFormat::Fixed(component),
+                    ..
+                } => {
+                    component_names(component, visitor, context);
+                }
+                _ => {}
+            }
+        }
+        ScoreboardCommand::ObjectivesList | ScoreboardCommand::PlayersList(None) => {}
     }
 }
 
