@@ -1,0 +1,3 @@
+// expect: 未知物品组件
+namespace bad;
+@player fn main() { give(self, item_stack("minecraft:stone") { components = nbt { "minecraft:not_real" = 1; }; }); }

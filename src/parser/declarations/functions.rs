@@ -24,7 +24,11 @@ impl Parser {
         let (name, name_span) = self.ident("函数名称")?;
         self.expect(TokenKind::LeftParen, "函数名称后需要 `(`")?;
         let mut parameters = Vec::new();
-        let macro_parameters = if is_macro { self.macro_parameters()? } else { Vec::new() };
+        let macro_parameters = if is_macro {
+            self.macro_parameters()?
+        } else {
+            Vec::new()
+        };
         if !is_macro && !self.check(&TokenKind::RightParen) {
             loop {
                 let (name, span) = self.ident("参数名称")?;
@@ -45,10 +49,19 @@ impl Parser {
         let (body, end) = self.block()?;
         let macro_signature = if is_macro {
             for token in &self.tokens[body_start..self.cursor] {
-                if let TokenKind::String(text) = &token.kind { self.active_macro_uses.extend(crate::parser::macros::template_uses(text, token.span)?); }
+                if let TokenKind::String(text) = &token.kind {
+                    self.active_macro_uses
+                        .extend(crate::parser::macros::template_uses(text, token.span)?);
+                }
             }
-            Some(MacroSignature { parameters: macro_parameters, uses: std::mem::take(&mut self.active_macro_uses), coordinates: std::mem::take(&mut self.active_macro_coordinates) })
-        } else { None };
+            Some(MacroSignature {
+                parameters: macro_parameters,
+                uses: std::mem::take(&mut self.active_macro_uses),
+                coordinates: std::mem::take(&mut self.active_macro_coordinates),
+            })
+        } else {
+            None
+        };
         self.active_macro_parameters.clear();
         Ok(Function {
             exported: false,

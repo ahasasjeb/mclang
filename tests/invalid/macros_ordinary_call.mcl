@@ -1,0 +1,4 @@
+// expect: 需要 nbt 参数或 with 来源
+namespace bad;
+macro fn greet(text label) { message.all(text("$(label)")); }
+fn main() { call greet(1); }

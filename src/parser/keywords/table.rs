@@ -6,8 +6,14 @@ pub(crate) struct Keyword {
 
 /// 全部语言关键词。中英文写法都必须全局唯一，测试 `keywords_are_unique` 保证这一点。
 pub(crate) const KEYWORDS: &[Keyword] = &[
-    Keyword { english: "with", chinese: "用" },
-    Keyword { english: "macro", chinese: "宏" },
+    Keyword {
+        english: "with",
+        chinese: "用",
+    },
+    Keyword {
+        english: "macro",
+        chinese: "宏",
+    },
     Keyword {
         english: "item_predicate",
         chinese: "物品谓词",

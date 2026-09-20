@@ -151,8 +151,18 @@ pub(super) fn validate_clear_inventory(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if let Some(Holder::Query(name, _)) = target { require_player_query(name, span, ctx, diagnostics); }
-    else { super::super::entity_commands::entity_target(target.as_ref().unwrap_or(&Holder::SelfEntity), false, true, span, ctx, diagnostics); }
+    if let Some(Holder::Query(name, _)) = target {
+        require_player_query(name, span, ctx, diagnostics);
+    } else {
+        super::super::entity_commands::entity_target(
+            target.as_ref().unwrap_or(&Holder::SelfEntity),
+            false,
+            true,
+            span,
+            ctx,
+            diagnostics,
+        );
+    }
     if let Some(item) = item {
         super::super::item_components::validate_predicate(item, diagnostics);
     }

@@ -1,0 +1,3 @@
+// expect: 散布范围
+namespace bad;
+@entity fn main() { spreadplayers(vec2(0, 0), 1, 0.5, false, self); }

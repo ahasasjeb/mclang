@@ -1,0 +1,3 @@
+// expect: 不能作为 @load/@tick 入口
+namespace bad;
+@load macro fn load(text label) { message.all(text("$(label)")); }

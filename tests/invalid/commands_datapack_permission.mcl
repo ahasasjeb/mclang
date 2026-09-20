@@ -1,0 +1,3 @@
+// expect: OWNER
+namespace bad;
+fn main() { datapack.create("test"); }

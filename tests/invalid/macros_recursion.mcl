@@ -1,0 +1,4 @@
+// expect: 同步递归调用环
+namespace bad;
+macro fn greet(text label) { message.all(text("$(label)")); call #group(nbt { label = "again"; }); }
+fn_tag group { value(greet); }

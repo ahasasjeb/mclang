@@ -1,0 +1,4 @@
+// expect: 宏坐标参数 30000000 超出范围
+namespace bad;
+@player macro fn move_here(integer x) { teleport(self, vec3(macro(x), 64, 0)); }
+@player fn main() { call move_here(nbt { x = 30000000; }); }

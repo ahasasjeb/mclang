@@ -1,0 +1,4 @@
+// expect: 不符合 integer 类型
+namespace bad;
+@player macro fn move_here(integer x) { teleport(self, vec3(macro(x), 64, 0)); }
+@player fn main() { call move_here(nbt { x = "abc"; }); }

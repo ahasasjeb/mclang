@@ -27,8 +27,11 @@ impl Slots {
     pub fn accepts_single(&self, name: &str) -> bool {
         self.single.contains(name)
             || self.ranges.iter().any(|(prefix, count)| {
-                name.strip_prefix(prefix)
-                    .is_some_and(|suffix| suffix.parse::<usize>().is_ok_and(|index| index < *count && index.to_string() == suffix))
+                name.strip_prefix(prefix).is_some_and(|suffix| {
+                    suffix
+                        .parse::<usize>()
+                        .is_ok_and(|index| index < *count && index.to_string() == suffix)
+                })
             })
     }
     fn from_value(value: Option<&Value>) -> Self {
@@ -103,7 +106,9 @@ pub fn snapshot() -> &'static Snapshot {
 }
 
 impl Snapshot {
-    pub fn enchantment_max_level(&self, id: &str) -> Option<u64> { self.enchantment_max_levels.get(id).copied() }
+    pub fn enchantment_max_level(&self, id: &str) -> Option<u64> {
+        self.enchantment_max_levels.get(id).copied()
+    }
     fn load() -> Self {
         let registries = parse_json(include_str!("../../data/version/26.3-rc-2/registries.json"));
         let enums = parse_json(include_str!("../../data/version/26.3-rc-2/enums.json"));
@@ -112,7 +117,13 @@ impl Snapshot {
             "../../data/version/26.3-rc-2/advancement_triggers.json"
         ));
         Self {
-            enchantment_max_levels: serde_json::from_value(registries.get("enchantment_max_levels").cloned().unwrap_or_else(|| serde_json::json!({}))).expect("valid enchantment level snapshot"),
+            enchantment_max_levels: serde_json::from_value(
+                registries
+                    .get("enchantment_max_levels")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({})),
+            )
+            .expect("valid enchantment level snapshot"),
             registries: object_sets(registries.get("registries")),
             enums: object_arrays(enums.get("enums")),
             resource_kinds: string_set(registries.get("resource_kinds")),

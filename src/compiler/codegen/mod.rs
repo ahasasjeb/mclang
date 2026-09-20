@@ -12,13 +12,14 @@
 
 mod actions;
 mod advancement;
+mod command_targets;
 mod components;
 mod core_commands;
 mod emit;
 mod entity_commands;
 mod expressions;
-mod names;
 mod macros;
+mod names;
 mod statements;
 mod world;
 
@@ -61,6 +62,8 @@ pub(super) struct Compiler<'a> {
     loop_counter: usize,
     /// 是否使用了 `give(..., self.item)` 需要的空槽来源资源。
     uses_empty_slot: bool,
+    selector_overrides: HashMap<String, String>,
+    selector_objectives: BTreeMap<String, String>,
 }
 
 impl<'a> Compiler<'a> {
@@ -75,6 +78,8 @@ impl<'a> Compiler<'a> {
             loops: Vec::new(),
             loop_counter: 0,
             uses_empty_slot: false,
+            selector_overrides: HashMap::new(),
+            selector_objectives: BTreeMap::new(),
         }
     }
 
@@ -96,6 +101,9 @@ impl<'a> Compiler<'a> {
             "scoreboard objectives add {} dummy",
             self.objective
         )];
+        for objective in self.selector_objectives.values() {
+            commands.push(format!("scoreboard objectives add {objective} dummy"));
+        }
         for objective in &self.program.objectives {
             let runtime = names::user_objective_name(&self.program.namespace, &objective.name);
             let criteria = objective.criteria.as_deref().unwrap_or("dummy");

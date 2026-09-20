@@ -193,7 +193,10 @@ impl Parser {
             _ => return self.unknown_command_method("loot 来源", &method),
         };
         self.expect(TokenKind::RightParen, "战利品来源缺少 `)`")?;
-        Ok(CoreCommand::Loot { target, source: Box::new(source) })
+        Ok(CoreCommand::Loot {
+            target,
+            source: Box::new(source),
+        })
     }
 
     fn loot_tool(&mut self) -> Result<Option<LootTool>, Diagnostic> {

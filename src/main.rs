@@ -81,7 +81,7 @@ fn run() -> Result<(), String> {
             let summary = check_file(&PathBuf::from(source))?;
             if deny_raw && summary.raw_statements > 0 {
                 return Err(format!(
-                    "严格模式检查失败：项目包含 {} 条底层 run/execute 语句",
+                    "严格模式检查失败：项目包含 {} 条底层语句或不安全宏（run/execute/return run/运行期 with/nbt 宏片段）",
                     summary.raw_statements
                 ));
             }

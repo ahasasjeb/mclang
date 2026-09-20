@@ -7,7 +7,10 @@ pub(super) fn validate_predicate(predicate: &ItemPredicate, diagnostics: &mut Ve
         validate_id_or_tag("item", "物品", base, predicate.span, diagnostics);
     }
     if predicate.item.contains('[') && !super::items::valid_item_predicate(&predicate.item) {
-        diagnostics.push(Diagnostic::new("物品谓词的组件过滤器不完整；建议使用 item_predicate 结构化条件", predicate.span));
+        diagnostics.push(Diagnostic::new(
+            "物品谓词的组件过滤器不完整；建议使用 item_predicate 结构化条件",
+            predicate.span,
+        ));
     }
     for test in predicate.clauses.iter().flatten() {
         let registry = if matches!(test.kind, ItemComponentTestKind::Match(_)) {
@@ -16,7 +19,9 @@ pub(super) fn validate_predicate(predicate: &ItemPredicate, diagnostics: &mut Ve
             "data_component_type"
         };
         let component_existence = matches!(test.kind, ItemComponentTestKind::Match(_))
-            && crate::version::snapshot::snapshot().registry_contains("data_component_type", &test.id) == Some(true);
+            && crate::version::snapshot::snapshot()
+                .registry_contains("data_component_type", &test.id)
+                == Some(true);
         if test.id != "minecraft:count" && !component_existence {
             validate_id(registry, "组件条件", &test.id, test.span, diagnostics);
         }

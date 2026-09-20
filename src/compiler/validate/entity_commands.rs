@@ -36,9 +36,14 @@ pub(super) fn validate_entity_command(
         } => {
             entity_target(target, false, false, span, ctx, diagnostics);
             validate_id("enchantment", "附魔", enchantment, span, diagnostics);
-            if let Some(maximum) = crate::version::snapshot::snapshot().enchantment_max_level(enchantment)
-                && u64::from(level.unwrap_or(1)) > maximum {
-                diagnostics.push(Diagnostic::new(format!("附魔 `{enchantment}` 的最高等级为 {maximum}"), span));
+            if let Some(maximum) =
+                crate::version::snapshot::snapshot().enchantment_max_level(enchantment)
+                && u64::from(level.unwrap_or(1)) > maximum
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("附魔 `{enchantment}` 的最高等级为 {maximum}"),
+                    span,
+                ));
             }
             if level.is_some_and(|v| v > i32::MAX as u32) {
                 diagnostics.push(Diagnostic::new("附魔等级不能超过 2147483647", span));
@@ -186,9 +191,6 @@ pub(in crate::compiler::validate) fn entity_target(
                         format!("目标 `{name}` 必须匹配 minecraft:player"),
                         *query_span,
                     ));
-                }
-                if query.item.is_some() {
-                    diagnostics.push(Diagnostic::new(format!("目标 `{name}` 含物品条件，不能直接用作选择器；请在 each({name}) 中使用 self"), *query_span));
                 }
             }
         }

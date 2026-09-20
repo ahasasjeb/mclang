@@ -193,7 +193,7 @@ pub(super) fn item_filter_predicate(item: &ItemFilter) -> String {
         return predicate;
     }
     let extra = components.join(",");
-    match predicate.rfind('[') {
+    match predicate.find('[') {
         Some(open) if predicate.ends_with(']') => {
             let inner = &predicate[open + 1..predicate.len() - 1];
             if inner.is_empty() {

@@ -72,7 +72,9 @@ fn statement_kind_names(
     match kind {
         StatementKind::MacroCall { target, arguments } => {
             call_target_names(target, visitor, context);
-            if let MacroArguments::With { source, .. } = arguments { nbt_source_names(source, visitor, context); }
+            if let MacroArguments::With { source, .. } = arguments {
+                nbt_source_names(source, visitor, context);
+            }
         }
         StatementKind::CoreCommand(command) => {
             super::core_commands::core_command_names(command, visitor, context)
@@ -102,7 +104,11 @@ fn statement_kind_names(
             visitor(context, NameSite::Reference, NameRole::Query, target);
         }
         StatementKind::StopwatchAction { .. } => {}
-        StatementKind::ClearInventory { target, .. } => { if let Some(target) = target { holder_names(target, visitor, context); } }
+        StatementKind::ClearInventory { target, .. } => {
+            if let Some(target) = target {
+                holder_names(target, visitor, context);
+            }
+        }
         StatementKind::PlaySound { targets, .. } => {
             if let Some(targets) = targets {
                 visitor(context, NameSite::Reference, NameRole::Query, targets);

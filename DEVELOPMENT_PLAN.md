@@ -19,9 +19,9 @@
 
 | 状态 | 数量 | 含义 |
 | --- | --- | --- |
-| 完成 | 25 | 结构化语法覆盖该命令的常规数据包用法，编译期检查完整 |
-| 部分 | 7 | 已有结构化入口，子命令或参数面存在明确缺口 |
-| 缺失 | 29 | 没有结构化入口，只能写 `run` 字符串或完全不可用 |
+| 完成 | 52 | 结构化语法覆盖该命令的常规数据包用法，编译期检查完整 |
+| 部分 | 1 | 已有结构化入口，子命令或参数面存在明确缺口 |
+| 缺失 | 8 | 没有结构化入口，只能写 `run` 字符串或完全不可用 |
 | 不可达 | 21 | 需要高于默认等级 2 的函数权限，数据包函数无法合法执行 |
 | 等价覆盖 | 2 | 没有独立结构化入口，但用途已由其他结构化语句覆盖 |
 | 只读反馈 | 4 | 只向命令来源输出信息，不改变世界状态 |
@@ -35,11 +35,11 @@
 | 1 类型系统与版本数据 | 6/6（余说明性待补） | 动态子命令树与动态 NBT 键、SNBT 备选记法 |
 | 2 补齐现有结构化能力 | 10/10 | — |
 | 3 世界与方块命令族 | 12/12 | `place.feature` 内联 JSON |
-| 4 实体与玩家命令族 | 3/18 | enchant、damage、attribute、team、ride 等 |
-| 5 物品、战利品与进度 | 1/5 | loot、recipe、slot_source、完整物品谓词 |
+| 4 实体与玩家命令族 | 18/18 | — |
+| 5 物品、战利品与进度 | 4/5 | slot_source 声明 |
 | 6 界面与感官 | 1/8 | title、bossbar、particle、dialog、msg 等 |
-| 7 服务器数据与工具 | 2/8（7.1 部分） | random.roll/reset、reload/datapack 等 |
-| 8 语言与工具体验 | 2/8（8.6 部分） | 函数宏、参数形状校验、增量构建、标准库 |
+| 7 服务器数据与工具 | 5/8 | 只读反馈、测试工具与越级命令策略的剩余说明 |
+| 8 语言与工具体验 | 3/8（8.6 部分） | 参数形状校验、增量构建、标准库 |
 | 9 数据包内容与资源 schema | 0/8（9.2 函数标签已完成） | 注册表标签、资源 schema、worldgen、打包 |
 
 ## 二、原版命令覆盖矩阵
@@ -62,20 +62,20 @@
 | 命令 | 原版形态（26.3-rc-2） | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
 | `execute` | `run`；`if`/`unless`（block、biome、loaded、dimension、score、blocks、entity、predicate、function、stopwatch、data、items、slots）；修饰符 as、at、positioned、rotated、facing、align、anchored、in、on（8 种关系）、summon；store result/success | 完成 | 结构化修饰符、条件族与 store 全覆盖（细节见 §四）；旧字符串子句保留为逃生口并计入 `--deny-raw` |
-| `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 部分 | `call`、表达式调用与 `#tag` 已支持；缺 `<fn> <nbt>` 宏参数与 `with`（8.3） |
+| `function` | `<fn>`；`<fn> <nbt>`；`<fn> with <entity\|block\|storage> [path]`；`#tag` | 完成 | 普通 call、计分表达式、外部函数与 #tag；macro fn、NBT 字面量参数、with entity/block/storage 可选路径；宏类型、键与上下文检查（8.3） |
 | `return` | `<int>`；`fail`；`run <命令>` | 完成 | 计分返回值、store ABI、`return fail`、`return run` 全覆盖；`return run` 计入 `--deny-raw` |
 | `schedule` | `function <fn> <time> [replace\|append]`；`clear <fn>` | 完成 | 整数与浮点时间（按原版 `TimeArgument` 换算为游戏刻）、`replace`/`append`、`schedule.clear`、`#tag` 调度 |
 | `data` | get；merge；remove；modify（insert/prepend/append/set/merge；from/string/compute/value；entity/block/storage） | 完成 | `data.get`（表达式）/`merge`/`remove`/`modify` 与 entity/block/storage 三类目标；实体目标沿用非玩家写保护 |
 | `scoreboard` | objectives（add/remove/list/modify：displayname/rendertype/displayautoupdate/numberformat）；players（set/get/add/remove/reset/enable/operation/display）；display | 完成 | `objective` 声明（准则/显示名/渲染类型/数字格式/显示槽）与 `set/get/reset/enable/operation/display`；与内部 ABI 目标隔离 |
 | `item` | replace/fill/override/modify（entity/block 目标、槽位集合、from/with/loot_modifier） | 完成 | `replace/fill/override/modify`；实体（`limit(1)`）与方块目标、任意槽位、`with`/`from` 与可选修饰器 |
-| `loot` | loot/fish/kill/mine + give/insert/replace/spawn | 缺失 | 战利品表资源可声明，但没有取用命令（5.1） |
+| `loot` | loot/fish/kill/mine + give/insert/replace/spawn | 完成 | loot.give/insert/spawn/replace × loot.table/fish/kill/mine；物品工具、mainhand/offhand、单槽位与可选数量（5.1） |
 | `advancement` | grant/revoke × only/from/until/through/everything | 完成 | `advancement.grant/revoke[_through\|_from\|_until\|_everything]`，目标是玩家；进度引用本命名空间声明或字符串资源位置，`only` 可带准则名 |
-| `recipe` | give/take `<recipe\|*>` | 缺失 | — （5.4） |
-| `reload` | — | 缺失 | — （7.4） |
-| `datapack` | enable/disable/list；create（不可达，需 OWNER） | 缺失 | — （7.4） |
+| `recipe` | give/take `<recipe\|*>` | 完成 | recipe.give/take，声明资源、外部资源位置与 *（5.4） |
+| `reload` | — | 完成 | reload()（7.4） |
+| `datapack` | enable/disable/list；create（不可达，需 OWNER） | 完成 | enable（默认/first/last/before/after）、disable、list（全部/available/enabled）；create 按 OWNER 权限拒绝（7.4） |
 | `compute` | default/block/entity × float/integer provider | 完成 | 结果表达式 `compute(来源, float\|integer, provider[, 缩放])`；provider 与上下文对照注册表校验 |
 | `stopwatch` | create/query/restart/remove | 完成 | `stopwatch.create/restart/remove(id)`；`query` 作为表达式并支持可选缩放，失败写入 0 |
-| `random` | value/roll/reset | 部分 | `random(1, 6)` 结果表达式已支持；缺 `random.roll` 与 `random.reset`（7.1） |
+| `random` | value/roll/reset | 完成 | random(min,max)、random.value/roll(min,max[,sequence])、random.reset(sequence或*[,seed[,world_seed[,sequence_id]]])（7.1） |
 | `test` | gametest 系列 | 测试工具 | 测试框架，不属于数据包标准层（7.7） |
 | `fetchprofile` | name/id/entity | 只读反馈 | 只输出可点击引用，无返回值（7.6） |
 
@@ -84,32 +84,32 @@
 | 命令 | 原版形态 | 状态 | 当前入口与缺口 |
 | --- | --- | --- | --- |
 | `summon` | `<entity> [pos] [nbt]` | 完成 | `spawn("id", pos\|vec3) { ... }` 进入新实体上下文；初始 NBT 在召唤后合并；拒绝 `noSummon` 类型 |
-| `give` | `<players> <item> [count]` | 部分 | 目标必须是已声明玩家查询，物品必须是 `item_stack` 定义；缺内联任意组件与完整物品谓词（5.5） |
-| `kill` | `[targets]` | 部分 | 只有 `self.remove()`，无目标参数 |
-| `tag` | add/remove/list | 部分 | 只有 `self.add_tag`/`self.remove_tag`；多目标与 `list` 见 4.16 |
-| `team` | list/add/remove/empty/join/leave/modify（displayName/color/friendlyFire/seeFriendlyInvisibles/nametagVisibility/deathMessageVisibility/collisionRule/prefix/suffix） | 缺失 | 4.17 |
-| `attribute` | get；base set/get/reset；modifier add/remove/value get | 缺失 | 4.6 |
+| `give` | `<players> <item> [count]` | 完成 | 玩家查询/self/origin；物品定义或内联 item_stack；components 结构化 NBT 任意组件与组件删除（5.5） |
+| `kill` | `[targets]` | 完成 | kill([targets])，支持查询与当前实体；self.remove 保留 |
+| `tag` | add/remove/list | 完成 | tag.add/remove/list(targets,...)，支持多目标与物品过滤查询；self 方法保留（4.16） |
+| `team` | list/add/remove/empty/join/leave/modify（displayName/color/friendlyFire/seeFriendlyInvisibles/nametagVisibility/deathMessageVisibility/collisionRule/prefix/suffix） | 完成 | list/add/remove/empty/join/leave 与 modify 全部选项；名称、前后缀使用文本组件（4.17） |
+| `attribute` | get；base set/get/reset；modifier add/remove/value get | 完成 | get、base.get/set/reset、modifier.add/remove/value.get；单实体、资源位置、有限数值检查（4.6） |
 | `effect` | give（时长/等级/隐藏粒子/infinite）；clear | 完成 | `effect.give`、`effect.give_infinite`、`effect.clear`；秒数与等级按 26.3 范围编译期检查 |
-| `enchant` | `<targets> <enchantment> [level]` | 缺失 | 4.2 |
+| `enchant` | `<targets> <enchantment> [level]` | 完成 | enchant(targets,id[,level])；原版最高等级从附魔 JSON 提取并校验（4.2） |
 | `experience`（`xp`） | add/set/query（points/levels） | 完成 | `xp.add`/`xp.set`；`xp.query` 作为表达式，要求 `limit(1)` 玩家查询 |
-| `clear` | `[targets] [item] [maxCount]` | 完成 | `clear(玩家查询[, 物品][, 数量])`，数量上限 2147483647 |
-| `damage` | `<target> <amount> [damage_type] [at <pos>\|by <entity> [from <cause>]]` | 缺失 | 4.5 |
-| `teleport`（`tp`） | 坐标/实体/朝向 | 部分 | 已有 `pos`/`vec3`、`rotation` 与单个实体查询；缺 `facing` 与朝向变体（4.7） |
-| `ride` | mount/dismount | 缺失 | 4.8 |
-| `rotate` | rotation/facing | 缺失 | 4.9 |
-| `spreadplayers` | 中心/间距/范围 + `under` | 缺失 | 4.10 |
-| `spectate` | `[target] [player]` | 缺失 | 4.11 |
-| `swing` | `[targets] [hand] [animation] [duration]` | 缺失 | 4.12 |
-| `trigger` | add/set | 缺失 | `scoreboard.enable` 已能开启 `trigger` 目标；命令本身见 4.13 |
-| `gamemode` | `<mode> [players]` | 缺失 | 4.14 |
-| `defaultgamemode` | `<mode>` | 缺失 | 4.14 |
-| `difficulty` | 查询/设置 | 缺失 | 4.14 |
-| `spawnpoint` | `[players] [pos] [rotation]` | 缺失 | 4.15 |
-| `setworldspawn` | `[pos] [rotation]` | 缺失 | 4.15 |
-| `waypoint` | list；modify color（含 hex/reset）/style | 缺失 | 4.18 |
+| `clear` | `[targets] [item] [maxCount]` | 完成 | clear([players][,item_predicate或资源位置][,count])；self/省略玩家上下文、标签/通配/组件谓词，count=0 只计数 |
+| `damage` | `<target> <amount> [damage_type] [at <pos>\|by <entity> [from <cause>]]` | 完成 | damage(one,amount[,type[,at position或by entity from cause]])；单实体、非负浮点与注册表检查（4.5） |
+| `teleport`（`tp`） | 坐标/实体/朝向 | 完成 | pos/vec3、rotation、单实体目的地与 facing position/entity（feet/eyes）（4.7） |
+| `ride` | mount/dismount | 完成 | ride.mount(one,vehicle)、ride.dismount(one)（4.8） |
+| `rotate` | rotation/facing | 完成 | rotate.to(one,rotation)、rotate.facing(one,position或entity[,anchor])（4.9） |
+| `spreadplayers` | 中心/间距/范围 + `under` | 完成 | spreadplayers(vec2,spread,range,respect_teams,targets[,under height])（4.10） |
+| `spectate` | `[target] [player]` | 完成 | spectate([target[,player]])；单目标与玩家上下文检查（4.11） |
+| `swing` | `[targets] [hand] [animation] [duration]` | 完成 | swing([targets[,hand[,animation[,duration]]]])；mainhand/offhand、none/whack/stab，至少 1 刻（4.12） |
+| `trigger` | add/set | 完成 | trigger(objective[,add或set,value])；玩家上下文与 trigger 准则检查（4.13） |
+| `gamemode` | `<mode> [players]` | 完成 | gamemode(mode[,players])（4.14） |
+| `defaultgamemode` | `<mode>` | 完成 | defaultgamemode(mode)（4.14） |
+| `difficulty` | 查询/设置 | 完成 | difficulty([mode])；可作结果表达式（4.14） |
+| `spawnpoint` | `[players] [pos] [rotation]` | 完成 | spawnpoint([players[,pos[,rotation]]])，26.3 双分量朝向（4.15） |
+| `setworldspawn` | `[pos] [rotation]` | 完成 | setworldspawn([pos[,rotation]])，26.3 双分量朝向（4.15） |
+| `waypoint` | list；modify color（含 hex/reset）/style | 完成 | list、modify.color（颜色/hex/reset）、modify.style.set/reset（4.18） |
 | `emote`（`me`） | `<action>` | 等价覆盖 | `message.all` 已能广播文本 |
 | `kick` | `<players> [reason]` | 不可达 | 需要 ADMIN |
-| `list` | `[uuids]` | 缺失 | 只读反馈，低优先（7.5） |
+| `list` | `[uuids]` | 完成 | list([uuids布尔值])；反馈在线列表，结果为人数（7.5） |
 
 ### 2.3 世界与方块
 
@@ -203,36 +203,15 @@
 
 ### 阶段 4：实体与玩家命令族
 
-已完成：4.1、4.3、4.4（记录见 §四）。
-
-剩余：
-
-- [ ] 4.2 `enchant(targets, enchantment[, level])`。
-- [ ] 4.5 `damage(target, amount[, damage_type][, at pos | by entity [from cause]])`；枚举 damage_type 来自注册表。
-- [ ] 4.6 `attribute` 全子命令：`get`、`base set/get/reset`、`modifier add/remove/value get`。
-- [ ] 4.7 `teleport` 收尾：`facing` 与朝向变体（已有的 `pos`/`vec3`、`rotation` 与单个实体查询见 §四）。
-- [ ] 4.8 `ride.mount(target, vehicle)`、`ride.dismount(target)`。
-- [ ] 4.9 `rotate.to(target, rotation)`、`rotate.facing(target, ...)`。
-- [ ] 4.10 `spreadplayers(center, spread, max_range, respect_teams, targets)` 与 `under` 变体。
-- [ ] 4.11 `spectate([target, player])`。
-- [ ] 4.12 `swing([targets][, hand][, animation][, duration])`。
-- [ ] 4.13 `trigger(objective[, add|set value])`。
-- [ ] 4.14 `gamemode(mode[, players])`、`defaultgamemode(mode)`、`difficulty([mode])`。
-- [ ] 4.15 `spawnpoint([players][, pos][, rotation])`、`setworldspawn([pos][, rotation])`。
-- [ ] 4.16 `tag` 目标扩展：任意查询的 `tag.add/remove/list`，`self` 版本保留。
-- [ ] 4.17 `team` 全子命令，成员参数接受查询或玩家选择器。
-- [ ] 4.18 `waypoint.list/modify.color/modify.style`。
+全部完成（4.1–4.18，记录见 §四），无剩余。
 
 ### 阶段 5：物品、战利品与进度
 
-已完成：5.3（记录见 §四）。
+已完成：5.1、5.3、5.4、5.5（记录见 §四）。
 
 剩余：
 
-- [ ] 5.1 `loot` 全形态：上下文来源（loot table、fish、kill、mine）与投放目标（`give`、`insert`、`replace`、`spawn`）。
 - [ ] 5.2 `slot_source` 声明与 `item` 联动，替代 `give(..., self.item)` 中的内建空槽来源。
-- [ ] 5.4 `recipe.give/take`（含 `*`）。
-- [ ] 5.5 `clear` 与 `give` 使用完整的物品谓词（实体查询声明中的 `id[...]` 与槽位来源，见 §四）。
 
 ### 阶段 6：界面与感官
 
@@ -250,30 +229,21 @@
 
 ### 阶段 7：服务器数据与工具
 
-已完成：7.2、7.3（记录见 §四）。
+已完成：7.1–7.5（记录见 §四）；seed/version/help 仍按只读反馈处理。
 
 剩余：
 
-- [ ] 7.1 `random.roll`/`random.reset`（`random(1, 6)` 结果表达式已完成；sequence 参数受等级限制）。
-- [ ] 7.4 `reload()`、`datapack.enable/disable/list`。
-- [ ] 7.5 `list`：只读反馈，低优先；`seed`/`version`/`help` 归入只读反馈状态，不提供结构化入口，需要时用 `run`（计入 `--deny-raw`）。
 - [ ] 7.6 `fetchprofile`：只读反馈，暂不提供结构化入口；`serverpack` 归入仅开发构建，不进入标准层。
 - [ ] 7.7 `test`：归入测试工具，不提供结构化入口，需要时在开发构建中用 `run`。
 - [ ] 7.8 越级命令策略：`tick`、`debug`、`jfr`、`kick` 等 ADMIN/OWNER 命令在固定的 GAMEMASTER 等级下不可达，不提供结构化入口，只在校验诊断中说明权限缺口。
 
 ### 阶段 8：语言与工具体验
 
-已完成：8.1、8.2；8.6 的 LSP 与 VSCode 基础（记录见 §四）。
+已完成：8.1、8.2、8.3；8.6 的 LSP 与 VSCode 基础（记录见 §四）。
 
 剩余：
 
 - [ ] 8.1 收尾：未导入引用的诊断仍复用「找不到 X」并附导入提示，尚未在符号表标记“存在但未公开”的候选；不支持包管理、条件导入或跨项目共享模块。
-- [ ] 8.3 函数宏高级调用：`function <fn> with <source>` 与 `$(key)` 宏参数，用于文本、坐标与 NBT 动态参数。
-  - **评估结论：可以实现，运行时不需要新 ABI，但必须限制类型与调用面。** 26.3 的宏函数就是普通 `.mcfunction`，正文里的 `$(键)` 在调用时做文本替换；调用形式是 `function <fn> {键: "值"}`、`function <fn> with entity <选择器> <路径>`、`with block`、`with storage`。编译器可以把宏参数建模成一种新的形参类别（文本、坐标分量、NBT 片段、整数的十进制文本），在 `run` 字符串、方块 id、坐标、`text()`、`selector()` 等允许动态值的位置写 `$(参数名)`，代码生成时原样写进产物，并把该函数标记为宏函数。
-  - 静态检查能覆盖：模板里每个 `$(键)` 都有同名参数、参数表里的每个参数都被使用、同一文件里 `$(...)` 的键名集合一致（宏函数的键在运行期由调用点提供，缺键会在原版加载时报错，因此调用点必须列全）；`with` 的路径语法、目标实体上下文；普通 `call`/`schedule`/`fn_tag` 引用宏函数报错，宏函数形参表不能与计分参数混用。
-  - 无法覆盖：替换文本本身。调用点若提供的是运行期表达式（计分变量、NBT 读值），编译器只能退化为“任意文本”，无法保证替换后仍是合法命令；建议这类调用单独统计（计入 `--deny-raw` 的“不安全宏”计数）并在手册里明确标注。
-  - 主要技术风险：`with` 的运行期 NBT 只能检查路径与实体类型；宏函数不能返回 score（返回值语义与原生命令一致，需要单独设计）；双语言产物仍可保证逐字节一致，但与手写 `.mcfunction` 没有等价对照，只能用“同一实参 → 同一产物”的回归测试。
-  - 工作量：与 8.1 同量级（解析 + 模板校验 + 调用点代码生成 + 语料与文档），约 800–1200 行改动。
 - [ ] 8.4 静态命令校验与补全：现有 `run` 校验只覆盖根命令与权限，剩余参数形状校验与补全（结合 1.1 的命令树）。
 - [ ] 8.5 增量构建与源映射：只重建受影响函数，产物与源码行对应。
 - [ ] 8.6 语言服务器剩余：文档格式化、代码操作（快速修复）、点号成员（`self.*`、`effect.*` 等）补全与语义高亮；实体 NBT 键按上下文补全/悬停。
@@ -403,6 +373,16 @@
 - `tests/valid/`：`advancement`、`chinese_identifiers`、`components`、`conditions`、`data_ops`、`effects`、`entities`、`execute`、`expressions`、`language`、`loops`、`modules`、`multifile`、`nbt`、`raw`、`scoreboard`、`world` 等；`tests/dual` 双语往返。
 - `tests/invalid/`：模块、命名空间、语法负例与 `advancement_conditions`、`chinese_identifiers`、`context`、`execute`、`items`、`loops`、`nbt_tags`、`player_nbt`、`recursion`、`stopwatch_*`、`unknown_references`、`world` 等，文件头注释写明期望诊断。
 - `tests/corpus.rs`：语料编译、产物布局、重复构建一致性与版本数据校验。
+
+### 4.9 核心与实体命令补全（§2.1、§2.2）
+
+- **依据**：逐项核对随附 `FunctionCommand`/`MacroFunction`/`StringTemplate`、`RandomCommand`、`LootCommand`、`DataPackCommand` 与实体命令注册及执行逻辑；保留 GAMEMASTER 权限、测试工具和只读反馈边界。
+- **函数宏（8.3）**：`macro fn` 声明 integer/decimal/text/resource/nbt 参数；`call f(nbt {...})`、`call f with(entity|block|storage, ...[,path])`，含本地函数标签和外部函数/标签。检查必需键、类型、已知坐标范围、占位符声明/使用、执行上下文、同步递归；禁止普通计分调用、调度及无参函数条件误用宏。辅助函数自动转发参数，键保留原名。text/坐标宏可通过严格模式，运行期 with 和任意 nbt 片段计入不安全宏；未建模的动态注册表参数位置使用 run 模板。
+- **战利品与服务器工具（5.1/5.4/7.1/7.4/7.5）**：loot 四类来源及全部投放目标；recipe.give/take 与 *；random.value/roll/reset 的序列、种子与默认规则；reload、datapack 启用顺序/停用/列表，以及 list 的 UUID 选项。原版随机区间至少含两个整数，跨度小于 2147483647。
+- **实体命令（4.2、4.5–4.18）**：kill/tag 任意目标、enchant、damage、attribute 全子命令、teleport facing、ride、rotate、spreadplayers under、spectate、swing、trigger、游戏模式/难度、出生点、team 全选项与 waypoint 颜色/样式。目标基数、玩家上下文、有限数值和原版注册表在编译时检查；装备兼容性、实体是否具有属性、队伍/修饰器是否已创建等世界状态由服务器检查。
+- **物品组件与谓词（5.5）**：give 的内联 item_stack、components NBT 补丁和组件删除；clear 的标签/通配/存在/相等/子谓词/取反/任选条件；结构化 item_predicate 共用于查询与 execute if items。组件名和附魔等级来自新增版本数据。复杂组件 codec/schema 的字段级检查仍归阶段 9.3。
+- **结果与目标捕获**：新增命令可获取原生整数结果。带物品条件的查询先记录到编译器内部计分目标，再执行一次多目标命令；清理不覆盖结果或成功状态，也不把内部标签混入 tag.list。
+- **验收语料**：`tests/valid/{entity_commands,core_commands,item_components,macros,macro_sources}`；对应命令/宏负例包含期望诊断；`tests/command_outputs.rs` 检查真实产物、宏辅助函数转发、重复构建和严格模式。示例为 `entity_commands.mcl`、`core_commands.mcl`、`item_components.mcl`、`macro_demo/`，手册及双语翻译工具同步。
 
 ## 五、依赖关系与验收
 

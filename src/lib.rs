@@ -92,7 +92,7 @@ pub fn build_file(
     let raw_statements = raw_statement_count(&program.functions);
     if options.deny_raw && raw_statements > 0 {
         return Err(format!(
-            "严格模式拒绝构建：项目包含 {raw_statements} 条底层 run/execute 语句"
+            "严格模式拒绝构建：项目包含 {raw_statements} 条底层语句或不安全宏（run/execute/return run/运行期 with/nbt 宏片段）"
         ));
     }
     let pack = compile(
@@ -112,7 +112,14 @@ pub fn build_file(
 fn raw_statement_count(functions: &[ast::Function]) -> usize {
     functions
         .iter()
-        .map(|function| raw_count_in_block(&function.body) + usize::from(function.macro_signature.as_ref().is_some_and(|s| s.parameters.iter().any(|p| p.kind == ast::MacroType::Nbt))))
+        .map(|function| {
+            raw_count_in_block(&function.body)
+                + usize::from(
+                    function.macro_signature.as_ref().is_some_and(|s| {
+                        s.parameters.iter().any(|p| p.kind == ast::MacroType::Nbt)
+                    }),
+                )
+        })
         .sum()
 }
 
@@ -120,7 +127,9 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
     statements
         .iter()
         .map(|statement| match &statement.kind {
-            ast::StatementKind::MacroCall { arguments, .. } => usize::from(matches!(arguments, ast::MacroArguments::With { .. })),
+            ast::StatementKind::MacroCall { arguments, .. } => {
+                usize::from(matches!(arguments, ast::MacroArguments::With { .. }))
+            }
             ast::StatementKind::CoreCommand(_) | ast::StatementKind::EntityCommand(_) => 0,
             ast::StatementKind::Run(_) => 1,
             ast::StatementKind::Return(ast::ReturnKind::Run(_)) => 1,

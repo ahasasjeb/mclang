@@ -1,0 +1,3 @@
+// expect: 六位 RGB
+namespace bad;
+@entity fn main() { waypoint.modify.color.hex(self, "#123456"); }

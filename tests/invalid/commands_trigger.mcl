@@ -1,0 +1,4 @@
+// expect: criteria = "trigger"
+namespace bad;
+objective ordinary;
+@player fn main() { trigger(ordinary); }

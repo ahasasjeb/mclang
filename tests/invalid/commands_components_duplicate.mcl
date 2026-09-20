@@ -1,0 +1,7 @@
+// expect: 与具名属性冲突
+namespace bad;
+item pick = item_stack("minecraft:diamond_pickaxe") {
+    damage = 2;
+    components = nbt { "minecraft:damage" = 1; };
+}
+fn main() {}

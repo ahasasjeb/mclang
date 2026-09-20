@@ -137,7 +137,11 @@ impl Compiler<'_> {
     pub(super) fn component_holder(&self, holder: &Holder) -> String {
         match holder {
             Holder::SelfEntity | Holder::Origin => "@s".to_owned(),
-            Holder::Query(name, _) => entity_query_selector(self.query(name)),
+            Holder::Query(name, _) => self
+                .selector_overrides
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| entity_query_selector(self.query(name))),
         }
     }
 }

@@ -1,0 +1,4 @@
+// expect: 必须匹配 minecraft:player
+namespace bad;
+query zombie = entity("minecraft:zombie") { limit(1); }
+fn main() { spectate(zombie, zombie); }

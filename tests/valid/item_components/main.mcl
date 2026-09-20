@@ -1,5 +1,8 @@
 namespace item_components;
 query players = entity("minecraft:player") {}
+query equipped = entity("minecraft:player") {
+    item("weapon.mainhand") { id = item_predicate("*") { has("minecraft:custom_data"); }; }
+}
 item tool = item_stack("minecraft:diamond_pickaxe") {
     components = nbt {
         "minecraft:custom_data" = { owner = "Alex"; };
@@ -22,4 +25,14 @@ fn inventory() {
         matches("minecraft:count", nbt { min = 1; max = 64; });
     }, 0);
     clear(players, "#minecraft:logs", 10);
+    clear(equipped);
+    if items(entity, players, "weapon.mainhand", item_predicate("*") { equals("minecraft:damage", 0); }) {
+        message.all("Ready");
+    }
+}
+
+@player fn sender_inventory() {
+    clear();
+    clear(self, "minecraft:stone", 0);
+    give(self, item_stack("minecraft:stone") {});
 }

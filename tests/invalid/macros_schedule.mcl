@@ -1,0 +1,4 @@
+// expect: 不能调度需要 1 个参数
+namespace bad;
+macro fn greet(text label) { message.all(text("$(label)")); }
+fn main() { schedule greet() after 1 s; }

@@ -1,0 +1,3 @@
+// expect: 下界小于上界
+namespace bad;
+fn main() { random.value(1, 1); }

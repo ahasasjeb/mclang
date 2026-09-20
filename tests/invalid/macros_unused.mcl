@@ -1,0 +1,3 @@
+// expect: 未在函数中使用
+namespace bad;
+macro fn greet(text label) { message.all("hello"); }

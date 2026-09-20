@@ -3,7 +3,9 @@ use super::*;
 impl Coordinate {
     pub fn text(&self) -> &str {
         match self {
-            Self::Macro(text) | Self::Absolute(text) | Self::Relative(text) | Self::Local(text) => text,
+            Self::Macro(text) | Self::Absolute(text) | Self::Relative(text) | Self::Local(text) => {
+                text
+            }
         }
     }
 

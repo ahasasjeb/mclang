@@ -21,4 +21,5 @@ fn invoke() {
     call "external:plain"();
     call "#external:tag"(nbt { note = "test"; });
     schedule "external:plain"() after 1 s;
+    schedule.clear("external:plain");
 }

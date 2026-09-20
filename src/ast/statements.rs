@@ -2,7 +2,10 @@ use super::*;
 
 #[derive(Debug)]
 pub enum StatementKind {
-    MacroCall { target: CallTarget, arguments: MacroArguments },
+    MacroCall {
+        target: CallTarget,
+        arguments: MacroArguments,
+    },
     CoreCommand(Box<CoreCommand>),
     EntityCommand(Box<EntityCommand>),
     Run(String),

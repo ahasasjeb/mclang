@@ -1,0 +1,18 @@
+namespace filtered_targets;
+query armed = entity("minecraft:player") {
+    item("weapon.mainhand") { id = item_predicate("*") { has("minecraft:custom_data"); }; }
+}
+query one = entity("minecraft:player") {
+    limit(1);
+    item("weapon.mainhand") { id = "minecraft:diamond_sword"; }
+}
+objective result_value;
+@player fn commands() {
+    let total = tag.list(armed);
+    tag.add(armed, "equipped");
+    recipe.give(armed, *);
+    loot.give(armed, loot.kill(one));
+    damage(one, 1, "minecraft:generic", by self);
+    teleport(armed, pos(0, 64, 0), facing one, eyes);
+    execute store.success(self, result_value) { tag.remove(armed, "equipped"); }
+}

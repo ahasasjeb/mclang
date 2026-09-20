@@ -1862,6 +1862,138 @@ cargo run -- check examples/multi_counter --deny-raw
 | `module_demo/` | 最小模块项目：`import lib::math::{sum, product}` 与 `export` 的产物路径 |
 | `bounty_hunter/` | 进度事件、触发器条件、连杀结算与里程碑播报的大型示例 |
 
+## 核心与实体命令补全 {#command-completion}
+
+本节对应开发计划 §2.1、§2.2，命令形状以随附的 26.3-rc-2 源码为准。新增命令都可以直接写成语句，也可把原版整数结果用于表达式，例如 `let total = tag.list(players);`、`let health = attribute.get(one, "minecraft:max_health", 100);`。查询失败时结果为 0。函数宏使用下文单独的调用形式。
+
+实体参数使用已声明查询或 `self`。`damage`、`attribute`、`ride`、`rotate`、`spectate` 的被观察目标、路径点以及 `loot.kill` 都要求单实体，查询必须声明 `limit(1)`；玩家参数还要求查询匹配 `minecraft:player`。省略目标的 `kill`、`swing` 需要实体上下文，`spectate`、`gamemode`、`spawnpoint`、`clear` 需要玩家上下文。`trigger` 只能在玩家上下文执行，目标准则必须是 `trigger`。
+
+带物品过滤条件的查询仍可作为新增命令的目标。编译器先用内部计分目标记录匹配实体，再执行一次原生命令，并在清理后保留命令的结果与成功状态。这样 `tag.list` 仍查询整个实体集合，`loot` 也不会因为逐实体展开而重复抽取战利品。
+
+### 战利品、配方、随机与数据包
+
+```mcl
+loot.give(players, loot.table(treasure));
+loot.insert(pos(0, 64, 0), loot.kill(one));
+loot.spawn(vec3(~, ~1, ~), loot.mine(pos(~, ~-1, ~), mainhand));
+loot.replace(entity, one, "weapon.mainhand", 1, loot.table("minecraft:chests/simple_dungeon"));
+loot.replace(block, pos(0, 64, 0), "container.0", loot.fish("minecraft:gameplay/fishing", pos(0, 62, 0), fishing_rod));
+recipe.give(players, *);
+recipe.take(players, declared_recipe);
+let roll_result = random.roll(1, 6, "demo:dice");
+let sample = random.value(-10, 10);
+random.reset("demo:dice");
+random.reset(*, 42, false, true);
+reload();
+datapack.enable("file/example", before, "vanilla");
+datapack.disable("file/example");
+datapack.list(enabled);
+```
+
+`loot.table`、`loot.fish` 的表可以是本模块声明的资源名或外部资源位置字符串。`fish`、`mine` 的工具可省略，或使用物品定义、`mainhand`、`offhand`；手持工具要求实体上下文。`loot.replace` 的数量可省略，也可以为 0；起始槽位必须是单槽位，不能使用槽位范围或 `slot_source`。
+
+`recipe.give/take` 接受资源名、资源位置或 `*`。`random.value/roll(min, max[, sequence])` 使用闭区间，必须至少包含两个整数，且上下界之差小于 2147483647；`roll` 会广播结果。旧的 `random(min, max)` 保留为无序列的结果表达式。`random.reset(sequence[, seed[, include_world_seed[, include_sequence_id]]])` 的种子盐值是有符号 32 位整数；`*` 重置所有序列，带种子时还设置新序列的默认生成规则。
+
+`datapack.enable(name[, first|last|before|after[, existing]])` 中，`before/after` 必须提供参照包。`datapack.list()` 列出所有包，参数可为 `available` 或 `enabled`。包的当前启用状态由服务器在运行时检查。`datapack.create` 和 `kick` 超过默认函数权限，编译器拒绝；`test` 与 `fetchprofile` 保持开发计划中的测试工具、只读反馈定位。
+
+### 实体、队伍与路径点
+
+| 入口 | 参数与行为 |
+| --- | --- |
+| `kill([targets])` | 移除指定实体；省略时是当前实体 |
+| `tag.add/remove(targets, "tag")`、`tag.list(targets)` | 多目标标签操作；`self.add_tag/remove_tag` 仍可使用 |
+| `enchant(targets, "id"[, level])` | 等级下界为 0，原版附魔的最高等级来自版本快照；当前装备与兼容性在运行时检查 |
+| `damage(one, amount[, "type"[, at position]])` | 非负浮点伤害，可指定伤害位置 |
+| `damage(one, amount, "type", by entity [from cause])` | 直接实体与间接来源都要求单实体；与 `at` 互斥 |
+| `attribute.get/base.get(one, "id"[, scale])` | 获取缩放后的整数结果 |
+| `attribute.base.set(one, "id", value)`、`attribute.base.reset(one, "id")` | 设置或恢复属性基值 |
+| `attribute.modifier.add(one, "id", "modifier_id", value, operation)` | 运算为 `add_value`、`add_multiplied_base`、`add_multiplied_total` |
+| `attribute.modifier.remove(one, "id", "modifier_id")` | 移除修饰器 |
+| `attribute.modifier.value.get(one, "id", "modifier_id"[, scale])` | 获取修饰器数值 |
+| `ride.mount(one, vehicle)`、`ride.dismount(one)` | 乘骑与下乘；骑乘关系由服务器检查 |
+| `rotate.to(one, rotation(yaw, pitch))` | 设置单实体朝向 |
+| `rotate.facing(one, position)`、`rotate.facing(one, entity[, feet|eyes])` | 面向坐标或实体，默认脚部 |
+| `teleport(targets, position, facing entity[, feet|eyes])` | 补全传送的实体朝向；也可写 `facing position` |
+| `spreadplayers(vec2(x, z), spread, range, respect_teams, targets[, under height])` | 间距至少 0，范围至少 1；最高高度为有符号整数 |
+| `spectate([target[, player]])` | 开始旁观，或无参数结束当前玩家的旁观；玩家须处于旁观模式 |
+| `swing([targets[, mainhand|offhand[, none|whack|stab[, duration]]]])` | 挥动动画，时长至少 1 游戏刻 |
+| `trigger(objective[, add|set, value])` | 触发已启用的目标，默认加 1；执行后原版会锁定目标 |
+| `gamemode(mode[, players])`、`defaultgamemode(mode)` | `survival/creative/adventure/spectator` |
+| `difficulty([mode])` | 查询或设置 `peaceful/easy/normal/hard` |
+| `spawnpoint([players[, pos[, rotation]]])`、`setworldspawn([pos[, rotation]])` | 26.3 的出生朝向包含 yaw、pitch 两个分量 |
+| `list([uuids])` | 布尔参数控制是否显示 UUID；结果为在线玩家数量 |
+
+`team.list(["name"])`、`team.add("name"[, component])`、`team.remove/empty("name")`、`team.join("name"[, members])`、`team.leave(members)` 覆盖队伍生命周期。成员可以是实体查询、`self`、玩家名称字符串或 `"*"`；省略 `join` 成员时使用当前实体。
+
+`team.modify.<option>("name", value)` 支持 `display_name`、`prefix`、`suffix` 文本组件，`color` 颜色或 `reset`，`friendly_fire`、`see_friendly_invisibles` 布尔值。`nametag_visibility` 和 `death_message_visibility` 可取 `always/never/hide_for_other_teams/hide_for_own_team`；`collision_rule` 可取 `always/never/push_own_team/push_other_teams`。
+
+`waypoint.list()` 列出当前维度路径点；`waypoint.modify.color(one, color)`、`.color.hex(one, "RRGGBB")`、`.color.reset(one)` 修改或重置颜色；`.style.set(one, "namespace:style")`、`.style.reset(one)` 修改或重置客户端样式。十六进制颜色不带 `#`。路径点样式是资源包资产，这里检查资源位置，不生成资源包。
+
+### 任意物品组件与结构化谓词
+
+物品定义和 `give` 的内联 `item_stack(...) { ... }` 都支持 `components = nbt { ... };`。键是组件资源位置，值使用结构化 NBT；删除组件写成 `"!minecraft:组件" = {};`。组件名对照 26.3 注册表，重复设置、与已有具名属性冲突以及常用数值范围会报错。复杂组件内部 schema 属于资源 schema 阶段，最终由原版 codec 检查。
+
+`item_predicate("id/#tag/*") { ... }` 可用于 `clear`、`if items` 和查询的 `item(...){ id = ...; }`。`has` 检查存在，`equals` 检查组件完整相等，`matches` 使用组件子谓词；前缀 `!` 取反，`||` 连接任选条件，不同分号分隔的条件必须全部满足。`minecraft:count` 是原版提供的数量伪组件。
+
+```mcl title="item_predicates.mcl" verify id=item_predicates
+namespace item_predicates;
+query players = entity("minecraft:player") {}
+fn inventory() {
+    give(players, item_stack("minecraft:stone") {
+        components = nbt {
+            "minecraft:max_stack_size" = 99;
+            "minecraft:custom_data" = { group = "building"; };
+        };
+    }, 100);
+    clear(players, item_predicate("*") {
+        has("minecraft:custom_data");
+        !has("minecraft:damage") || equals("minecraft:damage", 0);
+        matches("minecraft:custom_data", nbt { group = "building"; });
+    }, 0);
+}
+```
+
+`clear(..., 0)` 只计数。`clear()` 和 `clear(self, ...)` 可在玩家上下文使用，`give(self, item_stack(...){...})` 亦然。`give` 接收具体物品堆；标签、通配和物品谓词用于筛选，不能作为给予的物品。
+
+### 函数宏与原生参数来源
+
+`macro fn` 的参数按 `类型 名称` 声明，类型为 `integer`、`decimal`、`text`、`resource`、`nbt`。宏参数不是计分变量，不能与普通计分参数混合。文本和 NBT 字符串中的 `$(名称)` 会生成原版宏占位符；坐标或朝向分量写成 `macro(名称)`，要求整数或小数类型，方块坐标要求整数。宏不能作为 `@load/@tick` 入口，也不能声明 `-> score`。
+
+```mcl title="function_macros.mcl" verify id=function_macros
+namespace function_macros;
+query players = entity("minecraft:player") {}
+score active = 1;
+macro fn welcome(text label, integer x, decimal z) {
+    message.all(text("Hello $(label)"));
+    teleport(players, vec3(macro(x), 64, macro(z)));
+    if active == 1 { message.all(text("$(label) arrived")); }
+}
+fn_tag greetings { value(welcome); }
+fn invoke() {
+    call welcome(nbt { label = "Alex"; x = 5; z = 0.5d; });
+    call #greetings(nbt { label = "Steve"; x = 6; z = 1.5d; });
+    call "external:plain"();
+    schedule "external:plain"() after 1 s;
+    schedule.clear("external:plain");
+}
+```
+
+字面量调用检查必需键、参数类型和已知坐标范围；额外键遵循原版规则忽略。每个占位符必须有声明，每个宏参数必须被使用。`text` 参数禁止引号、反斜杠、控制字符和二次占位符，避免破坏生成的字符串。宏参数键保留原名，模块函数名仍按语言规则重写；嵌套的条件、循环和执行块会自动转发宏参数。
+
+运行期来源使用以下形式，末尾路径可省略。来源必须在运行时提供复合标签；实体来源要求单实体，允许读取玩家数据。
+
+```mcl
+call welcome with(storage, "demo:args", "payload");
+call welcome with(block, pos(0, 64, 0), "data");
+call welcome with(entity, one, "data");
+call "external:macro"(nbt { key = "value"; });
+call "#external:macros" with(storage, "demo:args");
+```
+
+`with` 来源不能在编译时验证实际键和值，因此计入 `--deny-raw`。`nbt` 类型用于 `run` 模板中的完整 SNBT 片段，也计入不安全宏；资源 id 等未建模动态位置可通过 `run` 模板表达。普通 `call f(...)`、表达式调用、无参数标签调用和 `schedule` 不能调用需要宏参数的函数；标签宏调用会逐个检查本地成员的参数和执行上下文。`schedule.clear` 只能清除函数，原版不接受 `#标签`。
+
+完整示例见 `examples/entity_commands.mcl`、`core_commands.mcl`、`item_components.mcl` 和 `macro_demo/`，均通过严格模式和双语产物对比。
+
 ## 附录 A：语言关键词总表 {#appendix-keywords}
 
 关键词、函数属性与方法/枚举的中英写法完全等价；构造器关键词（`pos`、`block_state`、`entity` 等）与声明名保持 ASCII。

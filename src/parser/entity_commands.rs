@@ -7,14 +7,25 @@ mod teams;
 
 impl Parser {
     pub(in crate::parser) fn take_command_word(&mut self, word: &str) -> bool {
-        if self.check_word(word) || matches!(&self.current().kind, TokenKind::Ident(value) if super::keywords::command_value(value) == Some(word)) {
-            self.advance(); true
-        } else { false }
+        if self.check_word(word)
+            || matches!(&self.current().kind, TokenKind::Ident(value) if super::keywords::command_value(value) == Some(word))
+        {
+            self.advance();
+            true
+        } else {
+            false
+        }
     }
 
     fn expect_command_word(&mut self, word: &str) -> Result<(), Diagnostic> {
-        if self.take_command_word(word) { Ok(()) }
-        else { Err(Diagnostic::new(format!("这里需要 `{word}`"), self.current().span)) }
+        if self.take_command_word(word) {
+            Ok(())
+        } else {
+            Err(Diagnostic::new(
+                format!("这里需要 `{word}`"),
+                self.current().span,
+            ))
+        }
     }
     pub(in crate::parser) fn command_boolean(&mut self) -> Result<bool, Diagnostic> {
         let (value, span) = self.ident("布尔值 true/false")?;

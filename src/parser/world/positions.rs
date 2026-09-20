@@ -162,7 +162,9 @@ impl Parser {
 
     /// 精确坐标分量：`coordinate` 的小数版本。
     fn fractional_coordinate(&mut self, label: &str) -> Result<Coordinate, Diagnostic> {
-        if let Some(value) = self.macro_coordinate(false)? { return Ok(value); }
+        if let Some(value) = self.macro_coordinate(false)? {
+            return Ok(value);
+        }
         if let Some(token) = self.take(&TokenKind::Tilde) {
             let offset = self.coordinate_offset(label, &token)?;
             return Ok(Coordinate::Relative(format!("~{offset}")));
@@ -241,7 +243,9 @@ impl Parser {
 
     /// 一个坐标分量：绝对整数、`~[±数]` 或 `^[±数]`。
     fn coordinate(&mut self, label: &str) -> Result<Coordinate, Diagnostic> {
-        if let Some(value) = self.macro_coordinate(true)? { return Ok(value); }
+        if let Some(value) = self.macro_coordinate(true)? {
+            return Ok(value);
+        }
         if let Some(token) = self.take(&TokenKind::Tilde) {
             let offset = self.coordinate_offset(label, &token)?;
             return Ok(Coordinate::Relative(format!("~{offset}")));

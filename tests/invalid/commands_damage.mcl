@@ -1,0 +1,3 @@
+// expect: 伤害值
+namespace bad;
+@entity fn main() { damage(self, -1); }

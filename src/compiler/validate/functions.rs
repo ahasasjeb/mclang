@@ -102,7 +102,11 @@ pub(super) fn validate_function_bodies(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for function in &program.functions {
-        let function_declarations = program.functions.iter().map(|f| (f.name.as_str(), f)).collect();
+        let function_declarations = program
+            .functions
+            .iter()
+            .map(|f| (f.name.as_str(), f))
+            .collect();
         let loot_tables = program
             .resources
             .iter()

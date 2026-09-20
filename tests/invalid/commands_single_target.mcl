@@ -1,0 +1,4 @@
+// expect: 必须使用 limit(1)
+namespace bad;
+query zombies = entity("minecraft:zombie") {}
+fn main() { damage(zombies, 1); }

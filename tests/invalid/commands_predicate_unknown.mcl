@@ -1,0 +1,3 @@
+// expect: 未知组件条件
+namespace bad;
+@player fn main() { clear(self, item_predicate("*") { has("minecraft:not_real"); }); }

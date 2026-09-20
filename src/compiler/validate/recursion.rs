@@ -53,13 +53,23 @@ fn collect_synchronous_calls<'a>(
 ) {
     for statement in statements {
         match &statement.kind {
-            StatementKind::MacroCall { target: CallTarget::Function(name), .. } => { calls.insert(name); }
-            StatementKind::MacroCall { target: CallTarget::Tag(name), .. } => { calls.extend(reachable_functions(name, tags)); }
-            StatementKind::MacroCall { .. } => {},
+            StatementKind::MacroCall {
+                target: CallTarget::Function(name),
+                ..
+            } => {
+                calls.insert(name);
+            }
+            StatementKind::MacroCall {
+                target: CallTarget::Tag(name),
+                ..
+            } => {
+                calls.extend(reachable_functions(name, tags));
+            }
+            StatementKind::MacroCall { .. } => {}
             StatementKind::CoreCommand(_) | StatementKind::EntityCommand(_) => {}
             StatementKind::Call { target, arguments } => {
                 match target {
-                    CallTarget::External(_) => {},
+                    CallTarget::External(_) => {}
                     CallTarget::Function(function) => {
                         calls.insert(function);
                     }

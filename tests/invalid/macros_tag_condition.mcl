@@ -1,0 +1,5 @@
+// expect: 需要参数
+namespace bad;
+macro fn greet(text label) { message.all(text("$(label)")); }
+fn_tag group { value(greet); }
+fn main() { if function(#group) { message.all("ok"); } }

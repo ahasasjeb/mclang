@@ -325,7 +325,10 @@ pub(super) fn collect_signatures<'a>(
             function.name.as_str(),
             Signature {
                 is_macro: function.macro_signature.is_some(),
-                parameters: function.macro_signature.as_ref().map_or(function.parameters.len(), |m| m.parameters.len()),
+                parameters: function
+                    .macro_signature
+                    .as_ref()
+                    .map_or(function.parameters.len(), |m| m.parameters.len()),
                 returns_score: function.returns_score,
                 required_context: function_context(function),
             },

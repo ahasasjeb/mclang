@@ -107,11 +107,20 @@ fn invalid_corpus_is_rejected() {
             if path.is_dir() {
                 stack.push(path);
             } else if path.extension().and_then(|value| value.to_str()) == Some("mcl") {
-                assert!(
-                    check_file(&path).is_err(),
-                    "tests/invalid/{} 应当被拒绝",
-                    path.display()
-                );
+                let error = check_file(&path)
+                    .expect_err(&format!("tests/invalid/{} 应当被拒绝", path.display()));
+                let source = fs::read_to_string(&path).expect("无法读取错误语料");
+                if let Some(expected) = source
+                    .lines()
+                    .next()
+                    .and_then(|line| line.strip_prefix("// expect: "))
+                {
+                    assert!(
+                        error.contains(expected),
+                        "{} 应当报告 `{expected}`，实际：\n{error}",
+                        path.display()
+                    );
+                }
                 checked += 1;
             }
         }

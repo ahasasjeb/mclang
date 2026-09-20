@@ -11,21 +11,46 @@ impl Compiler<'_> {
 
     /// `teleport(持有者, 坐标或实体查询[, rotation(朝向)])`：`tp @s` 到坐标或单个实体。
     pub(in crate::compiler::codegen) fn compile_teleport(
+        &mut self,
+        targets: &Holder,
+        destination: &TeleportDestination,
+        rotation: Option<&crate::ast::Facing>,
+        owner: &str,
+        commands: &mut Vec<String>,
+    ) {
+        let destination_holder = match destination {
+            TeleportDestination::Entity { query, query_span } => {
+                Some(Holder::Query(query.clone(), *query_span))
+            }
+            _ => None,
+        };
+        let mut holders: Vec<&Holder> = destination_holder.iter().collect();
+        if let Some(crate::ast::Facing::Entity { target, .. }) = rotation {
+            holders.push(target);
+        }
+        let command = self.capture_command_targets(&holders, owner, |compiler| {
+            compiler.teleport_text(targets, destination, rotation)
+        });
+        commands.push(command);
+    }
+
+    fn teleport_text(
         &self,
         targets: &Holder,
         destination: &TeleportDestination,
         rotation: Option<&crate::ast::Facing>,
-        commands: &mut Vec<String>,
-    ) {
+    ) -> String {
         let prefix = self.score_holder_prefix(targets);
         let destination = match destination {
             TeleportDestination::Position(position) => world::position_value_text(position),
-            TeleportDestination::Entity { query, .. } => entity_query_selector(self.query(query)),
+            TeleportDestination::Entity { query, query_span } => {
+                self.component_holder(&Holder::Query(query.clone(), *query_span))
+            }
         };
         let rotation = rotation
             .map(|rotation| format!(" {}", self.facing_text(rotation)))
             .unwrap_or_default();
-        commands.push(format!("{prefix}tp @s {destination}{rotation}"));
+        format!("{prefix}tp @s {destination}{rotation}")
     }
 
     /// 计分操作的上下文前缀：`@s` 是当前实体、投掷者还是查询命中的实体。
@@ -148,7 +173,10 @@ impl Compiler<'_> {
                 command.push_str(&format!(" {max_count}"));
             }
         }
-        let prefix = target.as_ref().map(|target| self.score_holder_prefix(target)).unwrap_or_default();
+        let prefix = target
+            .as_ref()
+            .map(|target| self.score_holder_prefix(target))
+            .unwrap_or_default();
         commands.push(format!("{prefix}{command}"));
     }
 

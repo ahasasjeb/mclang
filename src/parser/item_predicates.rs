@@ -15,6 +15,12 @@ impl Parser {
         self.expect_word("item_predicate")?;
         self.expect(TokenKind::LeftParen, "item_predicate 后需要 `(`")?;
         let item = self.string("物品、#标签或 *")?.0;
+        if item.contains('[') {
+            return Err(Diagnostic::new(
+                "item_predicate 的基项只接受物品、#标签或 *，组件条件请写在块内",
+                start,
+            ));
+        }
         self.expect(TokenKind::RightParen, "物品谓词缺少 `)`")?;
         self.expect(TokenKind::LeftBrace, "物品谓词需要 `{`")?;
         let mut clauses = Vec::new();

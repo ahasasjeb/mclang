@@ -1,0 +1,4 @@
+// expect: text 不能含引号
+namespace bad;
+macro fn greet(text label) { message.all(text("$(label)")); }
+fn main() { call greet(nbt { label = "\"injected\""; }); }

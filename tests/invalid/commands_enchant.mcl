@@ -1,0 +1,3 @@
+// expect: 最高等级为 5
+namespace bad;
+@player fn main() { enchant(self, "minecraft:sharpness", 6); }

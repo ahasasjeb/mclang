@@ -1,0 +1,3 @@
+// expect: 必须是单槽位
+namespace bad;
+fn main() { loot.replace(block, pos(0, 64, 0), "container.*", loot.table("minecraft:empty")); }

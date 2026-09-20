@@ -24,6 +24,7 @@ impl Compiler<'_> {
         }
         match &expression.kind {
             ExprKind::CoreCommand(command) => {
+                let native = self.core_command(command, owner);
                 let result = self.temporary();
                 commands.push(format!(
                     "scoreboard players set {result} {} 0",
@@ -31,12 +32,12 @@ impl Compiler<'_> {
                 ));
                 commands.push(format!(
                     "execute store result score {result} {} run {}",
-                    self.objective,
-                    self.core_command_text(command)
+                    self.objective, native
                 ));
                 Value::Score(result)
             }
             ExprKind::EntityCommand(command) => {
+                let native = self.entity_command(command, owner);
                 let result = self.temporary();
                 commands.push(format!(
                     "scoreboard players set {result} {} 0",
@@ -44,8 +45,7 @@ impl Compiler<'_> {
                 ));
                 commands.push(format!(
                     "execute store result score {result} {} run {}",
-                    self.objective,
-                    self.entity_command_text(command)
+                    self.objective, native
                 ));
                 Value::Score(result)
             }
@@ -373,7 +373,8 @@ impl Compiler<'_> {
             } => self.compile_atomic_condition(
                 format!(
                     "items {} {slots} {}",
-                    self.item_condition_source_text(source), super::emit::item_predicate_text(item)
+                    self.item_condition_source_text(source),
+                    super::emit::item_predicate_text(item)
                 ),
                 commands,
             ),

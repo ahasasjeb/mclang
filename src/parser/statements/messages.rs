@@ -244,7 +244,9 @@ impl Parser {
     }
 
     pub(in crate::parser) fn call_target(&mut self, label: &str) -> Result<CallTarget, Diagnostic> {
-        if matches!(self.current().kind, TokenKind::String(_)) { return Ok(CallTarget::External(self.string(label)?.0)); }
+        if matches!(self.current().kind, TokenKind::String(_)) {
+            return Ok(CallTarget::External(self.string(label)?.0));
+        }
         if self.take(&TokenKind::Hash).is_some() {
             let (name, _) = self.ident("函数标签名称")?;
             Ok(CallTarget::Tag(name))

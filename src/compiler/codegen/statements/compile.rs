@@ -40,10 +40,12 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         match &statement.kind {
-            StatementKind::MacroCall { target, arguments } => commands.push(self.macro_call_text(target, arguments)),
-            StatementKind::CoreCommand(command) => commands.push(self.core_command_text(command)),
+            StatementKind::MacroCall { target, arguments } => {
+                commands.push(self.macro_command(target, arguments, owner))
+            }
+            StatementKind::CoreCommand(command) => commands.push(self.core_command(command, owner)),
             StatementKind::EntityCommand(command) => {
-                commands.push(self.entity_command_text(command))
+                commands.push(self.entity_command(command, owner))
             }
             StatementKind::Run(command) => commands.push(command.clone()),
             StatementKind::Each { query, body } => {
@@ -239,10 +241,10 @@ impl Compiler<'_> {
                 delay,
                 mode,
             } => self.compile_schedule(target, delay, *mode, commands),
-            StatementKind::ScheduleClear { function } => {
+            StatementKind::ScheduleClear { target } => {
                 commands.push(format!(
-                    "schedule clear {}:{function}",
-                    self.program.namespace
+                    "schedule clear {}",
+                    self.function_target_text(target)
                 ));
             }
             StatementKind::Assign {
@@ -284,7 +286,7 @@ impl Compiler<'_> {
                 destination,
                 rotation,
             } => {
-                self.compile_teleport(targets, destination, rotation.as_ref(), commands);
+                self.compile_teleport(targets, destination, rotation.as_ref(), owner, commands);
             }
             StatementKind::ItemAction {
                 method,
