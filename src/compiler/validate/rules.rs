@@ -61,13 +61,7 @@ pub(super) fn valid_resource_location(value: &str) -> bool {
 }
 
 pub(super) fn valid_nbt_path(path: &str) -> bool {
-    !path.is_empty()
-        && path.split('.').all(|segment| {
-            !segment.is_empty()
-                && segment
-                    .chars()
-                    .all(|character| character.is_ascii_alphanumeric() || character == '_')
-        })
+    crate::ast::NbtPath::parse(path).is_ok()
 }
 
 pub(super) fn valid_entity_tag(tag: &str) -> bool {
