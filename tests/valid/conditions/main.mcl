@@ -5,6 +5,7 @@
 namespace conditions_test;
 
 score ready = 0;
+score side_effects = 0;
 objective points;
 
 query zombies = entity("minecraft:zombie") { limit(1); };
@@ -13,6 +14,22 @@ resource predicate conditions_predicate = """{"type":"minecraft:random_chance","
 
 fn check_ready() -> score {
     return 1;
+}
+
+fn mark_side_effect() -> score {
+    side_effects += 1;
+    return 1;
+}
+
+// The generated calls must be guarded: `&&` skips the call after a false
+// left side, while `||` skips it after a true left side.
+fn short_circuit_probe() {
+    if ready == 1 && mark_side_effect() == 1 {
+        ready = 2;
+    }
+    if ready == 2 || mark_side_effect() == 1 {
+        ready = 3;
+    }
 }
 
 fn_tag group {

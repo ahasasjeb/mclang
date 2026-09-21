@@ -537,7 +537,7 @@ data_slot note = entity_data("pc_note.name");
 resource predicate <name> = """{ ... }""";
 ```
 
-声明一份原样写出的 JSON 资源，编译后保存到 `data/<命名空间>/<类型>/<名称>.json`。可用的类型是 26.3 的资源目录名（见[附录 C](#appendix-registry)），其中 `predicate` 可以在条件里用 `if predicate(<name>)` 引用；其他类型写英文名称，带斜杠的类型要写成字符串名称（例如 `"worldgen/feature/example"`）。JSON 会在编译期解析，格式错误直接报告行列位置，输出时统一重排为两空格缩进。`predicate` 的正文是内联战利品条件，26.3 的判别键 `type` 必填（`condition` 只用于引用谓词资源）。
+声明一份原样写出的 JSON 资源，编译后保存到 `data/<命名空间>/<类型>/<名称>.json`。可用的类型是 26.3 的资源目录名（见[附录 C](#appendix-registry)），其中 `predicate` 可以在条件里用 `if predicate(<name>)` 引用；常用的 `recipe`、`predicate`、`dialog` 可写中文 `配方`、`谓词`、`对话框`，其他类型写英文名称，带斜杠的类型要写成字符串名称（例如 `"worldgen/feature/example"`）。JSON 会在编译期解析，格式错误直接报告行列位置，输出时统一重排为两空格缩进。`predicate` 的正文是内联战利品条件，26.3 的判别键 `type` 必填（`condition` 只用于引用谓词资源）。
 
 ```mcl title="示例" fragment
 resource predicate coin_flip = """
@@ -1628,7 +1628,7 @@ if !(ticks < 100) || ready == 1 {
 ```
 
 :::note 条件如何求值
-条件最终变成一个 0/1 的标志计分项：比较生成 `execute if/unless score A <symbol> B run scoreboard players set <flag> … 1`，`&&` 用两条 `if score … matches 1` 串联，`||` 分别置 1，`!` 先置 1 再在内部为 1 时清零。编译器为条件分配临时计分项（`#t<序号>`），同一份源码的分配结果稳定可复现。结构化 `execute` 的 `if`/`unless` 子句复用同一套求值：标志在修饰符建立的上下文里算完，再用一条 `execute if score <flag> matches 1 run function <辅助函数>` 进入块体。
+条件最终变成一个 0/1 的标志计分项。计分值与整数常量比较时直接使用 `execute if/unless score … matches <范围>`，不会为常量创建额外假玩家；两个运行期计分值之间的比较使用 `execute if/unless score A <symbol> B`。`&&` 与 `||` 按从左到右的短路语义求值，因此右侧函数调用及其它运行期查询只在确有需要时执行；`!` 反转内部标志。编译器为条件分配临时计分项（`#t<序号>`），同一份源码的分配结果稳定可复现。结构化 `execute` 的 `if`/`unless` 子句复用同一套求值：标志在修饰符建立的上下文里算完，再用一条 `execute if score <flag> matches 1 run function <辅助函数>` 进入块体。
 :::
 
 ## 编译产物与运行模型 {#artifacts}

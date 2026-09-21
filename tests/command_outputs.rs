@@ -108,6 +108,31 @@ fn native_command_shapes_and_macro_forwarding() {
         build_file(&root.join("tests/valid").join(fixture), &output, &options).unwrap();
         assert_eq!(before, files(&output), "{fixture} 重复构建必须一致");
     }
+    let conditions_output = root.join("target/command-outputs/conditions");
+    let options = BuildOptions {
+        description: "条件短路产物验收".to_owned(),
+        deny_raw: true,
+    };
+    build_file(
+        &root.join("tests/valid/conditions"),
+        &conditions_output,
+        &options,
+    )
+    .unwrap();
+    let short_circuit = fs::read_to_string(
+        conditions_output.join("data/conditions_test/function/short_circuit_probe.mcfunction"),
+    )
+    .unwrap();
+    assert!(short_circuit.contains("matches 1 store result score"));
+    assert!(short_circuit.contains("matches 0 store result score"));
+    assert!(short_circuit.contains("run function conditions_test:mark_side_effect"));
+    assert!(
+        short_circuit
+            .lines()
+            .filter(|line| line.contains("function conditions_test:mark_side_effect"))
+            .all(|line| line.starts_with("execute if score ")),
+        "短路条件右侧的副作用调用必须受左侧标志保护：{short_circuit}"
+    );
     let ui_files = files(&root.join("target/command-outputs/ui_commands"));
     let ui_text = ui_files
         .values()

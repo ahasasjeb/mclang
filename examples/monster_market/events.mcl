@@ -1,0 +1,136 @@
+namespace monster_market;
+
+import main;
+
+objective last_sleep_day;
+
+// Positive player actions add supply or confidence to the shared market.
+advancement village_hero_event {
+    criterion won { trigger = hero_of_the_village; }
+    reward { function = on_village_hero; }
+}
+
+advancement cured_villager_event {
+    criterion cured { trigger = cured_zombie_villager; }
+    reward { function = on_cured_villager; }
+}
+
+advancement trade_event {
+    criterion traded { trigger = villager_trade; }
+    reward { function = on_trade; }
+}
+
+advancement sleep_event {
+    criterion slept { trigger = slept_in_bed; }
+    reward { function = on_sleep; }
+}
+
+advancement beacon_event {
+    criterion built { trigger = construct_beacon; conditions = """{"level":{"min":4}}"""; }
+    reward { function = on_beacon; }
+}
+
+// Negative events model emergency buying, damaged logistics and scarce inputs.
+advancement death_event {
+    criterion died { trigger = entity_killed_player; }
+    reward { function = on_death; }
+}
+
+advancement golden_apple_consumed_event {
+    criterion normal { trigger = consume_item; conditions = """{"item":{"items":"minecraft:golden_apple"}}"""; }
+    criterion enchanted { trigger = consume_item; conditions = """{"item":{"items":"minecraft:enchanted_golden_apple"}}"""; }
+    requirements = any;
+    reward { function = on_golden_apple_consumed; }
+}
+
+advancement totem_event {
+    criterion used { trigger = used_totem; conditions = """{"item":{"items":"minecraft:totem_of_undying"}}"""; }
+    reward { function = on_totem; }
+}
+
+advancement raid_omen_event {
+    criterion omen { trigger = voluntary_exile; }
+    reward { function = on_raid_omen; }
+}
+
+advancement enchanting_event {
+    criterion enchanted { trigger = enchanted_item; }
+    reward { function = on_enchanting; }
+}
+
+@player fn on_village_hero() {
+    advancement.revoke(self, village_hero_event);
+    award(150);
+    market_relief(3);
+    armory_supply(2);
+    message.all("正面事件：村庄保卫成功，市场信心与装备供应上升。", green);
+}
+
+@player fn on_cured_villager() {
+    advancement.revoke(self, cured_villager_event);
+    award(80);
+    market_relief(2);
+    food_supply(2);
+    message.all("正面事件：村民治愈，贸易与补给恢复。", green);
+}
+
+@player fn on_trade() {
+    advancement.revoke(self, trade_event);
+    award(5);
+    market_relief(1);
+    message.self("正面事件：完成村民交易，积分 +5，市场压力略降。", green);
+}
+
+@player fn on_sleep() {
+    advancement.revoke(self, sleep_event);
+    let day_stamp = time.query() / 24000 + 1;
+    if day_stamp > scoreboard.get(self, last_sleep_day) {
+        scoreboard.set(self, last_sleep_day, day_stamp);
+        award(15);
+        food_supply(1);
+        message.self("正面事件：每日休整完成，积分 +15。", aqua);
+    }
+}
+
+@player fn on_beacon() {
+    advancement.revoke(self, beacon_event);
+    award(200);
+    market_relief(4);
+    armory_supply(3);
+    message.all("正面事件：满级信标启用，贸易路线更加安全。", aqua);
+}
+
+@player fn on_death() {
+    advancement.revoke(self, death_event);
+    apply_death_penalty();
+    market_shock(1);
+    armory_shortage(1);
+    message.self("负面事件：阵亡导致积分损失，并刺激装备需求。", red);
+}
+
+@player fn on_golden_apple_consumed() {
+    advancement.revoke(self, golden_apple_consumed_event);
+    food_shortage(2);
+    message.self("负面事件：高价值消耗品被使用，金苹果供应趋紧。", red);
+}
+
+@player fn on_totem() {
+    advancement.revoke(self, totem_event);
+    market_shock(2);
+    armory_shortage(2);
+    food_shortage(1);
+    message.all("负面事件：不死图腾被触发，全服进入紧急采购。", red);
+}
+
+@player fn on_raid_omen() {
+    advancement.revoke(self, raid_omen_event);
+    market_shock(3);
+    message.all("负面事件：袭击威胁出现，市场风险溢价上升。", dark_red);
+}
+
+@player fn on_enchanting() {
+    advancement.revoke(self, enchanting_event);
+    award(10);
+    armory_shortage(1);
+    message.self("混合事件：附魔奖励积分 +10，但魔法装备原料趋紧。", yellow);
+}

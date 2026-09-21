@@ -131,6 +131,7 @@ pub(crate) fn resource_kind(value: &str) -> Option<&'static str> {
     match value {
         "recipe" | "配方" => Some("recipe"),
         "predicate" | "谓词" => Some("predicate"),
+        "dialog" | "对话框" => Some("dialog"),
         _ => None,
     }
 }

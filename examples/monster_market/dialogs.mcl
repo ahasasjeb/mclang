@@ -1,0 +1,163 @@
+namespace monster_market;
+
+// Dialogs are registry resources in 26.3. The list screen shows six product
+// buttons; each detail screen shows the actual item and a purchase action.
+// Prices in registry JSON are ranges because global demand changes at runtime.
+export resource dialog shop_menu = """
+{
+  "type": "minecraft:dialog_list",
+  "title": {"text": "怪物积分商店", "color": "gold"},
+  "pause": false,
+  "after_action": "close",
+  "body": [
+    {
+      "type": "minecraft:plain_message",
+      "contents": {"text": "选择商品查看装备与价格。当前积分显示在侧边栏；成交价由商品需求、整体风险和分类供应共同计算。", "color": "gray"},
+      "width": 340
+    }
+  ],
+  "dialogs": [
+    "monster_market:dialogs/market_rules_page",
+    "monster_market:dialogs/iron_sword_page",
+    "monster_market:dialogs/shield_page",
+    "monster_market:dialogs/bow_page",
+    "monster_market:dialogs/sharp_sword_page",
+    "monster_market:dialogs/power_bow_page",
+    "monster_market:dialogs/golden_apple_page"
+  ],
+  "columns": 2,
+  "button_width": 170,
+  "exit_action": {"label": {"text": "关闭商店"}}
+}
+""";
+
+resource dialog market_rules_page = """
+{
+  "type": "minecraft:multi_action",
+  "title": {"text": "动态市场规则", "color": "yellow"},
+  "external_title": {"text": "市场规则与事件", "color": "yellow"},
+  "pause": false,
+  "body": [
+    {"type": "minecraft:plain_message", "contents": {"text": "需求：每次成交使对应商品需求 +2。\n风险：怪物潮、阵亡、袭击与图腾会推高全局或分类压力。\n供应：村庄英雄、治愈村民、信标和 Boss 战果会降低压力。\n回归：每 60 秒需求与压力向正常水平回落；每 5 分钟可能发生随机市场事件。", "color": "gray"}, "width": 340}
+  ],
+  "actions": [
+    {"label": {"text": "刷新实时价格", "color": "green"}, "tooltip": {"text": "把六种商品的当前成交价显示到聊天并返回商店"}, "width": 210, "action": {"type": "minecraft:run_command", "command": "/trigger monster_market_shop_request set 10"}},
+    {"label": {"text": "返回商品列表"}, "width": 210, "action": {"type": "minecraft:show_dialog", "dialog": "monster_market:dialogs/shop_menu"}}
+  ],
+  "columns": 1
+}
+""";
+
+resource dialog iron_sword_page = """
+{
+  "type": "minecraft:multi_action",
+  "title": {"text": "铁剑", "color": "white"},
+  "external_title": {"text": "铁剑 · 20～225 分"},
+  "pause": false,
+  "body": [
+    {"type": "minecraft:item", "item": "minecraft:iron_sword", "description": {"contents": {"text": "普通铁剑 · 基础价 40 分。需求、市场风险和军械供应共同决定 20～225 分的成交价。"}, "width": 240}, "width": 32, "height": 32}
+  ],
+  "actions": [
+    {"label": {"text": "购买铁剑", "color": "green"}, "tooltip": {"text": "按购买时的实时价格扣分"}, "width": 210, "action": {"type": "minecraft:run_command", "command": "/trigger monster_market_shop_request set 1"}}
+  ],
+  "columns": 1,
+  "exit_action": {"label": {"text": "返回商品列表"}, "action": {"type": "minecraft:show_dialog", "dialog": "monster_market:dialogs/shop_menu"}}
+}
+""";
+
+resource dialog shield_page = """
+{
+  "type": "minecraft:multi_action",
+  "title": {"text": "盾牌", "color": "white"},
+  "external_title": {"text": "盾牌 · 15～215 分"},
+  "pause": false,
+  "body": [
+    {"type": "minecraft:item", "item": "minecraft:shield", "description": {"contents": {"text": "普通盾牌 · 基础价 30 分。动态成交范围 15～215 分。"}, "width": 240}, "width": 32, "height": 32}
+  ],
+  "actions": [
+    {"label": {"text": "购买盾牌", "color": "green"}, "tooltip": {"text": "按购买时的实时价格扣分"}, "width": 210, "action": {"type": "minecraft:run_command", "command": "/trigger monster_market_shop_request set 2"}}
+  ],
+  "columns": 1,
+  "exit_action": {"label": {"text": "返回商品列表"}, "action": {"type": "minecraft:show_dialog", "dialog": "monster_market:dialogs/shop_menu"}}
+}
+""";
+
+resource dialog bow_page = """
+{
+  "type": "minecraft:multi_action",
+  "title": {"text": "弓", "color": "white"},
+  "external_title": {"text": "弓 · 25～235 分"},
+  "pause": false,
+  "body": [
+    {"type": "minecraft:item", "item": "minecraft:bow", "description": {"contents": {"text": "普通弓 · 基础价 50 分。动态成交范围 25～235 分。"}, "width": 240}, "width": 32, "height": 32}
+  ],
+  "actions": [
+    {"label": {"text": "购买弓", "color": "green"}, "tooltip": {"text": "按购买时的实时价格扣分"}, "width": 210, "action": {"type": "minecraft:run_command", "command": "/trigger monster_market_shop_request set 3"}}
+  ],
+  "columns": 1,
+  "exit_action": {"label": {"text": "返回商品列表"}, "action": {"type": "minecraft:show_dialog", "dialog": "monster_market:dialogs/shop_menu"}}
+}
+""";
+
+resource dialog sharp_sword_page = """
+{
+  "type": "minecraft:multi_action",
+  "title": {"text": "猎手之剑", "color": "aqua"},
+  "external_title": {"text": "附魔铁剑 · 70～425 分", "color": "aqua"},
+  "pause": false,
+  "body": [
+    {
+      "type": "minecraft:item",
+      "item": {"id": "minecraft:iron_sword", "components": {"minecraft:enchantments": {"minecraft:sharpness": 2, "minecraft:unbreaking": 2}}},
+      "description": {"contents": {"text": "锋利 II · 耐久 II\n基础价 140 分，动态成交范围 70～425 分。"}, "width": 240},
+      "width": 32,
+      "height": 32
+    }
+  ],
+  "actions": [
+    {"label": {"text": "购买附魔铁剑", "color": "green"}, "tooltip": {"text": "按购买时的实时价格扣分"}, "width": 210, "action": {"type": "minecraft:run_command", "command": "/trigger monster_market_shop_request set 4"}}
+  ],
+  "columns": 1,
+  "exit_action": {"label": {"text": "返回商品列表"}, "action": {"type": "minecraft:show_dialog", "dialog": "monster_market:dialogs/shop_menu"}}
+}
+""";
+
+resource dialog power_bow_page = """
+{
+  "type": "minecraft:multi_action",
+  "title": {"text": "狩猎之弓", "color": "aqua"},
+  "external_title": {"text": "附魔弓 · 80～445 分", "color": "aqua"},
+  "pause": false,
+  "body": [
+    {
+      "type": "minecraft:item",
+      "item": {"id": "minecraft:bow", "components": {"minecraft:enchantments": {"minecraft:power": 3, "minecraft:unbreaking": 2}}},
+      "description": {"contents": {"text": "力量 III · 耐久 II\n基础价 160 分，动态成交范围 80～445 分。"}, "width": 240},
+      "width": 32,
+      "height": 32
+    }
+  ],
+  "actions": [
+    {"label": {"text": "购买附魔弓", "color": "green"}, "tooltip": {"text": "按购买时的实时价格扣分"}, "width": 210, "action": {"type": "minecraft:run_command", "command": "/trigger monster_market_shop_request set 5"}}
+  ],
+  "columns": 1,
+  "exit_action": {"label": {"text": "返回商品列表"}, "action": {"type": "minecraft:show_dialog", "dialog": "monster_market:dialogs/shop_menu"}}
+}
+""";
+
+resource dialog golden_apple_page = """
+{
+  "type": "minecraft:multi_action",
+  "title": {"text": "金苹果", "color": "gold"},
+  "external_title": {"text": "金苹果 · 40～280 分", "color": "gold"},
+  "pause": false,
+  "body": [
+    {"type": "minecraft:item", "item": "minecraft:golden_apple", "description": {"contents": {"text": "金苹果 · 基础价 80 分。需求、市场风险和食物供应共同决定 40～280 分的成交价。"}, "width": 240}, "width": 32, "height": 32}
+  ],
+  "actions": [
+    {"label": {"text": "购买金苹果", "color": "green"}, "tooltip": {"text": "按购买时的实时价格扣分"}, "width": 210, "action": {"type": "minecraft:run_command", "command": "/trigger monster_market_shop_request set 6"}}
+  ],
+  "columns": 1,
+  "exit_action": {"label": {"text": "返回商品列表"}, "action": {"type": "minecraft:show_dialog", "dialog": "monster_market:dialogs/shop_menu"}}
+}
+""";

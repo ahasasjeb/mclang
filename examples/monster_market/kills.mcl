@@ -1,0 +1,122 @@
+namespace monster_market;
+
+import main;
+
+// Kill bounties are grouped by danger tier. Each criterion names one entity
+// type and `requirements = any` lets a single advancement cover a whole tier.
+advancement common_hunt {
+    criterion zombie { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}"""; }
+    criterion husk { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:husk"}}}"""; }
+    criterion drowned { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:drowned"}}}"""; }
+    criterion spider { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:spider"}}}"""; }
+    criterion slime { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:slime"}}}"""; }
+    requirements = any;
+    reward { function = reward_common; }
+}
+
+advancement trained_hunt {
+    criterion skeleton { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:skeleton"}}}"""; }
+    criterion stray { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:stray"}}}"""; }
+    criterion bogged { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:bogged"}}}"""; }
+    criterion creeper { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:creeper"}}}"""; }
+    criterion cave_spider { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:cave_spider"}}}"""; }
+    criterion phantom { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:phantom"}}}"""; }
+    requirements = any;
+    reward { function = reward_trained; }
+}
+
+advancement dangerous_hunt {
+    criterion enderman { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:enderman"}}}"""; }
+    criterion blaze { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:blaze"}}}"""; }
+    criterion ghast { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ghast"}}}"""; }
+    criterion breeze { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:breeze"}}}"""; }
+    criterion witch { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:witch"}}}"""; }
+    criterion pillager { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:pillager"}}}"""; }
+    criterion vindicator { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:vindicator"}}}"""; }
+    criterion magma_cube { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:magma_cube"}}}"""; }
+    criterion guardian { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:guardian"}}}"""; }
+    criterion shulker { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:shulker"}}}"""; }
+    criterion wither_skeleton { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:wither_skeleton"}}}"""; }
+    requirements = any;
+    reward { function = reward_dangerous; }
+}
+
+advancement elite_hunt {
+    criterion evoker { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:evoker"}}}"""; }
+    criterion piglin_brute { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:piglin_brute"}}}"""; }
+    criterion ravager { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ravager"}}}"""; }
+    requirements = any;
+    reward { function = reward_elite; }
+}
+
+advancement elder_guardian_hunt {
+    criterion elder_guardian { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:elder_guardian"}}}"""; }
+    reward { function = reward_elder_guardian; }
+}
+
+advancement warden_hunt {
+    criterion warden { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:warden"}}}"""; }
+    reward { function = reward_warden; }
+}
+
+advancement wither_hunt {
+    criterion wither { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:wither"}}}"""; }
+    reward { function = reward_wither; }
+}
+
+advancement dragon_hunt {
+    criterion dragon { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ender_dragon"}}}"""; }
+    reward { function = reward_dragon; }
+}
+
+@player fn reward_common() {
+    advancement.revoke(self, common_hunt);
+    award(20);
+}
+
+@player fn reward_trained() {
+    advancement.revoke(self, trained_hunt);
+    award(30);
+}
+
+@player fn reward_dangerous() {
+    advancement.revoke(self, dangerous_hunt);
+    award(50);
+}
+
+@player fn reward_elite() {
+    advancement.revoke(self, elite_hunt);
+    award(100);
+}
+
+@player fn reward_elder_guardian() {
+    advancement.revoke(self, elder_guardian_hunt);
+    award(250);
+    food_supply(2);
+    message.all(translate("chat.type.announcement", [selector("@s"), text("击败远古守卫者，金苹果原料价格下降")]) { color = "aqua"; });
+}
+
+@player fn reward_warden() {
+    advancement.revoke(self, warden_hunt);
+    award(750);
+    armory_supply(3);
+    market_relief(2);
+    message.all(translate("chat.type.announcement", [selector("@s"), text("击败 Warden，深暗遗物涌入市场")]) { color = "dark_aqua"; });
+}
+
+@player fn reward_wither() {
+    advancement.revoke(self, wither_hunt);
+    award(1500);
+    market_shock(5);
+    food_shortage(3);
+    message.all(translate("chat.type.announcement", [selector("@s"), text("击败凋灵，但战后需求推高市场")]) { color = "dark_purple"; });
+}
+
+@player fn reward_dragon() {
+    advancement.revoke(self, dragon_hunt);
+    award(2000);
+    market_relief(6);
+    armory_supply(4);
+    food_supply(4);
+    message.all(translate("chat.type.announcement", [selector("@s"), text("击败末影龙，全服进入繁荣期")]) { color = "light_purple"; });
+}

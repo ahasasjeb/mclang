@@ -404,25 +404,41 @@ impl Compiler<'_> {
             } => {
                 let left_value = self.compile_expr(left, owner, commands);
                 let right_value = self.compile_expr(right, owner, commands);
-                let left = self.materialize(left_value, commands);
-                let right = self.materialize(right_value, commands);
                 let flag = self.temporary();
-                commands.push(format!(
-                    "scoreboard players set {flag} {} 0",
-                    self.objective
-                ));
-                let (prefix, symbol) = match comparison {
-                    Comparison::Equal => ("if", "="),
-                    Comparison::NotEqual => ("unless", "="),
-                    Comparison::Less => ("if", "<"),
-                    Comparison::LessEqual => ("if", "<="),
-                    Comparison::Greater => ("if", ">"),
-                    Comparison::GreaterEqual => ("if", ">="),
-                };
-                commands.push(format!(
-                    "execute {prefix} score {left} {} {symbol} {right} {} run scoreboard players set {flag} {} 1",
-                    self.objective, self.objective, self.objective
-                ));
+                match (left_value, right_value) {
+                    (Value::Integer(left), Value::Integer(right)) => commands.push(format!(
+                        "scoreboard players set {flag} {} {}",
+                        self.objective,
+                        i32::from(compare_integers(left, *comparison, right))
+                    )),
+                    (Value::Score(score), Value::Integer(value)) => self
+                        .compile_score_constant_comparison(
+                            &flag,
+                            &score,
+                            *comparison,
+                            value,
+                            commands,
+                        ),
+                    (Value::Integer(value), Value::Score(score)) => self
+                        .compile_score_constant_comparison(
+                            &flag,
+                            &score,
+                            reverse_comparison(*comparison),
+                            value,
+                            commands,
+                        ),
+                    (Value::Score(left), Value::Score(right)) => {
+                        commands.push(format!(
+                            "scoreboard players set {flag} {} 0",
+                            self.objective
+                        ));
+                        let (prefix, symbol) = comparison_operator(*comparison);
+                        commands.push(format!(
+                            "execute {prefix} score {left} {} {symbol} {right} {} run scoreboard players set {flag} {} 1",
+                            self.objective, self.objective, self.objective
+                        ));
+                    }
+                }
                 flag
             }
             Condition::Not(condition) => {
@@ -440,37 +456,89 @@ impl Compiler<'_> {
             }
             Condition::And(left, right) => {
                 let left = self.compile_condition(left, owner, commands);
-                let right = self.compile_condition(right, owner, commands);
-                let flag = self.temporary();
+                let mut right_commands = Vec::new();
+                let right = self.compile_condition(right, owner, &mut right_commands);
+                self.append_guarded_commands(&left, 1, right_commands, commands);
                 commands.push(format!(
-                    "scoreboard players set {flag} {} 0",
-                    self.objective
+                    "execute if score {left} {} matches 1 unless score {right} {} matches 1 run scoreboard players set {left} {} 0",
+                    self.objective, self.objective, self.objective,
                 ));
-                commands.push(format!(
-                    "execute if score {left} {} matches 1 if score {right} {} matches 1 run scoreboard players set {flag} {} 1",
-                    self.objective, self.objective, self.objective
-                ));
-                flag
+                left
             }
             Condition::Or(left, right) => {
                 let left = self.compile_condition(left, owner, commands);
-                let right = self.compile_condition(right, owner, commands);
-                let flag = self.temporary();
+                let mut right_commands = Vec::new();
+                let right = self.compile_condition(right, owner, &mut right_commands);
+                self.append_guarded_commands(&left, 0, right_commands, commands);
                 commands.push(format!(
-                    "scoreboard players set {flag} {} 0",
-                    self.objective
+                    "execute if score {left} {} matches 0 if score {right} {} matches 1 run scoreboard players set {left} {} 1",
+                    self.objective, self.objective, self.objective,
                 ));
-                commands.push(format!(
-                    "execute if score {left} {} matches 1 run scoreboard players set {flag} {} 1",
-                    self.objective, self.objective
-                ));
-                commands.push(format!(
-                    "execute if score {right} {} matches 1 run scoreboard players set {flag} {} 1",
-                    self.objective, self.objective
-                ));
-                flag
+                left
             }
         }
+    }
+
+    /// Compare a score against a literal without materializing the literal as
+    /// another fake player. This is common in guards and saves one command and
+    /// one temporary for every comparison.
+    fn compile_score_constant_comparison(
+        &self,
+        flag: &str,
+        score: &str,
+        comparison: Comparison,
+        value: i32,
+        commands: &mut Vec<String>,
+    ) {
+        commands.push(format!(
+            "scoreboard players set {flag} {} 0",
+            self.objective
+        ));
+        let test = match comparison {
+            Comparison::Equal => ScoreConstantTest::Matches("if", value.to_string()),
+            Comparison::NotEqual => ScoreConstantTest::Matches("unless", value.to_string()),
+            Comparison::Less if value == i32::MIN => ScoreConstantTest::Always(false),
+            Comparison::Less => ScoreConstantTest::Matches("if", format!("..{}", value - 1)),
+            Comparison::LessEqual => ScoreConstantTest::Matches("if", format!("..{value}")),
+            Comparison::Greater if value == i32::MAX => ScoreConstantTest::Always(false),
+            Comparison::Greater => ScoreConstantTest::Matches("if", format!("{}..", value + 1)),
+            Comparison::GreaterEqual => ScoreConstantTest::Matches("if", format!("{value}..")),
+        };
+        match test {
+            ScoreConstantTest::Always(true) => commands.push(format!(
+                "scoreboard players set {flag} {} 1",
+                self.objective
+            )),
+            ScoreConstantTest::Always(false) => {}
+            ScoreConstantTest::Matches(prefix, range) => commands.push(format!(
+                "execute {prefix} score {score} {} matches {range} run scoreboard players set {flag} {} 1",
+                self.objective, self.objective
+            )),
+        }
+    }
+
+    /// `&&` and `||` are short-circuiting. Expressions may call functions, so
+    /// eagerly compiling the right side would also execute its side effects.
+    fn append_guarded_commands(
+        &self,
+        guard: &str,
+        expected: i32,
+        guarded: Vec<String>,
+        commands: &mut Vec<String>,
+    ) {
+        commands.extend(guarded.into_iter().map(|command| {
+            if let Some(clauses) = command.strip_prefix("execute ") {
+                format!(
+                    "execute if score {guard} {} matches {expected} {clauses}",
+                    self.objective
+                )
+            } else {
+                format!(
+                    "execute if score {guard} {} matches {expected} run {command}",
+                    self.objective
+                )
+            }
+        }));
     }
 
     /// 原子条件：置 0 后用一条 `execute if <谓词>` 冻结为 0/1 标志。
@@ -527,5 +595,43 @@ impl Compiler<'_> {
                 format!("entity {}", self.component_holder(holder))
             }
         }
+    }
+}
+
+enum ScoreConstantTest {
+    Always(bool),
+    Matches(&'static str, String),
+}
+
+fn compare_integers(left: i32, comparison: Comparison, right: i32) -> bool {
+    match comparison {
+        Comparison::Equal => left == right,
+        Comparison::NotEqual => left != right,
+        Comparison::Less => left < right,
+        Comparison::LessEqual => left <= right,
+        Comparison::Greater => left > right,
+        Comparison::GreaterEqual => left >= right,
+    }
+}
+
+fn reverse_comparison(comparison: Comparison) -> Comparison {
+    match comparison {
+        Comparison::Equal => Comparison::Equal,
+        Comparison::NotEqual => Comparison::NotEqual,
+        Comparison::Less => Comparison::Greater,
+        Comparison::LessEqual => Comparison::GreaterEqual,
+        Comparison::Greater => Comparison::Less,
+        Comparison::GreaterEqual => Comparison::LessEqual,
+    }
+}
+
+fn comparison_operator(comparison: Comparison) -> (&'static str, &'static str) {
+    match comparison {
+        Comparison::Equal => ("if", "="),
+        Comparison::NotEqual => ("unless", "="),
+        Comparison::Less => ("if", "<"),
+        Comparison::LessEqual => ("if", "<="),
+        Comparison::Greater => ("if", ">"),
+        Comparison::GreaterEqual => ("if", ">="),
     }
 }

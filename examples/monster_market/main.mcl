@@ -1,0 +1,373 @@
+// Multiplayer monster hunt: each player owns a wallet and sends shop requests
+// through their own trigger score. Build with:
+// cargo run --bin mclang -- build examples/monster_market -o build/monster_market --deny-raw
+namespace monster_market;
+
+import dialogs;
+import events;
+import kills;
+
+objective points {
+    display_name = "怪物积分";
+    display_slot = "sidebar";
+}
+objective shop_request { criteria = "trigger"; }
+objective joined;
+objective health_tier;
+objective last_spent;
+objective points_seen;
+objective quoted_iron_sword;
+objective quoted_shield;
+objective quoted_bow;
+objective quoted_sharp_sword;
+objective quoted_power_bow;
+objective quoted_golden_apple;
+
+// Demand is shared by the server, while points and quoted prices belong to players.
+score market_ticks = 0;
+score health_audit_ticks = 0;
+score market_event_ticks = 0;
+score market_pressure = 0;
+score armory_pressure = 0;
+score food_pressure = 0;
+score transactions = 0;
+score demand_iron_sword = 0;
+score demand_shield = 0;
+score demand_bow = 0;
+score demand_sharp_sword = 0;
+score demand_power_bow = 0;
+score demand_golden_apple = 0;
+
+query players = entity("minecraft:player") {}
+
+item iron_sword = item_stack("minecraft:iron_sword") {}
+item shield = item_stack("minecraft:shield") {}
+item bow = item_stack("minecraft:bow") {}
+item sharp_sword = item_stack("minecraft:iron_sword") {
+    custom_name = "猎手之剑";
+    enchantment("minecraft:sharpness", 2);
+    enchantment("minecraft:unbreaking", 2);
+}
+item power_bow = item_stack("minecraft:bow") {
+    custom_name = "狩猎之弓";
+    enchantment("minecraft:power", 3);
+    enchantment("minecraft:unbreaking", 2);
+}
+item golden_apple = item_stack("minecraft:golden_apple") {}
+
+export @player fn award(amount) {
+    scoreboard.set(self, points, scoreboard.get(self, points) + amount);
+    message.self(translate("chat.type.announcement", [text("积分余额"), score(self, points)]) { color = "gold"; });
+    sound.self("minecraft:entity.experience_orb.pickup", player);
+    update_health();
+}
+
+@load fn load() {
+    message.all("怪物积分商店已加载：输入 /trigger monster_market_shop_request set 9 打开商店界面。", green);
+}
+
+@tick fn tick() {
+    market_ticks += 1;
+    health_audit_ticks += 1;
+    market_event_ticks += 1;
+    if market_ticks >= 1200 {
+        market_ticks = 0;
+        decay_market();
+    }
+    if market_event_ticks >= 6000 {
+        market_event_ticks = 0;
+        random_market_event();
+    }
+    if health_audit_ticks >= 20 {
+        health_audit_ticks = 0;
+        each(players) {
+            if scoreboard.get(self, points) != scoreboard.get(self, points_seen) {
+                update_health();
+            }
+        }
+    }
+    each(players) {
+        if scoreboard.get(self, joined) == 0 {
+            scoreboard.set(self, joined, 1);
+            scoreboard.set(self, health_tier, -1);
+            scoreboard.set(self, points_seen, -1);
+            message.self("29 种敌对生物都有悬赏，Warden、凋灵与末影龙奖励最高。", gold);
+            message.self(text("[打开可视化商店]") { color = "aqua"; click = run_command("/trigger monster_market_shop_request set 9"); });
+        }
+
+        let choice = scoreboard.get(self, shop_request);
+        if choice != 0 {
+            scoreboard.set(self, shop_request, 0);
+            handle_request(choice);
+        }
+        scoreboard.enable(self, shop_request);
+    }
+}
+
+fn decay_market() {
+    if demand_iron_sword > 0 { demand_iron_sword -= 1; }
+    if demand_shield > 0 { demand_shield -= 1; }
+    if demand_bow > 0 { demand_bow -= 1; }
+    if demand_sharp_sword > 0 { demand_sharp_sword -= 1; }
+    if demand_power_bow > 0 { demand_power_bow -= 1; }
+    if demand_golden_apple > 0 { demand_golden_apple -= 1; }
+    if market_pressure > 0 { market_pressure -= 1; }
+    if market_pressure < 0 { market_pressure += 1; }
+    if armory_pressure > 0 { armory_pressure -= 1; }
+    if armory_pressure < 0 { armory_pressure += 1; }
+    if food_pressure > 0 { food_pressure -= 1; }
+    if food_pressure < 0 { food_pressure += 1; }
+}
+
+fn random_market_event() {
+    let roll = random(1, 100);
+    if roll <= 8 {
+        market_relief(4);
+        message.all("市场事件：商队抵达，整体价格压力下降。", green);
+    }
+    if roll >= 9 && roll <= 16 {
+        armory_supply(5);
+        message.all("市场事件：军械库补货，装备价格承压。", aqua);
+    }
+    if roll >= 17 && roll <= 22 {
+        food_supply(6);
+        message.all("市场事件：金苹果丰收，消耗品价格承压。", gold);
+    }
+    if roll >= 23 && roll <= 31 {
+        market_shock(3);
+        message.all("市场事件：怪物潮来袭，所有商品价格上涨。", red);
+    }
+    if roll >= 32 && roll <= 38 {
+        armory_shortage(4);
+        message.all("市场事件：军械商队遇袭，装备供应紧张。", red);
+    }
+    if roll >= 39 && roll <= 45 {
+        food_shortage(5);
+        message.all("市场事件：炼金原料短缺，金苹果价格上涨。", red);
+    }
+}
+
+// Request 9 shows the menu; 1..6 purchase an item. Price is read at checkout,
+// so another player's earlier purchase can change the final charge.
+@player fn handle_request(choice) {
+    if choice == 9 { show_shop(); }
+    if choice == 10 { show_live_prices(); }
+    if choice == 1 && charge(iron_sword_price()) == 1 {
+        self.give_item(iron_sword);
+        demand_iron_sword += 2;
+        if demand_iron_sword > 20 { demand_iron_sword = 20; }
+        message.self("已购买铁剑。", green);
+        finish_purchase();
+    }
+    if choice == 2 && charge(shield_price()) == 1 {
+        self.give_item(shield);
+        demand_shield += 2;
+        if demand_shield > 20 { demand_shield = 20; }
+        message.self("已购买盾牌。", green);
+        finish_purchase();
+    }
+    if choice == 3 && charge(bow_price()) == 1 {
+        self.give_item(bow);
+        demand_bow += 2;
+        if demand_bow > 20 { demand_bow = 20; }
+        message.self("已购买弓。", green);
+        finish_purchase();
+    }
+    if choice == 4 && charge(sharp_sword_price()) == 1 {
+        self.give_item(sharp_sword);
+        demand_sharp_sword += 2;
+        if demand_sharp_sword > 20 { demand_sharp_sword = 20; }
+        message.self("已购买附魔铁剑。", green);
+        finish_purchase();
+    }
+    if choice == 5 && charge(power_bow_price()) == 1 {
+        self.give_item(power_bow);
+        demand_power_bow += 2;
+        if demand_power_bow > 20 { demand_power_bow = 20; }
+        message.self("已购买附魔弓。", green);
+        finish_purchase();
+    }
+    if choice == 6 && charge(golden_apple_price()) == 1 {
+        self.give_item(golden_apple);
+        demand_golden_apple += 2;
+        if demand_golden_apple > 20 { demand_golden_apple = 20; }
+        message.self("已购买金苹果。", green);
+        finish_purchase();
+    }
+    if choice < 1 || choice > 10 || choice == 7 || choice == 8 {
+        message.self("未知商品编号。输入 /trigger monster_market_shop_request set 9 查看商店。", red);
+    }
+}
+
+@player fn show_live_prices() {
+    scoreboard.set(self, quoted_iron_sword, iron_sword_price());
+    scoreboard.set(self, quoted_shield, shield_price());
+    scoreboard.set(self, quoted_bow, bow_price());
+    scoreboard.set(self, quoted_sharp_sword, sharp_sword_price());
+    scoreboard.set(self, quoted_power_bow, power_bow_price());
+    scoreboard.set(self, quoted_golden_apple, golden_apple_price());
+    message.self(translate("chat.type.announcement", [text("铁剑"), score(self, quoted_iron_sword)]) { color = "white"; });
+    message.self(translate("chat.type.announcement", [text("盾牌"), score(self, quoted_shield)]) { color = "white"; });
+    message.self(translate("chat.type.announcement", [text("弓"), score(self, quoted_bow)]) { color = "white"; });
+    message.self(translate("chat.type.announcement", [text("附魔铁剑"), score(self, quoted_sharp_sword)]) { color = "aqua"; });
+    message.self(translate("chat.type.announcement", [text("附魔弓"), score(self, quoted_power_bow)]) { color = "aqua"; });
+    message.self(translate("chat.type.announcement", [text("金苹果"), score(self, quoted_golden_apple)]) { color = "gold"; });
+    show_shop();
+}
+
+fn iron_sword_price() -> score {
+    let price = 40 + demand_iron_sword * 5 + market_pressure * 2 + armory_pressure * 3;
+    if price < 20 { price = 20; }
+    if price > 225 { price = 225; }
+    return price;
+}
+
+fn shield_price() -> score {
+    let price = 30 + demand_shield * 5 + market_pressure * 2 + armory_pressure * 3;
+    if price < 15 { price = 15; }
+    if price > 215 { price = 215; }
+    return price;
+}
+
+fn bow_price() -> score {
+    let price = 50 + demand_bow * 5 + market_pressure * 2 + armory_pressure * 3;
+    if price < 25 { price = 25; }
+    if price > 235 { price = 235; }
+    return price;
+}
+
+fn sharp_sword_price() -> score {
+    let price = 140 + demand_sharp_sword * 10 + market_pressure * 2 + armory_pressure * 3;
+    if price < 70 { price = 70; }
+    if price > 425 { price = 425; }
+    return price;
+}
+
+fn power_bow_price() -> score {
+    let price = 160 + demand_power_bow * 10 + market_pressure * 2 + armory_pressure * 3;
+    if price < 80 { price = 80; }
+    if price > 445 { price = 445; }
+    return price;
+}
+
+fn golden_apple_price() -> score {
+    let price = 80 + demand_golden_apple * 5 + market_pressure * 2 + food_pressure * 4;
+    if price < 40 { price = 40; }
+    if price > 280 { price = 280; }
+    return price;
+}
+
+export fn market_relief(amount) {
+    market_pressure -= amount;
+    if market_pressure < -10 { market_pressure = -10; }
+    demand_iron_sword -= amount;
+    demand_shield -= amount;
+    demand_bow -= amount;
+    demand_sharp_sword -= amount;
+    demand_power_bow -= amount;
+    demand_golden_apple -= amount;
+    if demand_iron_sword < 0 { demand_iron_sword = 0; }
+    if demand_shield < 0 { demand_shield = 0; }
+    if demand_bow < 0 { demand_bow = 0; }
+    if demand_sharp_sword < 0 { demand_sharp_sword = 0; }
+    if demand_power_bow < 0 { demand_power_bow = 0; }
+    if demand_golden_apple < 0 { demand_golden_apple = 0; }
+}
+
+export fn market_shock(amount) {
+    market_pressure += amount;
+    if market_pressure > 20 { market_pressure = 20; }
+}
+
+export fn armory_supply(amount) {
+    armory_pressure -= amount;
+    if armory_pressure < -5 { armory_pressure = -5; }
+    demand_iron_sword -= amount;
+    demand_shield -= amount;
+    demand_bow -= amount;
+    demand_sharp_sword -= amount;
+    demand_power_bow -= amount;
+    if demand_iron_sword < 0 { demand_iron_sword = 0; }
+    if demand_shield < 0 { demand_shield = 0; }
+    if demand_bow < 0 { demand_bow = 0; }
+    if demand_sharp_sword < 0 { demand_sharp_sword = 0; }
+    if demand_power_bow < 0 { demand_power_bow = 0; }
+}
+
+export fn armory_shortage(amount) {
+    armory_pressure += amount;
+    if armory_pressure > 15 { armory_pressure = 15; }
+}
+
+export fn food_supply(amount) {
+    food_pressure -= amount;
+    if food_pressure < -5 { food_pressure = -5; }
+    demand_golden_apple -= amount;
+    if demand_golden_apple < 0 { demand_golden_apple = 0; }
+}
+
+export fn food_shortage(amount) {
+    food_pressure += amount;
+    if food_pressure > 15 { food_pressure = 15; }
+}
+
+export @player fn apply_death_penalty() {
+    let balance = scoreboard.get(self, points);
+    let loss = balance / 10;
+    if loss < 10 { loss = 10; }
+    if balance <= loss {
+        scoreboard.set(self, points, 0);
+    } else {
+        scoreboard.set(self, points, balance - loss);
+    }
+    scoreboard.set(self, last_spent, loss);
+    message.self(translate("chat.type.announcement", [text("阵亡损失"), score(self, last_spent)]) { color = "red"; });
+    update_health();
+}
+
+@player fn finish_purchase() {
+    transactions += 1;
+    update_health();
+    show_shop();
+}
+
+@player fn charge(cost) -> score {
+    let paid = 0;
+    if scoreboard.get(self, points) >= cost {
+        scoreboard.set(self, points, scoreboard.get(self, points) - cost);
+        scoreboard.set(self, last_spent, cost);
+        message.self(translate("chat.type.announcement", [text("实际成交价"), score(self, last_spent)]) { color = "gold"; });
+        paid = 1;
+    } else {
+        message.self("积分不足。", red);
+    }
+    return paid;
+}
+
+@player fn show_shop() {
+    dialog.show(self, shop_menu);
+}
+
+// A named modifier leaves the player's base health available to other packs.
+// Store the last tier so only a changed balance updates the attribute.
+@player fn update_health() {
+    let balance = scoreboard.get(self, points);
+    scoreboard.set(self, points_seen, balance);
+    let tier = balance / 100;
+    if tier < 0 { tier = 0; }
+    if tier > 10 { tier = 10; }
+    if tier != scoreboard.get(self, health_tier) {
+        attribute.modifier.remove(self, "minecraft:max_health", "monster_market:points_health");
+        if tier == 1 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 2, add_value); }
+        if tier == 2 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 4, add_value); }
+        if tier == 3 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 6, add_value); }
+        if tier == 4 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 8, add_value); }
+        if tier == 5 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 10, add_value); }
+        if tier == 6 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 12, add_value); }
+        if tier == 7 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 14, add_value); }
+        if tier == 8 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 16, add_value); }
+        if tier == 9 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 18, add_value); }
+        if tier == 10 { attribute.modifier.add(self, "minecraft:max_health", "monster_market:points_health", 20, add_value); }
+        scoreboard.set(self, health_tier, tier);
+    }
+}
