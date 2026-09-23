@@ -4,45 +4,61 @@ import main;
 
 // Kill bounties are grouped by danger tier. Each criterion names one entity
 // type and `requirements = any` lets a single advancement cover a whole tier.
-advancement common_hunt {
+advancement common_hunt_v2 {
     criterion zombie { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}"""; }
     criterion husk { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:husk"}}}"""; }
     criterion drowned { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:drowned"}}}"""; }
+    criterion endermite { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:endermite"}}}"""; }
+    criterion silverfish { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:silverfish"}}}"""; }
     criterion spider { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:spider"}}}"""; }
     criterion slime { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:slime"}}}"""; }
+    criterion zombie_horse { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie_horse"}}}"""; }
+    criterion zombie_villager { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie_villager"}}}"""; }
     requirements = any;
     reward { function = reward_common; }
 }
 
-advancement trained_hunt {
+advancement trained_hunt_v2 {
     criterion skeleton { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:skeleton"}}}"""; }
     criterion stray { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:stray"}}}"""; }
     criterion bogged { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:bogged"}}}"""; }
     criterion creeper { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:creeper"}}}"""; }
     criterion cave_spider { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:cave_spider"}}}"""; }
+    criterion hoglin { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:hoglin"}}}"""; }
+    criterion parched { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:parched"}}}"""; }
     criterion phantom { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:phantom"}}}"""; }
+    criterion piglin { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:piglin"}}}"""; }
+    criterion zombified_piglin { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombified_piglin"}}}"""; }
     requirements = any;
     reward { function = reward_trained; }
 }
 
-advancement dangerous_hunt {
+advancement dangerous_hunt_v2 {
     criterion enderman { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:enderman"}}}"""; }
     criterion blaze { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:blaze"}}}"""; }
     criterion ghast { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ghast"}}}"""; }
     criterion breeze { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:breeze"}}}"""; }
+    criterion camel_husk { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:camel_husk"}}}"""; }
+    criterion creaking { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:creaking"}}}"""; }
     criterion witch { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:witch"}}}"""; }
     criterion pillager { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:pillager"}}}"""; }
     criterion vindicator { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:vindicator"}}}"""; }
     criterion magma_cube { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:magma_cube"}}}"""; }
     criterion guardian { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:guardian"}}}"""; }
     criterion shulker { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:shulker"}}}"""; }
+    criterion sulfur_cube { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:sulfur_cube"}}}"""; }
+    criterion vex { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:vex"}}}"""; }
     criterion wither_skeleton { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:wither_skeleton"}}}"""; }
+    criterion zoglin { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zoglin"}}}"""; }
+    criterion zombie_nautilus { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie_nautilus"}}}"""; }
     requirements = any;
     reward { function = reward_dangerous; }
 }
 
-advancement elite_hunt {
+advancement elite_hunt_v2 {
     criterion evoker { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:evoker"}}}"""; }
+    criterion giant { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:giant"}}}"""; }
+    criterion illusioner { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:illusioner"}}}"""; }
     criterion piglin_brute { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:piglin_brute"}}}"""; }
     criterion ravager { trigger = player_killed_entity; conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:ravager"}}}"""; }
     requirements = any;
@@ -70,22 +86,22 @@ advancement dragon_hunt {
 }
 
 @player fn reward_common() {
-    advancement.revoke(self, common_hunt);
+    advancement.revoke(self, common_hunt_v2);
     award(20);
 }
 
 @player fn reward_trained() {
-    advancement.revoke(self, trained_hunt);
+    advancement.revoke(self, trained_hunt_v2);
     award(30);
 }
 
 @player fn reward_dangerous() {
-    advancement.revoke(self, dangerous_hunt);
+    advancement.revoke(self, dangerous_hunt_v2);
     award(50);
 }
 
 @player fn reward_elite() {
-    advancement.revoke(self, elite_hunt);
+    advancement.revoke(self, elite_hunt_v2);
     award(100);
 }
 

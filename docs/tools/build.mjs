@@ -477,7 +477,7 @@ function composePage({ content, headings, data, stats, examples }) {
 <body>
 <header class="topbar">
   <button id="nav-toggle" type="button" aria-label="打开目录">目录</button>
-  <a class="brand" href="#top">Mclang 语言手册 <small>v${escapeHtml(version ?? "")} · Minecraft Java 26.3-rc-2</small></a>
+  <a class="brand" href="#top">Mclang 语言手册 <small>v${escapeHtml(version ?? "")} · Minecraft Java 26.3</small></a>
   <span class="spacer"></span>
   <button id="keyword-toggle" type="button" title="切换代码块与行内关键词的语言">中文关键词</button>
   <button id="theme-toggle" type="button" title="切换深浅色">深色</button>
@@ -499,7 +499,7 @@ ${content}
     <p>全部 ${stats.examples} 个标注“编译器验证通过”的完整示例（${verifiedList || "无"}）都分别用英文与中文关键词
     编译过，两种写法的数据包逐字节一致；仓库 <code>examples/</code> 示例的往返验证可用
     <code>bun docs/tools/build.mjs --self-test</code> 复现。</p>
-    <p>目标版本：Minecraft Java Edition 26.3-rc-2，数据包格式 121.0。手册随 <code>mclang ${escapeHtml(version ?? "")}</code> 生成。</p>
+    <p>目标版本：Minecraft Java Edition 26.3，数据包格式 121.0。手册随 <code>mclang ${escapeHtml(version ?? "")}</code> 生成。</p>
   </div>
 </footer>
 <button id="to-top" type="button" title="回到顶部">↑</button>

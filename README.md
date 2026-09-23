@@ -1,6 +1,6 @@
 # Mclang
 
-面向 **Minecraft Java Edition 26.3-rc-2** 的数据包编程语言及其 Rust 编译器。
+面向 **Minecraft Java Edition 26.3** 的数据包编程语言及其 Rust 编译器。
 
 Mclang 把 `.mcl` 源码编译成可以直接放进世界 `datapacks/` 目录的数据包。作者只描述意图，实体选择器、`execute` 上下文、NBT 路径、文本组件 JSON、计分板 ABI、函数标签和 26.3 的目录结构全部由编译器生成并检查；`run` 和字符串形式的 `execute` 只是最后手段的逃生口。
 
@@ -164,7 +164,7 @@ code --install-extension mclang-0.5.0.vsix
 | `docs/` | 语言手册：正文 `content/manual.md`、构建工具 `tools/`、静态页面 `index.html` 与 `assets/` |
 | `editors/vscode/` | VSCode 插件：语法高亮、语言配置与语言客户端 |
 | `examples/` | 端到端示例项目 |
-| `minecraft_client_26.3-rc-2/` | 随仓库固定的目标版本源码（用于核对注册表与命令签名） |
+| `minecraft_client_26.3/` | 随仓库固定的目标版本源码（用于核对注册表与命令签名） |
 
 ## 文档
 
@@ -176,7 +176,7 @@ code --install-extension mclang-0.5.0.vsix
 
 ## 目标版本
 
-目标版本固定在仓库内的 `minecraft_client_26.3-rc-2/` 源码，数据包格式为 `121.0`。
+目标版本固定在仓库内的 `minecraft_client_26.3/` 源码，数据包格式为 `121.0`。
 资源类型、物品组件、槽位名、声音分类和命令签名都以该源码和注册表为准，不依赖记忆。
 
 ## 开发

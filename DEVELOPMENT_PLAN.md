@@ -68,7 +68,7 @@
 | predicate | 部分 | 建 typed predicate schema，并与 execute/item/advancement 复用。 |
 | loot table | 部分 | 分阶段覆盖 pools、entries、functions、conditions、number providers。 |
 | item modifier | 部分 | 与 loot function 模型共用 schema。 |
-| advancement | 部分 | 将 conditions 等 raw JSON 字段逐步结构化。 |
+| advancement | 部分 | `requirements = all/any` 已按原版“外层 AND、内层 OR”生成；继续将 conditions 等 raw JSON 字段逐步结构化。 |
 | recipe | 部分 | 覆盖常用 vanilla recipe serializer。 |
 | dialog | 部分 | 根据 26.3 dialog codec 建 typed schema。 |
 | enchantment / provider / trade / timeline 等动态注册表资源 | 部分 | 使用通用 codec schema 框架提供字段校验。 |

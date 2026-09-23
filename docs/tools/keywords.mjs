@@ -44,7 +44,7 @@ export async function loadKeywordTables(repoRoot) {
   );
   const entityNbtSource = await readRustModule(repoRoot, "src/version/entity_nbt");
   const registriesSource = await readFile(
-    path.join(repoRoot, "data/version/26.3-rc-2/registries.json"),
+    path.join(repoRoot, "data/version/26.3/registries.json"),
     "utf8",
   );
 

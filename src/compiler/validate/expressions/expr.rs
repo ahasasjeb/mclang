@@ -176,11 +176,11 @@ pub(in crate::compiler::validate) fn validate_expr(
                 *kind,
                 provider,
                 *provider_span,
-                scale.as_deref(),
                 expression.span,
                 ctx,
                 diagnostics,
             );
+            super::validate_compute_scale(*kind, scale.as_deref(), expression.span, diagnostics);
         }
         ExprKind::Negate(value) => validate_expr(value, locals, ctx, diagnostics),
         ExprKind::Binary {

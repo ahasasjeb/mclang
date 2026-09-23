@@ -279,7 +279,7 @@ fn validate_advancement(
 /// 校验已知触发器的 `conditions` 结构。
 ///
 /// 字段表来自 26.3 源码里各触发器的 `TriggerInstance` 记录（见
-/// `data/version/26.3-rc-2/advancement_triggers.json`）；战利品条件字段
+/// `data/version/26.3/advancement_triggers.json`）；战利品条件字段
 /// 需要谓词资源字符串或带 `type` 的内联条件对象——26.3 把旧版本的判别键
 /// `condition` 改成了 `type`，写错时原版只会给出「Failed to parse」。
 fn validate_conditions(

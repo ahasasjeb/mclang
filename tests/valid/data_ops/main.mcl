@@ -22,7 +22,7 @@ fn edit_data() {
     data.modify(entity, self, "CustomName", set, string(storage, "data_ops_test:store", "names[0]"));
     data.modify(entity, self, "CustomName", set, string(storage, "data_ops_test:store", "names[0]", 0, 3));
     data.modify(entity, self, "data.count", set, compute(default, integer, "minecraft:cooking/time_coal"));
-    data.modify(entity, self, "data.count", set, compute(block, pos(1, 2, 3), float, "minecraft:cooking/speed_default", 2.5));
+    data.modify(entity, self, "data.count", set, compute(block, pos(1, 2, 3), float, "minecraft:cooking/speed_default"));
 }
 
 @load

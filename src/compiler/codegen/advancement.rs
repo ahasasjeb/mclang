@@ -47,18 +47,21 @@ pub(super) fn advancement_json(
     root.insert("criteria".to_owned(), Value::Object(criteria));
 
     let requirements = match advancement.requirements {
-        AdvancementRequirements::All => vec![
+        // Minecraft ANDs the outer requirement groups and ORs the criterion
+        // names inside each group. `all` therefore needs one singleton group
+        // per criterion, while `any` needs one group containing every name.
+        AdvancementRequirements::All => advancement
+            .criteria
+            .iter()
+            .map(|criterion| vec![criterion.name.clone()])
+            .collect(),
+        AdvancementRequirements::Any => vec![
             advancement
                 .criteria
                 .iter()
                 .map(|criterion| criterion.name.clone())
                 .collect::<Vec<_>>(),
         ],
-        AdvancementRequirements::Any => advancement
-            .criteria
-            .iter()
-            .map(|criterion| vec![criterion.name.clone()])
-            .collect(),
     };
     root.insert(
         "requirements".to_owned(),

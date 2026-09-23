@@ -239,15 +239,12 @@ pub(super) fn validate_slot_source(slots: &str, span: Span, diagnostics: &mut Ve
     }
 }
 
-/// 物品谓词：物品 id、`#标签`，可带 `[组件过滤器]`。
 /// `compute` 的公共校验（表达式与 `data.modify` 的 compute 来源共用）。
-#[allow(clippy::too_many_arguments)]
 pub(super) fn validate_compute(
     source: &ComputeSource,
     kind: ComputeKind,
     provider: &str,
     provider_span: Span,
-    scale: Option<&str>,
     span: Span,
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -265,6 +262,15 @@ pub(super) fn validate_compute(
                 ));
             } else {
                 super::statements::validate_holder(holder, span, ctx, diagnostics);
+                if let Holder::Query(name, query_span) = holder
+                    && let Some(query) = ctx.symbols.queries.get(name.as_str())
+                    && query.limit != Some(1)
+                {
+                    diagnostics.push(Diagnostic::new(
+                        format!("compute 的 entity 来源 `{name}` 必须使用 limit(1)"),
+                        *query_span,
+                    ));
+                }
             }
         }
     }
@@ -277,12 +283,24 @@ pub(super) fn validate_compute(
         ComputeKind::Integer => "整数 provider",
     };
     super::registry::validate_id(registry, label, provider, provider_span, diagnostics);
-    if let Some(scale) = scale
-        && !scale
-            .parse::<f64>()
-            .is_ok_and(|value| value.is_finite() && value != 0.0)
-    {
-        diagnostics.push(Diagnostic::new("compute 的缩放必须是非零数字", span));
+}
+
+/// 独立 `compute` 命令仅允许 float 使用单精度缩放，0 也是有效值。
+pub(super) fn validate_compute_scale(
+    kind: ComputeKind,
+    scale: Option<&str>,
+    span: Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if let Some(scale) = scale {
+        if kind == ComputeKind::Integer {
+            diagnostics.push(Diagnostic::new("compute 的 integer 类型不接受缩放", span));
+        } else if !scale.parse::<f32>().is_ok_and(f32::is_finite) {
+            diagnostics.push(Diagnostic::new(
+                "compute 的缩放必须在单精度浮点数范围内",
+                span,
+            ));
+        }
     }
 }
 
@@ -326,11 +344,16 @@ pub(super) fn validate_data_source(
                 *kind,
                 provider,
                 *provider_span,
-                scale.as_deref(),
                 span,
                 ctx,
                 diagnostics,
             );
+            if scale.is_some() {
+                diagnostics.push(Diagnostic::new(
+                    "data.modify 的 compute 来源不接受缩放",
+                    span,
+                ));
+            }
         }
     }
 }

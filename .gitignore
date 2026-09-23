@@ -1,6 +1,6 @@
 /target
 /build
-minecraft_client_26.3-rc-2
+minecraft_client_26.3
 
 # VSCode 插件
 node_modules/

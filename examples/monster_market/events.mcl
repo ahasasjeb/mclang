@@ -36,7 +36,7 @@ advancement death_event {
     reward { function = on_death; }
 }
 
-advancement golden_apple_consumed_event {
+advancement golden_apple_consumed_event_v2 {
     criterion normal { trigger = consume_item; conditions = """{"item":{"items":"minecraft:golden_apple"}}"""; }
     criterion enchanted { trigger = consume_item; conditions = """{"item":{"items":"minecraft:enchanted_golden_apple"}}"""; }
     requirements = any;
@@ -109,7 +109,7 @@ advancement enchanting_event {
 }
 
 @player fn on_golden_apple_consumed() {
-    advancement.revoke(self, golden_apple_consumed_event);
+    advancement.revoke(self, golden_apple_consumed_event_v2);
     food_shortage(2);
     message.self("负面事件：高价值消耗品被使用，金苹果供应趋紧。", red);
 }

@@ -6741,7 +6741,7 @@
       "ticks_since_last_hurt_by_mob"
     ]
   },
-  "source": "minecraft_client_26.3-rc-2",
+  "source": "minecraft_client_26.3",
   "tags": {
     "AbsorptionAmount": "number",
     "Age": "number",

@@ -7,6 +7,7 @@ score health = 0;
 score cooked = 0;
 
 query zombies = entity("minecraft:zombie") { within(32); };
+query one_zombie = entity("minecraft:zombie") { limit(1); };
 objective points;
 
 @load
@@ -29,4 +30,6 @@ fn read_data() {
 fn compute_values() {
     cooked = compute(default, integer, "minecraft:cooking/time_coal");
     cooked = compute(block, pos(1, 2, 3), float, "minecraft:cooking/speed_default", 2.5);
+    cooked = compute(default, float, "minecraft:cooking/speed_default", 0);
+    cooked = compute(entity, one_zombie, integer, "minecraft:cooking/time_coal");
 }

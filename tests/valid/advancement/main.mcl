@@ -70,6 +70,13 @@ advancement portal_frame {
     }
 }
 
+// requirements 外层是 AND、内层是 OR：all 应生成两个单元素组。
+advancement all_gate {
+    criterion placed { trigger = placed_block; }
+    criterion ticked { trigger = tick; }
+    requirements = all;
+}
+
 @tick
 fn lucky_tick() {
     if predicate(lucky) {

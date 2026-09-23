@@ -1,6 +1,6 @@
 # 怪物积分商店
 
-面向 Minecraft Java Edition 26.3-rc-2 的 Mclang 示例数据包。`main.mcl` 负责市场与购买，`kills.mcl` 负责悬赏，`events.mcl` 负责玩家事件，`dialogs.mcl` 负责原生商店界面。生成后的 `build/monster_market` 可以直接复制进世界的 `datapacks` 目录。
+面向 Minecraft Java Edition 26.3 的 Mclang 示例数据包。`main.mcl` 负责市场与购买，`kills.mcl` 负责悬赏，`events.mcl` 负责玩家事件，`dialogs.mcl` 负责原生商店界面。生成后的 `build/monster_market` 可以直接复制进世界的 `datapacks` 目录。
 
 ```powershell
 cargo run --bin mclang -- build examples/monster_market -o build/monster_market --deny-raw
@@ -10,10 +10,10 @@ cargo run --bin mclang -- build examples/monster_market -o build/monster_market 
 
 | 危险级别 | 生物 | 积分 |
 | --- | --- | ---: |
-| 常见 | 僵尸、尸壳、溺尸、蜘蛛、史莱姆 | 20 |
-| 熟练 | 骷髅、流浪者、沼骸、苦力怕、洞穴蜘蛛、幻翼 | 30 |
-| 危险 | 末影人、烈焰人、恶魂、旋风人、女巫、掠夺者、卫道士、岩浆怪、守卫者、潜影贝、凋灵骷髅 | 50 |
-| 精英 | 唤魔者、猪灵蛮兵、劫掠兽 | 100 |
+| 常见 | 僵尸、尸壳、溺尸、末影螨、蠹虫、蜘蛛、史莱姆、僵尸马、僵尸村民 | 20 |
+| 熟练 | 骷髅、流浪者、沼骸、苦力怕、洞穴蜘蛛、幻翼、疣猪兽、猪灵、`parched`、僵尸猪灵 | 30 |
+| 危险 | 末影人、烈焰人、恶魂、旋风人、女巫、掠夺者、卫道士、岩浆怪、守卫者、潜影贝、凋灵骷髅、`camel_husk`、嘎枝、`sulfur_cube`、恼鬼、僵尸疣猪兽、`zombie_nautilus` | 50 |
+| 精英 | 唤魔者、猪灵蛮兵、劫掠兽、巨人、幻术师 | 100 |
 | 小型 Boss | 远古守卫者 | 250 |
 | 深暗 Boss | Warden | 750 |
 | Boss | 凋灵 | 1500 |
@@ -29,7 +29,7 @@ cargo run --bin mclang -- build examples/monster_market -o build/monster_market 
 
 可用两名玩家做联机验收：
 
-1. 分别击杀僵尸、精英怪和 Warden，确认得到 20、100 和 750 分；连续击杀同一档生物仍能重复奖励。
+1. 分别击杀僵尸、精英怪和 Warden，确认得到 20、100 和 750 分；连续击杀同一档生物仍能重复奖励。全部 45 个 `MobCategory.MONSTER` 注册实体都应属于且只属于一个悬赏档。
 2. 给一名玩家累积到 100 分，确认只增加该玩家的最大生命值；购买后余额低于 100 时，确认额外生命值撤销。
 3. 两人打开原生对话框商店，确认市场规则、六个商品按钮和详情物品图标都可见；点击返回能回到列表。
 4. 先让一人购买铁剑，再让另一人购买铁剑，确认第二笔交易受到需求上涨影响；购买后聊天显示实际成交价。

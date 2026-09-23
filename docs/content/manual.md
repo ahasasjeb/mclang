@@ -1,4 +1,4 @@
-:::lede Mclang 是一门面向 Minecraft Java Edition 26.3-rc-2 的数据包编程语言。作者用命名、类型和结构化语法描述实体查询、物品、消息、控制流与世界命令，实体选择器、execute 上下文、NBT 路径、文本组件 JSON、计分板 ABI 与数据包目录全部由编译器生成并检查。
+:::lede Mclang 是一门面向 Minecraft Java Edition 26.3 的数据包编程语言。作者用命名、类型和结构化语法描述实体查询、物品、消息、控制流与世界命令，实体选择器、execute 上下文、NBT 路径、文本组件 JSON、计分板 ABI 与数据包目录全部由编译器生成并检查。
 :::
 
 :::note 本手册怎么读
@@ -579,6 +579,8 @@ advancement <名称> {
 
 进度是数据包唯一的事件入口：`criterion` 监听原版触发器（26.3 `CriteriaTriggers` 注册表，名字可以省略 `minecraft:` 前缀，完整清单见[附录 D](#appendix-triggers)），事件命中时运行 `reward.function` 指向的函数。**进度完成一次后不再触发**；需要持续响应时，在奖励函数里用 `advancement.revoke(自身, 进度)` 撤销自己。
 
+`requirements = all` 要求每条准则都完成，是默认策略；`requirements = any` 在任意一条准则完成时触发。生成的原版二维数组对外层分组做 AND、对同一内层分组里的准则名做 OR，因此 `all` 生成多个单元素组，`any` 生成一个包含全部准则名的组。
+
 `conditions` 保持触发器的原始 JSON（`location`、`blocks` 等字段由原版定义）；编译期检查 JSON 语法、触发器名与准则重名，并按源码快照校验已知触发器的条件字段——字段名必须属于该触发器，战利品条件字段需要谓词资源字符串或带 `type` 的内联条件对象。注意 26.3 的内联战利品条件用 `type` 作判别键（`condition` 现在只用于引用谓词资源），例如 `{"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}`；需要实体谓词时套 `minecraft:entity_properties`，实体填 `"entity":"this"`，类型字段写 `minecraft:entity_type`，例如击杀僵尸：`{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}`。`parent`、`reward.function`、`reward.loot`、`reward.recipe` 引用本命名空间声明时要求存在，字符串形式按外部资源位置处理；`reward.loot` 与 `reward.recipe` 引用 `resource loot_table` / `resource recipe` 声明。`display.icon` 引用已声明的 `item` 定义，图标会带上它的组件。显示规则与原版一致：**根进度的 `display` 必须声明 `background`，带 `parent` 的进度不能声明 `background`**。
 
 `reward` 与 `display` 都可以省略：只有触发逻辑的隐形进度是数据包的常规用法。
@@ -824,7 +826,7 @@ let <name> = data.get(<目标>, "<路径>");
 | `from(<目标>, "<路径>")` | `from <目标> <路径>` | 从另一个 NBT 位置复制 |
 | `value(<NBT 值>)` | `value <SNBT>` | 内联 NBT 值，可写 `value(nbt { ... })` 或标量 `value(1.5f)` |
 | `string(<目标>, "<路径>"[, <起始>[, <结束>]])` | `string <目标> <路径> …` | 读取后转成字符串 |
-| `compute(<上下文>, float\|integer, "<provider>"[, <缩放>])` | `compute …` | 用上下文 provider 计算数值 |
+| `compute(<上下文>, float\|integer, "<provider>")` | `compute …` | 用上下文 provider 计算数值；此处不支持缩放 |
 
 `data.get` 是表达式，经 `execute store result` 落入计分项；读取失败或非数值时为 0。NBT 路径会解析成成员、带引号成员、`[0]`/`[-1]` 下标、`[]` 全列表、`[{...}]` 列表元素匹配、`成员{...}` 与根级 `{...}` 匹配节点。匹配复合中的 SNBT 会检查键值、逗号、列表和嵌套结构；命令中仍保留原路径文本。
 
@@ -1332,7 +1334,7 @@ nbt { <具名标签> = <值>; ... }        // 合并到 @s
 数据 { ... }                          // 中文写法
 ```
 
-`nbt { ... }` 作为语句时生成 `data merge entity @s {...}`，把具名标签合并到当前实体。键会对照从 26.3 客户端源码提取的实体标签表检查（`data/version/26.3-rc-2/entity_nbt.json`）：
+`nbt { ... }` 作为语句时生成 `data merge entity @s {...}`，把具名标签合并到当前实体。键会对照从 26.3 客户端源码提取的实体标签表检查（`data/version/26.3/entity_nbt.json`）：
 
 - `spawn("minecraft:zombie") { nbt { ... } }` 与知道实体类型的 `each(查询)` 按该实体类型沿继承链的全部标签检查；
 - `@non_player`、`@entity` 等不知道具体类型的上下文按 26.3 全部实体标签的并集检查；
@@ -1593,9 +1595,10 @@ fn release() {
 | `count(<查询>)` | 查询命中的实体数量（无命中为 0） |
 | `random(<最小值>, <最大值>)` | 闭区间随机整数，如 `random(1, 6)` |
 | `data.get(entity, <持有者>, "<路径>")` 等 | 读取 NBT 数值；`block <坐标>`、`storage "<资源位置>"` 三种来源 |
-| `compute(<来源>, float 或 integer, "<provider>"[, <缩放>])` | 按上下文 provider 计算数值；来源是 `default`、`block, <坐标>` 或 `entity, <持有者>` |
+| `compute(<来源>, float, "<provider>"[, <缩放>])` | 按上下文浮点 provider 计算数值，可选单精度缩放（包括 0） |
+| `compute(<来源>, integer, "<provider>")` | 按上下文整数 provider 计算数值，不支持缩放 |
 
-`count`、`random`、`data.get`、`compute` 都通过 `execute store result score` 落入临时计分项，可以参与后续算术与条件；`data.get` 读取失败或非数值时为 0，`compute` 的 provider 必须是 26.3 注册表里的 `context_float_provider`/`context_int_provider`。
+`compute` 的来源是 `default`、`block, <坐标>` 或 `entity, <持有者>`；实体查询必须使用 `limit(1)`。`count`、`random`、`data.get`、`compute` 都通过 `execute store result score` 落入临时计分项，可以参与后续算术与条件；`data.get` 读取失败或非数值时为 0，`compute` 的 provider 必须是 26.3 注册表里的 `context_float_provider`/`context_int_provider`。
 
 运算符：一元 `-`，二元 `+`、`-`、`*`、`/`、`%`，括号分组；优先级与常见语言一致（`* / %` 高于 `+ -`）。除以常量 0 在编译期拒绝。
 
@@ -1969,7 +1972,7 @@ cargo run -- check examples/multi_counter --deny-raw
 
 ## 核心与实体命令补全 {#command-completion}
 
-本节对应开发计划 §2.1、§2.2，命令形状以随附的 26.3-rc-2 源码为准。新增命令都可以直接写成语句，也可把原版整数结果用于表达式，例如 `let total = tag.list(players);`、`let health = attribute.get(one, "minecraft:max_health", 100);`。查询失败时结果为 0。函数宏使用下文单独的调用形式。
+本节对应开发计划 §2.1、§2.2，命令形状以随附的 26.3 源码为准。新增命令都可以直接写成语句，也可把原版整数结果用于表达式，例如 `let total = tag.list(players);`、`let health = attribute.get(one, "minecraft:max_health", 100);`。查询失败时结果为 0。函数宏使用下文单独的调用形式。
 
 实体参数使用已声明查询或 `self`。`damage`、`attribute`、`ride`、`rotate`、`spectate` 的被观察目标、路径点以及 `loot.kill` 都要求单实体，查询必须声明 `limit(1)`；玩家参数还要求查询匹配 `minecraft:player`。省略目标的 `kill`、`swing` 需要实体上下文，`spectate`、`gamemode`、`spawnpoint`、`clear` 需要玩家上下文。`trigger` 只能在玩家上下文执行，目标准则必须是 `trigger`。
 
@@ -2150,7 +2153,7 @@ call "#external:macros" with(storage, "demo:args");
 
 ## 附录 E：实体 NBT 中文别名 {#appendix-nbt-aliases}
 
-实体 `nbt { … }` 语句与 `set_block`/`fill` 方块实体数据的顶层键支持中文别名，解析期归一化为规范英文键；英文键始终可用，别名只覆盖数据包作者常用的标签，其余写英文键。完整标签表由 `cargo run --bin generate-version-data` 从 26.3 源码生成到 `data/version/26.3-rc-2/entity_nbt.json`。
+实体 `nbt { … }` 语句与 `set_block`/`fill` 方块实体数据的顶层键支持中文别名，解析期归一化为规范英文键；英文键始终可用，别名只覆盖数据包作者常用的标签，其余写英文键。完整标签表由 `cargo run --bin generate-version-data` 从 26.3 源码生成到 `data/version/26.3/entity_nbt.json`。
 
 :::table kind=nbt-aliases
 :::

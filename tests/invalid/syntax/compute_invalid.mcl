@@ -1,0 +1,15 @@
+// 编译测试（负向语义）：compute 的参数必须符合原版命令分支。
+// 期望诊断：integer 缩放、data.modify 的 compute 缩放、多实体来源、单精度缩放越界。
+namespace invalid_compute;
+
+query many_zombies = entity("minecraft:zombie") { within(32); };
+
+@load
+fn check_compute() {
+    let integer_scale = compute(default, integer, "minecraft:cooking/time_coal", 2);
+    let many_entities = compute(entity, many_zombies, float, "minecraft:cooking/speed_default");
+    let huge_scale = compute(default, float, "minecraft:cooking/speed_default", 1000000000000000000000000000000000000000.0);
+    data.modify(storage, "invalid_compute:data", "value", set, compute(default, float, "minecraft:cooking/speed_default", 2.5));
+    data.modify(storage, "invalid_compute:data", "integer", set, compute(default, integer, "minecraft:cooking/time_coal", 2));
+    data.modify(storage, "invalid_compute:data", "entity", set, compute(entity, many_zombies, integer, "minecraft:cooking/time_coal"));
+}

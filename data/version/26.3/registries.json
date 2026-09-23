@@ -14728,7 +14728,7 @@
       "weapon.offhand"
     ]
   },
-  "source": "minecraft_client_26.3-rc-2",
+  "source": "minecraft_client_26.3",
   "tag_registries": [
     "banner_pattern",
     "banner_pattern/pattern_item",

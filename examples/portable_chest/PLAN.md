@@ -1,6 +1,6 @@
 # 便携箱子项目执行计划
 
-- [x] 从 Minecraft 26.3-rc-2 源码确认掉落物的 `contents` 槽和物品谓词语法。
+- [x] 从 Minecraft 26.3 源码确认掉落物的 `contents` 槽和物品谓词语法。
 - [x] 确认玩家 NBT 不能通过 `data` 修改（`EntityDataAccessor` 拒绝玩家），按玩家状态必须走计分板。
 - [x] 为语言补充 `objective` 声明与 `scoreboard.set/reset/get` 计分板读写。
 - [x] 为语言补充 `teleport(持有者, pos(...) | 实体查询)`，并核对 `tp @s <实体>` 会跟随目标实体的维度。
@@ -10,7 +10,7 @@
 - [x] 收起时整辆矿车传送进仓库，放出时传送回触发物身边；物品始终留在矿车 `Items` 里。
 - [x] 矿车补充 `NoGravity` 与 `Invulnerable`，不会下落、滑动或被伤害摧毁。
 - [x] 用 `--deny-raw` 严格模式验证源码不含底层命令字符串。
-- [x] 通过 Mclang 静态检查并生成 26.3-rc-2 数据包。
+- [x] 通过 Mclang 静态检查并生成 26.3 数据包。
 - [x] 检查生成的标签、函数、数据包格式和关键命令。
 - [x] 运行 Rust 测试、格式检查和 Clippy 回归检查。
-- [ ] 在 Minecraft 26.3-rc-2 世界中完成双人交互验收。
+- [ ] 在 Minecraft 26.3 世界中完成双人交互验收。

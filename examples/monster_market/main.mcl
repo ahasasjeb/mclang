@@ -91,7 +91,7 @@ export @player fn award(amount) {
             scoreboard.set(self, joined, 1);
             scoreboard.set(self, health_tier, -1);
             scoreboard.set(self, points_seen, -1);
-            message.self("29 种敌对生物都有悬赏，Warden、凋灵与末影龙奖励最高。", gold);
+            message.self("45 种 MONSTER 类生物都有悬赏，Warden、凋灵与末影龙奖励最高。", gold);
             message.self(text("[打开可视化商店]") { color = "aqua"; click = run_command("/trigger monster_market_shop_request set 9"); });
         }
 

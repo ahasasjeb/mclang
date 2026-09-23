@@ -133,6 +133,33 @@ fn native_command_shapes_and_macro_forwarding() {
             .all(|line| line.starts_with("execute if score ")),
         "短路条件右侧的副作用调用必须受左侧标志保护：{short_circuit}"
     );
+    let advancement_output = root.join("target/command-outputs/advancement");
+    build_file(
+        &root.join("tests/valid/advancement"),
+        &advancement_output,
+        &options,
+    )
+    .unwrap();
+    let portal: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            advancement_output.join("data/advancement_test/advancement/portal_frame.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let any = portal["requirements"].as_array().unwrap();
+    assert_eq!(any.len(), 1, "any 应生成一个 OR 组：{portal}");
+    assert_eq!(any[0].as_array().unwrap().len(), 3);
+    let all_gate: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(
+            advancement_output.join("data/advancement_test/advancement/all_gate.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let all = all_gate["requirements"].as_array().unwrap();
+    assert_eq!(all.len(), 2, "all 应生成两个 AND 组：{all_gate}");
+    assert!(all.iter().all(|group| group.as_array().unwrap().len() == 1));
     let ui_files = files(&root.join("target/command-outputs/ui_commands"));
     let ui_text = ui_files
         .values()

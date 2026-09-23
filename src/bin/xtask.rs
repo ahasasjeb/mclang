@@ -2,8 +2,8 @@
 //!
 //! 目前支持：
 //!
-//! - `generate-version-data`：从 `minecraft_client_26.3-rc-2/` 重新生成
-//!   版本数据快照到 `data/version/26.3-rc-2/`；
+//! - `generate-version-data`：从 `minecraft_client_26.3/` 重新生成
+//!   版本数据快照到 `data/version/26.3/`；
 //! - `check-version-data`：比对快照与源码，不写盘（CI 使用）。
 //!
 //! 子命令省略时等价于 `generate-version-data`。

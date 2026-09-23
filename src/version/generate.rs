@@ -28,9 +28,9 @@ pub use registries::generate_registries;
 pub use triggers::generate_triggers;
 
 /// 仓库内 Minecraft 源码目录名。
-pub const SOURCE_DIR: &str = "minecraft_client_26.3-rc-2";
+pub const SOURCE_DIR: &str = "minecraft_client_26.3";
 /// 快照对应的版本标识。
-pub const VERSION: &str = "26.3-rc-2";
+pub const VERSION: &str = "26.3";
 
 /// 一次生成的产物：文件名与内容。
 pub struct Output {

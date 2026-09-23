@@ -10,7 +10,7 @@
 //!    `minecraft:<id>` → 类的映射；
 //! 4. 沿继承链求并集，输出排序、可复现的 JSON。
 //!
-//! 快照保存在 `data/version/26.3-rc-2/entity_nbt.json`，测试会重新生成并比对，
+//! 快照保存在 `data/version/26.3/entity_nbt.json`，测试会重新生成并比对，
 //! 因此表与随附源码不会脱节。运行时 [`catalog`] 解析该快照供语义检查使用。
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -149,7 +149,7 @@ pub fn generate(source_root: &Path) -> Result<String, String> {
     let mut root = serde_json::Map::new();
     root.insert(
         "source".to_owned(),
-        serde_json::Value::String("minecraft_client_26.3-rc-2".to_owned()),
+        serde_json::Value::String("minecraft_client_26.3".to_owned()),
     );
     let mut tag_object = serde_json::Map::new();
     for (key, category) in &tags {
@@ -198,9 +198,9 @@ static CATALOG: OnceLock<EntityNbtCatalog> = OnceLock::new();
 /// 进程内共享的实体 NBT 标签目录。
 pub fn catalog() -> &'static EntityNbtCatalog {
     CATALOG.get_or_init(|| {
-        let text = include_str!("../../data/version/26.3-rc-2/entity_nbt.json");
+        let text = include_str!("../../data/version/26.3/entity_nbt.json");
         EntityNbtCatalog::from_json(text)
-            .expect("data/version/26.3-rc-2/entity_nbt.json 必须是有效的实体 NBT 快照")
+            .expect("data/version/26.3/entity_nbt.json 必须是有效的实体 NBT 快照")
     })
 }
 

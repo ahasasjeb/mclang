@@ -93,7 +93,7 @@ fn block_properties() -> &'static BlockProperties {
     BLOCK_PROPERTIES.get_or_init(|| {
         let source = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/data/version/26.3-rc-2/block_states.json"
+            "/data/version/26.3/block_states.json"
         ));
         let document: serde_json::Value =
             serde_json::from_str(source).expect("方块状态快照必须是 JSON");

@@ -1,6 +1,6 @@
 {
   "digest": "fnv1a64:b99d580460657323",
-  "source": "minecraft_client_26.3-rc-2",
+  "source": "minecraft_client_26.3",
   "triggers": {
     "allay_drop_item_on_block": {
       "location": "loot_condition",

@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 use serde_json::Value;
 
 /// 当前随附的版本标识。
-pub const VERSION: &str = "26.3-rc-2";
+pub const VERSION: &str = "26.3";
 
 static SNAPSHOT: OnceLock<Snapshot> = OnceLock::new();
 
@@ -110,11 +110,11 @@ impl Snapshot {
         self.enchantment_max_levels.get(id).copied()
     }
     fn load() -> Self {
-        let registries = parse_json(include_str!("../../data/version/26.3-rc-2/registries.json"));
-        let enums = parse_json(include_str!("../../data/version/26.3-rc-2/enums.json"));
-        let commands = parse_json(include_str!("../../data/version/26.3-rc-2/commands.json"));
+        let registries = parse_json(include_str!("../../data/version/26.3/registries.json"));
+        let enums = parse_json(include_str!("../../data/version/26.3/enums.json"));
+        let commands = parse_json(include_str!("../../data/version/26.3/commands.json"));
         let triggers = parse_json(include_str!(
-            "../../data/version/26.3-rc-2/advancement_triggers.json"
+            "../../data/version/26.3/advancement_triggers.json"
         ));
         Self {
             enchantment_max_levels: serde_json::from_value(
