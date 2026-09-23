@@ -148,6 +148,8 @@ fn validate_item_enchantments(
 
 pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut Vec<Diagnostic>) {
     validate_entity_type(&query.entity_type, query.span, diagnostics);
+    let base_is_tag = query.entity_type.starts_with('#');
+    let mut excluded_type_tags = HashSet::new();
     for filter in &query.type_filters {
         let (value, span) = match filter {
             EntityTypeFilter::Include(value, span) | EntityTypeFilter::Exclude(value, span) => {
@@ -163,11 +165,28 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
                 ),
                 span,
             )),
-            EntityTypeFilter::Exclude(value, _) if value == &query.entity_type => {
+            EntityTypeFilter::Exclude(value, _) if !base_is_tag => {
                 diagnostics.push(Diagnostic::new(
-                    format!("查询 `{}` 同时包含并排除实体类型 `{value}`", query.name),
+                    format!(
+                        "查询 `{}` 已由 entity(\"{}\") 指定具体类型，不能再添加 without_type(\"{value}\")；原版选择器会拒绝具体正向类型后的第二个 type 选项",
+                        query.name, query.entity_type
+                    ),
                     span,
                 ))
+            }
+            EntityTypeFilter::Exclude(value, _) if value == &query.entity_type => diagnostics.push(
+                Diagnostic::new(
+                    format!("查询 `{}` 同时包含并排除实体类型标签 `{value}`", query.name),
+                    span,
+                ),
+            ),
+            EntityTypeFilter::Exclude(value, _) if value.starts_with('#') => {
+                if !excluded_type_tags.insert(value.as_str()) {
+                    diagnostics.push(Diagnostic::new(
+                        format!("查询 `{}` 重复排除实体类型标签 `{value}`", query.name),
+                        span,
+                    ));
+                }
             }
             EntityTypeFilter::Exclude(_, _) => {}
         }

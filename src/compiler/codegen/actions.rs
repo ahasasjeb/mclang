@@ -255,7 +255,16 @@ impl Compiler<'_> {
         let mut command = format!("item {} {target} {slots}", method.as_str());
         match action {
             ItemActionKind::With(item, _) => {
-                command.push_str(&format!(" with {}", self.item_stack_argument_for(item)));
+                let definition = self
+                    .program
+                    .item_stacks
+                    .iter()
+                    .find(|candidate| candidate.name == *item)
+                    .expect("semantic validation guarantees the item stack exists");
+                command.push_str(&format!(" with {}", item_stack_argument(definition)));
+                if definition.count != 1 {
+                    command.push_str(&format!(" {}", definition.count));
+                }
             }
             ItemActionKind::From {
                 source,
@@ -279,16 +288,6 @@ impl Compiler<'_> {
     }
 
     /// 按声明名称取物品堆文本。
-    pub(super) fn item_stack_argument_for(&self, name: &str) -> String {
-        let item = self
-            .program
-            .item_stacks
-            .iter()
-            .find(|candidate| candidate.name == name)
-            .expect("semantic validation guarantees the item stack exists");
-        item_stack_argument(item)
-    }
-
     /// `scoreboard.set(持有者, 目标, 值)`：把表达式写入用户计分板。
     pub(super) fn compile_score_set(
         &mut self,

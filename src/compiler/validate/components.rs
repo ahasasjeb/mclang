@@ -19,6 +19,12 @@ pub(super) fn validate_message_argument(
             message.span,
         ));
     }
+    if message.text.encode_utf16().count() > 256 {
+        diagnostics.push(Diagnostic::new(
+            "聊天消息不能超过 256 个 UTF-16 字符",
+            message.span,
+        ));
+    }
 }
 
 /// 校验整个组件树。
@@ -219,6 +225,74 @@ pub(super) fn validate_nbt_source(
     }
 }
 
+/// Data commands use `EntityArgument.entity()`, so an entity query must be
+/// syntactically limited to one result. Text components share
+/// [`validate_nbt_source`] but allow multiple entities; only data entry points
+/// call this stricter wrapper.
+pub(super) fn validate_data_nbt_source(
+    source: &NbtComponentSource,
+    span: crate::ast::Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    validate_nbt_source(source, span, ctx, diagnostics);
+    if let NbtComponentSource::Entity(holder) = source {
+        match holder {
+            Holder::Origin => diagnostics.push(Diagnostic::new(
+                "data 实体参数不接受 origin；请在 execute on origin 块中使用 self",
+                span,
+            )),
+            Holder::Query(name, query_span)
+                if ctx
+                    .symbols
+                    .queries
+                    .get(name.as_str())
+                    .is_some_and(|query| query.limit != Some(1)) =>
+            {
+                diagnostics.push(Diagnostic::new(
+                    format!("data 实体参数查询 `{name}` 必须使用 limit(1)"),
+                    *query_span,
+                ));
+            }
+            Holder::SelfEntity | Holder::Query(_, _) => {}
+        }
+    }
+}
+
+/// Validate the writable target side of `data merge/remove/modify`.
+pub(super) fn validate_writable_data_nbt_target(
+    target: &NbtComponentSource,
+    span: crate::ast::Span,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    validate_data_nbt_source(target, span, ctx, diagnostics);
+    let NbtComponentSource::Entity(holder) = target else {
+        return;
+    };
+    match holder {
+        Holder::SelfEntity if ctx.context != crate::compiler::types::ExecutionContext::Mob => {
+            diagnostics.push(Diagnostic::new(
+                "data 写入实体 NBT 时 self 必须处于确定的非玩家上下文",
+                span,
+            ));
+        }
+        Holder::Query(name, query_span)
+            if ctx
+                .symbols
+                .queries
+                .get(name.as_str())
+                .is_some_and(|query| query.entity_type == "minecraft:player") =>
+        {
+            diagnostics.push(Diagnostic::new(
+                format!("data 不能写入玩家 NBT：查询 `{name}` 匹配 minecraft:player"),
+                *query_span,
+            ));
+        }
+        Holder::SelfEntity | Holder::Origin | Holder::Query(_, _) => {}
+    }
+}
+
 /// 组件里的持有者：`origin`（投掷者）无法在 JSON 组件里表达，直接拒绝。
 fn validate_component_holder(
     holder: &Holder,
@@ -250,6 +324,15 @@ fn validate_click(click: &ClickEvent, span: crate::ast::Span, diagnostics: &mut 
             if command.trim().is_empty() {
                 diagnostics.push(Diagnostic::new("点击事件里的命令不能为空", span));
             }
+            if command
+                .chars()
+                .any(|character| matches!(character as u32, 0..=31 | 127 | 167))
+            {
+                diagnostics.push(Diagnostic::new(
+                    "run_command/suggest_command 含有 Minecraft 聊天字符串禁止的控制字符、DEL 或 §",
+                    span,
+                ));
+            }
         }
         ClickEvent::CopyToClipboard(value) => {
             if value.is_empty() {
@@ -259,15 +342,15 @@ fn validate_click(click: &ClickEvent, span: crate::ast::Span, diagnostics: &mut 
         ClickEvent::ChangePage(page) => {
             if *page == 0 {
                 diagnostics.push(Diagnostic::new("change_page 的页号从 1 开始", span));
-            }
-        }
-        ClickEvent::ShowDialog(dialog) => {
-            if !valid_resource_location(dialog) {
+            } else if *page > i32::MAX as u32 {
                 diagnostics.push(Diagnostic::new(
-                    format!("show_dialog 的 `{dialog}` 不是有效的对话框资源位置"),
+                    "change_page 的页号不能超过 2147483647",
                     span,
                 ));
             }
+        }
+        ClickEvent::ShowDialog(dialog) => {
+            super::registry::validate_id("dialog", "对话框", dialog, span, diagnostics);
         }
         ClickEvent::Custom { id, .. } => {
             if !valid_resource_location(id) {

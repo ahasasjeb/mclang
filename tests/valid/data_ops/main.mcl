@@ -2,13 +2,17 @@
 namespace data_ops_test;
 
 query holder = entity("minecraft:player") { limit(1); };
+query armed_holder = entity("minecraft:player") {
+    limit(1);
+    item("weapon.mainhand") { id = "minecraft:diamond_sword"; }
+}
 score points = 0;
 
 item reward = item_stack("minecraft:diamond") { count = 2; custom_name = "奖励"; };
 
 data_slot extra = entity_data("nested.records[0].payload");
 
-@entity
+@non_player
 fn edit_data() {
     data.merge(entity, self, nbt { CustomName = "仓库"; Tags = ["a", "b"]; });
     data.merge(block, pos(0, 64, 0), nbt { label = "箱子"; });
@@ -40,5 +44,6 @@ fn read_back() {
     let health = data.get(entity, self, "Health");
     let block_count = data.get(block, pos(0, 64, 0), "Items[0].count");
     let stored = data.get(storage, "data_ops_test:store", "names[0]");
-    points = health + block_count + stored;
+    let armed_health = data.get(entity, armed_holder, "Health");
+    points = health + block_count + stored + armed_health;
 }

@@ -171,6 +171,13 @@ fn validate_test_command(command: &TestCommand, span: Span, diagnostics: &mut Ve
             span,
         ));
     }
+    if let TestCommand::Run {
+        times: Some(times), ..
+    } = command
+        && *times > i32::MAX as u32
+    {
+        diagnostics.push(Diagnostic::new("测试运行次数不能超过 2147483647", span));
+    }
     match command {
         TestCommand::Create { id, .. } if !super::rules::valid_resource_location(id) => {
             diagnostics.push(Diagnostic::new(

@@ -1,0 +1,5 @@
+// expect: f32::MAX
+namespace invalid_worldborder_float;
+fn bad() {
+    worldborder.damage_amount(999999999999999999999999999999999999999.0);
+}

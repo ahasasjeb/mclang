@@ -1,0 +1,5 @@
+// expect: Minecraft 聊天字符串禁止
+namespace invalid_component_chat_character;
+fn bad() {
+    message.all(text("run") { click = run_command("/say §bad"); });
+}

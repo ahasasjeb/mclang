@@ -307,21 +307,26 @@ impl Compiler<'_> {
                 commands.push(format!("data merge entity @s {}", nbt_text(nbt)));
             }
             StatementKind::DataMerge { target, nbt } => {
-                commands.push(format!(
-                    "data merge {} {}",
-                    self.nbt_source_text(target),
-                    nbt_text(nbt)
-                ));
+                let holders = nbt_source_holders(target);
+                let command = self.capture_command_targets(&holders, owner, |compiler| {
+                    format!(
+                        "data merge {} {}",
+                        compiler.nbt_source_text(target),
+                        nbt_text(nbt)
+                    )
+                });
+                commands.push(command);
             }
             StatementKind::DataRemove {
                 target,
                 path,
                 path_span: _,
             } => {
-                commands.push(format!(
-                    "data remove {} {path}",
-                    self.nbt_source_text(target)
-                ));
+                let holders = nbt_source_holders(target);
+                let command = self.capture_command_targets(&holders, owner, |compiler| {
+                    format!("data remove {} {path}", compiler.nbt_source_text(target))
+                });
+                commands.push(command);
             }
             StatementKind::DataModify {
                 target,
@@ -336,58 +341,68 @@ impl Compiler<'_> {
                     DataOperationKind::Set => "set",
                     DataOperationKind::Merge => "merge",
                 };
-                let mut command =
-                    format!("data modify {} {path} {kind}", self.nbt_source_text(target));
-                if let Some(index) = operation.index {
-                    command.push_str(&format!(" {index}"));
-                }
-                match &operation.source {
-                    DataSource::From {
-                        target,
-                        path,
-                        path_span: _,
-                    } => {
-                        command.push_str(&format!(" from {} {path}", self.nbt_source_text(target)))
+                let mut holders = nbt_source_holders(target);
+                holders.extend(data_source_holders(&operation.source));
+                let command = self.capture_command_targets(&holders, owner, |compiler| {
+                    let mut command = format!(
+                        "data modify {} {path} {kind}",
+                        compiler.nbt_source_text(target)
+                    );
+                    if let Some(index) = operation.index {
+                        command.push_str(&format!(" {index}"));
                     }
-                    DataSource::Value(nbt) => {
-                        command.push_str(&format!(" value {}", nbt_text(nbt)));
-                    }
-                    DataSource::String {
-                        target,
-                        path,
-                        path_span: _,
-                        start,
-                        end,
-                    } => {
-                        command
-                            .push_str(&format!(" string {} {path}", self.nbt_source_text(target)));
-                        if let Some(start) = start {
-                            command.push_str(&format!(" {start}"));
+                    match &operation.source {
+                        DataSource::From {
+                            target,
+                            path,
+                            path_span: _,
+                        } => command.push_str(&format!(
+                            " from {} {path}",
+                            compiler.nbt_source_text(target)
+                        )),
+                        DataSource::Value(nbt) => {
+                            command.push_str(&format!(" value {}", nbt_text(nbt)));
                         }
-                        if let Some(end) = end {
-                            command.push_str(&format!(" {end}"));
-                        }
-                    }
-                    DataSource::Compute {
-                        source,
-                        kind,
-                        provider,
-                        provider_span: _,
-                        scale,
-                    } => {
-                        command.push_str(&format!(
-                            " compute {} {} {provider}",
-                            self.compute_source_text(source),
-                            match kind {
-                                ComputeKind::Float => "float",
-                                ComputeKind::Integer => "integer",
+                        DataSource::String {
+                            target,
+                            path,
+                            path_span: _,
+                            start,
+                            end,
+                        } => {
+                            command.push_str(&format!(
+                                " string {} {path}",
+                                compiler.nbt_source_text(target)
+                            ));
+                            if let Some(start) = start {
+                                command.push_str(&format!(" {start}"));
                             }
-                        ));
-                        if let Some(scale) = scale {
-                            command.push_str(&format!(" {scale}"));
+                            if let Some(end) = end {
+                                command.push_str(&format!(" {end}"));
+                            }
+                        }
+                        DataSource::Compute {
+                            source,
+                            kind,
+                            provider,
+                            provider_span: _,
+                            scale,
+                        } => {
+                            command.push_str(&format!(
+                                " compute {} {} {provider}",
+                                compiler.compute_source_text(source),
+                                match kind {
+                                    ComputeKind::Float => "float",
+                                    ComputeKind::Integer => "integer",
+                                }
+                            ));
+                            if let Some(scale) = scale {
+                                command.push_str(&format!(" {scale}"));
+                            }
                         }
                     }
-                }
+                    command
+                });
                 commands.push(command);
             }
             StatementKind::AdvancementAction {
@@ -444,5 +459,29 @@ impl Compiler<'_> {
             }
             StatementKind::Return(kind) => self.compile_return(kind, owner, commands),
         }
+    }
+}
+
+fn nbt_source_holders(source: &NbtComponentSource) -> Vec<&Holder> {
+    match source {
+        NbtComponentSource::Entity(holder) => vec![holder],
+        NbtComponentSource::Block(_) | NbtComponentSource::Storage(_, _) => Vec::new(),
+    }
+}
+
+fn data_source_holders(source: &DataSource) -> Vec<&Holder> {
+    match source {
+        DataSource::From { target, .. } | DataSource::String { target, .. } => {
+            nbt_source_holders(target)
+        }
+        DataSource::Compute {
+            source: ComputeSource::Entity(holder),
+            ..
+        } => vec![holder],
+        DataSource::Value(_)
+        | DataSource::Compute {
+            source: ComputeSource::Default | ComputeSource::Block(_),
+            ..
+        } => Vec::new(),
     }
 }

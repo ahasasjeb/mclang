@@ -126,7 +126,7 @@ pub(super) fn validate_condition(
             path_span,
             ..
         } => {
-            super::components::validate_nbt_source(
+            super::components::validate_data_nbt_source(
                 source,
                 condition_span(condition),
                 ctx,
@@ -323,7 +323,7 @@ pub(super) fn validate_data_source(
             path_span,
             ..
         } => {
-            super::components::validate_nbt_source(target, span, ctx, diagnostics);
+            super::components::validate_data_nbt_source(target, span, ctx, diagnostics);
             if !super::components::valid_nbt_component_path(path) {
                 diagnostics.push(Diagnostic::new(
                     format!("`{path}` 不是有效的 NBT 路径"),

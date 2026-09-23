@@ -303,7 +303,7 @@ pub(super) fn validate_statement<'a>(
             );
         }
         StatementKind::DataMerge { target, nbt } => {
-            crate::compiler::validate::components::validate_nbt_source(
+            crate::compiler::validate::components::validate_writable_data_nbt_target(
                 target,
                 statement.span,
                 ctx,
@@ -321,7 +321,7 @@ pub(super) fn validate_statement<'a>(
             path,
             path_span,
         } => {
-            crate::compiler::validate::components::validate_nbt_source(
+            crate::compiler::validate::components::validate_writable_data_nbt_target(
                 target,
                 statement.span,
                 ctx,
@@ -340,7 +340,7 @@ pub(super) fn validate_statement<'a>(
             path_span,
             operation,
         } => {
-            crate::compiler::validate::components::validate_nbt_source(
+            crate::compiler::validate::components::validate_writable_data_nbt_target(
                 target,
                 statement.span,
                 ctx,
@@ -400,13 +400,23 @@ pub(super) fn validate_statement<'a>(
             }
             match action {
                 ItemActionKind::With(item, span) => {
-                    if !ctx.symbols.item_stacks.contains_key(item.as_str()) {
-                        diagnostics.push(Diagnostic::new(
+                    match ctx.symbols.item_stacks.get(item.as_str()) {
+                        None => diagnostics.push(Diagnostic::new(
                             format!(
                                 "找不到物品定义 `{item}`；先声明 `item {item} = item_stack(...);`"
                             ),
                             *span,
-                        ));
+                        )),
+                        Some(definition) if definition.count > 99 => {
+                            diagnostics.push(Diagnostic::new(
+                                format!(
+                                    "item with 使用的物品 `{item}` 数量不能超过 99，实际为 {}",
+                                    definition.count
+                                ),
+                                *span,
+                            ))
+                        }
+                        Some(_) => {}
                     }
                 }
                 ItemActionKind::From {

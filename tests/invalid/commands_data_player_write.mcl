@@ -1,0 +1,6 @@
+// expect: 不能写入玩家 NBT
+namespace invalid_data_player_write;
+query player = entity("minecraft:player") { limit(1); }
+fn bad() {
+    data.remove(entity, player, "Tags[0]");
+}

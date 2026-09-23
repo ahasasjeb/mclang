@@ -3,10 +3,12 @@ query players = entity("minecraft:player") {}
 query player_one = entity("minecraft:player") { limit(1); }
 query mob_one = entity("minecraft:zombie") { limit(1); }
 query mobs = entity("minecraft:zombie") {}
+query named_undead = entity("#minecraft:undead") { name("Bob Smith"); limit(1); }
 objective request { criteria = "trigger"; }
 
 fn commands() {
     kill(mobs);
+    kill(named_undead);
     tag.add(mobs, "test");
     tag.remove(mobs, "test");
     let tags = tag.list(mobs);

@@ -74,7 +74,7 @@ impl Compiler<'_> {
                 ))
             ),
             ScoreboardCommand::PlayersNumberFormat { target, format } => format!(
-                "scoreboard players numberformat {} {}{}",
+                "scoreboard players display numberformat {} {}{}",
                 self.component_holder(&target.holder),
                 self.objective_name(&target.objective),
                 self.number_format_text(format)

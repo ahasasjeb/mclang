@@ -92,7 +92,7 @@ const GAME_RULES: &[(&str, GameRuleKind)] = &[
 
 /// `gamerule.query` 的表达式只需要存在性检查。
 pub(crate) fn game_rule_exists(name: &str) -> bool {
-    game_rule(name).is_some()
+    game_rule(name).is_some_and(|(id, _)| id != "max_minecart_speed")
 }
 
 fn game_rule(name: &str) -> Option<(&'static str, GameRuleKind)> {
@@ -116,6 +116,13 @@ pub(super) fn validate_game_rule(
         ));
         return;
     };
+    if id == "max_minecart_speed" {
+        diagnostics.push(Diagnostic::new(
+            "游戏规则 `max_minecart_speed` 需要未默认启用的 minecart_improvements 实验特性",
+            span,
+        ));
+        return;
+    }
     match (kind, value) {
         (GameRuleKind::Bool, GameRuleValue::Bool(_)) => {}
         (GameRuleKind::Bool, GameRuleValue::Integer(_)) => diagnostics.push(Diagnostic::new(

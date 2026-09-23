@@ -1,0 +1,5 @@
+// expect: 不接受 origin
+namespace invalid_data_origin;
+@entity fn bad() {
+    let value = data.get(entity, origin, "Health");
+}

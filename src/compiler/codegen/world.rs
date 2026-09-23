@@ -160,15 +160,19 @@ pub(super) fn clone_command(options: &CloneOptions<'_>) -> String {
         command.push_str(&format!(" from {dimension}"));
     }
     command.push_str(&format!(
-        " {} {} {}",
+        " {} {}",
         position_text(options.begin),
-        position_text(options.end),
-        position_text(options.destination)
+        position_text(options.end)
     ));
     if let Some(dimension) = options.to_dimension {
         command.push_str(&format!(" to {dimension}"));
     }
+    command.push_str(&format!(" {}", position_text(options.destination)));
+    if options.strict {
+        command.push_str(" strict");
+    }
     match options.filter {
+        CloneFilter::Replace if options.mode != CloneMode::Normal => command.push_str(" replace"),
         CloneFilter::Replace => {}
         CloneFilter::Masked => command.push_str(" masked"),
         CloneFilter::Filtered(filter) => {
@@ -177,9 +181,6 @@ pub(super) fn clone_command(options: &CloneOptions<'_>) -> String {
     }
     if let Some(mode) = options.mode.as_str() {
         command.push_str(&format!(" {mode}"));
-    }
-    if options.strict {
-        command.push_str(" strict");
     }
     command
 }

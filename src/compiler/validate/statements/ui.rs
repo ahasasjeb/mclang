@@ -164,7 +164,13 @@ fn validate_particle(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    validate_id("particle", "粒子", &particle.name, span, diagnostics);
+    crate::compiler::validate::registry::validate_static_id(
+        "particle",
+        "粒子",
+        &particle.name,
+        span,
+        diagnostics,
+    );
     particle::validate_options(particle, span, diagnostics);
     if let Some(position) = &particle.position {
         crate::compiler::validate::world::validate_position_value(position, diagnostics);

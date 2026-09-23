@@ -50,8 +50,14 @@ pub(super) fn validate_world_border(
             }
         }
         WorldBorderOperation::DamageAmount(value) | WorldBorderOperation::DamageBuffer(value) => {
-            if !value.parse::<f64>().is_ok_and(|value| value >= 0.0) {
-                diagnostics.push(Diagnostic::new("worldborder 伤害参数必须是非负数字", span));
+            if !value
+                .parse::<f64>()
+                .is_ok_and(|value| (0.0..=f32::MAX as f64).contains(&value))
+            {
+                diagnostics.push(Diagnostic::new(
+                    "worldborder 伤害参数必须是 0 到 f32::MAX 的有限数字",
+                    span,
+                ));
             }
         }
         WorldBorderOperation::WarningDistance(value) => {

@@ -1,0 +1,5 @@
+// expect: 测试运行次数不能超过 2147483647
+namespace invalid_test_times;
+fn bad() {
+    test.run("invalid_test_times:case", 2147483648);
+}

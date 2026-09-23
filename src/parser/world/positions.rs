@@ -177,7 +177,7 @@ impl Parser {
         let token = self.advance().clone();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
-            TokenKind::Decimal(value) => format!("{value}"),
+            TokenKind::Decimal(value) => decimal_text(value),
             _ => {
                 return Err(Diagnostic::new(
                     format!("{label}的坐标需要数字，或用 `~`/`^` 写相对坐标"),
@@ -278,7 +278,7 @@ impl Parser {
         let token = self.advance().clone();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
-            TokenKind::Decimal(value) => format!("{value}"),
+            TokenKind::Decimal(value) => decimal_text(value),
             _ => {
                 return Err(Diagnostic::new(
                     format!("{label}的 `~`/`^` 偏移需要数字"),
@@ -299,7 +299,7 @@ impl Parser {
         let token = self.advance().clone();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
-            TokenKind::Decimal(value) => format!("{value}"),
+            TokenKind::Decimal(value) => decimal_text(value),
             _ => {
                 return Err(Diagnostic::new(
                     format!("{label}需要数字或 `~`"),
@@ -308,5 +308,15 @@ impl Parser {
             }
         };
         Ok(if negative { format!("-{text}") } else { text })
+    }
+}
+
+/// Keep an explicit decimal marker when the source token was decimal. Minecraft
+/// center-corrects integer-looking absolute Vec2/Vec3 coordinates by `+0.5`.
+fn decimal_text(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.1}")
+    } else {
+        value.to_string()
     }
 }

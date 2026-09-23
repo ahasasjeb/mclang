@@ -1,0 +1,5 @@
+// expect: 该类型不能由数据包注册
+namespace invalid_particle_registry;
+fn bad() {
+    particle("example:not_registered");
+}

@@ -27,6 +27,7 @@ fn build() {
     fill_biome(pos(0, 0, 0), pos(15, 0, 15), "minecraft:plains", replace, "#minecraft:is_forest");
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0));
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), masked, force, strict);
+    clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), force);
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), filtered, block_state("#minecraft:logs"), move);
     clone(pos(0, 64, 0), pos(4, 64, 4), pos(10, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
     place.feature("minecraft:oak", pos(0, 64, 0));
@@ -66,6 +67,7 @@ fn environment() {
     worldborder.set(1000);
     worldborder.center(~, 0.5);
     worldborder.center(vec2(1.5, ~2));
+    worldborder.center(vec2(10.0, 20.0));
     worldborder.damage_amount(0.5);
     worldborder.damage_buffer(5);
     worldborder.warning_distance(10);
@@ -81,6 +83,7 @@ fn environment() {
 @entity
 fn journey() {
     teleport(self, vec3(1.5, 64, -3.25), rotation(90, -45));
+    teleport(self, vec3(2.0, 64.0, 4.0));
     teleport(自身, block_pos(~1, ~, ~));
     teleport(self, vec3(~, ~1.5, ~-2.25));
 }

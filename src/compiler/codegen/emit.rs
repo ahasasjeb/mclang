@@ -44,15 +44,22 @@ pub(super) fn item_predicate_text(predicate: &crate::ast::ItemPredicate) -> Stri
 
 pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
     let mut selector = Vec::new();
-    if let Some(tag) = query.entity_type.strip_prefix('#') {
+    let base_is_tag = if let Some(tag) = query.entity_type.strip_prefix('#') {
         selector.push(format!("type=#{tag}"));
+        true
     } else {
         selector.push(format!("type={}", query.entity_type));
-    }
-    for filter in &query.type_filters {
-        match filter {
-            EntityTypeFilter::Include(value, _) => selector.push(format!("type={value}")),
-            EntityTypeFilter::Exclude(value, _) => selector.push(format!("type=!{value}")),
+        false
+    };
+    // A concrete positive type makes Brigadier reject every following `type=`
+    // option. Validation diagnoses that source shape; keep formatting defensive
+    // so only tag-based queries can emit the legal repeated exclusions.
+    if base_is_tag {
+        for filter in &query.type_filters {
+            match filter {
+                EntityTypeFilter::Include(value, _) => selector.push(format!("type={value}")),
+                EntityTypeFilter::Exclude(value, _) => selector.push(format!("type=!{value}")),
+            }
         }
     }
     selector.extend(query.tags.iter().map(|tag| format!("tag={tag}")));
@@ -61,7 +68,7 @@ pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
         selector.push(format!(
             "name={}{}",
             if filter.negated { "!" } else { "" },
-            filter.value
+            brigadier_string(&filter.value)
         ));
     }
     for score in &query.scores {
@@ -116,6 +123,11 @@ pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
         selector.push(format!("limit={limit}"));
     }
     format!("@e[{}]", selector.join(","))
+}
+
+/// Brigadier quoted strings only escape the delimiter and backslash, unlike JSON.
+fn brigadier_string(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// 选择器的 `distance` 选项只能出现一次：`distance` 与 `within` 取交集。

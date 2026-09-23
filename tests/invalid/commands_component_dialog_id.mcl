@@ -1,0 +1,5 @@
+// expect: 未知对话框
+namespace invalid_component_dialog;
+fn bad() {
+    message.all(text("open") { click = show_dialog("minecraft:not_a_dialog"); });
+}

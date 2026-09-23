@@ -34,6 +34,7 @@ fn native_command_shapes_and_macro_forwarding() {
             "commands",
             &[
                 "damage @e[type=minecraft:zombie,limit=1] 1.5 minecraft:arrow by @e[type=minecraft:player,limit=1] from @e[type=minecraft:player,limit=1]",
+                "kill @e[type=#minecraft:undead,name=\"Bob Smith\",limit=1]",
                 "attribute @e[type=minecraft:zombie,limit=1] minecraft:max_health modifier add entity_commands:bonus 2 add_value",
                 "rotate @e[type=minecraft:zombie,limit=1] facing entity @e[type=minecraft:player,limit=1] eyes",
                 "spreadplayers 0 0 4 32 under 100 true @e[type=minecraft:player]",
@@ -86,6 +87,13 @@ fn native_command_shapes_and_macro_forwarding() {
             ],
         ),
         ("ui_commands", "personal", &["teammsg 集合！"]),
+        (
+            "remaining_commands",
+            "commands",
+            &[
+                "scoreboard players display numberformat @e[type=minecraft:player,limit=1] remaining_commands_points blank",
+            ],
+        ),
     ];
     for (fixture, function, expected) in cases {
         let output = root.join("target/command-outputs").join(fixture);
@@ -133,6 +141,11 @@ fn native_command_shapes_and_macro_forwarding() {
             .all(|line| line.starts_with("execute if score ")),
         "短路条件右侧的副作用调用必须受左侧标志保护：{short_circuit}"
     );
+    let condition_checks = fs::read_to_string(
+        conditions_output.join("data/conditions_test/function/checks.mcfunction"),
+    )
+    .unwrap();
+    assert!(condition_checks.contains("stopwatch conditions_test:timer 0.."));
     let advancement_output = root.join("target/command-outputs/advancement");
     build_file(
         &root.join("tests/valid/advancement"),
@@ -216,4 +229,37 @@ fn native_command_shapes_and_macro_forwarding() {
         !helpers.contains("run tag @s add __"),
         "不能给 tag.list 引入内部标签"
     );
+    let data_output = root.join("target/command-outputs/data-filter");
+    build_file(&root.join("tests/valid/data_ops"), &data_output, &options).unwrap();
+    let data_files = files(&data_output);
+    let data_text = data_files
+        .values()
+        .map(|bytes| String::from_utf8_lossy(bytes))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(data_text.contains("if items entity @s weapon.mainhand minecraft:diamond_sword"));
+    assert!(data_text.contains("run data get entity @e[scores={"));
+    assert!(data_text.contains("item replace entity @e[type=minecraft:player,limit=1] weapon.mainhand with minecraft:diamond[minecraft:custom_name={text:\"奖励\"}] 2"));
+    let world_output = root.join("target/command-outputs/world");
+    build_file(&root.join("tests/valid/world"), &world_output, &options).unwrap();
+    let world_build =
+        fs::read_to_string(world_output.join("data/world_test/function/build.mcfunction")).unwrap();
+    for expected in [
+        "clone 0 64 0 4 64 4 10 64 0 strict masked force",
+        "clone 0 64 0 4 64 4 10 64 0 replace force",
+        "clone from minecraft:the_nether 0 64 0 4 64 4 to minecraft:overworld 10 64 0",
+    ] {
+        assert!(
+            world_build.contains(expected),
+            "缺少 clone 形状：{expected}"
+        );
+    }
+    let world_environment =
+        fs::read_to_string(world_output.join("data/world_test/function/environment.mcfunction"))
+            .unwrap();
+    assert!(world_environment.contains("worldborder center 10.0 20.0"));
+    let world_journey =
+        fs::read_to_string(world_output.join("data/world_test/function/journey.mcfunction"))
+            .unwrap();
+    assert!(world_journey.contains("tp @s 2.0 64.0 4.0"));
 }

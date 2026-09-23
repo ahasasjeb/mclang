@@ -28,6 +28,32 @@ pub(super) fn validate_id(
     report_unknown(kind, label, value, span, diagnostics);
 }
 
+/// Validate an ID from a static registry that data packs cannot extend.
+pub(super) fn validate_static_id(
+    kind: &str,
+    label: &str,
+    value: &str,
+    span: Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if !valid_resource_location(value) {
+        diagnostics.push(Diagnostic::new(
+            format!("`{value}` 不是有效的{label}资源位置"),
+            span,
+        ));
+        return;
+    }
+    let snapshot = snapshot();
+    if snapshot.registry_contains(kind, value) == Some(true) {
+        return;
+    }
+    let mut message = format!("未知{label} `{value}`；该类型不能由数据包注册");
+    if let Some(candidate) = snapshot.suggest_registry_id(kind, value) {
+        message.push_str(&format!("，是否想写 `{candidate}`？"));
+    }
+    diagnostics.push(Diagnostic::new(message, span));
+}
+
 /// 与 [`validate_id`] 相同，但接受 `#标签` 前缀（标签存在性不做检查）。
 pub(super) fn validate_id_or_tag(
     kind: &str,

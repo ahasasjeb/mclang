@@ -151,7 +151,7 @@ pub(in crate::compiler::validate) fn validate_expr(
             path,
             path_span,
         } => {
-            super::super::components::validate_nbt_source(
+            super::super::components::validate_data_nbt_source(
                 source,
                 expression.span,
                 ctx,

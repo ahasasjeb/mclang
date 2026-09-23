@@ -1,0 +1,5 @@
+// expect: change_page 的页号不能超过 2147483647
+namespace invalid_component_page;
+fn bad() {
+    message.all(text("next") { click = change_page(2147483648); });
+}

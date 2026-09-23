@@ -1,0 +1,6 @@
+// expect: 必须使用 limit(1)
+namespace invalid_data_single;
+query many = entity("minecraft:zombie") {}
+@entity fn bad() {
+    data.merge(entity, many, nbt { Health = 1.0f; });
+}

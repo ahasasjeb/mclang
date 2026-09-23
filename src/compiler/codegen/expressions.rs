@@ -169,23 +169,21 @@ impl Compiler<'_> {
                 Value::Score(target)
             }
             ExprKind::DataGet { source, path, .. } => {
-                let targets = match source {
-                    NbtComponentSource::Entity(holder) => {
-                        format!("entity {}", self.component_holder(holder))
-                    }
-                    NbtComponentSource::Block(position) => {
-                        format!("block {}", super::world::position_text(position))
-                    }
-                    NbtComponentSource::Storage(storage, _) => format!("storage {storage}"),
+                let holders = match source {
+                    NbtComponentSource::Entity(holder) => vec![holder],
+                    NbtComponentSource::Block(_) | NbtComponentSource::Storage(_, _) => Vec::new(),
                 };
+                let native = self.capture_command_targets(&holders, owner, |compiler| {
+                    format!("data get {} {path}", compiler.nbt_source_text(source))
+                });
                 let target = self.temporary();
                 commands.push(format!(
                     "scoreboard players set {target} {} 0",
                     self.objective
                 ));
                 commands.push(format!(
-                    "execute store result score {target} {} run data get {targets} {path}",
-                    self.objective
+                    "execute store result score {target} {} run {native}",
+                    self.objective,
                 ));
                 Value::Score(target)
             }
@@ -365,10 +363,19 @@ impl Compiler<'_> {
                 format!("entity {}", entity_query_selector(self.query(query))),
                 commands,
             ),
-            Condition::Data { source, path, .. } => self.compile_atomic_condition(
-                format!("data {} {path}", self.nbt_source_text(source)),
-                commands,
-            ),
+            Condition::Data { source, path, .. } => {
+                let holders = match source {
+                    NbtComponentSource::Entity(holder) => vec![holder],
+                    NbtComponentSource::Block(_) | NbtComponentSource::Storage(_, _) => Vec::new(),
+                };
+                let native = self.capture_command_targets(&holders, owner, |compiler| {
+                    format!(
+                        "execute if data {} {path}",
+                        compiler.nbt_source_text(source)
+                    )
+                });
+                self.compile_command_success(native, commands)
+            }
             Condition::Items {
                 source,
                 slots,
@@ -395,7 +402,7 @@ impl Compiler<'_> {
                 self.compile_atomic_condition(format!("function {target}"), commands)
             }
             Condition::Stopwatch { id, .. } => {
-                self.compile_atomic_condition(format!("stopwatch {id}"), commands)
+                self.compile_atomic_condition(format!("stopwatch {id} 0.."), commands)
             }
             Condition::Compare {
                 left,
@@ -554,6 +561,19 @@ impl Compiler<'_> {
         ));
         commands.push(format!(
             "execute if {predicate} run scoreboard players set {flag} {} 1",
+            self.objective
+        ));
+        flag
+    }
+
+    fn compile_command_success(&mut self, command: String, commands: &mut Vec<String>) -> String {
+        let flag = self.temporary();
+        commands.push(format!(
+            "scoreboard players set {flag} {} 0",
+            self.objective
+        ));
+        commands.push(format!(
+            "execute store success score {flag} {} run {command}",
             self.objective
         ));
         flag

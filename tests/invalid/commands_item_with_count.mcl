@@ -1,0 +1,7 @@
+// expect: 数量不能超过 99
+namespace invalid_item_with_count;
+query one = entity("minecraft:player") { limit(1); }
+item too_many = item_stack("minecraft:stone") { count = 100; }
+fn bad() {
+    item.replace(entity, one, "weapon.mainhand", with(too_many));
+}

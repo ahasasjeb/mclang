@@ -1,0 +1,5 @@
+// expect: minecart_improvements
+namespace invalid_experimental_gamerule;
+fn bad() {
+    gamerule.set("max_minecart_speed", 40);
+}

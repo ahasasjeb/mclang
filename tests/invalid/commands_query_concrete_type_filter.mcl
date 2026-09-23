@@ -1,0 +1,6 @@
+// expect: 不能再添加 without_type
+namespace invalid_query_type_filter;
+query impossible = entity("minecraft:zombie") {
+    without_type("minecraft:skeleton");
+}
+fn bad() { kill(impossible); }

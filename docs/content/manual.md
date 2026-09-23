@@ -400,7 +400,7 @@ query <name> = entity("<实体类型或 #标签>") {
 }
 ```
 
-查询是一段可复用的选择器。`entity(...)` 已指定正向实体类型，因此 `type(...)` 会报互斥诊断；可用 `without_type(...)` 排除其它类型。`tag`、`without_tag`、`without_type` 和 `scores` 可以重复，其余属性各只能出现一次；`distance` 与 `within` 会合并成同一个区间，交集为空时报错。区间不接受倒置边界或非有限小数；`level`、`gamemode` 仅适用于玩家查询。`item` 过滤器的槽位是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0` …）或 `slot_source` 资源位置，`id` 可以是物品 id、`#标签` 或带 `[组件过滤器]` 的谓词。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear`、`count` 与条件里被引用。
+查询是一段可复用的选择器。`entity(...)` 已指定正向实体类型，因此 `type(...)` 会报互斥诊断。原版只允许在正向 `#类型标签` 后继续追加排除条件，所以 `without_type(...)` 仅能用于 `entity("#标签")` 查询；具体实体类型后再写会在编译期拒绝。`tag`、`without_tag`、`without_type` 和 `scores` 可以重复（同一个类型标签不能重复排除），其余属性各只能出现一次；`distance` 与 `within` 会合并成同一个区间，交集为空时报错。区间不接受倒置边界或非有限小数；`level`、`gamemode` 仅适用于玩家查询。`item` 过滤器的槽位是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0` …）或 `slot_source` 资源位置，`id` 可以是物品 id、`#标签` 或带 `[组件过滤器]` 的谓词。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear`、`count` 与条件里被引用。
 
 | 属性 | 生成的参数 | 中文写法 |
 | --- | --- | --- |
@@ -410,7 +410,7 @@ query <name> = entity("<实体类型或 #标签>") {
 | `limit(3)` | `limit=3` | `上限(3)` |
 | `within(16)` | `distance=..16` | `范围(16)` |
 | `sort(nearest)` | `sort=nearest` | `排序(最近)` |
-| `name("Bob")` / `without_name(...)` | `name=Bob` / `name=!Bob` | `名称(...)` / `排除名称(...)` |
+| `name("Bob")` / `without_name(...)` | `name="Bob"` / `name=!"Bob"` | `名称(...)` / `排除名称(...)` |
 | `scores("obj", "1..5")` | `scores={obj=1..5}` | `分数(...)` |
 | `nbt(...)` / `without_nbt(...)` | `nbt=…` / `nbt=!…` | `数据谓词(...)` / `排除数据(...)` |
 | `box(0, 60, 0, 16, 8, 16)` | `x=…,y=…,z=…,dx=…,dy=…,dz=…` | `坐标盒(...)` |
@@ -819,7 +819,7 @@ data.modify(<目标>, "<路径>", prepend | append | set | merge, <来源>);
 let <name> = data.get(<目标>, "<路径>");
 ```
 
-目标写法与 `nbt` 组件一致：`entity, <持有者>`（要求非玩家实体）、`block, <坐标>` 或 `storage, "<资源位置>"`。`data.merge` 生成 `data merge <目标> {...}`，`data.remove` 生成 `data remove <目标> <路径>`，`data.modify` 生成 `data modify <目标> <路径> <操作> …`。数据来源有四种：
+目标写法与 `nbt` 组件一致：`entity, <持有者>`（要求非玩家实体）、`block, <坐标>` 或 `storage, "<资源位置>"`。data 命令的实体目标及 `from`/`string` 实体来源都是单实体参数，查询必须带 `limit(1)`；查询自带的 `item` 过滤会先捕获真实目标再执行命令。这里不直接接受 `origin`，需要先进入 `execute on origin`，再使用 `self`。`data.merge` 生成 `data merge <目标> {...}`，`data.remove` 生成 `data remove <目标> <路径>`，`data.modify` 生成 `data modify <目标> <路径> <操作> …`。数据来源有四种：
 
 | 来源 | 生成 | 说明 |
 | --- | --- | --- |
@@ -846,7 +846,7 @@ item.override(<目标>, "<槽位>", with(<物品定义>) | from(...));
 item.modify(<目标>, "<槽位>", "<物品修饰器>");
 ```
 
-目标与来源都是 `entity, <单个实体查询>`（必须 `limit(1)`）或 `block, <坐标>`；槽位与原版一致（`contents`、`weapon.mainhand`、`hotbar.*`、`container.0` …）。`with` 引用已声明的 `item` 定义并输出完整的物品组件文本；`from` 从另一个实体或方块的槽位复制；`item.modify` 应用 `loot_modifier` 资源位置。生成 `item replace/fill/override/modify …`。
+目标与来源都是 `entity, <单个实体查询>`（必须 `limit(1)`）或 `block, <坐标>`；槽位与原版一致（`contents`、`weapon.mainhand`、`hotbar.*`、`container.0` …）。`with` 引用已声明的 `item` 定义，输出完整组件及定义中的 `count`；原版此处只接受 1 到 99，因此超出范围会在编译期拒绝。`from` 从另一个实体或方块的槽位复制；`item.modify` 应用 `loot_modifier` 资源位置。生成 `item replace/fill/override/modify …`。
 
 ```mcl title="示例" fragment
 item.replace(entity, holder, "weapon.mainhand", with(reward));
@@ -1065,6 +1065,8 @@ nbt(storage, "<存储资源位置>", "<路径>") { <样式> }
 
 `score` 的目标写已声明的 `objective` 名称时生成 `<命名空间>_<名称>`，写字符串时原样使用。`nbt` 路径使用上面的共用节点语法。`selector` 的字符串必须是 `@a`、`@e[...]` 这类选择器。
 
+点击事件按 26.3 组件 codec 校验：`change_page` 是 1 到 2147483647；`run_command`/`suggest_command` 不能含控制字符、DEL 或 `§`；`show_dialog` 的 `minecraft:` id 必须存在，自定义命名空间可以引用外部数据包提供的对话框。
+
 ```mcl title="示例" fragment
 message.all(text("你好") {
     color = "red";
@@ -1128,7 +1130,7 @@ posteffect.list(<单个玩家目标>);
 posteffect.remove(<玩家目标>, "<后处理效果资源位置>");
 ```
 
-`particle` 的可选参数顺序与原版一致；只写位置时省略偏移、速度和数量，要指定观众则必须先给出模式。选项使用结构化 SNBT，编译器按 26.3 的粒子 codec 检查内建粒子的必需字段、字段名、基本类型以及方块状态、物品堆和振动目的地的常用嵌套字段；例如 `dust` 需要 `color` 与 `scale`，普通 `flame` 不接受选项。速度和数量必须非负。`stopsound(players, *, "minecraft:...")` 表示不限声音分类。`posteffect.list` 需要 `limit(1)` 查询，后处理效果的自定义资源包资产由资源包提供。
+`particle` 的可选参数顺序与原版一致；只写位置时省略偏移、速度和数量，要指定观众则必须先给出模式。粒子类型是代码注册的静态注册表，必须是随 26.3 提供的内建 ID，不能由数据包新增。选项使用结构化 SNBT，编译器按 26.3 的粒子 codec 检查必需字段、字段名、基本类型以及方块状态、物品堆和振动目的地的常用嵌套字段；例如 `dust` 需要 `color` 与 `scale`，普通 `flame` 不接受选项。速度和数量必须非负。`stopsound(players, *, "minecraft:...")` 表示不限声音分类。`posteffect.list` 需要 `limit(1)` 查询，后处理效果的自定义资源包资产由资源包提供。
 
 ### 私聊与队伍聊天
 
@@ -1137,7 +1139,7 @@ msg(<玩家目标>, "<单行消息>");
 teammsg("<单行消息>");
 ```
 
-`msg` 生成原版私聊命令（`tell`、`w` 是原版别名）；`teammsg` 生成队伍聊天命令（`tm` 是别名），要求实体执行上下文，运行时发送者必须属于队伍。`msg`、`teammsg`、`say`、`me` 的消息参数使用独立的 `MessageArgument` 类型，只接受非空单行字符串；需要 JSON 文本组件与样式时使用 `message.player`。
+`msg` 生成原版私聊命令（`tell`、`w` 是原版别名）；`teammsg` 生成队伍聊天命令（`tm` 是别名），要求实体执行上下文，运行时发送者必须属于队伍。`msg`、`teammsg`、`say`、`me` 的消息参数使用独立的 `MessageArgument` 类型，只接受非空单行字符串，且按 Minecraft 的 UTF-16 长度最多 256；其中可解析的 `@` 选择器会由原版展开。需要 JSON 文本组件与样式时使用 `message.player`。
 
 ### 状态效果（effect）
 
@@ -1484,14 +1486,15 @@ locate.poi("<兴趣点或标签>");
 
 补充规则：
 
-- `clone` 的选项可以任意顺序书写，但每类最多一次：过滤方式是 `replace`（默认）、`masked` 或 `filtered <方块谓词>`；复制模式是 `normal`（默认）、`force` 或 `move`；`strict` 是一个标志；跨维度写成 `from_dimension("<维度>")` 与 `to_dimension("<维度>")`（中文 `起始维度`/`目标维度`）。输出顺序固定为 `from`、坐标、`to`、过滤、模式、`strict`。
+- `clone` 的选项可以任意顺序书写，但每类最多一次：过滤方式是 `replace`（默认）、`masked` 或 `filtered <方块谓词>`；复制模式是 `normal`（默认）、`force` 或 `move`；`strict` 是一个标志；跨维度写成 `from_dimension("<维度>")` 与 `to_dimension("<维度>")`（中文 `起始维度`/`目标维度`）。输出顺序固定为 `from`、起止坐标、`to`、目标坐标、`strict`、过滤、模式；指定 `force`/`move` 而未显式写过滤方式时会补 `replace`。
 - `fill` 的替换过滤器只能与 `replace` 模式一起使用。
 - `set_block` 与 `fill` 的 `nbt { ... }` 是方块实体数据（见[结构化 NBT](#basics-nbt)），写在方块状态之后、模式与过滤器之前；可选参数可以任意顺序书写，但模式、过滤器和 `nbt` 各自最多一次。
 - `place.feature` 的字符串形式引用 26.3 的地物注册表；内联形式使用结构化 `nbt { ... }`，编译为原版 `ResourceOrIdArgument.feature` 接受的 SNBT 对象。顶层必须有 `type`，其值是 26.3 注册的地物类型（例如 `minecraft:simple_block`）；该类型的字段直接与 `type` 并列，不能放进旧式 `config` 包裹层。编译器检查类型名和 NBT 语法，具体类型的内部字段仍由原版 `Feature.DIRECT_CODEC` 在命令加载时解码。
 - `place.jigsaw` 的最大深度是 1 到 20；`place.template` 的完整度是 0.0 到 1.0，旋转是 `none`、`clockwise_90`、`180`、`counterclockwise_90`，镜像是 `none`、`left_right`、`front_back`；要写后面的可选参数必须按顺序补齐前面的。
 - 时间参数是“数字 + 单位”，单位 `t`/`s`/`d`（刻/秒/天），括号里可写逗号：`time.set(6000, t)`、`worldborder.set(1000, 5 s)`、`after 1.5 s`。`time.set` 的最小值是 0，`time.add` 允许负数，`weather` 持续时间至少 1 刻。注意 `s` 与 `d` 紧贴数字时是 NBT 后缀（`1s` 是短整数，`1d` 是双精度），时间单位要用空格或逗号分开。
 - `forceload` 用列坐标 `column(<x>, <z>)`（中文 `列坐标(...)`），不支持 `^`；一次 `add`/`remove` 影响的范围最多 256 个区块。
-- 范围检查：`forceload.add`/`remove` 的列坐标、`worldborder` 的数值都会在编译期检查（`worldborder.set` 是 1 到 59999968，`center` 绝对值不超过 29999984，伤害参数非负）。
+- 范围检查：`forceload.add`/`remove` 的列坐标、`worldborder` 的数值都会在编译期检查（`worldborder.set` 是 1 到 59999968，`center` 绝对值不超过 29999984，伤害参数是 0 到 `f32::MAX`）。`vec2(10.0, 20.0)` 这类显式小数会保留 `.0`，避免原版把整数形坐标自动偏移 0.5。
+- `max_minecart_speed` 只在 `minecart_improvements` 实验特性启用时注册；编译器以默认 26.3 特性集为目标，因此拒绝该规则。
 - `locate` 只产生命令反馈，不返回值；`gamerule.query`、`time.query`、`time.query_gametime`、`worldborder.get` 是表达式，可以赋值给计分变量。
 
 ```mcl title="完整示例：世界与方块命令" verify id=tour_world
@@ -1594,7 +1597,7 @@ fn release() {
 | `worldborder.get()` | 世界边界边长 |
 | `count(<查询>)` | 查询命中的实体数量（无命中为 0） |
 | `random(<最小值>, <最大值>)` | 闭区间随机整数，如 `random(1, 6)` |
-| `data.get(entity, <持有者>, "<路径>")` 等 | 读取 NBT 数值；`block <坐标>`、`storage "<资源位置>"` 三种来源 |
+| `data.get(entity, <持有者>, "<路径>")` 等 | 读取 NBT 数值；实体查询要求 `limit(1)`，另有 `block`、`storage` 来源 |
 | `compute(<来源>, float, "<provider>"[, <缩放>])` | 按上下文浮点 provider 计算数值，可选单精度缩放（包括 0） |
 | `compute(<来源>, integer, "<provider>")` | 按上下文整数 provider 计算数值，不支持缩放 |
 
@@ -1617,7 +1620,7 @@ fn release() {
 | `items(entity, <持有者> \| block, <坐标>, "<槽位>", "<物品谓词>")` | `if items …` | 槽位里有匹配物品 |
 | `slots(entity, <持有者> \| block, <坐标>, "<槽位>")` | `if slots …` | 槽位里有物品 |
 | `function(<函数或 #标签>)` | `if function ns:name` | 函数返回成功 |
-| `stopwatch("<id>")` | `if stopwatch <id>` | 秒表在运行 |
+| `stopwatch("<id>")` | `if stopwatch <id> 0..` | 秒表存在且经过时间非负 |
 
 槽位来源是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0`、`hotbar.3` …）或 `slot_source` 资源位置；物品谓词是物品 id、`#标签`，可以带 `[组件过滤器]`。
 
@@ -2008,7 +2011,7 @@ datapack.list(enabled);
 
 `help(["命令路径"])`、`version()`、`seed()` 是查询入口。`say("消息")` 与 `me("动作")` 分别生成原生广播和动作消息，参数按 Minecraft 的 MessageArgument 解释。`fetchprofile.name("玩家名")`、`fetchprofile.id("UUID")`、`fetchprofile.entity(单实体查询或 self)` 返回档案信息；UUID 在编译期检查格式。
 
-`test` 覆盖 26.3 中数据包可调用的 GameTest 分支：`run`、`runmultiple`、`runthese`、`runclosest`、`runthat`、`runfailed`、`verify`、`locate`、`resetclosest/resetthese/resetthat`、`clearthat/clearthese/clearall`、`stop`、`pos`、`create`。`run/verify/locate` 的测试实例参数是允许 `*`、`?` 的资源选择式字符串；IDE 限定的 export 分支不可用。
+`test` 覆盖 26.3 中数据包可调用的 GameTest 分支：`run`、`runmultiple`、`runthese`、`runclosest`、`runthat`、`runfailed`、`verify`、`locate`、`resetclosest/resetthese/resetthat`、`clearthat/clearthese/clearall`、`stop`、`pos`、`create`。`run/verify/locate` 的测试实例参数是允许 `*`、`?` 的资源选择式字符串；运行次数最大为 2147483647；IDE 限定的 export 分支不可用。
 
 ```mcl title="GameTest 示例" fragment
 test.run("demo:basic", 3, true, 1, 8);
