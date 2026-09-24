@@ -8,7 +8,14 @@ use super::{HORIZONTAL_MAX, HORIZONTAL_MIN, VERTICAL_MAX, VERTICAL_MIN};
 /// 校验方块坐标的绝对分量；相对坐标与局部坐标留给运行时。
 pub(crate) fn validate_block_position(position: &BlockPosition, diagnostics: &mut Vec<Diagnostic>) {
     for (axis, coordinate) in [("X", &position.x), ("Y", &position.y), ("Z", &position.z)] {
-        let Some(value) = coordinate.absolute_integer() else {
+        let Coordinate::Absolute(text) = coordinate else {
+            continue;
+        };
+        let Ok(value) = text.parse::<i32>() else {
+            diagnostics.push(Diagnostic::new(
+                format!("方块 {axis} 绝对坐标 `{text}` 超出 32 位整数范围"),
+                position.span,
+            ));
             continue;
         };
         let valid = match axis {
@@ -116,7 +123,14 @@ pub(super) fn validate_column_position(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (axis, coordinate) in [("X", &position.x), ("Z", &position.z)] {
-        let Some(value) = coordinate.absolute_integer() else {
+        let Coordinate::Absolute(text) = coordinate else {
+            continue;
+        };
+        let Ok(value) = text.parse::<i32>() else {
+            diagnostics.push(Diagnostic::new(
+                format!("列 {axis} 绝对坐标 `{text}` 超出 32 位整数范围"),
+                position.span,
+            ));
             continue;
         };
         if !(HORIZONTAL_MIN..=HORIZONTAL_MAX).contains(&value) {

@@ -179,6 +179,11 @@ fn validate_test_command(command: &TestCommand, span: Span, diagnostics: &mut Ve
         diagnostics.push(Diagnostic::new("测试运行次数不能超过 2147483647", span));
     }
     match command {
+        TestCommand::Create { dimensions, .. }
+            if dimensions.iter().any(|dimension| *dimension > 48) =>
+        {
+            diagnostics.push(Diagnostic::new("test.create 的宽、高、深不能超过 48", span));
+        }
         TestCommand::Create { id, .. } if !super::rules::valid_resource_location(id) => {
             diagnostics.push(Diagnostic::new(
                 format!("test.create 的 `{id}` 不是有效的资源位置"),

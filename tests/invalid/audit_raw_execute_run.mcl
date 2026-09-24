@@ -1,0 +1,3 @@
+// expect: 缺少可执行子句或叶命令
+namespace audit_raw_execute_run;
+fn invalid() { run "execute as @s run"; }

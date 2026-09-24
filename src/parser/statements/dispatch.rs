@@ -279,7 +279,7 @@ impl Parser {
         if command.trim().is_empty() {
             return Err(Diagnostic::new(format!("{label} 命令不能为空"), span));
         }
-        if command.starts_with('/') {
+        if command.trim_start().starts_with('/') {
             return Err(Diagnostic::new(
                 "Minecraft 函数中的命令不能以 `/` 开头",
                 span,
@@ -288,6 +288,12 @@ impl Parser {
         if command.contains(['\n', '\r']) {
             return Err(Diagnostic::new(
                 format!("一条 {label} 语句只能包含一行命令"),
+                span,
+            ));
+        }
+        if command.trim_end().ends_with('\\') {
+            return Err(Diagnostic::new(
+                "命令不能以反斜杠结尾；Minecraft 会把下一行拼接进来",
                 span,
             ));
         }

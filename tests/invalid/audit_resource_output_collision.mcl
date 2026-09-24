@@ -1,0 +1,4 @@
+// expect: 重复声明资源
+namespace audit_resource_output_collision;
+resource "tags/block" "mineable/custom" = """{"values":["minecraft:stone"]}""";
+resource "tags/block/mineable" custom = """{"values":["minecraft:dirt"]}""";

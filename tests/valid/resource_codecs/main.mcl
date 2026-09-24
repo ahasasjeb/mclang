@@ -1,0 +1,10 @@
+namespace resource_codecs;
+
+resource predicate base = """{"type":"random_chance","chance":0.5}""";
+resource predicate single_term = """{"type":"all_of","terms":"resource_codecs:base"}""";
+resource predicate inline_term = """{"type":"any_of","terms":{"type":"inverted","term":"resource_codecs:base"}}""";
+resource context_float_provider chance = """0.5""";
+resource context_int_provider rolls = """1""";
+resource predicate chance_reference = """{"type":"random_chance","chance":"resource_codecs:chance"}""";
+resource loot_table rolls_reference = """{"pools":[{"entries":[],"rolls":"resource_codecs:rolls"}]}""";
+resource recipe default_namespace = """{"type":"crafting_shapeless","ingredients":["stone"],"result":"stone"}""";

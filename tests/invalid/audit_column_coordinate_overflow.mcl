@@ -1,0 +1,3 @@
+// expect: 列 X 绝对坐标
+namespace audit_column_coordinate_overflow;
+fn invalid() { forceload.add(column(2147483648, 0)); }

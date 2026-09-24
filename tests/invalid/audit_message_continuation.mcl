@@ -1,0 +1,3 @@
+// expect: 聊天消息不能以反斜杠结尾
+namespace audit_message_continuation;
+fn invalid() { say("hello \\"); }

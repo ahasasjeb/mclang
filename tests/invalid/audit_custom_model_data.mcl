@@ -1,0 +1,5 @@
+// expect: minecraft:custom_model_data
+namespace audit_custom_model_data;
+item bad = item_stack("minecraft:stone") {
+    components = nbt { "minecraft:custom_model_data" = 1; };
+}

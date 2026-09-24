@@ -25,6 +25,26 @@ pub(super) fn validate_message_argument(
             message.span,
         ));
     }
+    if message.text.trim_end().ends_with('\\') {
+        diagnostics.push(Diagnostic::new(
+            "聊天消息不能以反斜杠结尾；Minecraft 会把下一行拼接进来",
+            message.span,
+        ));
+    }
+    // MessageArgument eagerly parses selectors before the command is loaded.
+    // Filtered selectors need the complete Brigadier option grammar; reject
+    // them here until that parser is available instead of emitting bad packs.
+    if message
+        .text
+        .as_bytes()
+        .windows(3)
+        .any(|part| part[0] == b'@' && b"paresn".contains(&part[1]) && part[2] == b'[')
+    {
+        diagnostics.push(Diagnostic::new(
+            "聊天消息暂不支持带 [...] 选项的实体选择器；请使用文本组件或无选项的 @a/@e 等",
+            message.span,
+        ));
+    }
 }
 
 /// 校验整个组件树。

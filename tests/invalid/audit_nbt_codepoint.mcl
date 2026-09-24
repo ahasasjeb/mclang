@@ -1,0 +1,3 @@
+// expect: 需要语法完整的 SNBT
+namespace audit_nbt_codepoint;
+query players = entity("minecraft:player") { nbt("{key:\"\\U00110000\"}"); }

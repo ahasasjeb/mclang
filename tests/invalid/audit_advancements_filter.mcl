@@ -1,0 +1,3 @@
+// expect: 需要 {进度ID=true/false}
+namespace audit_advancements_filter;
+query players = entity("minecraft:player") { advancements("{minecraft:story/root=maybe}"); }

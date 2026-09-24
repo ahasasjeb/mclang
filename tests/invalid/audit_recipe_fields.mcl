@@ -1,0 +1,3 @@
+// expect: crafting_shapeless 需要 1 到 9 个
+namespace audit_recipe_fields;
+resource recipe bad = """{"type":"minecraft:crafting_shapeless","ingredients":[],"result":{"id":"minecraft:stone"}}""";

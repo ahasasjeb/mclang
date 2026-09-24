@@ -151,6 +151,7 @@ pub(super) fn validate_component_value(
         "minecraft:weapon" => Some(ValueSchema::Compound(WEAPON_FIELDS)),
         "minecraft:attack_range" => Some(ValueSchema::Compound(ATTACK_RANGE_FIELDS)),
         "minecraft:enchantable" => Some(ValueSchema::Compound(ENCHANTABLE_FIELDS)),
+        "minecraft:custom_model_data" => Some(ValueSchema::Compound(CUSTOM_MODEL_DATA_FIELDS)),
         _ => None,
     };
     if let Some(schema) = schema {
@@ -170,6 +171,10 @@ enum ValueSchema {
     Text,
     TextList,
     Enchantments,
+    FloatList,
+    BooleanList,
+    StringList,
+    ColorList,
     Compound(&'static [SchemaField]),
 }
 
@@ -275,6 +280,28 @@ const ENCHANTABLE_FIELDS: &[SchemaField] = &[SchemaField {
     schema: ValueSchema::Integer(1, i32::MAX),
     required: true,
 }];
+const CUSTOM_MODEL_DATA_FIELDS: &[SchemaField] = &[
+    SchemaField {
+        name: "floats",
+        schema: ValueSchema::FloatList,
+        required: false,
+    },
+    SchemaField {
+        name: "flags",
+        schema: ValueSchema::BooleanList,
+        required: false,
+    },
+    SchemaField {
+        name: "strings",
+        schema: ValueSchema::StringList,
+        required: false,
+    },
+    SchemaField {
+        name: "colors",
+        schema: ValueSchema::ColorList,
+        required: false,
+    },
+];
 
 fn validate_schema(
     label: &str,
@@ -333,6 +360,21 @@ fn validate_schema(
             } else {
                 false
             }
+        }
+        ValueSchema::FloatList => {
+            matches!(&value.kind, NbtValueKind::List(values) if values.iter().all(|value| numeric(value).is_some_and(|number| number.is_finite() && number.abs() <= f32::MAX as f64)))
+        }
+        ValueSchema::BooleanList => {
+            matches!(&value.kind, NbtValueKind::List(values) if values.iter().all(|value| matches!(value.kind, NbtValueKind::Byte(0 | 1))))
+        }
+        ValueSchema::StringList => {
+            matches!(&value.kind, NbtValueKind::List(values) if values.iter().all(|value| matches!(value.kind, NbtValueKind::String(_))))
+        }
+        ValueSchema::ColorList => {
+            matches!(&value.kind, NbtValueKind::List(values) if values.iter().all(|value| {
+                matches!(value.kind, NbtValueKind::Int(_))
+                    || matches!(&value.kind, NbtValueKind::List(channels) if channels.len() == 3 && channels.iter().all(|channel| numeric(channel).is_some_and(|number| number.is_finite())))
+            }))
         }
         ValueSchema::Compound(fields) => {
             if let NbtValueKind::Compound(entries) = &value.kind {

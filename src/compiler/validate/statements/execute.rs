@@ -364,8 +364,46 @@ pub(super) fn validate_raw_command(command: &str, span: Span, diagnostics: &mut 
     let Some(first) = command.split_whitespace().next() else {
         return;
     };
+    if command.trim_end().ends_with('\\') {
+        diagnostics.push(Diagnostic::new(
+            "原始命令不能以反斜杠结尾；Minecraft 会拼接下一行",
+            span,
+        ));
+    }
+    if command.trim_start().starts_with('/') {
+        diagnostics.push(Diagnostic::new(
+            "Minecraft 函数中的命令不能以 `/` 开头",
+            span,
+        ));
+    }
     let name = first.strip_prefix('/').unwrap_or(first);
     let snapshot = crate::version::snapshot::snapshot();
+    if !snapshot.has_root_command(name) {
+        diagnostics.push(Diagnostic::new(
+            format!("原始命令根名 `{name}` 不在 Minecraft 26.3 命令树中"),
+            span,
+        ));
+        return;
+    }
+    if name != "execute"
+        && command.split_whitespace().count() == 1
+        && !snapshot
+            .root_command(name)
+            .and_then(|node| node.get("executable"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+    {
+        diagnostics.push(Diagnostic::new(
+            format!("原始命令 `{name}` 缺少参数或可执行子命令"),
+            span,
+        ));
+    }
+    if name == "execute" && raw_execute_definitely_incomplete(command) {
+        diagnostics.push(Diagnostic::new(
+            "原始命令 `execute` 缺少可执行子句或叶命令",
+            span,
+        ));
+    }
     let Some(level) = snapshot.root_command_level(name) else {
         return;
     };
@@ -379,6 +417,25 @@ pub(super) fn validate_raw_command(command: &str, span: Span, diagnostics: &mut 
             ),
             span,
         ));
+    }
+}
+
+fn raw_execute_definitely_incomplete(command: &str) -> bool {
+    let mut words = command.split_whitespace().skip(1);
+    // Only diagnose shapes we can prove incomplete without parsing arguments.
+    // Conditions can execute on their own, and their arguments may be named
+    // `run`; looking for a word anywhere in the text is not a grammar check.
+    loop {
+        match words.next() {
+            None => return true,
+            Some("run") => return words.next().is_none(),
+            Some("as" | "at") => {
+                if words.next().is_none() {
+                    return true;
+                }
+            }
+            Some(_) => return false,
+        }
     }
 }
 

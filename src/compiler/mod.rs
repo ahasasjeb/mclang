@@ -14,7 +14,7 @@ mod rename;
 mod types;
 mod validate;
 
-pub(crate) use validate::rules::{valid_user_name, windows_reserved_name};
+pub(crate) use validate::rules::{valid_resource_path, valid_user_name, windows_reserved_name};
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -36,6 +36,7 @@ pub(crate) fn stable_hash(value: &str) -> u64 {
 #[derive(Debug)]
 pub struct CompiledPack {
     pub files: BTreeMap<PathBuf, String>,
+    pub binary_files: BTreeMap<PathBuf, Vec<u8>>,
 }
 
 /// 数据包函数的权限上限：26.3 的 `function-permission-level` 默认
@@ -66,5 +67,5 @@ pub fn compile(
 
     let mut compiler = codegen::Compiler::new(program);
     compiler.compile_functions();
-    Ok(compiler.finish(&options.description))
+    compiler.finish(&options.description)
 }

@@ -79,6 +79,18 @@ fn valid_corpus_compiles() {
 }
 
 #[test]
+fn structure_asset_is_copied_byte_for_byte() {
+    let source = repo_root().join("tests/valid/structure_assets");
+    let output = output_directory("structure_assets");
+    build(&source, &output, true).expect("带结构资源的项目应当构建成功");
+    let original =
+        fs::read(source.join("assets/structure/empty_room.nbt")).expect("缺少结构 NBT 语料");
+    let packed = fs::read(output.join("data/structure_assets/structure/empty_room.nbt"))
+        .expect("结构 NBT 未写入数据包");
+    assert_eq!(packed, original);
+}
+
+#[test]
 fn invalid_corpus_is_rejected() {
     let root = repo_root().join("tests/invalid");
     let mut checked = 0;

@@ -91,9 +91,9 @@ pub(super) fn validate_waypoint(
             target
         }
         WaypointOperation::Hex { target, color } => {
-            if color.len() != 6 || !color.bytes().all(|c| c.is_ascii_hexdigit()) {
+            if !matches!(color.len(), 3 | 6) || !color.bytes().all(|c| c.is_ascii_hexdigit()) {
                 diagnostics.push(Diagnostic::new(
-                    format!("路径点颜色 `{color}` 必须是六位 RGB 十六进制（不带 #）"),
+                    format!("路径点颜色 `{color}` 必须是三位或六位 RGB 十六进制（不带 #）"),
                     span,
                 ));
             }

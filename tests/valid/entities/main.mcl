@@ -29,6 +29,7 @@ query armed = entity("#minecraft:undead") {
     without_type("minecraft:zombie_villager");
     name("Bob");
     scores("processed", "1..");
+    scores("salvaged", "..20");
     nbt("{Health:10.0f}");
     box(0, 60, 0, 16, 8, 16);
     distance("3..10");

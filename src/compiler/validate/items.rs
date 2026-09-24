@@ -232,9 +232,27 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
             filter.span,
         ));
     }
+    let mut score_objectives = HashSet::new();
     for score in &query.scores {
-        if score.objective.is_empty() {
-            diagnostics.push(Diagnostic::new("scores 的目标名不能为空", score.span));
+        if score.objective.is_empty()
+            || !score
+                .objective
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_-.+".contains(&byte))
+        {
+            diagnostics.push(Diagnostic::new(
+                format!("scores 的目标名 `{}` 不是有效的命令单词", score.objective),
+                score.span,
+            ));
+        }
+        if !score_objectives.insert(&score.objective) {
+            diagnostics.push(Diagnostic::new(
+                format!(
+                    "查询 `{}` 重复使用 scores 目标 `{}`",
+                    query.name, score.objective
+                ),
+                score.span,
+            ));
         }
         if !valid_int_range(&score.range) {
             diagnostics.push(Diagnostic::new(
@@ -244,10 +262,10 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
         }
     }
     if let Some(filter) = &query.nbt_filter
-        && (filter.value.is_empty() || !balanced_snbt(&filter.value))
+        && !super::selector_literals::valid_nbt_compound(&filter.value)
     {
         diagnostics.push(Diagnostic::new(
-            "查询 nbt 需要平衡的 SNBT 谓词或路径",
+            "查询 nbt 需要语法完整的 SNBT 复合标签",
             filter.span,
         ));
     }
@@ -278,7 +296,7 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
         }
     }
     if let Some(distance) = &query.distance
-        && !valid_float_range(distance)
+        && !valid_nonnegative_float_range(distance)
     {
         diagnostics.push(Diagnostic::new(
             format!("`{distance}` 不是有效的距离区间，例如 3..10、..10、5.."),
@@ -286,7 +304,7 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
         ));
     }
     if let (Some(distance), Some(within)) = (&query.distance, query.within)
-        && valid_float_range(distance)
+        && valid_nonnegative_float_range(distance)
         && !ranges_intersect(distance, &format!("..{within}"))
     {
         diagnostics.push(Diagnostic::new(
@@ -298,7 +316,7 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
         ));
     }
     if let Some(level) = &query.level
-        && !valid_int_range(level)
+        && !valid_nonnegative_int_range(level)
     {
         diagnostics.push(Diagnostic::new(
             format!("`{level}` 不是有效的等级区间，例如 1..5、..5、5.."),
@@ -326,9 +344,19 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
         ));
     }
     if let Some(filter) = &query.team_filter
-        && filter.value.is_empty()
+        && (filter.value.is_empty()
+            || !filter
+                .value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_-.+".contains(&byte)))
     {
-        diagnostics.push(Diagnostic::new("查询 team 不能为空", filter.span));
+        diagnostics.push(Diagnostic::new(
+            format!(
+                "查询 team `{}` 必须是非空命令单词（字母、数字、_、-、.、+）",
+                filter.value
+            ),
+            filter.span,
+        ));
     }
     if let Some(rotation) = &query.rotation {
         for (label, value) in [("偏航", &rotation.yaw), ("俯仰", &rotation.pitch)] {
@@ -349,10 +377,10 @@ pub(super) fn validate_entity_query(query: &EntityQueryDecl, diagnostics: &mut V
         ));
     }
     if let Some(advancements) = &query.advancements
-        && (advancements.is_empty() || !balanced_snbt(advancements))
+        && !super::selector_literals::valid_advancements(advancements)
     {
         diagnostics.push(Diagnostic::new(
-            "查询 advancements 需要平衡的 SNBT 谓词",
+            "查询 advancements 需要 {进度ID=true/false} 或嵌套准则布尔过滤",
             query.span,
         ));
     }
@@ -397,7 +425,24 @@ fn validate_entity_type(value: &str, span: Span, diagnostics: &mut Vec<Diagnosti
 
 /// 选择器区间：`5`、`..5`、`5..`、`5..10` 与小数版本。
 pub(super) fn valid_int_range(text: &str) -> bool {
-    parse_range(text, |value| value.parse::<i64>().ok()).is_some()
+    parse_range(text, |value| value.parse::<i32>().ok()).is_some()
+}
+
+fn valid_nonnegative_int_range(text: &str) -> bool {
+    parse_range(text, |value| {
+        value.parse::<i32>().ok().filter(|number| *number >= 0)
+    })
+    .is_some()
+}
+
+fn valid_nonnegative_float_range(text: &str) -> bool {
+    parse_range(text, |value| {
+        value
+            .parse::<f64>()
+            .ok()
+            .filter(|number| number.is_finite() && *number >= 0.0)
+    })
+    .is_some()
 }
 
 pub(super) fn valid_float_range(text: &str) -> bool {

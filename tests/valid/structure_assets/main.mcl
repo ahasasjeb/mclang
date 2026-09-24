@@ -1,0 +1,2 @@
+namespace structure_assets;
+fn empty_room() { place.template("structure_assets:empty_room", pos(0, 64, 0)); }

@@ -1,0 +1,3 @@
+// expect: 必须是非空命令单词
+namespace audit_team_space;
+query players = entity("minecraft:player") { team("red team"); }

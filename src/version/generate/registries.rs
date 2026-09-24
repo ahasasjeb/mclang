@@ -94,6 +94,28 @@ pub fn generate_registries(root: &Path) -> Result<String, String> {
         }
     }
 
+    // ObjectiveCriteria.byName resolves statistical criteria through the
+    // registered stat type and its value registry. Keep custom statistics in
+    // the same snapshot so unknown names cannot break __mcl/load.
+    let stats = extractor.read("net/minecraft/stats/Stats.java")?;
+    for id in string_args_in_calls(&stats, "makeCustomStat") {
+        insert(&mut registries, "custom_stat", &id);
+    }
+    for (registry, path) in [
+        (
+            "loot_condition_type",
+            "net/minecraft/world/level/storage/loot/predicates/LootItemConditionTypes.java",
+        ),
+        (
+            "recipe_serializer",
+            "net/minecraft/world/item/crafting/RecipeSerializers.java",
+        ),
+    ] {
+        for id in string_args_in_calls(&extractor.read(path)?, "Registry.register") {
+            insert(&mut registries, registry, &id);
+        }
+    }
+
     // 代码注册的其它注册表。
     let code_sources: &[(&str, &str, &str)] = &[
         (

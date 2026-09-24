@@ -1,0 +1,3 @@
+// expect: 暂不支持带 [...] 选项
+namespace audit_message_nearest_selector;
+fn invalid() { say("hello @n[foo=bar]"); }

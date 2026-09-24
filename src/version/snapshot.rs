@@ -95,6 +95,7 @@ pub struct Snapshot {
     registries: BTreeMap<String, BTreeSet<String>>,
     enums: BTreeMap<String, Vec<String>>,
     resource_kinds: BTreeSet<String>,
+    tag_registries: BTreeSet<String>,
     slots: Slots,
     commands: BTreeMap<String, Value>,
     triggers: BTreeMap<String, BTreeMap<String, String>>,
@@ -127,6 +128,7 @@ impl Snapshot {
             registries: object_sets(registries.get("registries")),
             enums: object_arrays(enums.get("enums")),
             resource_kinds: string_set(registries.get("resource_kinds")),
+            tag_registries: string_set(registries.get("tag_registries")),
             slots: Slots::from_value(registries.get("slots")),
             commands: commands
                 .get("commands")
@@ -202,6 +204,9 @@ impl Snapshot {
     /// `resource` 声明是否支持该类型。
     pub fn resource_kind_supported(&self, kind: &str) -> bool {
         self.resource_kinds.contains(kind)
+            || kind.strip_prefix("tags/").is_some_and(|registry| {
+                registry == "function" || self.tag_registries.contains(registry)
+            })
     }
 
     /// 槽位表。

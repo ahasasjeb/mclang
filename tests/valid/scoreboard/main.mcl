@@ -11,6 +11,7 @@ namespace scoreboard_test;
 score next_key = 0;
 objective box_key;
 objective box_active;
+objective jumps { criteria = "minecraft.custom:minecraft.jump"; }
 
 // 2.6 目标属性：准则、显示名、渲染类型、数字格式与显示槽。
 objective trigger_ready {

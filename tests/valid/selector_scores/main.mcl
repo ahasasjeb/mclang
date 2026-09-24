@@ -1,0 +1,6 @@
+namespace selector_scores;
+query players = entity("minecraft:player") {
+    scores("first", "1..");
+    scores("second", "..5");
+}
+fn show() { if entity(players) { say("matched"); } }

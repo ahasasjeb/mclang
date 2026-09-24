@@ -98,10 +98,32 @@ pub(super) fn collect_objectives<'a>(
     objectives
 }
 
-/// 计分板准则：简单准则名或 `命名空间:统计` 形式。
+/// ObjectiveCriteria.byName accepts registered custom names or a registered
+/// stat type and value pair encoded with dots instead of resource colons.
 fn valid_score_criteria(criteria: &str) -> bool {
-    if let Some((namespace, path)) = criteria.split_once(':') {
-        return valid_name(namespace) && valid_resource_path(path);
+    if let Some((stat_type, value)) = criteria.split_once(':') {
+        let Some(stat_type) = stat_type.strip_prefix("minecraft.") else {
+            return false;
+        };
+        let Some(value) = value.strip_prefix("minecraft.") else {
+            return false;
+        };
+        let registry = match stat_type {
+            "mined" => "block",
+            "crafted" | "used" | "broken" | "picked_up" | "dropped" => "item",
+            "killed" | "killed_by" => "entity_type",
+            "custom" => "custom_stat",
+            _ => return false,
+        };
+        return crate::version::snapshot::snapshot()
+            .registry_contains(registry, &format!("minecraft:{value}"))
+            == Some(true);
+    }
+    if let Some(color) = criteria
+        .strip_prefix("teamkill.")
+        .or_else(|| criteria.strip_prefix("killedByTeam."))
+    {
+        return crate::version::snapshot::snapshot().enum_contains("team_color", color);
     }
     matches!(
         criteria,
@@ -116,14 +138,6 @@ fn valid_score_criteria(criteria: &str) -> bool {
             | "armor"
             | "xp"
             | "level"
-            | "teamkill.red"
-            | "teamkill.blue"
-            | "teamkill.green"
-            | "teamkill.yellow"
-            | "killedByTeam.red"
-            | "killedByTeam.blue"
-            | "killedByTeam.green"
-            | "killedByTeam.yellow"
     )
 }
 
@@ -281,27 +295,36 @@ pub(super) fn validate_resources<'a>(
                 resource.span,
             ));
         }
-        if !resources.insert((resource.kind.as_str(), resource.name.as_str())) {
+        // The kind may itself include a subdirectory, so different declarations
+        // can still resolve to the same output file.
+        if !resources.insert(format!("{}/{}", resource.kind, resource.name)) {
             diagnostics.push(Diagnostic::new(
                 format!("重复声明资源 `{}/{}`", resource.kind, resource.name),
                 resource.span,
             ));
         }
+        if resource.kind == "tags/function"
+            && program
+                .function_tags
+                .iter()
+                .any(|tag| tag.name == resource.name)
+        {
+            diagnostics.push(Diagnostic::new(
+                format!(
+                    "函数标签 `{}` 同时由 fn_tag 和 resource 声明",
+                    resource.name
+                ),
+                resource.span,
+            ));
+        }
         match serde_json::from_str::<serde_json::Value>(&resource.json) {
-            Ok(value) => {
-                // predicate 资源的正文就是一段内联战利品条件，26.3 用 `type`
-                // 作判别键；缺了它原版只会在加载时报 Failed to parse。
-                if resource.kind == "predicate"
-                    && value
-                        .as_object()
-                        .is_some_and(|object| !object.contains_key("type"))
-                {
-                    diagnostics.push(Diagnostic::new(
-                        "predicate 资源必须是内联战利品条件：26.3 的判别键是 `type` 而不是 `condition`，例如 {\"type\":\"minecraft:random_chance\",\"chance\":0.5}",
-                        resource.span,
-                    ));
-                }
-            }
+            Ok(value) => super::resource_schema::validate_resource(
+                &resource.kind,
+                &resource.name,
+                &value,
+                resource.span,
+                diagnostics,
+            ),
             Err(error) => {
                 diagnostics.push(Diagnostic::new(
                     format!(

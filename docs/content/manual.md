@@ -381,8 +381,8 @@ query <name> = entity("<实体类型或 #标签>") {
     name("<名称>");
     without_name("<名称>");
     scores("<计分目标>", "<整数区间>");
-    nbt("<SNBT 谓词或路径>");
-    without_nbt("<SNBT 谓词或路径>");
+    nbt("<SNBT 复合标签>");
+    without_nbt("<SNBT 复合标签>");
     box(<x>, <y>, <z>, <dx>, <dy>, <dz>);
     distance("<距离区间>");
     level("<等级区间>");
@@ -391,7 +391,7 @@ query <name> = entity("<实体类型或 #标签>") {
     without_team("<队伍>");
     rotate("<偏航区间>", "<俯仰区间>");
     predicate("<谓词资源位置>");
-    advancements("<SNBT 谓词>");
+    advancements("{namespace:path=true/false}");
     item(<槽位>) {
         id = "<物品谓词>";
         count = <数量>;
@@ -400,7 +400,7 @@ query <name> = entity("<实体类型或 #标签>") {
 }
 ```
 
-查询是一段可复用的选择器。`entity(...)` 已指定正向实体类型，因此 `type(...)` 会报互斥诊断。原版只允许在正向 `#类型标签` 后继续追加排除条件，所以 `without_type(...)` 仅能用于 `entity("#标签")` 查询；具体实体类型后再写会在编译期拒绝。`tag`、`without_tag`、`without_type` 和 `scores` 可以重复（同一个类型标签不能重复排除），其余属性各只能出现一次；`distance` 与 `within` 会合并成同一个区间，交集为空时报错。区间不接受倒置边界或非有限小数；`level`、`gamemode` 仅适用于玩家查询。`item` 过滤器的槽位是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0` …）或 `slot_source` 资源位置，`id` 可以是物品 id、`#标签` 或带 `[组件过滤器]` 的谓词。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear`、`count` 与条件里被引用。
+查询是一段可复用的选择器。`entity(...)` 已指定正向实体类型，因此 `type(...)` 会报互斥诊断。原版只允许在正向 `#类型标签` 后继续追加排除条件，所以 `without_type(...)` 仅能用于 `entity("#标签")` 查询；具体实体类型后再写会在编译期拒绝。`tag`、`without_tag`、`without_type` 和 `scores` 可以重复（同一个类型标签或计分目标不能重复），多个分数条件会合并为一个 `scores={...}` 选项；其余属性各只能出现一次。`distance` 与 `within` 会合并成同一个区间，交集为空时报错。区间不接受倒置边界或非有限小数；`distance` 和 `level` 的边界不能为负，整数边界必须落在 32 位整数范围。`team` 只接受不含空格的命令单词。`nbt` 需要完整的 SNBT 复合标签；`advancements` 使用进度 ID 与 `true`/`false`，可嵌套准则过滤。`level`、`gamemode` 仅适用于玩家查询。`item` 过滤器的槽位是原版槽位名（`contents`、`weapon.mainhand`、`armor.*`、`container.0` …）或 `slot_source` 资源位置，`id` 可以是物品 id、`#标签` 或带 `[组件过滤器]` 的谓词。查询不产生命令，只在 `each`、`give`、`effect`、`xp`、`clear`、`count` 与条件里被引用。
 
 | 属性 | 生成的参数 | 中文写法 |
 | --- | --- | --- |
@@ -503,6 +503,8 @@ objective <name> {
 
 声明一个用户计分板目标，运行期名称是 `<命名空间>_<名称>`（例如 `portable_chest_box_key`）。`__mcl/load` 负责创建目标并应用显示名、渲染类型、数字格式与显示槽，`/reload` 不会清空已有分数。目标可以同时记录玩家与实体的分数，是「给实体打上属于谁」这类绑定的基础；读写用 `scoreboard.set/reset/get`（见[计分板](#statements-scoreboard)）。
 
+`criteria` 会按 26.3 注册表核对。统计准则采用 `minecraft.custom:minecraft.jump`、`minecraft.mined:minecraft.stone` 这样的名称；不存在的统计值会在编译期拒绝。
+
 ```mcl title="示例" fragment
 objective box_key;
 objective trigger_ready {
@@ -537,7 +539,7 @@ data_slot note = entity_data("pc_note.name");
 resource predicate <name> = """{ ... }""";
 ```
 
-声明一份原样写出的 JSON 资源，编译后保存到 `data/<命名空间>/<类型>/<名称>.json`。可用的类型是 26.3 的资源目录名（见[附录 C](#appendix-registry)），其中 `predicate` 可以在条件里用 `if predicate(<name>)` 引用；常用的 `recipe`、`predicate`、`dialog` 可写中文 `配方`、`谓词`、`对话框`，其他类型写英文名称，带斜杠的类型要写成字符串名称（例如 `"worldgen/feature/example"`）。JSON 会在编译期解析，格式错误直接报告行列位置，输出时统一重排为两空格缩进。`predicate` 的正文是内联战利品条件，26.3 的判别键 `type` 必填（`condition` 只用于引用谓词资源）。
+声明一份原样写出的 JSON 资源，编译后保存到 `data/<命名空间>/<类型>/<名称>.json`。可用的类型是 26.3 的资源目录名（见[附录 C](#appendix-registry)），其中 `predicate` 可以在条件里用 `if predicate(<name>)` 引用；常用的 `recipe`、`predicate`、`dialog` 可写中文 `配方`、`谓词`、`对话框`，其他类型写英文名称，带斜杠的类型要写成字符串名称（例如 `"worldgen/feature/example"`）。JSON 会在编译期解析，格式错误直接报告行列位置，输出时统一重排为两空格缩进。`predicate` 的内联对象必须有已注册的 `type`；`recipe` 也会核对配方类型，`crafting_shapeless` 还要求 1 到 9 个材料及合法结果；`loot_table` 的池要求 `entries` 和 `rolls`。其他资源仍有未覆盖的 codec 字段，见开发计划。
 
 ```mcl title="示例" fragment
 resource predicate coin_flip = """
@@ -547,6 +549,12 @@ resource predicate coin_flip = """
 }
 """;
 ```
+
+注册表标签可用 `resource "tags/<注册表>"` 声明，例如 `resource "tags/block" building = """{"values":["minecraft:stone",{"id":"#minecraft:mineable/pickaxe","required":false}]}""";`。`values` 可包含资源位置字符串或 `{ "id": "...", "required": false }`；`#` 表示引用另一标签。函数标签也可通过 `resource "tags/function"` 使用可选引用；普通 `fn_tag` 语法仍负责本地函数与标签的引用检查。
+
+项目目录中的 `assets/structure/<名称>.nbt` 会按字节复制为 `data/<命名空间>/structure/<名称>.nbt`，子目录也会保留。文件须为 gzip 压缩的 NBT；`check` 会核对路径和 gzip 文件头，结构内容仍需由原版加载验收。例如 `assets/structure/house.nbt` 可由 `place.template("<命名空间>:house", pos(0, 64, 0));` 引用。
+
+`predicate` 资源正文必须是对象；嵌套的 `term` 才允许谓词引用字符串，`terms` 支持单条条件、引用、标签或条件数组。`chance`、战利品池 `rolls` 也允许数值提供器引用字符串。物品 ID 等 JSON 字段可省略默认的 `minecraft:` 命名空间。同一输出路径不能由不同的资源声明覆盖。
 
 ### 进度（advancement）
 
@@ -981,7 +989,7 @@ fn load() {
 :::
 
 :::note 字符串子句仍是逃生口
-`execute "as @a at @s" { ... }` 原样转发子句字符串，只做空值、跨行与首尾 `run` 的形状检查，并计入 `--deny-raw`；结构化子句则完全绕过字符串，可以在严格模式项目里使用。
+`execute "as @a at @s" { ... }` 原样转发子句字符串，检查空值、跨行与首尾 `run` 的形状，并计入 `--deny-raw`；结构化子句可以在严格模式项目里使用。
 :::
 
 ### 函数调用（call）
@@ -1139,7 +1147,7 @@ msg(<玩家目标>, "<单行消息>");
 teammsg("<单行消息>");
 ```
 
-`msg` 生成原版私聊命令（`tell`、`w` 是原版别名）；`teammsg` 生成队伍聊天命令（`tm` 是别名），要求实体执行上下文，运行时发送者必须属于队伍。`msg`、`teammsg`、`say`、`me` 的消息参数使用独立的 `MessageArgument` 类型，只接受非空单行字符串，且按 Minecraft 的 UTF-16 长度最多 256；其中可解析的 `@` 选择器会由原版展开。需要 JSON 文本组件与样式时使用 `message.player`。
+`msg` 生成原版私聊命令（`tell`、`w` 是原版别名）；`teammsg` 生成队伍聊天命令（`tm` 是别名），要求实体执行上下文，运行时发送者必须属于队伍。`msg`、`teammsg`、`say`、`me` 的消息参数使用独立的 `MessageArgument` 类型，只接受非空单行字符串，且按 Minecraft 的 UTF-16 长度最多 256；无选项的 `@` 选择器会由原版展开，带 `[...]` 的选择器在接入完整 Brigadier 校验前由编译器拒绝。需要 JSON 文本组件与样式时使用 `message.player`。
 
 ### 状态效果（effect）
 
@@ -1399,7 +1407,7 @@ return run "<原生命令>";      // 返回命令结果
 run "<完整命令>";
 ```
 
-把一条命令原样写进 `.mcfunction`。命令不能以 `/` 开头、不能跨行、不能为空。`run`、字符串形式的 `execute` 与字符串形式的 `return run` 都计入 `--deny-raw` 的统计；严格模式会在任何嵌套深度拒绝它们。
+把一条命令原样写进 `.mcfunction`。命令不能以 `/` 开头、不能跨行、不能为空，也不能以反斜杠结尾。根命令须在 26.3 命令表中；裸 `execute` 和部分明显未完成的分支会被拒绝。条件本身也可以是可执行叶，例如 `execute if entity @s` 不需要 `run`。原始命令参数尚未经过完整 Brigadier 解析。所有生成的函数行最多为 2,000,000 个 UTF-16 字符。`run`、字符串形式的 `execute` 与字符串形式的 `return run` 都计入 `--deny-raw` 的统计；严格模式会在任何嵌套深度拒绝它们。
 
 ```mcl title="示例（严格模式会拒绝）" verify id=raw_escape raw
 namespace raw_escape;
@@ -2009,9 +2017,9 @@ datapack.list(enabled);
 
 ### 信息、档案与 GameTest
 
-`help(["命令路径"])`、`version()`、`seed()` 是查询入口。`say("消息")` 与 `me("动作")` 分别生成原生广播和动作消息，参数按 Minecraft 的 MessageArgument 解释。`fetchprofile.name("玩家名")`、`fetchprofile.id("UUID")`、`fetchprofile.entity(单实体查询或 self)` 返回档案信息；UUID 在编译期检查格式。
+`help(["命令路径"])`、`version()`、`seed()` 是查询入口。`say("消息")` 与 `me("动作")` 分别生成原生广播和动作消息，参数按 Minecraft 的 MessageArgument 解释。消息不得以反斜杠结尾；当前只接受无选项的 `@a`、`@e` 等选择器，带 `[...]` 的选择器会在编译期拒绝。`fetchprofile.name("玩家名")`、`fetchprofile.id("UUID")`、`fetchprofile.entity(单实体查询或 self)` 返回档案信息；UUID 在编译期检查格式。
 
-`test` 覆盖 26.3 中数据包可调用的 GameTest 分支：`run`、`runmultiple`、`runthese`、`runclosest`、`runthat`、`runfailed`、`verify`、`locate`、`resetclosest/resetthese/resetthat`、`clearthat/clearthese/clearall`、`stop`、`pos`、`create`。`run/verify/locate` 的测试实例参数是允许 `*`、`?` 的资源选择式字符串；运行次数最大为 2147483647；IDE 限定的 export 分支不可用。
+`test` 覆盖 26.3 中数据包可调用的 GameTest 分支：`run`、`runmultiple`、`runthese`、`runclosest`、`runthat`、`runfailed`、`verify`、`locate`、`resetclosest/resetthese/resetthat`、`clearthat/clearthese/clearall`、`stop`、`pos`、`create`。`run/verify/locate` 的测试实例参数是允许 `*`、`?` 的资源选择式字符串；运行次数最大为 2147483647；`create` 每个尺寸最多为 48；IDE 限定的 export 分支不可用。
 
 ```mcl title="GameTest 示例" fragment
 test.run("demo:basic", 3, true, 1, 8);
@@ -2056,11 +2064,11 @@ test.create("demo:new_test", 5, 4, 7);
 
 `team.modify.<option>("name", value)` 支持 `display_name`、`prefix`、`suffix` 文本组件，`color` 颜色或 `reset`，`friendly_fire`、`see_friendly_invisibles` 布尔值。`nametag_visibility` 和 `death_message_visibility` 可取 `always/never/hide_for_other_teams/hide_for_own_team`；`collision_rule` 可取 `always/never/push_own_team/push_other_teams`。
 
-`waypoint.list()` 列出当前维度路径点；`waypoint.modify.color(one, color)`、`.color.hex(one, "RRGGBB")`、`.color.reset(one)` 修改或重置颜色；`.style.set(one, "namespace:style")`、`.style.reset(one)` 修改或重置客户端样式。十六进制颜色不带 `#`。路径点样式是资源包资产，这里检查资源位置，不生成资源包。
+`waypoint.list()` 列出当前维度路径点；`waypoint.modify.color(one, color)`、`.color.hex(one, "RGB" | "RRGGBB")`、`.color.reset(one)` 修改或重置颜色；`.style.set(one, "namespace:style")`、`.style.reset(one)` 修改或重置客户端样式。十六进制颜色不带 `#`。路径点样式是资源包资产，这里检查资源位置，不生成资源包。
 
 ### 任意物品组件与结构化谓词
 
-物品定义和 `give` 的内联 `item_stack(...) { ... }` 都支持 `components = nbt { ... };`。键是组件资源位置，值使用结构化 NBT；删除组件写成 `"!minecraft:组件" = {};`。组件名对照 26.3 注册表，重复设置、与已有具名属性冲突会报错。常用组件还检查整数/浮点范围、布尔值、资源位置、稀有度枚举、文本列表、附魔级别以及 `food`、`use_cooldown`、`use_effects`、`weapon`、`attack_range`、`enchantable` 的字段。其余复杂组件仍由原版 codec 在加载时检查。
+物品定义和 `give` 的内联 `item_stack(...) { ... }` 都支持 `components = nbt { ... };`。键是组件资源位置，值使用结构化 NBT；删除组件写成 `"!minecraft:组件" = {};`。组件名对照 26.3 注册表，重复设置、与已有具名属性冲突会报错。常用组件还检查整数/浮点范围、布尔值、资源位置、稀有度枚举、文本列表、附魔级别以及 `food`、`use_cooldown`、`use_effects`、`weapon`、`attack_range`、`enchantable`、`custom_model_data` 的字段；后者需要可选的 `floats`、`flags`、`strings`、`colors` 列表。其余复杂组件仍由原版 codec 在加载时检查。
 
 `item_predicate("id/#tag/*") { ... }` 可用于 `clear`、`if items` 和查询的 `item(...){ id = ...; }`。`has` 检查存在，`equals` 检查组件完整相等，`matches` 使用组件子谓词；前缀 `!` 取反，`||` 连接任选条件，不同分号分隔的条件必须全部满足。`minecraft:count` 是原版提供的数量伪组件；`count`、`damage`、`potion_contents`、`enchantments`、`stored_enchantments`、`trim`、`firework_explosion`、`written_book_content`、`jukebox_playable`、`villager/variant` 的常用字段会检查值类型、资源引用与范围。整数范围可写单个整数或 `nbt { min = ...; max = ...; }`，`min` 不能大于 `max`。
 

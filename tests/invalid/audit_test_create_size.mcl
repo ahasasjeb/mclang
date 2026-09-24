@@ -1,0 +1,3 @@
+// expect: 宽、高、深不能超过 48
+namespace audit_test_create_size;
+fn invalid() { test.create("audit_test_create_size:room", 49); }

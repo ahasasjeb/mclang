@@ -1,0 +1,3 @@
+// expect: 不是有效的距离区间
+namespace audit_negative_distance;
+query players = entity("minecraft:player") { distance("-1..5"); }

@@ -1,0 +1,3 @@
+// expect: 不是有效的等级区间
+namespace audit_level_overflow;
+query players = entity("minecraft:player") { level("2147483648"); }

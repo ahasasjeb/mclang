@@ -17,7 +17,7 @@ item icon = item_stack("minecraft:crying_obsidian") {}
 
 resource predicate lucky = """{"type":"minecraft:random_chance","chance":0.5}""";
 resource loot_table trophy = """{"type":"minecraft:generic","pools":[]}""";
-resource recipe token = """{"type":"minecraft:crafting_shapeless","ingredients":[],"result":{"id":"minecraft:emerald","count":1}}""";
+resource recipe token = """{"type":"minecraft:crafting_shapeless","ingredients":["minecraft:stone"],"result":{"id":"minecraft:emerald","count":1}}""";
 
 query players = entity("minecraft:player") {}
 

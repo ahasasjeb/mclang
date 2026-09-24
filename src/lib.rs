@@ -68,6 +68,7 @@ pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
         },
     )
     .map_err(|diagnostics| render(&loaded.sources, diagnostics))?;
+    load_structure_assets(&loaded.directory, &program.namespace)?;
     Ok(CheckSummary {
         functions: program.functions.len(),
         scores: program.scores.len(),
@@ -96,17 +97,18 @@ pub fn build_file(
             "严格模式拒绝构建：项目包含 {raw_statements} 条底层语句或不安全宏（run/execute/return run/运行期 with/nbt 宏片段）"
         ));
     }
-    let pack = compile(
+    let mut pack = compile(
         &mut program,
         &CompileOptions {
             description: options.description.clone(),
         },
     )
     .map_err(|diagnostics| render(&loaded.sources, diagnostics))?;
+    pack.binary_files = load_structure_assets(&loaded.directory, &program.namespace)?;
     write_pack(output, &pack)?;
     Ok(BuildResult {
         output: output.to_path_buf(),
-        file_count: pack.files.len(),
+        file_count: pack.files.len() + pack.binary_files.len(),
     })
 }
 
@@ -207,6 +209,7 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
 struct LoadedSources {
     sources: Vec<SourceFile>,
     root: usize,
+    directory: PathBuf,
 }
 
 /// 加载项目：入口是 `main.mcl`（目录输入）或给定文件（文件输入），
@@ -278,7 +281,11 @@ fn read_project(path: &Path) -> Result<LoadedSources, String> {
         }
     }
 
-    Ok(LoadedSources { sources, root })
+    Ok(LoadedSources {
+        sources,
+        root,
+        directory,
+    })
 }
 
 fn push_source(
@@ -375,6 +382,7 @@ fn write_pack(output: &Path, pack: &CompiledPack) -> Result<(), String> {
     let manifest = pack
         .files
         .keys()
+        .chain(pack.binary_files.keys())
         .map(|path| path.to_string_lossy().replace('\\', "/"))
         .collect::<Vec<_>>()
         .join("\n")
@@ -393,7 +401,80 @@ fn write_files(output: &Path, pack: &CompiledPack) -> Result<(), String> {
         fs::write(&path, contents)
             .map_err(|error| format!("无法写入 {}：{error}", path.display()))?;
     }
+    for (relative, contents) in &pack.binary_files {
+        let path = output.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
+        }
+        fs::write(&path, contents)
+            .map_err(|error| format!("无法写入 {}：{error}", path.display()))?;
+    }
     Ok(())
+}
+
+/// Copy project assets/structure/**/*.nbt into the namespace's data directory.
+/// Symlinks are skipped, so every copied file stays inside the project tree.
+fn load_structure_assets(
+    directory: &Path,
+    namespace: &str,
+) -> Result<std::collections::BTreeMap<PathBuf, Vec<u8>>, String> {
+    let root = directory.join("assets/structure");
+    if !root.is_dir() {
+        return Ok(std::collections::BTreeMap::new());
+    }
+    for path in [directory.join("assets"), root.clone()] {
+        if fs::symlink_metadata(&path)
+            .map_err(|error| format!("无法读取 {}：{error}", path.display()))?
+            .file_type()
+            .is_symlink()
+        {
+            return Err(format!("结构资源目录 {} 不能是符号链接", path.display()));
+        }
+    }
+    let mut files = std::collections::BTreeMap::new();
+    let mut pending = vec![root.clone()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory)
+            .map_err(|error| format!("无法读取结构资源目录 {}：{error}", directory.display()))?
+        {
+            let entry = entry.map_err(|error| format!("无法读取结构资源目录项：{error}"))?;
+            let file_type = entry
+                .file_type()
+                .map_err(|error| format!("无法读取 {} 的类型：{error}", entry.path().display()))?;
+            if file_type.is_dir() {
+                pending.push(entry.path());
+            } else if file_type.is_file()
+                && entry.path().extension().and_then(|ext| ext.to_str()) == Some("nbt")
+            {
+                let relative = entry
+                    .path()
+                    .strip_prefix(&root)
+                    .expect("asset path is inside structure root")
+                    .to_path_buf();
+                let name = relative
+                    .with_extension("")
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                if !compiler::valid_resource_path(&name) {
+                    return Err(format!("结构资源名称 `{name}` 不是有效的资源路径"));
+                }
+                let contents = fs::read(entry.path())
+                    .map_err(|error| format!("无法读取 {}：{error}", entry.path().display()))?;
+                if !contents.starts_with(&[0x1f, 0x8b]) {
+                    return Err(format!("结构资源 `{name}` 必须是 gzip 压缩的 NBT 文件"));
+                }
+                files.insert(
+                    PathBuf::from("data")
+                        .join(namespace)
+                        .join("structure")
+                        .join(relative),
+                    contents,
+                );
+            }
+        }
+    }
+    Ok(files)
 }
 
 /// 自底向上删除目录树里不再包含任何文件的空目录。

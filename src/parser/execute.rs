@@ -26,9 +26,9 @@ impl Parser {
             let (clauses, span) = self.string("execute 后需要子句字符串或结构化子句")?;
             if clauses.trim().is_empty()
                 || clauses.contains(['\n', '\r'])
-                || clauses.starts_with("execute ")
-                || clauses.starts_with("run ")
-                || clauses.ends_with(" run")
+                || clauses.trim_start().starts_with("execute ")
+                || clauses.trim_start().starts_with("run ")
+                || clauses.trim_end().ends_with(" run")
             {
                 return Err(Diagnostic::new(
                     "execute 字符串应只包含子句，例如 `as @a at @s`；也可以直接写结构化子句 `as(查询)`",

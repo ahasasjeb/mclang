@@ -1,0 +1,3 @@
+// expect: 重复使用 scores 目标
+namespace audit_duplicate_scores;
+query players = entity("minecraft:player") { scores("points", "1"); scores("points", "2"); }

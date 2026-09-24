@@ -1,0 +1,3 @@
+// expect: 未在 Minecraft 26.3
+namespace audit_predicate_type;
+resource predicate bad = """{"type":"minecraft:made_up"}""";

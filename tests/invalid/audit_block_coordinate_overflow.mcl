@@ -1,0 +1,3 @@
+// expect: 超出 32 位整数范围
+namespace audit_block_coordinate_overflow;
+fn invalid() { set_block(pos(2147483648, 64, 0), block_state("minecraft:stone")); }

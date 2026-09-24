@@ -1,0 +1,3 @@
+// expect: 需要 entries 数组和 rolls
+namespace audit_loot_pool;
+resource loot_table bad = """{"pools":[{}]}""";

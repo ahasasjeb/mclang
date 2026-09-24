@@ -29,3 +29,9 @@ fn nested_execute() {
 fn gametime() -> score {
     return run "time query gametime";
 }
+
+fn standalone_condition() {
+    run "execute if entity @s";
+    run "execute as @a unless entity @s[tag=ready]";
+    run "execute if entity run";
+}

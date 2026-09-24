@@ -1,0 +1,3 @@
+// expect: required 必须是布尔值
+namespace audit_tag_required_type;
+resource "tags/block" bad = """{"values":[{"id":"minecraft:stone","required":"no"}]}""";

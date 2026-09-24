@@ -1,0 +1,3 @@
+// expect: 不是有效的计分板准则
+namespace audit_bad_criteria;
+objective bad { criteria = "minecraft:made_up"; }

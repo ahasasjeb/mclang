@@ -1,0 +1,3 @@
+// expect: 缺少参数或可执行子命令
+namespace audit_raw_missing_argument;
+fn invalid() { run "say"; }

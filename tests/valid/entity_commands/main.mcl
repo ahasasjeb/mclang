@@ -58,6 +58,7 @@ fn commands() {
     waypoint.list();
     waypoint.modify.color(mob_one, gold);
     waypoint.modify.color.hex(mob_one, "ABCDEF");
+    waypoint.modify.color.hex(mob_one, "F00");
     waypoint.modify.color.reset(mob_one);
     waypoint.modify.style.set(mob_one, "minecraft:default");
     waypoint.modify.style.reset(mob_one);

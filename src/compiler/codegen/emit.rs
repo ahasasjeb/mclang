@@ -71,8 +71,14 @@ pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
             brigadier_string(&filter.value)
         ));
     }
-    for score in &query.scores {
-        selector.push(format!("scores={{{}={}}}", score.objective, score.range));
+    if !query.scores.is_empty() {
+        let entries = query
+            .scores
+            .iter()
+            .map(|score| format!("{}={}", score.objective, score.range))
+            .collect::<Vec<_>>()
+            .join(",");
+        selector.push(format!("scores={{{entries}}}"));
     }
     if let Some(filter) = &query.nbt_filter {
         selector.push(format!(

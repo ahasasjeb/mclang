@@ -36,7 +36,7 @@ fn valid_user_name_segment(segment: &str) -> bool {
         })
 }
 
-pub(super) fn valid_resource_path(path: &str) -> bool {
+pub(crate) fn valid_resource_path(path: &str) -> bool {
     !path.is_empty()
         && path.split('/').all(|segment| {
             !segment.is_empty()

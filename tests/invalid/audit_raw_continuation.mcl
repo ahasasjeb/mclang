@@ -1,0 +1,3 @@
+// expect: 不能以反斜杠结尾
+namespace audit_raw_continuation;
+fn invalid() { run "say hi \\"; }

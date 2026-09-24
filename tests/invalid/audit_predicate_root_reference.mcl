@@ -1,0 +1,3 @@
+// expect: predicate 需要带 type 的对象
+namespace audit_predicate_root_reference;
+resource predicate bad = "\"minecraft:fast_furnace\"";
