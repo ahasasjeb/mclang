@@ -170,6 +170,7 @@ code --install-extension mclang-0.5.0.vsix
 ## 文档
 
 - [`docs/index.html`](docs/index.html)：可离线打开的单页语言手册，带中英文关键词一键切换、附录对照表与经验证的完整示例。
+- [`LANGUAGE_DESIGN.md`](LANGUAGE_DESIGN.md)：后续扩展语法、语义、资源与诊断时遵循的语言设计规范。
 - 手册正文在 `docs/content/manual.md`，由 `docs/tools/build.mjs` 生成：关键词表取自 `src/parser/keywords.rs`，正文里的完整示例会用真实编译器分别以英文与中文关键词编译，并要求两种写法的产物逐字节一致。
   重新生成：`bun docs/tools/build.mjs --self-test`。
 - [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md)：已完成能力与后续路线。

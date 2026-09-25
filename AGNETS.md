@@ -87,6 +87,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3 的数据包编程语言及�
 
 ### 语言与目标版本
 
+- 新增或调整语言能力时遵循 `LANGUAGE_DESIGN.md`；若设计决定改变现有规则，同步修改该规范、手册与语料
 - 一切以仓库内的 `minecraft_client_26.3/` 源码和注册表为准，不要凭记忆猜资源类型、注册表
   路径或命令签名；数据包格式保持 `121.0`
 - 新增关键词必须同时提供中英文写法，并保证两种写法产物逐字节一致
@@ -116,6 +117,7 @@ cargo run -- check tests/invalid/items.mcl
 
 ## 文档索引
 
+- `LANGUAGE_DESIGN.md`：语言设计原则、现有语义边界与新增能力的评审清单
 - `docs/index.html`：单页语言手册，带中英文关键词切换、附录对照表与经验证的完整示例
 - `docs/content/manual.md`：手册正文；`docs/tools/` 从编译器源码提取词表并调用真实编译器验证示例
 - `docs/assets/`：手册样式与交互脚本
