@@ -183,7 +183,15 @@ pub(in crate::compiler::validate) fn validate_expr(
             );
             super::validate_compute_scale(*kind, scale.as_deref(), expression.span, diagnostics);
         }
-        ExprKind::Negate(value) => validate_expr(value, locals, ctx, diagnostics),
+        ExprKind::Negate(value) => {
+            validate_expr(value, locals, ctx, diagnostics);
+            if constant_value(value) == Some(i32::MIN) {
+                diagnostics.push(Diagnostic::new(
+                    "常量整数取负后超出 i32 范围",
+                    expression.span,
+                ));
+            }
+        }
         ExprKind::Binary {
             left,
             operation,
@@ -195,6 +203,21 @@ pub(in crate::compiler::validate) fn validate_expr(
                 && constant_value(right) == Some(0)
             {
                 diagnostics.push(Diagnostic::new("不能除以零", right.span));
+            } else if let (Some(left), Some(right)) = (constant_value(left), constant_value(right))
+            {
+                let result = match operation {
+                    BinaryOp::Add => left.checked_add(right),
+                    BinaryOp::Subtract => left.checked_sub(right),
+                    BinaryOp::Multiply => left.checked_mul(right),
+                    BinaryOp::Divide => left.checked_div(right),
+                    BinaryOp::Modulo => left.checked_rem(right),
+                };
+                if result.is_none() {
+                    diagnostics.push(Diagnostic::new(
+                        "常量整数运算结果超出 i32 范围",
+                        expression.span,
+                    ));
+                }
             }
         }
     }

@@ -191,9 +191,18 @@ fn native_command_shapes_and_macro_forwarding() {
         fs::read_to_string(output.join("data/macro_test/function/invoke.mcfunction")).unwrap();
     assert!(invoke.contains("function macro_test:welcome {label:\"Alex\",x:5,z:0.5d}"));
     assert!(invoke.contains("schedule clear external:plain"));
-    let helper =
-        fs::read_to_string(output.join("data/macro_test/function/__mcl/welcome/2.mcfunction"))
-            .unwrap();
+    let welcome =
+        fs::read_to_string(output.join("data/macro_test/function/welcome.mcfunction")).unwrap();
+    assert!(
+        welcome.contains("matches 1 run tellraw @a"),
+        "单命令 if 分支应直接内联：{welcome}"
+    );
+    let helper = files(&output)
+        .into_iter()
+        .filter(|(path, _)| path.to_string_lossy().contains("__mcl\\welcome"))
+        .map(|(_, bytes)| String::from_utf8(bytes).unwrap())
+        .find(|source| source.contains("{\"label\":\"$(label)\",\"x\":$(x),\"z\":$(z)}"))
+        .expect("宏循环辅助函数必须转发参数");
     assert_eq!(
         helper.lines().filter(|line| line.starts_with('$')).count(),
         2

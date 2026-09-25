@@ -13,11 +13,11 @@ mclang 是一门面向 Minecraft Java Edition 26.3 的数据包编程语言及�
 - 目标版本固定为仓库内 `minecraft_client_26.3` 源码，数据包版本 `121.0`
 - 依赖只有 `serde_json`，Rust edition 2024
 - 命令行：
-  - `mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]`
+  - `mclang build <源文件.mcl|项目目录> [-o <输出路径>] [--zip] [--description <文本>] [--deny-raw]`
   - `mclang check <源文件.mcl|项目目录> [--deny-raw]`
   - `mclang lsp`（标准输入输出上的语言服务器，供编辑器插件调用）
   - `mclang help` / `mclang version`
-- 默认输出到 `build/<项目名>`；`.mclang-manifest` 记录上次产物，重建只清理自己上次生成的文件，并回收 `data/` 下不再包含文件的空目录
+- 默认输出到 `build/<项目名>`，`--zip` 默认输出 `build/<项目名>.zip`；`.mclang-manifest` 记录目录构建的上次产物，重建只清理自己上次生成的文件，并回收 `data/` 下不再包含文件的空目录
 
 编译流水线：
 

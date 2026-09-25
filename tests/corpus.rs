@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use mclang::{BuildOptions, build_file, check_file};
+use mclang::{BuildOptions, build_file, build_zip_file, check_file};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -88,6 +88,96 @@ fn structure_asset_is_copied_byte_for_byte() {
     let packed = fs::read(output.join("data/structure_assets/structure/empty_room.nbt"))
         .expect("结构 NBT 未写入数据包");
     assert_eq!(packed, original);
+}
+
+#[test]
+fn pack_container_assets_and_zip_are_reproducible() {
+    let project = output_directory("pack-container-source");
+    fs::create_dir_all(project.join("assets/overlays/high/data/example/function"))
+        .expect("无法创建包资源语料");
+    fs::write(
+        project.join("main.mcl"),
+        "namespace pack_container;\n\nfn main() {}\n",
+    )
+    .expect("无法写入源码");
+    fs::write(
+        project.join("assets/pack.mcmeta"),
+        r#"{
+  "pack": {
+    "description": "asset description",
+    "min_format": [121, 0],
+    "max_format": [121, 0]
+  },
+  "overlays": {
+    "entries": [
+      {
+        "formats": {"min_inclusive": [121, 0], "max_inclusive": [121, 0]},
+        "directory": "high"
+      }
+    ]
+  },
+  "filter": {"block": [{"namespace": "legacy"}]},
+  "features": {"enabled": ["minecraft:vanilla"]}
+}"#,
+    )
+    .expect("无法写入 pack.mcmeta");
+    let icon = b"\x89PNG\r\n\x1a\ncontainer-test";
+    fs::write(project.join("assets/pack.png"), icon).expect("无法写入 pack.png");
+    fs::write(
+        project.join("assets/overlays/high/data/example/function/overlay.mcfunction"),
+        "say overlay\n",
+    )
+    .expect("无法写入 overlay 资源");
+
+    let options = BuildOptions {
+        description: "CLI description".to_owned(),
+        deny_raw: true,
+    };
+    let directory = output_directory("pack-container-output");
+    build_file(&project, &directory, &options).expect("带包容器资源的项目应当构建成功");
+    assert_eq!(fs::read(directory.join("pack.png")).unwrap(), icon);
+    assert!(
+        directory
+            .join("high/data/example/function/overlay.mcfunction")
+            .is_file()
+    );
+    let metadata: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(directory.join("pack.mcmeta")).unwrap()).unwrap();
+    assert_eq!(metadata["pack"]["description"], "CLI description");
+    assert!(metadata["overlays"]["entries"].is_array());
+    assert!(metadata["filter"]["block"].is_array());
+    assert!(metadata["features"]["enabled"].is_array());
+
+    let first = repo_root().join("target/corpus/pack-container-first.zip");
+    let second = repo_root().join("target/corpus/pack-container-second.zip");
+    let _ = fs::remove_file(&first);
+    let _ = fs::remove_file(&second);
+    build_zip_file(&project, &first, &options).expect("ZIP 构建应当成功");
+    build_zip_file(&project, &second, &options).expect("重复 ZIP 构建应当成功");
+    let first_bytes = fs::read(&first).unwrap();
+    assert!(first_bytes.starts_with(b"PK\x03\x04"));
+    assert!(
+        first_bytes
+            .windows("pack.mcmeta".len())
+            .any(|part| part == b"pack.mcmeta")
+    );
+    assert!(
+        first_bytes
+            .windows("pack.png".len())
+            .any(|part| part == b"pack.png")
+    );
+    assert_eq!(first_bytes, fs::read(second).unwrap(), "ZIP 产物必须可复现");
+
+    fs::write(
+        project.join("assets/pack.mcmeta"),
+        r#"{"pack":{"description":"bad","min_format":[121,0],"max_format":[121,0]},"features":{"enabled":["BAD ID"]}}"#,
+    )
+    .unwrap();
+    let error = check_file(&project).expect_err("无效包元数据必须被拒绝");
+    assert!(
+        error.contains("features.enabled"),
+        "诊断应指向无效字段：{error}"
+    );
 }
 
 #[test]

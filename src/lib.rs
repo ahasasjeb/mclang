@@ -1,4 +1,5 @@
 mod analysis;
+mod archive;
 mod ast;
 mod compiler;
 mod diagnostic;
@@ -68,7 +69,8 @@ pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
         },
     )
     .map_err(|diagnostics| render(&loaded.sources, diagnostics))?;
-    load_structure_assets(&loaded.directory, &program.namespace)?;
+    load_binary_assets(&loaded.directory, &program.namespace)?;
+    load_pack_metadata(&loaded.directory, None)?;
     Ok(CheckSummary {
         functions: program.functions.len(),
         scores: program.scores.len(),
@@ -89,6 +91,30 @@ pub fn build_file(
     output: &Path,
     options: &BuildOptions,
 ) -> Result<BuildResult, String> {
+    let pack = prepare_pack(source_path, options)?;
+    write_pack(output, &pack)?;
+    Ok(BuildResult {
+        output: output.to_path_buf(),
+        file_count: pack.files.len() + pack.binary_files.len(),
+    })
+}
+
+/// Build a single-file ZIP rooted at `pack.mcmeta` and `data/`.
+/// Directory-build bookkeeping (`.mclang-manifest`) is not archived.
+pub fn build_zip_file(
+    source_path: &Path,
+    output: &Path,
+    options: &BuildOptions,
+) -> Result<BuildResult, String> {
+    let pack = prepare_pack(source_path, options)?;
+    archive::write_pack_zip(output, &pack)?;
+    Ok(BuildResult {
+        output: output.to_path_buf(),
+        file_count: pack.files.len() + pack.binary_files.len(),
+    })
+}
+
+fn prepare_pack(source_path: &Path, options: &BuildOptions) -> Result<CompiledPack, String> {
     let loaded = read_project(source_path)?;
     let mut program = frontend(&loaded)?;
     let raw_statements = raw_statement_count(&program.functions);
@@ -104,12 +130,11 @@ pub fn build_file(
         },
     )
     .map_err(|diagnostics| render(&loaded.sources, diagnostics))?;
-    pack.binary_files = load_structure_assets(&loaded.directory, &program.namespace)?;
-    write_pack(output, &pack)?;
-    Ok(BuildResult {
-        output: output.to_path_buf(),
-        file_count: pack.files.len() + pack.binary_files.len(),
-    })
+    pack.binary_files = load_binary_assets(&loaded.directory, &program.namespace)?;
+    if let Some(metadata) = load_pack_metadata(&loaded.directory, Some(&options.description))? {
+        pack.files.insert(PathBuf::from("pack.mcmeta"), metadata);
+    }
+    Ok(pack)
 }
 
 fn raw_statement_count(functions: &[ast::Function]) -> usize {
@@ -415,66 +440,374 @@ fn write_files(output: &Path, pack: &CompiledPack) -> Result<(), String> {
 
 /// Copy project assets/structure/**/*.nbt into the namespace's data directory.
 /// Symlinks are skipped, so every copied file stays inside the project tree.
+fn load_binary_assets(
+    directory: &Path,
+    namespace: &str,
+) -> Result<std::collections::BTreeMap<PathBuf, Vec<u8>>, String> {
+    let mut files = load_structure_assets(directory, namespace)?;
+    load_pack_icon(directory, &mut files)?;
+    load_overlay_assets(directory, &mut files)?;
+    Ok(files)
+}
+
 fn load_structure_assets(
     directory: &Path,
     namespace: &str,
 ) -> Result<std::collections::BTreeMap<PathBuf, Vec<u8>>, String> {
     let root = directory.join("assets/structure");
-    if !root.is_dir() {
-        return Ok(std::collections::BTreeMap::new());
-    }
-    for path in [directory.join("assets"), root.clone()] {
-        if fs::symlink_metadata(&path)
-            .map_err(|error| format!("无法读取 {}：{error}", path.display()))?
-            .file_type()
-            .is_symlink()
-        {
-            return Err(format!("结构资源目录 {} 不能是符号链接", path.display()));
-        }
-    }
     let mut files = std::collections::BTreeMap::new();
-    let mut pending = vec![root.clone()];
-    while let Some(directory) = pending.pop() {
-        for entry in fs::read_dir(&directory)
-            .map_err(|error| format!("无法读取结构资源目录 {}：{error}", directory.display()))?
-        {
-            let entry = entry.map_err(|error| format!("无法读取结构资源目录项：{error}"))?;
-            let file_type = entry
+    if root.is_dir() {
+        for path in [directory.join("assets"), root.clone()] {
+            if fs::symlink_metadata(&path)
+                .map_err(|error| format!("无法读取 {}：{error}", path.display()))?
                 .file_type()
-                .map_err(|error| format!("无法读取 {} 的类型：{error}", entry.path().display()))?;
-            if file_type.is_dir() {
-                pending.push(entry.path());
-            } else if file_type.is_file()
-                && entry.path().extension().and_then(|ext| ext.to_str()) == Some("nbt")
+                .is_symlink()
             {
-                let relative = entry
-                    .path()
-                    .strip_prefix(&root)
-                    .expect("asset path is inside structure root")
-                    .to_path_buf();
-                let name = relative
-                    .with_extension("")
-                    .to_string_lossy()
-                    .replace('\\', "/");
-                if !compiler::valid_resource_path(&name) {
-                    return Err(format!("结构资源名称 `{name}` 不是有效的资源路径"));
+                return Err(format!("结构资源目录 {} 不能是符号链接", path.display()));
+            }
+        }
+        let mut pending = vec![root.clone()];
+        while let Some(directory) = pending.pop() {
+            for entry in fs::read_dir(&directory)
+                .map_err(|error| format!("无法读取结构资源目录 {}：{error}", directory.display()))?
+            {
+                let entry = entry.map_err(|error| format!("无法读取结构资源目录项：{error}"))?;
+                let file_type = entry.file_type().map_err(|error| {
+                    format!("无法读取 {} 的类型：{error}", entry.path().display())
+                })?;
+                if file_type.is_dir() {
+                    pending.push(entry.path());
+                } else if file_type.is_file()
+                    && entry.path().extension().and_then(|ext| ext.to_str()) == Some("nbt")
+                {
+                    let relative = entry
+                        .path()
+                        .strip_prefix(&root)
+                        .expect("asset path is inside structure root")
+                        .to_path_buf();
+                    let name = relative
+                        .with_extension("")
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    if !compiler::valid_resource_path(&name) {
+                        return Err(format!("结构资源名称 `{name}` 不是有效的资源路径"));
+                    }
+                    let contents = fs::read(entry.path())
+                        .map_err(|error| format!("无法读取 {}：{error}", entry.path().display()))?;
+                    if !contents.starts_with(&[0x1f, 0x8b]) {
+                        return Err(format!("结构资源 `{name}` 必须是 gzip 压缩的 NBT 文件"));
+                    }
+                    files.insert(
+                        PathBuf::from("data")
+                            .join(namespace)
+                            .join("structure")
+                            .join(relative),
+                        contents,
+                    );
                 }
-                let contents = fs::read(entry.path())
-                    .map_err(|error| format!("无法读取 {}：{error}", entry.path().display()))?;
-                if !contents.starts_with(&[0x1f, 0x8b]) {
-                    return Err(format!("结构资源 `{name}` 必须是 gzip 压缩的 NBT 文件"));
-                }
-                files.insert(
-                    PathBuf::from("data")
-                        .join(namespace)
-                        .join("structure")
-                        .join(relative),
-                    contents,
-                );
             }
         }
     }
+
     Ok(files)
+}
+
+fn load_pack_icon(
+    directory: &Path,
+    files: &mut std::collections::BTreeMap<PathBuf, Vec<u8>>,
+) -> Result<(), String> {
+    let icon = directory.join("assets/pack.png");
+    if !icon.exists() {
+        return Ok(());
+    }
+    let metadata = fs::symlink_metadata(&icon)
+        .map_err(|error| format!("无法读取 {}：{error}", icon.display()))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(format!("数据包图标 {} 必须是普通文件", icon.display()));
+    }
+    let contents =
+        fs::read(&icon).map_err(|error| format!("无法读取 {}：{error}", icon.display()))?;
+    if !contents.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Err(format!("数据包图标 {} 不是有效的 PNG 文件", icon.display()));
+    }
+    files.insert(PathBuf::from("pack.png"), contents);
+    Ok(())
+}
+
+/// Copy `assets/overlays/high/data/...` to `high/data/...`. Symlink rejection
+/// keeps every copied file inside the project tree.
+fn load_overlay_assets(
+    directory: &Path,
+    files: &mut std::collections::BTreeMap<PathBuf, Vec<u8>>,
+) -> Result<(), String> {
+    let overlays = directory.join("assets/overlays");
+    if !overlays.is_dir() {
+        return Ok(());
+    }
+    if fs::symlink_metadata(&overlays)
+        .map_err(|error| format!("无法读取 {}：{error}", overlays.display()))?
+        .file_type()
+        .is_symlink()
+    {
+        return Err(format!(
+            "overlay 资源目录 {} 不能是符号链接",
+            overlays.display()
+        ));
+    }
+    let mut pending = vec![overlays.clone()];
+    while let Some(current) = pending.pop() {
+        for entry in fs::read_dir(&current)
+            .map_err(|error| format!("无法读取 overlay 目录 {}：{error}", current.display()))?
+        {
+            let entry = entry.map_err(|error| format!("无法读取 overlay 目录项：{error}"))?;
+            let file_type = entry
+                .file_type()
+                .map_err(|error| format!("无法读取 {} 的类型：{error}", entry.path().display()))?;
+            if file_type.is_symlink() {
+                return Err(format!(
+                    "overlay 资源 {} 不能是符号链接",
+                    entry.path().display()
+                ));
+            }
+            if file_type.is_dir() {
+                pending.push(entry.path());
+            } else if file_type.is_file() {
+                let relative = entry
+                    .path()
+                    .strip_prefix(&overlays)
+                    .expect("overlay asset is inside its root")
+                    .to_path_buf();
+                if relative.components().count() < 2 {
+                    return Err(format!(
+                        "overlay 文件 {} 必须位于 assets/overlays/<目录>/ 下",
+                        entry.path().display()
+                    ));
+                }
+                let contents = fs::read(entry.path()).map_err(|error| {
+                    format!("无法读取 overlay 资源 {}：{error}", entry.path().display())
+                })?;
+                files.insert(relative, contents);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Load the optional complete metadata template. The CLI description always
+/// overrides its description after known fields have been validated.
+fn load_pack_metadata(
+    directory: &Path,
+    description: Option<&str>,
+) -> Result<Option<String>, String> {
+    let path = directory.join("assets/pack.mcmeta");
+    if !path.exists() {
+        if directory.join("assets/overlays").is_dir() {
+            return Err(
+                "assets/overlays 需要在 assets/pack.mcmeta 中声明 overlays.entries".to_owned(),
+            );
+        }
+        return Ok(None);
+    }
+    let metadata = fs::symlink_metadata(&path)
+        .map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(format!("数据包元数据 {} 必须是普通文件", path.display()));
+    }
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
+    let mut value: serde_json::Value = serde_json::from_str(&source)
+        .map_err(|error| format!("{} 不是有效 JSON：{error}", path.display()))?;
+    validate_pack_metadata(&value).map_err(|error| format!("{}：{error}", path.display()))?;
+    validate_overlay_layout(directory, &value)?;
+    if let Some(description) = description {
+        value["pack"]["description"] = serde_json::Value::String(description.to_owned());
+    }
+    Ok(Some(
+        serde_json::to_string_pretty(&value).expect("parsed JSON can be serialized") + "\n",
+    ))
+}
+
+fn validate_overlay_layout(directory: &Path, metadata: &serde_json::Value) -> Result<(), String> {
+    let declared = metadata["overlays"]["entries"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry["directory"].as_str())
+        .collect::<BTreeSet<_>>();
+    let root = directory.join("assets/overlays");
+    if !root.is_dir() {
+        if let Some(missing) = declared.first() {
+            return Err(format!(
+                "pack.mcmeta 声明了 overlay `{missing}`，但缺少 assets/overlays/{missing}"
+            ));
+        }
+        return Ok(());
+    }
+    for name in &declared {
+        if !root.join(name).is_dir() {
+            return Err(format!(
+                "pack.mcmeta 声明了 overlay `{name}`，但缺少 assets/overlays/{name}"
+            ));
+        }
+    }
+    for entry in
+        fs::read_dir(&root).map_err(|error| format!("无法读取 {}：{error}", root.display()))?
+    {
+        let entry = entry.map_err(|error| format!("无法读取 overlay 目录项：{error}"))?;
+        if entry
+            .file_type()
+            .map_err(|error| format!("无法读取 {} 的类型：{error}", entry.path().display()))?
+            .is_dir()
+        {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !declared.contains(name.as_str()) {
+                return Err(format!(
+                    "assets/overlays/{name} 未在 pack.mcmeta 的 overlays.entries 中声明"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_pack_metadata(value: &serde_json::Value) -> Result<(), String> {
+    let root = value
+        .as_object()
+        .ok_or_else(|| "根值必须是 JSON 对象".to_owned())?;
+    let pack = root
+        .get("pack")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "缺少 pack 对象".to_owned())?;
+    if !pack
+        .get("description")
+        .is_some_and(|value| value.is_string() || value.is_object() || value.is_array())
+    {
+        return Err("pack.description 必须是文本或文本组件".to_owned());
+    }
+    for field in ["min_format", "max_format"] {
+        if let Some(value) = pack.get(field)
+            && !valid_pack_format(value)
+        {
+            return Err(format!("pack.{field} 必须是非负整数或 [主版本, 次版本]"));
+        }
+    }
+    if pack.contains_key("min_format") != pack.contains_key("max_format") {
+        return Err("pack.min_format 与 pack.max_format 必须同时声明".to_owned());
+    }
+    if let Some(value) = pack.get("pack_format")
+        && !valid_pack_format(value)
+    {
+        return Err("pack.pack_format 必须是非负整数或 [主版本, 次版本]".to_owned());
+    }
+    if !pack.contains_key("pack_format") && !pack.contains_key("min_format") {
+        return Err("pack 需要 pack_format，或同时声明 min_format 与 max_format".to_owned());
+    }
+    if let Some(value) = pack.get("supported_formats")
+        && !valid_supported_formats(value)
+    {
+        return Err("pack.supported_formats 格式无效".to_owned());
+    }
+
+    if let Some(overlays) = root.get("overlays") {
+        let entries = overlays
+            .get("entries")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "overlays.entries 必须是数组".to_owned())?;
+        for (index, entry) in entries.iter().enumerate() {
+            let entry = entry
+                .as_object()
+                .ok_or_else(|| format!("overlays.entries 第 {} 项必须是对象", index + 1))?;
+            if !entry.get("formats").is_some_and(valid_supported_formats) {
+                return Err(format!(
+                    "overlays.entries 第 {} 项的 formats 无效",
+                    index + 1
+                ));
+            }
+            let directory = entry.get("directory").and_then(serde_json::Value::as_str);
+            if !directory.is_some_and(valid_relative_asset_directory) {
+                return Err(format!(
+                    "overlays.entries 第 {} 项的 directory 无效",
+                    index + 1
+                ));
+            }
+        }
+    }
+    if let Some(filter) = root.get("filter") {
+        let blocks = filter
+            .get("block")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "filter.block 必须是数组".to_owned())?;
+        for (index, block) in blocks.iter().enumerate() {
+            let block = block
+                .as_object()
+                .ok_or_else(|| format!("filter.block 第 {} 项必须是对象", index + 1))?;
+            if !block.contains_key("namespace") && !block.contains_key("path") {
+                return Err(format!(
+                    "filter.block 第 {} 项至少需要 namespace 或 path",
+                    index + 1
+                ));
+            }
+            for field in ["namespace", "path"] {
+                if block.get(field).is_some_and(|value| !value.is_string()) {
+                    return Err(format!(
+                        "filter.block 第 {} 项的 {field} 必须是字符串",
+                        index + 1
+                    ));
+                }
+            }
+        }
+    }
+    if let Some(features) = root.get("features") {
+        let enabled = features
+            .get("enabled")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "features.enabled 必须是数组".to_owned())?;
+        if !enabled
+            .iter()
+            .all(|entry| entry.as_str().is_some_and(valid_resource_location_text))
+        {
+            return Err("features.enabled 必须只包含有效资源位置".to_owned());
+        }
+    }
+    Ok(())
+}
+
+fn valid_pack_format(value: &serde_json::Value) -> bool {
+    value.as_u64().is_some()
+        || value.as_array().is_some_and(|parts| {
+            parts.len() == 2 && parts.iter().all(|part| part.as_u64().is_some())
+        })
+}
+
+fn valid_supported_formats(value: &serde_json::Value) -> bool {
+    valid_pack_format(value)
+        || value
+            .as_array()
+            .is_some_and(|range| range.len() == 2 && range.iter().all(valid_pack_format))
+        || value.as_object().is_some_and(|range| {
+            range.get("min_inclusive").is_some_and(valid_pack_format)
+                && range.get("max_inclusive").is_some_and(valid_pack_format)
+        })
+}
+
+fn valid_relative_asset_directory(value: &str) -> bool {
+    !value.is_empty()
+        && !Path::new(value).is_absolute()
+        && !value.contains('\\')
+        && Path::new(value)
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn valid_resource_location_text(value: &str) -> bool {
+    let (namespace, path) = value
+        .split_once(':')
+        .map_or(("minecraft", value), |(namespace, path)| (namespace, path));
+    !namespace.is_empty()
+        && namespace.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"_.-".contains(&byte)
+        })
+        && compiler::valid_resource_path(path)
 }
 
 /// 自底向上删除目录树里不再包含任何文件的空目录。

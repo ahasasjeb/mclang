@@ -38,6 +38,7 @@ fn tick() {
 - **可复现产物**：输出使用 `BTreeMap` 与稳定哈希，同一份源码总是生成同样的文件与内容。
 - **严格模式**：`--deny-raw` 递归拒绝 `run`、字符串 `execute` / `return run`、运行期 `with` 宏调用，以及声明 `nbt` 参数的宏函数。
 - **安全重建**：`.mclang-manifest` 记录上次生成的文件，重建只清理自己的产物，不碰目录里的其他文件，并回收 `data/` 下不再包含文件的空目录。
+- **完整包容器**：`assets/pack.png`、`assets/pack.mcmeta` 和 `assets/overlays/<目录>/` 会经过校验并进入产物；`--zip` 可直接生成可分发数据包。
 
 ## 快速开始
 
@@ -50,6 +51,9 @@ cargo run -- check examples/portable_chest --deny-raw
 
 # 编译为数据包，默认输出到 build/<项目名>
 cargo run -- build examples/portable_chest --deny-raw
+
+# 直接生成 build/portable_chest.zip
+cargo run --bin mclang -- build examples/portable_chest --zip --deny-raw
 ```
 
 把输出目录复制到目标世界的 `datapacks/` 下，执行 `/reload` 即可。
@@ -83,7 +87,7 @@ fn tick() {
 ## 命令行
 
 ```text
-mclang build <源文件.mcl|项目目录> [-o <输出目录>] [--description <文本>] [--deny-raw]
+mclang build <源文件.mcl|项目目录> [-o <输出路径>] [--zip] [--description <文本>] [--deny-raw]
 mclang check <源文件.mcl|项目目录> [--deny-raw]
 mclang lsp
 mclang help
@@ -93,6 +97,8 @@ mclang version
 - 输入可以是单个 `.mcl` 文件，也可以是递归包含 `.mcl` 的项目目录；项目内所有文件必须声明相同命名空间，声明与引用在整个项目内可见。
 - `check` 只做检查并打印统计；`build` 通过全部检查后才写出文件。
 - 默认输出目录是 `build/<源文件名>`。
+- `--zip` 直接生成 ZIP，默认路径是 `build/<源文件名>.zip`；指定 `-o` 时该路径就是 ZIP 文件名。
+- 目录项目可放置 `assets/pack.png`。如需自定义格式范围、`overlays`、`filter` 或 `features`，提供完整的 `assets/pack.mcmeta`；`--description` 会覆盖其中的描述。Overlay 文件放在 `assets/overlays/<directory>/`。
 - `lsp` 在标准输入输出上启动语言服务器，供编辑器插件调用，不面向终端交互。
 
 ## 编辑器支持

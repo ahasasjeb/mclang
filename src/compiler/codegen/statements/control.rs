@@ -140,18 +140,41 @@ impl Compiler<'_> {
             None => {}
         }
         let flag = self.compile_condition(condition, owner, commands);
-        let then_helper = self.compile_helper(then_body, owner);
-        commands.push(format!(
-            "execute if score {flag} {} matches 1 run function {}:{then_helper}",
-            self.objective, self.program.namespace
-        ));
-        if !else_body.is_empty() {
-            let else_helper = self.compile_helper(else_body, owner);
-            commands.push(format!(
-                "execute if score {flag} {} matches 0 run function {}:{else_helper}",
-                self.objective, self.program.namespace
-            ));
+        self.compile_conditional_branch(&flag, true, then_body, owner, commands);
+        self.compile_conditional_branch(&flag, false, else_body, owner, commands);
+    }
+
+    /// Inline a one-command branch after `execute ... run`. A `return` must
+    /// retain the helper boundary; inlining it would exit the caller instead.
+    fn compile_conditional_branch(
+        &mut self,
+        flag: &str,
+        expected: bool,
+        body: &[Statement],
+        owner: &str,
+        commands: &mut Vec<String>,
+    ) {
+        if body.is_empty() {
+            return;
         }
+
+        let branch = self.compile_block(body, owner);
+        let can_inline = branch.len() == 1
+            && !body
+                .iter()
+                .any(|statement| matches!(statement.kind, StatementKind::Return(_)));
+        let command = if can_inline {
+            branch.into_iter().next().expect("single-command branch")
+        } else {
+            let helper = self.next_helper_path(owner);
+            self.functions.insert(helper.clone(), branch);
+            format!("function {}:{helper}", self.program.namespace)
+        };
+        commands.push(format!(
+            "execute if score {flag} {} matches {} run {command}",
+            self.objective,
+            u8::from(expected)
+        ));
     }
 
     /// `while` 循环：循环辅助函数在每轮开头求值条件，命中就调用循环体辅助函数，

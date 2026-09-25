@@ -56,11 +56,11 @@
 
 | 能力 | 当前状态 | 计划 |
 | --- | --- | --- |
-| `pack.mcmeta` | 部分 | 支持 description、min/max format 等常用字段。 |
-| overlays | 待实现 | 支持 overlay entries、版本范围和目录布局。 |
-| `filter` | 待实现 | 支持 namespace/path pattern。 |
-| features | 待实现 | 支持 26.3 对应 feature flags。 |
-| `pack.png` | 待实现 | 项目配置指定并复制。 |
+| `pack.mcmeta` | 已支持 | 默认生成 description、min/max format；可用 `assets/pack.mcmeta` 提供完整模板并校验已知字段。 |
+| overlays | 已支持 | 校验 overlay entries/版本范围，并复制 `assets/overlays/<目录>/` 布局。 |
+| `filter` | 已支持 | 校验 block 列表与 namespace/path 字段。 |
+| features | 已支持 | 校验 enabled 资源位置列表。 |
+| `pack.png` | 已支持 | 自动校验并复制 `assets/pack.png`。 |
 | `.mcfunction` | 已支持 | 保持函数生成与命名空间输出。 |
 | load/tick function tag | 已支持 | 保持自动生成与用户声明合并。 |
 | 普通 function tag | 已支持 | 保持 `replace`、嵌套 tag 和引用检查。 |
@@ -79,7 +79,7 @@
 | storage | 部分 | 支持显式 storage ID、初始化和 typed helper。 |
 | 跨资源引用图 | 部分 | 检查函数、tag、advancement、predicate、loot、dialog、worldgen 等引用。 |
 | JSON codec 字段校验 | 较少 | 已按 26.3 注册表核对 predicate/recipe 类型，并检查常见配方与战利品池的必需字段；仍需统一 schema IR、完整字段和原版加载验收。 |
-| 数据包 ZIP | 待实现 | 提供构建为 ZIP 的输出方式。 |
+| 数据包 ZIP | 已支持 | `mclang build --zip` 生成根目录正确且字节可复现的 ZIP。 |
 | feature flag 诊断 | 待实现 | 对依赖 feature 的资源或命令给出静态提示。 |
 
 资源层可建设可复用 schema IR，再逐类增加更易写的语法。提取不稳定的 codec 可暂时保留受控 raw，并在诊断中标明未做字段级校验。
@@ -91,8 +91,8 @@
 | 词法 / 语法 / AST | 较高 | 给 AST 节点提供稳定 span/ID，供诊断、LSP 和 source map 使用。 |
 | 模块系统 | 较高 | 增加项目根和 manifest；继续检查循环、冲突和导入导出。 |
 | 类型系统 | 中等 | 增加 `const`、bool、resource/tag 等常用类型。 |
-| 表达式 | 中等 | 常量比较已直接下降为 `matches` 范围；继续增加一等 bool，并明确整数除法、取模和溢出诊断。 |
-| 控制流 | 较高 | `&&`/`||` 已按短路语义生成，避免右侧函数副作用提前发生；后续可增加 `match/switch`，并让简单条件块直接内联，减少辅助函数。 |
+| 表达式 | 中等 | 常量比较直接下降为 `matches` 范围，常量除零与 i32 溢出会诊断；继续增加一等 bool，并明确运行期计分板除法、取模与溢出语义。 |
+| 控制流 | 较高 | `&&`/`||` 按短路语义生成，单命令 `if` 分支直接内联；后续可增加 `match/switch` 并继续合并条件。 |
 | 函数调用 | 较高 | 整理参数、返回值、macro 调用规则和诊断。 |
 | raw 入口 | 已有 | 保留兼容入口；增加严格模式统计哪些代码仍依赖 raw。 |
 | 诊断 | 较高 | 增加诊断码、warning 等级、JSON 输出、related span、fix-it。 |
@@ -101,7 +101,7 @@
 | 多版本数据 | 待实现 | 把版本号和生成快照路径从散落常量收敛到统一版本配置；支持 26.3，并保留扩展其它版本的数据结构。 |
 | 本地库 | 待实现 | 支持只读 library roots、稳定解析顺序和冲突诊断。 |
 
-`examples/monster_market` 的复杂市场语料用于检查真实产物。本轮把同一份数据包从 1043 行函数命令降到 931 行（减少 10.7%），并修复了逻辑条件右侧函数会被提前执行的问题。仍可继续优化：让 `scoreboard.get(self, objective)` 保留原目标作为表达式操作数，避免复制到内部临时项；合并同一计分值上的区间条件；把无控制转移的单命令 `if` 块直接内联，减少 `__mcl` 辅助函数数量。
+`examples/monster_market` 的复杂市场语料用于检查真实产物。当前产物为 731 条函数命令、66 个 mcfunction，其中 24 个位于 `__mcl`；无控制转移的单命令 `if` 已直接内联，并修复了逻辑条件右侧函数会被提前执行的问题。仍可继续优化：让 `scoreboard.get(self, objective)` 保留原目标作为表达式操作数，避免复制到内部临时项；合并同一计分值上的区间条件。
 
 版本数据生成器建议补一份机器可读命令可用性文件，记录根命令、别名、注册条件、权限节点和可执行叶；命令覆盖统计由该文件校验。
 
@@ -134,7 +134,7 @@
 | 项目配置 | 从配置文件读取 namespace、description、output、strict policy、libraries、pack metadata；CLI 可覆盖。 |
 | `mclang fmt` | 稳定格式化、保留注释、中英文关键词不互改、支持 `--check`。 |
 | JSON diagnostics | 输出 code、severity、message、file、range、related、fixes。 |
-| `mclang build --zip` | 生成可直接分发的数据包 ZIP。 |
+| `mclang build --zip` | 已实现；生成可直接分发且可复现的数据包 ZIP。 |
 | warning policy | 支持 warning 类别与 allow/deny。 |
 | `mclang init` | 生成最小项目结构。 |
 | `mclang clean` | 清理当前项目构建产物。 |
