@@ -293,19 +293,25 @@ impl Parser {
             let source = self.nbt_source_value("data.get 来源")?;
             self.expect(TokenKind::Comma, "data.get 来源后需要 `,`")?;
             let (path, path_span) = self.string("data.get 需要 NBT 路径字符串")?;
+            let scale = if self.take(&TokenKind::Comma).is_some() {
+                Some(self.signed_number_text("data.get 缩放比例")?)
+            } else {
+                None
+            };
             self.expect(TokenKind::RightParen, "data.get 调用缺少 `)`")?;
             return Ok(Expr {
                 kind: ExprKind::DataGet {
                     source,
                     path,
                     path_span,
+                    scale,
                 },
                 span: start_span.merge(self.previous().span),
             });
         }
         Err(Diagnostic::new(
             format!(
-                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`、`scoreboard.get(持有者, 目标)`、`stopwatch.query(\"命名空间:id\"[, 缩放])`、`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(\"规则\")`、`worldborder.get()` 和 `data.get(来源, 路径)`"
+                "未知的具名表达式 `{receiver}.{method}`；目前支持 `xp.query(查询, points|levels)`、`scoreboard.get(持有者, 目标)`、`stopwatch.query(\"命名空间:id\"[, 缩放])`、`time.query([时钟])`、`time.query_gametime()`、`gamerule.query(\"规则\")`、`worldborder.get()` 和 `data.get(来源, 路径[, 缩放])`"
             ),
             span,
         ))

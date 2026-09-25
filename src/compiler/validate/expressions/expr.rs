@@ -150,6 +150,7 @@ pub(in crate::compiler::validate) fn validate_expr(
             source,
             path,
             path_span,
+            ..
         } => {
             super::super::components::validate_data_nbt_source(
                 source,

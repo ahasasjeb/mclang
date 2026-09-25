@@ -55,3 +55,38 @@ fn local_tags() {
         nbt { NoAI = true; Tags = ["calm"]; }
     }
 }
+
+// Shared ValueOutput helpers and list writers must be attributed to the
+// entity that calls them, including inherited Mob and vehicle behavior.
+fn shared_source_tags() {
+    spawn("minecraft:bee") {
+        nbt { 愤怒结束时间 = 120L; 仇恨目标 = [I; 1, 2, 3, 4]; 拴绳 = { UUID = [I; 1, 2, 3, 4]; }; }
+    }
+    spawn("minecraft:cat") {
+        nbt { 注册变种 = "minecraft:tabby"; 乘客 = []; }
+    }
+    spawn("minecraft:allay") {
+        nbt { 库存 = []; }
+    }
+    spawn("minecraft:donkey") {
+        nbt { 物品列表 = []; }
+    }
+    spawn("minecraft:oak_chest_boat") {
+        nbt { 物品列表 = []; 战利品表 = "minecraft:chests/simple_dungeon"; 战利品表种子 = 1L; }
+    }
+    spawn("minecraft:chest_minecart") {
+        nbt { Items = []; LootTableSeed = 1L; }
+    }
+    spawn("minecraft:skeleton") {
+        nbt { FreezingTime = 0; StrayConversionTime = 100; }
+    }
+    spawn("minecraft:zombie") {
+        nbt { InWaterTime = 0; DrownedConversionTime = 100; }
+    }
+    spawn("minecraft:text_display") {
+        nbt { shadow = true; see_through = false; default_background = true; }
+    }
+    spawn("minecraft:cat") {
+        nbt { LoveCause = [I; 1, 2, 3, 4]; }
+    }
+}

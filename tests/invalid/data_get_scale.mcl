@@ -1,0 +1,8 @@
+// 编译测试（负向）：data.get 的缩放参数必须是数字。
+// 期望 check 报出：data.get 缩放比例需要数字。
+namespace invalid_data_get_scale;
+
+@load
+fn bad_scale() {
+    let value = data.get(storage, "invalid_data_get_scale:store", "value", "twice");
+}

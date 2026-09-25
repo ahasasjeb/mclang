@@ -38,14 +38,13 @@ flowchart LR
 
 | # | 差距 | 位置 |
 |---|---|---|
-| M1 | `data get` 缺 scale 参数 | `src/compiler/codegen/expressions.rs:171` |
-| M2 | `schedule` 不能带参数/宏实参 | `src/ast/statements.rs:156` |
-| M3 | 宏是脆弱的文本替换，分数不能直接当宏实参 | `src/compiler/codegen/macros.rs:85` |
-| M4 | 无 ZIP 输出 / pack.png | `src/main.rs:33` |
-| M5 | 单版本硬编码 26.3，无多版本 | `src/version/snapshot.rs:14` |
-| M6 | 无 source map / `--emit` 调试 | `DEVELOPMENT_PLAN.md:100` |
-| M7 | stdlib 缺 9 个模块（debug/test/storage/entity/inventory/text/world/collections/fixed） | `src/stdlib.rs:5` |
-| M8 | 无项目配置文件、无本地库根 | `DEVELOPMENT_PLAN.md:99` |
+| M1 | `schedule` 不能带参数/宏实参 | `src/ast/statements.rs:156` |
+| M2 | 宏是脆弱的文本替换，分数不能直接当宏实参 | `src/compiler/codegen/macros.rs:85` |
+| M3 | 无 ZIP 输出 / pack.png | `src/main.rs:33` |
+| M4 | 单版本硬编码 26.3，无多版本 | `src/version/snapshot.rs:14` |
+| M5 | 无 source map / `--emit` 调试 | `DEVELOPMENT_PLAN.md:100` |
+| M6 | stdlib 缺 9 个模块（debug/test/storage/entity/inventory/text/world/collections/fixed） | `src/stdlib.rs:5` |
+| M7 | 无项目配置文件、无本地库根 | `DEVELOPMENT_PLAN.md:99` |
 
 ### 次要
 
@@ -58,7 +57,7 @@ flowchart LR
 
 1. **统一资源 schema IR**（一份 26.3 codec → 字段校验 + 类型化 DSL 骨架），先打 `loot_table` / `item_modifier` / `predicate`（三者共用 loot function 模型），再 `advancement conditions`、`dialog`
 2. **pack 容器补全**：`supported_formats` / `overlays` / `filter` / `features` / `pack.png` / `--zip`（工作量小、收益直接）
-3. **类型系统最小增强**：`const` + 一等 bool + `data get … scale` + 多返回值（或元组）——能显著减少计分板体操
+3. **类型系统最小增强**：加入 `const`、一等布尔值，以及多返回值（或元组），减少为表达常量、条件和多个结果而手写的计分板代码。
 4. 之后再做 stdlib 扩展、项目配置、source map、LSP 完善
 
 一句话：**作为「写命令的语言」已经完工，作为「写数据包的语言」还差资源层这一整个维度。** 优先攻资源 schema，大概能把整体从 60% 拉到 80%+。

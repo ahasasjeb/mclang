@@ -168,13 +168,25 @@ impl Compiler<'_> {
                 ));
                 Value::Score(target)
             }
-            ExprKind::DataGet { source, path, .. } => {
+            ExprKind::DataGet {
+                source,
+                path,
+                scale,
+                ..
+            } => {
                 let holders = match source {
                     NbtComponentSource::Entity(holder) => vec![holder],
                     NbtComponentSource::Block(_) | NbtComponentSource::Storage(_, _) => Vec::new(),
                 };
                 let native = self.capture_command_targets(&holders, owner, |compiler| {
-                    format!("data get {} {path}", compiler.nbt_source_text(source))
+                    let scale = scale
+                        .as_ref()
+                        .map(|scale| format!(" {scale}"))
+                        .unwrap_or_default();
+                    format!(
+                        "data get {} {path}{scale}",
+                        compiler.nbt_source_text(source)
+                    )
                 });
                 let target = self.temporary();
                 commands.push(format!(

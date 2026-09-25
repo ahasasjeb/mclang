@@ -9,6 +9,8 @@ pub(super) struct ClassInfo {
     pub(super) tags: BTreeMap<String, EntityTagType>,
 }
 
+pub(super) type SharedTags = BTreeMap<&'static str, BTreeMap<String, EntityTagType>>;
+
 /// 一个类在文件中的位置，用于把标签归到最内层类。
 struct ClassRange {
     name: String,
@@ -16,7 +18,11 @@ struct ClassRange {
     end: usize,
 }
 
-pub(super) fn scan_classes(text: &str, classes: &mut BTreeMap<String, ClassInfo>) {
+pub(super) fn scan_classes(
+    text: &str,
+    classes: &mut BTreeMap<String, ClassInfo>,
+    shared_tags: &SharedTags,
+) {
     let mut ranges = Vec::new();
     let mut search = 0;
     while let Some(offset) = text[search..].find("class ") {
@@ -59,6 +65,51 @@ pub(super) fn scan_classes(text: &str, classes: &mut BTreeMap<String, ClassInfo>
                 .or_insert(hit.category);
         }
     }
+
+    // Interface and utility methods write into the caller's ValueOutput. Their
+    // keys belong to the calling class and are then inherited by its children.
+    for (method, tags) in shared_tags {
+        let pattern = format!(".{method}(");
+        let mut search = 0;
+        while let Some(offset) = text[search..].find(&pattern) {
+            let position = search + offset;
+            search = position + pattern.len();
+            let owner = ranges
+                .iter()
+                .filter(|range| range.start <= position && position < range.end)
+                .min_by_key(|range| range.end - range.start)
+                .map(|range| range.name.clone());
+            if let Some(owner) = owner {
+                let class_tags = &mut classes.entry(owner).or_default().tags;
+                for (key, category) in tags {
+                    class_tags
+                        .entry(key.clone())
+                        .and_modify(|existing| *existing = existing.merge(*category))
+                        .or_insert(*category);
+                }
+            }
+        }
+    }
+}
+
+pub(super) fn collect_tags(text: &str) -> BTreeMap<String, EntityTagType> {
+    let mut tags = BTreeMap::new();
+    for hit in scan_tags(text) {
+        tags.entry(hit.name)
+            .and_modify(|existing: &mut EntityTagType| *existing = existing.merge(hit.category))
+            .or_insert(hit.category);
+    }
+    tags
+}
+
+pub(super) fn collect_method_tags(
+    text: &str,
+    signature: &str,
+) -> Option<BTreeMap<String, EntityTagType>> {
+    let start = text.find(signature)?;
+    let open = start + text[start..].find('{')?;
+    let close = matching_brace(text, open)?;
+    Some(collect_tags(&text[open..close]))
 }
 
 /// 类声明头：返回（类名、父类、类体的 `{` 位置）。
@@ -194,12 +245,26 @@ const READ_MARKERS: &[(&str, EntityTagType)] = &[
     ("getList(", EntityTagType::List),
 ];
 
+/// ValueInput/ValueOutput collection and nested-value calls also name NBT keys.
+const STRUCTURED_MARKERS: &[(&str, EntityTagType)] = &[
+    ("list(", EntityTagType::List),
+    ("listOrEmpty(", EntityTagType::List),
+    ("childrenList(", EntityTagType::List),
+    ("childrenListOrEmpty(", EntityTagType::List),
+    ("child(", EntityTagType::Compound),
+    ("childOrEmpty(", EntityTagType::Compound),
+];
+
 /// 编解码器式读写：`store("键", 编解码器` / `read("键", 编解码器`。
 const CODEC_MARKERS: &[&str] = &["store(", "storeNullable(", "read(", "readNullable("];
 
 fn scan_tags(text: &str) -> Vec<TagHit> {
     let mut hits = Vec::new();
-    for (marker, category) in WRITE_MARKERS.iter().chain(READ_MARKERS) {
+    for (marker, category) in WRITE_MARKERS
+        .iter()
+        .chain(READ_MARKERS)
+        .chain(STRUCTURED_MARKERS)
+    {
         let pattern = format!(".{marker}");
         let mut search = 0;
         while let Some(offset) = text[search..].find(&pattern) {
@@ -238,7 +303,68 @@ fn scan_tags(text: &str) -> Vec<TagHit> {
             });
         }
     }
+    hits.extend(scan_indirect_tags(text));
     hits
+}
+
+/// Keys forwarded through helpers or supplied to ConversionTracker at construction.
+fn scan_indirect_tags(text: &str) -> Vec<TagHit> {
+    const CALLS: &[(&str, usize, EntityTagType)] = &[
+        ("EntityReference.store(", 2, EntityTagType::IntArray),
+        ("EntityReference.read(", 1, EntityTagType::IntArray),
+        (
+            "EntityReference.readWithOldOwnerConversion(",
+            1,
+            EntityTagType::IntArray,
+        ),
+        (".store(output,", 0, EntityTagType::IntArray),
+        ("loadFlag(", 2, EntityTagType::Bool),
+        ("storeFlag(", 2, EntityTagType::Bool),
+    ];
+    let mut hits = Vec::new();
+    for (pattern, argument, category) in CALLS {
+        let mut search = 0;
+        while let Some(offset) = text[search..].find(pattern) {
+            let position = search + offset;
+            search = position + pattern.len();
+            if let Some(name) = string_argument(text, search, *argument) {
+                hits.push(TagHit {
+                    position,
+                    name,
+                    category: *category,
+                });
+            }
+        }
+    }
+    let pattern = "new ConversionTracker<>(";
+    let mut search = 0;
+    while let Some(offset) = text[search..].find(pattern) {
+        let position = search + offset;
+        search = position + pattern.len();
+        for argument in [5, 7] {
+            if let Some(name) = string_argument(text, search, argument) {
+                hits.push(TagHit {
+                    position,
+                    name,
+                    category: EntityTagType::Number,
+                });
+            }
+        }
+    }
+    hits
+}
+
+fn string_argument(text: &str, start: usize, index: usize) -> Option<String> {
+    let mut cursor = start;
+    for _ in 0..index {
+        let (_, end) = capture_expression(text, cursor);
+        if text.as_bytes().get(end) != Some(&b',') {
+            return None;
+        }
+        cursor = end + 1;
+    }
+    let argument = text[cursor..].trim_start();
+    parse_string(argument, 0).map(|(value, _)| value)
 }
 
 pub(super) fn parse_string(text: &str, start: usize) -> Option<(String, usize)> {
@@ -257,7 +383,7 @@ pub(super) fn parse_string(text: &str, start: usize) -> Option<(String, usize)> 
     None
 }
 
-/// 截取一个实参表达式：到同层的 `,`、`)`、`;` 或行尾为止。
+/// 截取一个实参表达式：到同层的 `,`、`)` 或 `;` 为止。
 fn capture_expression(text: &str, start: usize) -> (String, usize) {
     let mut depth = 0i32;
     let mut index = start;
@@ -271,7 +397,7 @@ fn capture_expression(text: &str, start: usize) -> (String, usize) {
                 }
                 depth -= 1;
             }
-            ',' | ';' | '\n' if depth == 0 => break,
+            ',' | ';' if depth == 0 => break,
             _ => {}
         }
         result.push(character);
@@ -282,6 +408,9 @@ fn capture_expression(text: &str, start: usize) -> (String, usize) {
 
 fn classify_codec(expression: &str) -> EntityTagType {
     let expression = expression.trim();
+    if expression.contains("EntityReference.codec().listOf") {
+        return EntityTagType::List;
+    }
     if expression.contains("Vec3.CODEC")
         || expression.contains("Vec2.CODEC")
         || expression.contains("DropChances.CODEC")
@@ -295,6 +424,7 @@ fn classify_codec(expression: &str) -> EntityTagType {
     if expression.contains("BlockPos.CODEC")
         || expression.contains("UUIDUtil.CODEC")
         || expression.contains("UUID.CODEC")
+        || expression.contains("EntityReference.codec()")
         || expression.contains("INT_STREAM")
         || expression.contains("IntStream")
     {

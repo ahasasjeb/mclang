@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | 资源位置 / 注册表引用 | 较高 | 统一资源引用类型；覆盖普通资源与 tag 引用。 |
 | 实体选择器 | 较高 | 已补重复 scores 合并、非负区间、SNBT/advancements 形状和 team 单词检查；后续让版本数据提供完整 option 形状。 |
-| NBT / SNBT | 较高 | 结构化 NBT 已校验并序列化；NBT path 匹配复合现检查 SNBT 键值与嵌套结构。继续补 round-trip 语料及完整数值语法。 |
+| NBT / SNBT | 较高 | 结构化 NBT 已校验并序列化；实体标签快照现覆盖 26.3 源码中的直接键、列表、接口/辅助方法及动态传入的已知键（161 种实体、305 个顶层键）；NBT path 匹配复合检查键值与嵌套结构。仍需补完整 SNBT 数值/内置运算语法、方块实体字段级校验和 round-trip 语料。 |
 | TextComponent | 较高 | 已补 `object` 的 atlas/player、click `show_dialog/custom`、hover `show_item/show_entity`；后续扩展 item 组件补丁与 player profile。 |
 | 物品组件 | 部分 | 已按 26.3 codec 检查常用字段类型、范围、枚举、资源引用及 `food`、`use_cooldown`、`use_effects`、`weapon`、`attack_range`、`enchantable`、`custom_model_data` 结构；继续覆盖其余组件。 |
 | 物品谓词 | 部分 | 已校验 `count`、`damage`、`potion_contents`、附魔、纹饰、烟花、成书、唱片和村民类型的常用字段、引用与区间；继续覆盖集合等复杂子谓词。 |

@@ -42,8 +42,9 @@ fn edit_items() {
 @player
 fn read_back() {
     let health = data.get(entity, self, "Health");
+    let scaled_health = data.get(entity, self, "Health", 2.5);
     let block_count = data.get(block, pos(0, 64, 0), "Items[0].count");
     let stored = data.get(storage, "data_ops_test:store", "names[0]");
     let armed_health = data.get(entity, armed_holder, "Health");
-    points = health + block_count + stored + armed_health;
+    points = health + scaled_health + block_count + stored + armed_health;
 }

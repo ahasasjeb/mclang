@@ -26,7 +26,7 @@ pub use aliases::{CHINESE_ALIASES, alias_of, chinese_alias};
 use registry::{
     all_class_tags, collect_java_files, inherited_tags, read_entity_ids, read_entity_registrations,
 };
-use scan::{ClassInfo, scan_classes};
+use scan::{ClassInfo, SharedTags, collect_method_tags, collect_tags, scan_classes};
 
 /// 具名 NBT 标签的期望粗类型；`Any` 表示无法从源码判定。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -117,12 +117,13 @@ pub fn generate(source_root: &Path) -> Result<String, String> {
     let mut files = Vec::new();
     collect_java_files(&entity_root, &mut files)?;
     files.sort();
+    let shared_tags = read_shared_tags(source_root)?;
 
     let mut classes: BTreeMap<String, ClassInfo> = BTreeMap::new();
     for file in &files {
         let text = fs::read_to_string(file)
             .map_err(|error| format!("无法读取 {}：{error}", file.display()))?;
-        scan_classes(&text, &mut classes);
+        scan_classes(&text, &mut classes, &shared_tags);
     }
 
     let ids = read_entity_ids(&source_root.join("net/minecraft/world/entity/EntityTypeIds.java"))?;
@@ -181,6 +182,66 @@ pub fn generate(source_root: &Path) -> Result<String, String> {
             text
         })
         .map_err(|error| format!("无法序列化实体 NBT 表：{error}"))
+}
+
+/// Resolve the ValueInput/ValueOutput keys written by shared entity helpers.
+/// The method names are call sites to look for; the keys still come from 26.3 source.
+fn read_shared_tags(source_root: &Path) -> Result<SharedTags, String> {
+    const HELPERS: &[(&str, &[&str])] = &[
+        (
+            "net/minecraft/world/entity/NeutralMob.java",
+            &["addPersistentAngerSaveData", "readPersistentAngerSaveData"],
+        ),
+        (
+            "net/minecraft/world/entity/Leashable.java",
+            &["readLeashData", "writeLeashData"],
+        ),
+        (
+            "net/minecraft/world/entity/vehicle/ContainerEntity.java",
+            &["addChestVehicleSaveData", "readChestVehicleSaveData"],
+        ),
+        (
+            "net/minecraft/world/entity/variant/VariantUtils.java",
+            &["writeVariant", "readVariant"],
+        ),
+        (
+            "net/minecraft/world/entity/npc/InventoryCarrier.java",
+            &["readInventoryFromTag", "writeInventoryToTag"],
+        ),
+    ];
+    let container_helper = source_root.join("net/minecraft/world/ContainerHelper.java");
+    let container_text = fs::read_to_string(&container_helper)
+        .map_err(|error| format!("无法读取 {}：{error}", container_helper.display()))?;
+    let container_tags = collect_tags(&container_text);
+    let mut shared = SharedTags::new();
+    for (relative_path, methods) in HELPERS {
+        let path = source_root.join(relative_path);
+        let text = fs::read_to_string(&path)
+            .map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
+        let mut tags = collect_tags(&text);
+        // ContainerEntity delegates its item list to ContainerHelper.
+        if relative_path.ends_with("/ContainerEntity.java") {
+            tags.extend(container_tags.clone());
+        }
+        for method in *methods {
+            shared.insert(method, tags.clone());
+        }
+    }
+    let food_data = source_root.join("net/minecraft/world/food/FoodData.java");
+    let food_text = fs::read_to_string(&food_data)
+        .map_err(|error| format!("无法读取 {}：{error}", food_data.display()))?;
+    shared.insert("foodData.addAdditionalSaveData", collect_tags(&food_text));
+
+    let nbt_utils = source_root.join("net/minecraft/nbt/NbtUtils.java");
+    let utils_text = fs::read_to_string(&nbt_utils)
+        .map_err(|error| format!("无法读取 {}：{error}", nbt_utils.display()))?;
+    let version_tags = collect_method_tags(
+        &utils_text,
+        "public static void addDataVersion(final ValueOutput output",
+    )
+    .ok_or_else(|| format!("无法提取 {} 的 ValueOutput 数据版本键", nbt_utils.display()))?;
+    shared.insert("addCurrentDataVersion", version_tags);
+    Ok(shared)
 }
 
 fn is_identifier(character: char) -> bool {

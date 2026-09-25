@@ -1,0 +1,28 @@
+// 编译测试（负向）：共享辅助方法的 NBT 键按实体类型与粗类型校验。
+// 期望 check 报出：
+//   - `Items` 需要列表；`LootTableSeed` 需要数字；
+//   - 普通船没有 `LootTable`；`variant` 需要字符串；
+//   - `angry_at` 需要整数数组；文字展示实体的 `shadow` 需要布尔值；
+//   - 骷髅没有 `DrownedConversionTime`。
+namespace invalid_entity_nbt_shared;
+
+fn bad_shared_tags() {
+    spawn("minecraft:oak_chest_boat") {
+        nbt { Items = "wrong"; LootTableSeed = "wrong"; }
+    }
+    spawn("minecraft:oak_boat") {
+        nbt { LootTable = "minecraft:chests/simple_dungeon"; }
+    }
+    spawn("minecraft:cat") {
+        nbt { variant = 1; }
+    }
+    spawn("minecraft:bee") {
+        nbt { angry_at = "wrong"; }
+    }
+    spawn("minecraft:text_display") {
+        nbt { shadow = "yes"; }
+    }
+    spawn("minecraft:skeleton") {
+        nbt { DrownedConversionTime = 1; }
+    }
+}

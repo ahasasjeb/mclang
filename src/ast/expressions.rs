@@ -49,11 +49,12 @@ pub enum ExprKind {
         min: i32,
         max: i32,
     },
-    /// `data.get(来源, 路径)`：NBT 数值或列表长度。
+    /// `data.get(来源, 路径[, 缩放])`：NBT 数值或列表长度。
     DataGet {
         source: NbtComponentSource,
         path: String,
         path_span: Span,
+        scale: Option<String>,
     },
     /// `compute(来源, float|integer, "provider"[, 缩放])`。
     Compute {

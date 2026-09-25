@@ -29,6 +29,7 @@ pub const CHINESE_ALIASES: &[(&str, &str)] = &[
     ("无敌时间", "invulnerable_time"),
     ("队伍", "Team"),
     ("视觉火焰", "HasVisualFire"),
+    ("乘客", "Passengers"),
     // 生物（Mob / LivingEntity）。
     ("无AI", "NoAI"),
     ("生命", "Health"),
@@ -110,6 +111,14 @@ pub const CHINESE_ALIASES: &[(&str, &str)] = &[
     ("驮运强度", "Strength"),
     ("消失延迟", "DespawnDelay"),
     ("声音变种", "sound_variant"),
+    ("注册变种", "variant"),
+    ("愤怒结束时间", "anger_end_time"),
+    ("仇恨目标", "angry_at"),
+    ("拴绳", "leash"),
+    ("库存", "Inventory"),
+    ("物品列表", "Items"),
+    ("战利品表", "LootTable"),
+    ("战利品表种子", "LootTableSeed"),
     // 物品、箭矢与投射物。
     ("拾取延迟", "PickupDelay"),
     ("穿透等级", "PierceLevel"),

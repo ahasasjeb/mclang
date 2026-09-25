@@ -825,7 +825,7 @@ data.merge(<目标>, nbt { ... });
 data.remove(<目标>, "<路径>");
 data.modify(<目标>, "<路径>", insert, <下标>, <来源>);
 data.modify(<目标>, "<路径>", prepend | append | set | merge, <来源>);
-let <name> = data.get(<目标>, "<路径>");
+let <name> = data.get(<目标>, "<路径>"[, <缩放>]);
 ```
 
 目标写法与 `nbt` 组件一致：`entity, <持有者>`（要求非玩家实体）、`block, <坐标>` 或 `storage, "<资源位置>"`。data 命令的实体目标及 `from`/`string` 实体来源都是单实体参数，查询必须带 `limit(1)`；查询自带的 `item` 过滤会先捕获真实目标再执行命令。这里不直接接受 `origin`，需要先进入 `execute on origin`，再使用 `self`。`data.merge` 生成 `data merge <目标> {...}`，`data.remove` 生成 `data remove <目标> <路径>`，`data.modify` 生成 `data modify <目标> <路径> <操作> …`。数据来源有四种：
@@ -837,12 +837,13 @@ let <name> = data.get(<目标>, "<路径>");
 | `string(<目标>, "<路径>"[, <起始>[, <结束>]])` | `string <目标> <路径> …` | 读取后转成字符串 |
 | `compute(<上下文>, float\|integer, "<provider>")` | `compute …` | 用上下文 provider 计算数值；此处不支持缩放 |
 
-`data.get` 是表达式，经 `execute store result` 落入计分项；读取失败或非数值时为 0。NBT 路径会解析成成员、带引号成员、`[0]`/`[-1]` 下标、`[]` 全列表、`[{...}]` 列表元素匹配、`成员{...}` 与根级 `{...}` 匹配节点。匹配复合中的 SNBT 会检查键值、逗号、列表和嵌套结构；命令中仍保留原路径文本。
+`data.get` 是表达式，经 `execute store result` 落入计分项；可选缩放参数会追加到原版 `data get <目标> <路径> <缩放>` 命令，缺省时保持原版不缩放写法。读取失败或非数值时为 0。NBT 路径会解析成成员、带引号成员、`[0]`/`[-1]` 下标、`[]` 全列表、`[{...}]` 列表元素匹配、`成员{...}` 与根级 `{...}` 匹配节点。匹配复合中的 SNBT 会检查键值、逗号、列表和嵌套结构；命令中仍保留原路径文本。
 
 ```mcl title="示例" fragment
 data.merge(entity, self, nbt { CustomName = "仓库"; Tags = ["a"]; });
 data.modify(block, pos(0, 64, 0), "Items", append, from(entity, self, "Items[0]"));
 let health = data.get(entity, self, "Health");
+let doubled = data.get(entity, self, "Health", 2);
 ```
 
 ### 物品操作（item）
@@ -1347,6 +1348,8 @@ nbt { <具名标签> = <值>; ... }        // 合并到 @s
 
 `nbt { ... }` 作为语句时生成 `data merge entity @s {...}`，把具名标签合并到当前实体。键会对照从 26.3 客户端源码提取的实体标签表检查（`data/version/26.3/entity_nbt.json`）：
 
+标签表同时提取直接读写、列表/乘客列表、接口默认方法与公共辅助方法的键，包括 `leash`、`Items`、`Inventory`、`LootTable`、`variant`、愤怒与转化计时，以及文字展示实体的布尔标志。当前快照包含 161 种实体、305 个不同的顶层键；类型检查仍是粗类型检查，复杂值由原版 codec 在数据包加载或命令执行时进一步解释。方块实体数据目前只检查 NBT 语法，不按方块类型检查顶层键。
+
 - `spawn("minecraft:zombie") { nbt { ... } }` 与知道实体类型的 `each(查询)` 按该实体类型沿继承链的全部标签检查；
 - `@non_player`、`@entity` 等不知道具体类型的上下文按 26.3 全部实体标签的并集检查；
 - 未知键报错并给出最近候选（`NoAi` → 「是否想写 `NoAI`？」）；
@@ -1606,7 +1609,7 @@ fn release() {
 | `worldborder.get()` | 世界边界边长 |
 | `count(<查询>)` | 查询命中的实体数量（无命中为 0） |
 | `random(<最小值>, <最大值>)` | 闭区间随机整数，如 `random(1, 6)` |
-| `data.get(entity, <持有者>, "<路径>")` 等 | 读取 NBT 数值；实体查询要求 `limit(1)`，另有 `block`、`storage` 来源 |
+| `data.get(entity, <持有者>, "<路径>"[, <缩放>])` 等 | 读取 NBT 数值，可选双精度缩放；实体查询要求 `limit(1)`，另有 `block`、`storage` 来源 |
 | `compute(<来源>, float, "<provider>"[, <缩放>])` | 按上下文浮点 provider 计算数值，可选单精度缩放（包括 0） |
 | `compute(<来源>, integer, "<provider>")` | 按上下文整数 provider 计算数值，不支持缩放 |
 
