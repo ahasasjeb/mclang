@@ -1,5 +1,6 @@
 use crate::ast::*;
 
+use super::helpers::constant_condition;
 use crate::compiler::codegen::emit::{entity_query_as_clause, entity_query_selector};
 use crate::compiler::codegen::names::user_objective_name;
 use crate::compiler::codegen::world;
@@ -26,14 +27,17 @@ impl Compiler<'_> {
         };
 
         let mut modifiers = Vec::new();
+        let mut may_fork = false;
         let mut conditions: Vec<(&Condition, bool)> = Vec::new();
         let mut plan = StorePlan::default();
         for clause in clauses {
             match &clause.kind {
                 ExecuteClauseKind::As { query, .. } => {
+                    may_fork |= self.query(query).limit != Some(1);
                     modifiers.push(entity_query_as_clause(self.query(query)));
                 }
                 ExecuteClauseKind::At { query, .. } => {
+                    may_fork |= self.query(query).limit != Some(1);
                     modifiers.push(format!("at {}", entity_query_selector(self.query(query))));
                 }
                 ExecuteClauseKind::Positioned(position) => modifiers.push(format!(
@@ -59,6 +63,7 @@ impl Compiler<'_> {
                     modifiers.push(format!("in {dimension}"));
                 }
                 ExecuteClauseKind::On(relation) => {
+                    may_fork |= *relation == EntityRelation::Passengers;
                     modifiers.push(format!("on {}", relation.as_str()));
                 }
                 ExecuteClauseKind::Summon { entity_type, .. } => {
@@ -76,56 +81,112 @@ impl Compiler<'_> {
             }
         }
 
+        let body_command = self.compile_execute_body(body, owner, plan);
+        let mut continuation = self.compile_execute_conditions(conditions, body_command, owner);
+        if may_fork {
+            // Native execute prepares conditions for every fork before running
+            // any body. Evaluate conditions and the body per source instead.
+            let helper = self.next_helper_path(owner);
+            self.functions.insert(helper.clone(), vec![continuation]);
+            continuation = format!("function {}:{helper}", self.program.namespace);
+        }
+        if modifiers.is_empty() {
+            commands.push(continuation);
+        } else {
+            commands.push(format!(
+                "execute {} run {continuation}",
+                modifiers.join(" ")
+            ));
+        }
+    }
+
+    fn compile_execute_body(&mut self, body: &[Statement], owner: &str, plan: StorePlan) -> String {
         // 块体：store 把 `execute store ... run` 套在块内最后一条命令上，
         // 于是捕获的是该命令在修饰符上下文里的结果。
-        let body_helper = if plan.clauses.is_empty() {
-            self.compile_helper(body, owner)
+        if plan.clauses.is_empty() && self.preserve_command_result {
+            let helper = self.compile_helper(body, owner);
+            format!("function {}:{helper}", self.program.namespace)
+        } else if plan.clauses.is_empty() {
+            self.compile_small_block(body, owner)
         } else {
-            let mut body_commands = self.compile_block(body, owner);
-            let last = body_commands
-                .pop()
-                .expect("semantic validation guarantees the stored block is not empty");
-            body_commands.extend(plan.presets);
-            body_commands.push(format!("execute {} run {last}", plan.clauses.join(" ")));
-            body_commands.extend(plan.followups);
-            let helper = self.next_helper_path(owner);
-            self.functions.insert(helper.clone(), body_commands);
-            helper
-        };
-        let namespace = self.program.namespace.clone();
-        let prefix = if modifiers.is_empty() {
-            String::new()
-        } else {
-            format!(" {}", modifiers.join(" "))
-        };
-
-        if conditions.is_empty() {
-            commands.push(format!(
-                "execute{prefix} run function {namespace}:{body_helper}"
-            ));
-            return;
+            let (last, prefix) = body.split_last().expect("validated nonempty stored block");
+            let mut body_commands = self.compile_block(prefix, owner);
+            let previous = std::mem::replace(&mut self.preserve_command_result, true);
+            body_commands.extend(self.compile_block(std::slice::from_ref(last), owner));
+            self.preserve_command_result = previous;
+            let can_inline_store = !self.preserve_command_result
+                && body.len() == 1
+                && !matches!(
+                    body[0].kind,
+                    StatementKind::Return(_) | StatementKind::Run(_)
+                )
+                && body_commands.len() == 1
+                && !body_commands[0].starts_with("return ")
+                && !body_commands[0].contains(" run return ")
+                && plan.presets.is_empty()
+                && plan.followups.is_empty();
+            if can_inline_store {
+                let command = body_commands.pop().expect("single stored command");
+                format!("execute {} run {command}", plan.clauses.join(" "))
+            } else {
+                let last = body_commands
+                    .pop()
+                    .expect("semantic validation guarantees the stored block is not empty");
+                body_commands.extend(plan.presets);
+                body_commands.push(format!("execute {} run {last}", plan.clauses.join(" ")));
+                body_commands.extend(plan.followups);
+                let helper = self.next_helper_path(owner);
+                self.functions.insert(helper.clone(), body_commands);
+                format!("function {}:{helper}", self.program.namespace)
+            }
         }
+    }
 
-        // 条件在修饰符建立的上下文里求值，全部成立才进入块体。
-        let mut entry_commands = Vec::new();
-        let mut gates = Vec::new();
-        for (condition, negated) in conditions {
+    fn compile_execute_conditions(
+        &mut self,
+        conditions: Vec<(&Condition, bool)>,
+        body_command: String,
+        owner: &str,
+    ) -> String {
+        // Build the chain from the end. A dynamic condition gets its own
+        // continuation helper; that helper is entered only after all earlier
+        // clauses have passed for the current Minecraft command source.
+        let mut next = body_command;
+        let mut direct = Vec::new();
+        for (condition, negated) in conditions.into_iter().rev() {
+            if let Some(value) = constant_condition(condition)
+                && value != negated
+            {
+                continue;
+            }
+            if let Some(clause) = self.direct_condition_clause(condition, negated, owner) {
+                direct.push(clause);
+                continue;
+            }
+            let mut entry_commands = Vec::new();
             let flag = self.compile_condition(condition, owner, &mut entry_commands);
-            gates.push(format!(
-                "{} score {flag} {} matches 1",
-                if negated { "unless" } else { "if" },
+            let test = if negated { "unless" } else { "if" };
+            direct.reverse();
+            let suffix = if direct.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", direct.join(" "))
+            };
+            direct.clear();
+            entry_commands.push(format!(
+                "execute {test} score {flag} {} matches 1{suffix} run {next}",
                 self.objective
             ));
+            let helper = self.next_helper_path(owner);
+            self.functions.insert(helper.clone(), entry_commands);
+            next = format!("function {}:{helper}", self.program.namespace);
         }
-        entry_commands.push(format!(
-            "execute {} run function {namespace}:{body_helper}",
-            gates.join(" ")
-        ));
-        let entry_helper = self.next_helper_path(owner);
-        self.functions.insert(entry_helper.clone(), entry_commands);
-        commands.push(format!(
-            "execute{prefix} run function {namespace}:{entry_helper}"
-        ));
+        direct.reverse();
+        if direct.is_empty() {
+            next
+        } else {
+            format!("execute {} run {next}", direct.join(" "))
+        }
     }
 
     /// `store result|success` 子句：计分板直接拼进 store 链；投掷者目标先落到

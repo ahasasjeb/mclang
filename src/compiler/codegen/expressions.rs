@@ -1,8 +1,8 @@
-//! 表达式与条件下降：产生计分板操作，并管理表达式临时值。
+//! Arithmetic lowering, command results, and temporary score slots.
 
 use crate::ast::{
-    BinaryOp, CallTarget, Comparison, ComputeKind, ComputeSource, Condition, Expr, ExprKind,
-    Holder, ItemConditionSource, NbtComponentSource,
+    BinaryOp, ComputeKind, ComputeSource, Expr, ExprKind, Holder, ItemConditionSource,
+    NbtComponentSource,
 };
 
 use super::Compiler;
@@ -12,6 +12,99 @@ use super::names::user_objective_name;
 use crate::compiler::constant::constant_value;
 
 impl Compiler<'_> {
+    /// Write a result into its final slot when the expression can be lowered
+    /// there without changing when its operands are observed.
+    pub(super) fn compile_expr_into(
+        &mut self,
+        expression: &Expr,
+        target: &str,
+        owner: &str,
+        commands: &mut Vec<String>,
+    ) {
+        if let Some(value) = constant_value(expression) {
+            self.store_value(target, Value::Integer(value), commands);
+            return;
+        }
+        match &expression.kind {
+            ExprKind::Score(name) => {
+                let source = self.variable_holder(owner, name);
+                if source != target {
+                    self.store_value(target, Value::Score(source), commands);
+                }
+            }
+            ExprKind::Call {
+                function,
+                arguments,
+            } => {
+                self.bind_arguments(function, arguments, owner, commands);
+                commands.push(format!(
+                    "execute store result score {target} {} run function {}:{function}",
+                    self.objective, self.program.namespace
+                ));
+            }
+            ExprKind::Binary {
+                left,
+                operation,
+                right,
+            } if let Some(literal) = constant_value(right) => {
+                self.compile_expr_into(left, target, owner, commands);
+                self.apply_literal_operation(target, *operation, literal, commands);
+            }
+            _ => {
+                let value = self.compile_expr(expression, owner, commands);
+                self.store_value(target, value, commands);
+            }
+        }
+    }
+
+    fn apply_literal_operation(
+        &mut self,
+        target: &str,
+        operation: BinaryOp,
+        literal: i32,
+        commands: &mut Vec<String>,
+    ) {
+        if matches!(operation, BinaryOp::Add | BinaryOp::Subtract) {
+            let signed = if operation == BinaryOp::Add {
+                i64::from(literal)
+            } else {
+                -i64::from(literal)
+            };
+            if signed == 0 {
+                return;
+            }
+            if (0..=i64::from(i32::MAX)).contains(&signed) {
+                commands.push(format!(
+                    "scoreboard players add {target} {} {signed}",
+                    self.objective
+                ));
+                return;
+            }
+            if (-i64::from(i32::MAX)..0).contains(&signed) {
+                commands.push(format!(
+                    "scoreboard players remove {target} {} {}",
+                    self.objective, -signed
+                ));
+                return;
+            }
+        }
+        if literal == 1 && matches!(operation, BinaryOp::Multiply | BinaryOp::Divide) {
+            return;
+        }
+        let source = self.materialize(Value::Integer(literal), commands);
+        let symbol = match operation {
+            BinaryOp::Add => "+=",
+            BinaryOp::Subtract => "-=",
+            BinaryOp::Multiply => "*=",
+            BinaryOp::Divide => "/=",
+            BinaryOp::Modulo => "%=",
+        };
+        commands.push(format!(
+            "scoreboard players operation {target} {} {symbol} {source} {}",
+            self.objective, self.objective
+        ));
+    }
+
     /// 下降表达式：常量直接折叠，变量解析为假玩家槽位，其余运算生成命令。
     pub(super) fn compile_expr(
         &mut self,
@@ -241,40 +334,45 @@ impl Compiler<'_> {
                 operation,
                 right,
             } => {
-                let left_value = self.compile_expr(left, owner, commands);
-                let right_value = self.compile_expr(right, owner, commands);
-                let target = self.temporary();
-                match left_value {
-                    Value::Integer(value) => commands.push(format!(
-                        "scoreboard players set {target} {} {value}",
-                        self.objective
-                    )),
-                    Value::Score(source) => commands.push(format!(
-                        "scoreboard players operation {target} {} = {source} {}",
-                        self.objective, self.objective
-                    )),
-                }
-                if matches!(operation, BinaryOp::Add | BinaryOp::Subtract)
-                    && let Value::Integer(value) = &right_value
+                if let Some(literal) = constant_value(right)
+                    && (matches!(operation, BinaryOp::Add | BinaryOp::Subtract) && literal == 0
+                        || matches!(operation, BinaryOp::Multiply | BinaryOp::Divide)
+                            && literal == 1)
                 {
-                    let signed = if *operation == BinaryOp::Add {
-                        i64::from(*value)
-                    } else {
-                        -i64::from(*value)
-                    };
-                    if (0..=i64::from(i32::MAX)).contains(&signed) {
-                        commands.push(format!(
-                            "scoreboard players add {target} {} {signed}",
-                            self.objective
-                        ));
-                        return Value::Score(target);
-                    } else if (-i64::from(i32::MAX)..0).contains(&signed) {
-                        commands.push(format!(
-                            "scoreboard players remove {target} {} {}",
-                            self.objective, -signed
-                        ));
-                        return Value::Score(target);
+                    return self.compile_expr(left, owner, commands);
+                }
+                if *operation == BinaryOp::Add && constant_value(left) == Some(0) {
+                    return self.compile_expr(right, owner, commands);
+                }
+                let left_value = self.compile_expr(left, owner, commands);
+                let left_value = self.freeze_before_effect(left_value, right, commands);
+                let right_value = self.compile_expr(right, owner, commands);
+                // Compiler temporaries have unique names within a build. The
+                // right operand cannot refer to one from source code.
+                let reuse = matches!(&left_value, Value::Score(score) if score.starts_with("#t"));
+                let target = if reuse {
+                    match &left_value {
+                        Value::Score(score) => score.clone(),
+                        _ => unreachable!(),
                     }
+                } else {
+                    self.temporary()
+                };
+                if !reuse {
+                    match left_value {
+                        Value::Integer(value) => commands.push(format!(
+                            "scoreboard players set {target} {} {value}",
+                            self.objective
+                        )),
+                        Value::Score(source) => commands.push(format!(
+                            "scoreboard players operation {target} {} = {source} {}",
+                            self.objective, self.objective
+                        )),
+                    }
+                }
+                if let Value::Integer(literal) = &right_value {
+                    self.apply_literal_operation(&target, *operation, *literal, commands);
+                    return Value::Score(target);
                 }
                 let source = self.materialize(right_value, commands);
                 let symbol = match operation {
@@ -305,290 +403,36 @@ impl Compiler<'_> {
         Value::Score(result)
     }
 
-    /// 把值落到具体计分项：常量需要额外生成一条 set 命令。
-    pub(super) fn materialize(&mut self, value: Value, commands: &mut Vec<String>) -> String {
+    /// A literal operand uses a reserved slot initialized once by __mcl/load.
+    pub(super) fn materialize(&mut self, value: Value, _commands: &mut Vec<String>) -> String {
         match value {
             Value::Score(score) => score,
             Value::Integer(value) => {
-                let score = self.temporary();
-                commands.push(format!(
-                    "scoreboard players set {score} {} {value}",
-                    self.objective
-                ));
-                score
+                self.constants.insert(value);
+                format!("#c_{value}")
             }
         }
     }
 
-    /// 把布尔条件求值为 0/1 的标志计分项，并返回它的名字。
-    ///
-    /// 调用方负责用 `execute if score <flag> matches 1` 分派分支。
-    pub(super) fn compile_condition(
+    pub(super) fn freeze_before_effect(
         &mut self,
-        condition: &Condition,
-        owner: &str,
+        value: Value,
+        next: &Expr,
         commands: &mut Vec<String>,
-    ) -> String {
-        match condition {
-            Condition::Predicate { name, .. } => self.compile_atomic_condition(
-                format!("predicate {}:{name}", self.program.namespace),
-                commands,
-            ),
-            Condition::Block { pos, block, .. } => self.compile_atomic_condition(
-                format!(
-                    "block {} {}",
-                    super::world::position_text(pos),
-                    super::world::block_state_text(block)
-                ),
-                commands,
-            ),
-            Condition::Blocks {
-                start,
-                end,
-                destination,
-                masked,
-                ..
-            } => {
-                let mode = if *masked { " masked" } else { "" };
-                self.compile_atomic_condition(
-                    format!(
-                        "blocks {} {} {}{mode}",
-                        super::world::position_text(start),
-                        super::world::position_text(end),
-                        super::world::position_text(destination),
-                    ),
-                    commands,
-                )
-            }
-            Condition::Biome { pos, biome, .. } => self.compile_atomic_condition(
-                format!("biome {} {biome}", super::world::position_text(pos)),
-                commands,
-            ),
-            Condition::Loaded { pos, .. } => self.compile_atomic_condition(
-                format!("loaded {}", super::world::position_text(pos)),
-                commands,
-            ),
-            Condition::Dimension { dimension, .. } => {
-                self.compile_atomic_condition(format!("dimension {dimension}"), commands)
-            }
-            Condition::Entity { query, .. } => self.compile_atomic_condition(
-                format!("entity {}", entity_query_selector(self.query(query))),
-                commands,
-            ),
-            Condition::Data { source, path, .. } => {
-                let holders = match source {
-                    NbtComponentSource::Entity(holder) => vec![holder],
-                    NbtComponentSource::Block(_) | NbtComponentSource::Storage(_, _) => Vec::new(),
-                };
-                let native = self.capture_command_targets(&holders, owner, |compiler| {
-                    format!(
-                        "execute if data {} {path}",
-                        compiler.nbt_source_text(source)
-                    )
-                });
-                self.compile_command_success(native, commands)
-            }
-            Condition::Items {
-                source,
-                slots,
-                item,
-                ..
-            } => self.compile_atomic_condition(
-                format!(
-                    "items {} {slots} {}",
-                    self.item_condition_source_text(source),
-                    super::emit::item_predicate_text(item)
-                ),
-                commands,
-            ),
-            Condition::Slots { source, slots, .. } => self.compile_atomic_condition(
-                format!("slots {} {slots}", self.item_condition_source_text(source)),
-                commands,
-            ),
-            Condition::Function { target, .. } => {
-                let target = match target {
-                    CallTarget::External(id) => id.clone(),
-                    CallTarget::Function(name) => format!("{}:{name}", self.program.namespace),
-                    CallTarget::Tag(tag) => format!("#{}:{tag}", self.program.namespace),
-                };
-                self.compile_atomic_condition(format!("function {target}"), commands)
-            }
-            Condition::Stopwatch { id, .. } => {
-                self.compile_atomic_condition(format!("stopwatch {id} 0.."), commands)
-            }
-            Condition::Compare {
-                left,
-                comparison,
-                right,
-            } => {
-                let left_value = self.compile_expr(left, owner, commands);
-                let right_value = self.compile_expr(right, owner, commands);
-                let flag = self.temporary();
-                match (left_value, right_value) {
-                    (Value::Integer(left), Value::Integer(right)) => commands.push(format!(
-                        "scoreboard players set {flag} {} {}",
-                        self.objective,
-                        i32::from(compare_integers(left, *comparison, right))
-                    )),
-                    (Value::Score(score), Value::Integer(value)) => self
-                        .compile_score_constant_comparison(
-                            &flag,
-                            &score,
-                            *comparison,
-                            value,
-                            commands,
-                        ),
-                    (Value::Integer(value), Value::Score(score)) => self
-                        .compile_score_constant_comparison(
-                            &flag,
-                            &score,
-                            reverse_comparison(*comparison),
-                            value,
-                            commands,
-                        ),
-                    (Value::Score(left), Value::Score(right)) => {
-                        commands.push(format!(
-                            "scoreboard players set {flag} {} 0",
-                            self.objective
-                        ));
-                        let (prefix, symbol) = comparison_operator(*comparison);
-                        commands.push(format!(
-                            "execute {prefix} score {left} {} {symbol} {right} {} run scoreboard players set {flag} {} 1",
-                            self.objective, self.objective, self.objective
-                        ));
-                    }
-                }
-                flag
-            }
-            Condition::Not(condition) => {
-                let inner = self.compile_condition(condition, owner, commands);
-                let flag = self.temporary();
+    ) -> Value {
+        match value {
+            Value::Score(score)
+                if !score.starts_with("#t") && expression_may_modify_state(next) =>
+            {
+                let frozen = self.temporary();
                 commands.push(format!(
-                    "scoreboard players set {flag} {} 1",
-                    self.objective
-                ));
-                commands.push(format!(
-                    "execute if score {inner} {} matches 1 run scoreboard players set {flag} {} 0",
+                    "scoreboard players operation {frozen} {} = {score} {}",
                     self.objective, self.objective
                 ));
-                flag
+                Value::Score(frozen)
             }
-            Condition::And(left, right) => {
-                let left = self.compile_condition(left, owner, commands);
-                let mut right_commands = Vec::new();
-                let right = self.compile_condition(right, owner, &mut right_commands);
-                self.append_guarded_commands(&left, 1, right_commands, commands);
-                commands.push(format!(
-                    "execute if score {left} {} matches 1 unless score {right} {} matches 1 run scoreboard players set {left} {} 0",
-                    self.objective, self.objective, self.objective,
-                ));
-                left
-            }
-            Condition::Or(left, right) => {
-                let left = self.compile_condition(left, owner, commands);
-                let mut right_commands = Vec::new();
-                let right = self.compile_condition(right, owner, &mut right_commands);
-                self.append_guarded_commands(&left, 0, right_commands, commands);
-                commands.push(format!(
-                    "execute if score {left} {} matches 0 if score {right} {} matches 1 run scoreboard players set {left} {} 1",
-                    self.objective, self.objective, self.objective,
-                ));
-                left
-            }
+            other => other,
         }
-    }
-
-    /// Compare a score against a literal without materializing the literal as
-    /// another fake player. This is common in guards and saves one command and
-    /// one temporary for every comparison.
-    fn compile_score_constant_comparison(
-        &self,
-        flag: &str,
-        score: &str,
-        comparison: Comparison,
-        value: i32,
-        commands: &mut Vec<String>,
-    ) {
-        commands.push(format!(
-            "scoreboard players set {flag} {} 0",
-            self.objective
-        ));
-        let test = match comparison {
-            Comparison::Equal => ScoreConstantTest::Matches("if", value.to_string()),
-            Comparison::NotEqual => ScoreConstantTest::Matches("unless", value.to_string()),
-            Comparison::Less if value == i32::MIN => ScoreConstantTest::Always(false),
-            Comparison::Less => ScoreConstantTest::Matches("if", format!("..{}", value - 1)),
-            Comparison::LessEqual => ScoreConstantTest::Matches("if", format!("..{value}")),
-            Comparison::Greater if value == i32::MAX => ScoreConstantTest::Always(false),
-            Comparison::Greater => ScoreConstantTest::Matches("if", format!("{}..", value + 1)),
-            Comparison::GreaterEqual => ScoreConstantTest::Matches("if", format!("{value}..")),
-        };
-        match test {
-            ScoreConstantTest::Always(true) => commands.push(format!(
-                "scoreboard players set {flag} {} 1",
-                self.objective
-            )),
-            ScoreConstantTest::Always(false) => {}
-            ScoreConstantTest::Matches(prefix, range) => commands.push(format!(
-                "execute {prefix} score {score} {} matches {range} run scoreboard players set {flag} {} 1",
-                self.objective, self.objective
-            )),
-        }
-    }
-
-    /// `&&` and `||` are short-circuiting. Expressions may call functions, so
-    /// eagerly compiling the right side would also execute its side effects.
-    fn append_guarded_commands(
-        &self,
-        guard: &str,
-        expected: i32,
-        guarded: Vec<String>,
-        commands: &mut Vec<String>,
-    ) {
-        commands.extend(guarded.into_iter().map(|command| {
-            if let Some(clauses) = command.strip_prefix("execute ") {
-                format!(
-                    "execute if score {guard} {} matches {expected} {clauses}",
-                    self.objective
-                )
-            } else {
-                format!(
-                    "execute if score {guard} {} matches {expected} run {command}",
-                    self.objective
-                )
-            }
-        }));
-    }
-
-    /// 原子条件：置 0 后用一条 `execute if <谓词>` 冻结为 0/1 标志。
-    fn compile_atomic_condition(
-        &mut self,
-        predicate: String,
-        commands: &mut Vec<String>,
-    ) -> String {
-        let flag = self.temporary();
-        commands.push(format!(
-            "scoreboard players set {flag} {} 0",
-            self.objective
-        ));
-        commands.push(format!(
-            "execute if {predicate} run scoreboard players set {flag} {} 1",
-            self.objective
-        ));
-        flag
-    }
-
-    fn compile_command_success(&mut self, command: String, commands: &mut Vec<String>) -> String {
-        let flag = self.temporary();
-        commands.push(format!(
-            "scoreboard players set {flag} {} 0",
-            self.objective
-        ));
-        commands.push(format!(
-            "execute store success score {flag} {} run {command}",
-            self.objective
-        ));
-        flag
     }
 
     /// NBT 数据来源的命令文本（`data` 条件与表达式共用）。
@@ -630,40 +474,15 @@ impl Compiler<'_> {
     }
 }
 
-enum ScoreConstantTest {
-    Always(bool),
-    Matches(&'static str, String),
-}
-
-fn compare_integers(left: i32, comparison: Comparison, right: i32) -> bool {
-    match comparison {
-        Comparison::Equal => left == right,
-        Comparison::NotEqual => left != right,
-        Comparison::Less => left < right,
-        Comparison::LessEqual => left <= right,
-        Comparison::Greater => left > right,
-        Comparison::GreaterEqual => left >= right,
-    }
-}
-
-fn reverse_comparison(comparison: Comparison) -> Comparison {
-    match comparison {
-        Comparison::Equal => Comparison::Equal,
-        Comparison::NotEqual => Comparison::NotEqual,
-        Comparison::Less => Comparison::Greater,
-        Comparison::LessEqual => Comparison::GreaterEqual,
-        Comparison::Greater => Comparison::Less,
-        Comparison::GreaterEqual => Comparison::LessEqual,
-    }
-}
-
-fn comparison_operator(comparison: Comparison) -> (&'static str, &'static str) {
-    match comparison {
-        Comparison::Equal => ("if", "="),
-        Comparison::NotEqual => ("unless", "="),
-        Comparison::Less => ("if", "<"),
-        Comparison::LessEqual => ("if", "<="),
-        Comparison::Greater => ("if", ">"),
-        Comparison::GreaterEqual => ("if", ">="),
+/// A later operand can change an earlier score through a function or native
+/// command. Freeze that earlier value before compiling the later operand.
+pub(super) fn expression_may_modify_state(expression: &Expr) -> bool {
+    match &expression.kind {
+        ExprKind::Integer(_) | ExprKind::Score(_) => false,
+        ExprKind::Negate(inner) => expression_may_modify_state(inner),
+        ExprKind::Binary { left, right, .. } => {
+            expression_may_modify_state(left) || expression_may_modify_state(right)
+        }
+        _ => true,
     }
 }

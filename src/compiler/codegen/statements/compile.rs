@@ -5,7 +5,7 @@ use crate::compiler::codegen::emit::nbt_text;
 use crate::compiler::codegen::names::user_objective_name;
 use crate::compiler::codegen::world;
 
-use super::helpers::contains_flow_jump;
+use super::helpers::contains_current_loop_jump;
 
 impl Compiler<'_> {
     /// 下降一个语句块。辅助函数命名计数器按所属函数（`owner`）独立编号。
@@ -21,8 +21,8 @@ impl Compiler<'_> {
         let mut commands = Vec::new();
         for statement in statements {
             self.compile_statement(statement, owner, &mut commands);
-            if let Some(state) = self.loops.last().map(|context| context.state.clone())
-                && contains_flow_jump(statement)
+            if let Some(state) = self.loops.last().and_then(|context| context.state.clone())
+                && contains_current_loop_jump(statement)
             {
                 commands.push(format!(
                     "execute unless score {state} {} matches 0 run return 0",

@@ -1,0 +1,261 @@
+namespace control_semantics;
+
+score counter = 0;
+score marker = 0;
+objective stored;
+
+query zombies = entity("minecraft:zombie") { limit(1); }
+query all_zombies = entity("minecraft:zombie") {}
+resource predicate always_true = """{"type":"minecraft:random_chance","chance":1.0}""";
+
+fn side_effect() -> score {
+    counter += 1;
+    return 1;
+}
+
+fn false_condition() -> score {
+    return 0;
+}
+
+fn lower_bound() -> score {
+    marker = marker * 10 + 1;
+    return 0;
+}
+
+fn upper_bound() -> score {
+    marker = marker * 10 + 2;
+    return 3;
+}
+
+fn absorbed_conditions() {
+    if side_effect() == 1 && 0 == 1 {
+        counter += 10;
+    }
+    if side_effect() == 1 || 1 == 1 {
+        counter += 10;
+    }
+    while side_effect() == 1 && 0 == 1 {
+        counter += 10;
+    }
+    while side_effect() == 1 || 1 == 1 {
+        break;
+    }
+}
+
+fn dynamic_bounds() {
+    for index in lower_bound()..upper_bound() {
+        counter += index;
+    }
+}
+
+fn condition_chain() {
+    execute if false_condition() == 1 if function(side_effect) {
+        counter += 10;
+    }
+    execute if function(false_condition) if function(side_effect) {
+        counter += 10;
+    }
+}
+
+fn condition_chain_dynamic() {
+    execute if false_condition() == 1 if side_effect() == 1 {
+        counter += 10;
+    }
+}
+
+@non_player
+fn store_one() {
+    execute store.result(self, stored) {
+        side_effect();
+    }
+}
+
+@non_player
+fn store_multi() {
+    execute store.result(self, stored) {
+        counter += 1;
+        side_effect();
+    }
+}
+
+fn if_else_once() {
+    if side_effect() == 1 {
+        counter += 1;
+    } else {
+        counter += 2;
+    }
+}
+
+fn pair(first, second) {
+    counter += first;
+    counter += second;
+}
+
+fn observe_left_before_call() {
+    if counter == side_effect() {
+        counter += 10;
+    }
+    let result = counter + side_effect();
+    pair(counter, side_effect());
+    counter += result;
+}
+
+fn simple_if(value) {
+    if value < 10 {
+        counter += 1;
+    }
+    if block(pos(0, 64, 0), block_state("minecraft:stone")) {
+        counter += 1;
+    }
+    if 1 + 1 == 2 {
+        counter += 1;
+    }
+    while 2 * 2 == 5 {
+        counter += 1;
+    }
+}
+
+fn atomic_if() {
+    if entity(zombies) {
+        counter += 1;
+    }
+    if predicate(always_true) {
+        counter += 1;
+    }
+}
+
+fn simple_while() {
+    while counter < 3 {
+        counter += 1;
+    }
+}
+
+fn simple_for() {
+    for index in 0..3 {
+        counter += 1;
+    }
+}
+
+@non_player
+fn small_blocks() {
+    each(zombies) {
+        self.add_tag("seen");
+    }
+    in_dimension("minecraft:overworld") {
+        counter += 1;
+    }
+    spawn("minecraft:armor_stand") {
+        self.add_tag("new");
+    }
+    execute if counter > 0 {
+        counter += 1;
+    }
+    execute {
+        counter += 1;
+    }
+}
+
+fn nested_no_outer_jump() {
+    for outer in 0..2 {
+        for inner in 0..2 {
+            if inner == 1 {
+                break;
+            }
+            counter += outer;
+        }
+        counter += outer;
+    }
+}
+
+fn arithmetic(value) -> score {
+    let result = value + 0;
+    result = result + 2;
+    result = result * 3;
+    result = result / 3;
+    result = result % 3;
+    return result;
+}
+
+fn return_execute() -> score {
+    return run execute {
+        say("result boundary");
+    }
+}
+
+fn forked_each() {
+    counter = 0;
+    each(all_zombies) {
+        if counter == 0 {
+            counter += 1;
+        }
+    }
+}
+
+fn forked_execute() {
+    counter = 0;
+    execute as(all_zombies) if counter == 0 {
+        counter += 1;
+    }
+}
+
+fn forked_at() {
+    counter = 0;
+    execute at(all_zombies) if counter == 0 {
+        counter += 1;
+    }
+}
+
+@entity
+fn forked_passengers() {
+    counter = 0;
+    execute on(passengers) if counter == 0 {
+        counter += 1;
+    }
+}
+
+@non_player
+fn stored_assignments() {
+    execute store.result(self, stored) {
+        counter = counter;
+    }
+    execute store.result(self, stored) {
+        marker += 1;
+        counter = counter + 0;
+    }
+    execute store.success(self, stored) {
+        counter = counter * 1;
+    }
+    execute store.success(self, stored) {
+        counter = failed_result();
+    }
+}
+
+fn failed_result() -> score {
+    return fail;
+}
+
+fn negated_queries() {
+    if !data(entity, zombies, "Health") {
+        marker += 1;
+    }
+    if !data(entity, zombies, "Health") {
+        marker += 2;
+    } else {
+        marker += 3;
+    }
+    execute unless data(entity, zombies, "Health") {
+        marker += 4;
+    }
+    while !data(entity, zombies, "Health") && counter < 1 {
+        counter += 1;
+    }
+    if !block(pos(0, 64, 0), block_state("minecraft:stone")) {
+        marker += 5;
+    }
+    if !items(entity, zombies, "weapon.mainhand", "minecraft:stone") {
+        marker += 6;
+    }
+    if !slots(entity, zombies, "armor.*") {
+        marker += 7;
+    }
+}

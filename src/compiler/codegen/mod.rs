@@ -6,7 +6,8 @@
 //!
 //! - [`statements`]：控制流（each/if/while/call 等）与辅助函数分配；
 //! - [`actions`]：`give` 与 `self` 实体操作；
-//! - [`expressions`]：表达式与条件求值，以及临时计分项；
+//! - [`expressions`]: arithmetic evaluation and temporary score slots;
+//! - [`conditions`]: boolean evaluation and native execute predicates;
 //! - [`names`]：假玩家、objective 和稳定哈希命名；
 //! - [`emit`]：Minecraft 命令片段与 JSON 文本的格式化。
 
@@ -14,6 +15,7 @@ mod actions;
 mod advancement;
 mod command_targets;
 mod components;
+mod conditions;
 mod core_commands;
 mod emit;
 mod entity_commands;
@@ -25,7 +27,7 @@ mod statements;
 mod ui;
 mod world;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 
 use crate::ast::*;
@@ -47,7 +49,7 @@ enum Value {
 /// `break`/`continue` 通过循环状态计分项在辅助函数之间传递：
 /// 0 = 正常运行，1 = continue（跳到下一轮），2 = break（跳出循环）。
 pub(super) struct LoopContext {
-    pub(super) state: String,
+    pub(super) state: Option<String>,
 }
 
 /// 单次代码生成的完整状态。
@@ -63,6 +65,10 @@ pub(super) struct Compiler<'a> {
     loops: Vec<LoopContext>,
     /// 循环状态与循环上限的编号计数器。
     loop_counter: usize,
+    /// Literals used as scoreboard operands, initialized once on pack load.
+    constants: BTreeSet<i32>,
+    /// A surrounding `return run` or `store` observes the command result.
+    preserve_command_result: bool,
     /// 是否使用了 `give(..., self.item)` 需要的空槽来源资源。
     uses_empty_slot: bool,
     selector_overrides: HashMap<String, String>,
@@ -80,6 +86,8 @@ impl<'a> Compiler<'a> {
             temporary_counter: 0,
             loops: Vec::new(),
             loop_counter: 0,
+            constants: BTreeSet::new(),
+            preserve_command_result: false,
             uses_empty_slot: false,
             selector_overrides: HashMap::new(),
             selector_objectives: BTreeMap::new(),
@@ -104,6 +112,12 @@ impl<'a> Compiler<'a> {
             "scoreboard objectives add {} dummy",
             self.objective
         )];
+        for value in &self.constants {
+            commands.push(format!(
+                "scoreboard players set #c_{value} {} {value}",
+                self.objective
+            ));
+        }
         for objective in self.selector_objectives.values() {
             commands.push(format!("scoreboard objectives add {objective} dummy"));
         }

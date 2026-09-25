@@ -1,6 +1,7 @@
 use crate::ast::*;
 
 use crate::compiler::codegen::emit::entity_query_selector;
+use crate::compiler::codegen::expressions::expression_may_modify_state;
 use crate::compiler::codegen::names::parameter_holder;
 use crate::compiler::codegen::world;
 use crate::compiler::codegen::{Compiler, Value};
@@ -67,8 +68,17 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         let mut values = Vec::new();
-        for argument in arguments {
-            values.push(self.compile_expr(argument, owner, commands));
+        for (index, argument) in arguments.iter().enumerate() {
+            let value = self.compile_expr(argument, owner, commands);
+            let value = if let Some(later) = arguments[index + 1..]
+                .iter()
+                .find(|later| expression_may_modify_state(later))
+            {
+                self.freeze_before_effect(value, later, commands)
+            } else {
+                value
+            };
+            values.push(value);
         }
         let parameters = self
             .program
@@ -104,20 +114,18 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         let target = self.variable_holder(owner, target);
-        let value = self.compile_expr(expression, owner, commands);
         if operation == AssignOp::Set {
-            match value {
-                Value::Integer(value) => commands.push(format!(
-                    "scoreboard players set {target} {} {value}",
-                    self.objective
-                )),
-                Value::Score(source) => commands.push(format!(
-                    "scoreboard players operation {target} {} = {source} {}",
-                    self.objective, self.objective
-                )),
+            if self.preserve_command_result {
+                // Store observes the assignment, including a self-assignment
+                // and the successful copy after a failed RHS command.
+                let value = self.compile_expr(expression, owner, commands);
+                self.store_value(&target, value, commands);
+            } else {
+                self.compile_expr_into(expression, &target, owner, commands);
             }
             return;
         }
+        let value = self.compile_expr(expression, owner, commands);
 
         // `add`/`remove` 命令比等价的 `operation +=` 更短，且不受整数溢出习惯影响。
         if matches!(operation, AssignOp::Add | AssignOp::Subtract)

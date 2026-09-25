@@ -1,8 +1,30 @@
 use crate::ast::*;
 
 use crate::compiler::codegen::Compiler;
+use crate::compiler::constant::constant_value;
 
 impl Compiler<'_> {
+    /// Keep a helper boundary for multi-command blocks and commands whose
+    /// return would otherwise escape the enclosing function.
+    pub(super) fn compile_small_block(&mut self, body: &[Statement], owner: &str) -> String {
+        let mut compiled = self.compile_block(body, owner);
+        let inline = body.len() == 1
+            && !matches!(
+                body[0].kind,
+                StatementKind::Return(_) | StatementKind::Run(_)
+            )
+            && compiled.len() == 1
+            && !compiled[0].starts_with("return ")
+            && !compiled[0].contains(" run return ");
+        if inline {
+            compiled.pop().expect("one command")
+        } else {
+            let path = self.next_helper_path(owner);
+            self.functions.insert(path.clone(), compiled);
+            format!("function {}:{path}", self.program.namespace)
+        }
+    }
+
     /// 把语句块放入新辅助函数，返回该函数的路径。
     pub(super) fn compile_helper(&mut self, body: &[Statement], owner: &str) -> String {
         let path = self.next_helper_path(owner);
@@ -26,15 +48,11 @@ pub(super) enum LoopLimit {
 
 /// 编译期能确定的整数表达式的值。
 pub(super) fn constant_integer(expression: &Expr) -> Option<i32> {
-    match &expression.kind {
-        ExprKind::Integer(value) => Some(*value),
-        ExprKind::Negate(value) => constant_integer(value)?.checked_neg(),
-        _ => None,
-    }
+    constant_value(expression)
 }
 
 /// 编译期能确定真假的布尔条件；三值逻辑，`None` 表示要在运行期求值。
-pub(super) fn constant_condition(condition: &Condition) -> Option<bool> {
+pub(in crate::compiler::codegen) fn constant_condition(condition: &Condition) -> Option<bool> {
     match condition {
         Condition::Compare {
             left,
@@ -53,37 +71,39 @@ pub(super) fn constant_condition(condition: &Condition) -> Option<bool> {
             })
         }
         Condition::Not(inner) => Some(!constant_condition(inner)?),
-        Condition::And(left, right) => {
-            match (constant_condition(left), constant_condition(right)) {
-                (Some(false), _) | (_, Some(false)) => Some(false),
-                (Some(true), Some(true)) => Some(true),
-                _ => None,
-            }
-        }
-        Condition::Or(left, right) => match (constant_condition(left), constant_condition(right)) {
-            (Some(true), _) | (_, Some(true)) => Some(true),
-            (Some(false), Some(false)) => Some(false),
-            _ => None,
+        // Only a constant *left* operand may skip the right operand. A constant
+        // right operand cannot erase the evaluation of a dynamic left operand.
+        Condition::And(left, right) => match constant_condition(left) {
+            Some(false) => Some(false),
+            Some(true) => constant_condition(right),
+            None => None,
+        },
+        Condition::Or(left, right) => match constant_condition(left) {
+            Some(true) => Some(true),
+            Some(false) => constant_condition(right),
+            None => None,
         },
         _ => None,
     }
 }
 
-/// 语句（含嵌套块）里是否可能出现 `break`/`continue`。
-///
-/// 保守判断：`if`/`execute`/内层循环里出现跳转时也返回真。多插入的状态检查
-/// 在状态为 0 时是空操作，因此不会改变行为，只多一条命令。
-pub(super) fn contains_flow_jump(statement: &Statement) -> bool {
+/// Whether a jump can target the current loop. Inner loops consume their own
+/// jumps and must not force a state check in the outer loop.
+pub(super) fn contains_current_loop_jump(statement: &Statement) -> bool {
     match &statement.kind {
         StatementKind::Break | StatementKind::Continue => true,
         StatementKind::If {
             then_body,
             else_body,
             ..
-        } => then_body.iter().any(contains_flow_jump) || else_body.iter().any(contains_flow_jump),
+        } => {
+            then_body.iter().any(contains_current_loop_jump)
+                || else_body.iter().any(contains_current_loop_jump)
+        }
         StatementKind::Execute { body, .. }
-        | StatementKind::While { body, .. }
-        | StatementKind::For { body, .. } => body.iter().any(contains_flow_jump),
+        | StatementKind::Each { body, .. }
+        | StatementKind::InDimension { body, .. }
+        | StatementKind::Spawn { body, .. } => body.iter().any(contains_current_loop_jump),
         _ => false,
     }
 }

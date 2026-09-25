@@ -4,7 +4,7 @@ use crate::compiler::codegen::emit::entity_query_clause;
 use crate::compiler::codegen::world;
 use crate::compiler::codegen::{Compiler, Value};
 
-use super::helpers::{LoopLimit, constant_condition, constant_integer};
+use super::helpers::{LoopLimit, constant_condition, constant_integer, contains_current_loop_jump};
 
 impl Compiler<'_> {
     pub(super) fn compile_each(
@@ -14,18 +14,22 @@ impl Compiler<'_> {
         owner: &str,
         commands: &mut Vec<String>,
     ) {
-        let helper = self.compile_helper(body, owner);
         let query = self
             .program
             .queries
             .iter()
             .find(|candidate| candidate.name == query_name)
             .expect("semantic validation guarantees the entity query exists");
-        commands.push(format!(
-            "execute {} run function {}:{helper}",
-            entity_query_clause(query),
-            self.program.namespace
-        ));
+        let clause = entity_query_clause(query);
+        let block = if query.limit == Some(1) {
+            self.compile_small_block(body, owner)
+        } else {
+            // A function boundary evaluates the whole body for one entity
+            // before preparing any nested execute chain for the next entity.
+            let helper = self.compile_helper(body, owner);
+            format!("function {}:{helper}", self.program.namespace)
+        };
+        commands.push(format!("execute {clause} run {block}"));
     }
 
     pub(super) fn compile_in_dimension(
@@ -35,11 +39,8 @@ impl Compiler<'_> {
         owner: &str,
         commands: &mut Vec<String>,
     ) {
-        let helper = self.compile_helper(body, owner);
-        commands.push(format!(
-            "execute in {dimension} run function {}:{helper}",
-            self.program.namespace
-        ));
+        let block = self.compile_small_block(body, owner);
+        commands.push(format!("execute in {dimension} run {block}"));
     }
 
     /// `sound.self`/`sound.play`：按原版顺序补齐可选参数。
@@ -51,14 +52,13 @@ impl Compiler<'_> {
         owner: &str,
         commands: &mut Vec<String>,
     ) {
-        let helper = self.compile_helper(body, owner);
+        let block = self.compile_small_block(body, owner);
         let positioned = match position {
             Some(position) => format!(" positioned {}", world::position_value_text(position)),
             None => String::new(),
         };
         commands.push(format!(
-            "execute{positioned} summon {entity_type} run function {}:{helper}",
-            self.program.namespace
+            "execute{positioned} summon {entity_type} run {block}"
         ));
     }
 
@@ -96,7 +96,9 @@ impl Compiler<'_> {
             ReturnKind::Run(command) => commands.push(format!("return run {command}")),
             ReturnKind::Command(command) => {
                 let mut nested = Vec::new();
+                let previous = std::mem::replace(&mut self.preserve_command_result, true);
                 self.compile_statement(command, owner, &mut nested);
+                self.preserve_command_result = previous;
                 if nested.len() == 1 {
                     commands.push(format!("return run {}", nested.pop().unwrap()));
                 } else {
@@ -139,6 +141,14 @@ impl Compiler<'_> {
             }
             None => {}
         }
+        if else_body.is_empty()
+            && !then_body.is_empty()
+            && let Some(clause) = self.direct_condition_clause(condition, false, owner)
+        {
+            let block = self.compile_small_block(then_body, owner);
+            commands.push(format!("execute {clause} run {block}"));
+            return;
+        }
         let flag = self.compile_condition(condition, owner, commands);
         self.compile_conditional_branch(&flag, true, then_body, owner, commands);
         self.compile_conditional_branch(&flag, false, else_body, owner, commands);
@@ -158,18 +168,7 @@ impl Compiler<'_> {
             return;
         }
 
-        let branch = self.compile_block(body, owner);
-        let can_inline = branch.len() == 1
-            && !body
-                .iter()
-                .any(|statement| matches!(statement.kind, StatementKind::Return(_)));
-        let command = if can_inline {
-            branch.into_iter().next().expect("single-command branch")
-        } else {
-            let helper = self.next_helper_path(owner);
-            self.functions.insert(helper.clone(), branch);
-            format!("function {}:{helper}", self.program.namespace)
-        };
+        let command = self.compile_small_block(body, owner);
         commands.push(format!(
             "execute if score {flag} {} matches {} run {command}",
             self.objective,
@@ -192,38 +191,79 @@ impl Compiler<'_> {
             return;
         }
 
-        let state = self.push_loop();
-        let body_helper = self.compile_helper(body, owner);
+        let state = self.push_loop(body.iter().any(contains_current_loop_jump));
+        if state.is_none()
+            && constant.is_none()
+            && let Some(clause) = self.direct_condition_clause(condition, false, owner)
+        {
+            let mut body_commands = self.compile_block(body, owner);
+            self.pop_loop();
+            // A native `return` in a raw command must exit the body helper,
+            // not the recursive while continuation.
+            if body
+                .iter()
+                .any(|statement| matches!(statement.kind, StatementKind::Run(_)))
+                || body_commands.iter().any(|command| {
+                    command.starts_with("return ") || command.contains(" run return ")
+                })
+            {
+                let body_helper = self.next_helper_path(owner);
+                self.functions.insert(body_helper.clone(), body_commands);
+                body_commands = vec![format!("function {}:{body_helper}", self.program.namespace)];
+            }
+            let loop_helper = self.next_helper_path(owner);
+            let continuation = self.next_helper_path(owner);
+            body_commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+            self.functions.insert(continuation.clone(), body_commands);
+            self.functions.insert(
+                loop_helper.clone(),
+                vec![format!(
+                    "execute {clause} run function {}:{continuation}",
+                    self.program.namespace
+                )],
+            );
+            commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+            return;
+        }
+        let body_command = self.compile_small_block(body, owner);
         self.pop_loop();
 
         let loop_helper = self.next_helper_path(owner);
         let mut loop_commands = Vec::new();
         if constant == Some(true) {
-            loop_commands.push(format!(
-                "execute if score {state} {} matches 0 run function {}:{body_helper}",
-                self.objective, self.program.namespace
-            ));
-            loop_commands.push(self.break_check(&state));
-            loop_commands.push(self.continue_reset(&state));
+            if let Some(state) = &state {
+                loop_commands.push(format!(
+                    "execute if score {state} {} matches 0 run {body_command}",
+                    self.objective
+                ));
+                loop_commands.push(self.break_check(state));
+                loop_commands.push(self.continue_reset(state));
+            } else {
+                loop_commands.push(body_command.clone());
+            }
             loop_commands.push(format!("function {}:{loop_helper}", self.program.namespace));
         } else {
             let flag = self.compile_condition(condition, owner, &mut loop_commands);
             loop_commands.push(format!(
-                "execute if score {flag} {} matches 1 run function {}:{body_helper}",
-                self.objective, self.program.namespace
+                "execute if score {flag} {} matches 1 run {body_command}",
+                self.objective
             ));
-            loop_commands.push(self.break_check(&state));
-            loop_commands.push(self.continue_reset(&state));
+            if let Some(state) = &state {
+                loop_commands.push(self.break_check(state));
+                loop_commands.push(self.continue_reset(state));
+            }
             loop_commands.push(format!(
                 "execute if score {flag} {} matches 1 run function {}:{loop_helper}",
                 self.objective, self.program.namespace
             ));
         }
         self.functions.insert(loop_helper.clone(), loop_commands);
-        commands.push(format!(
-            "scoreboard players set {state} {} 0",
-            self.objective
-        ));
+        if let Some(state) = state {
+            commands.push(format!(
+                "scoreboard players set {state} {} 0",
+                self.objective
+            ));
+        }
         commands.push(format!("function {}:{loop_helper}", self.program.namespace));
     }
 
@@ -248,69 +288,56 @@ impl Compiler<'_> {
             return;
         }
 
-        let state = self.push_loop();
+        let state = self.push_loop(body.iter().any(contains_current_loop_jump));
         let variable_holder = self.variable_holder(owner, variable);
-        let body_helper = self.compile_helper(body, owner);
+        let body_command = self.compile_small_block(body, owner);
         self.pop_loop();
+
+        // The start is stored before evaluating the end: both boundaries may
+        // call functions, and the dynamic end must still be frozen once.
+        self.compile_expr_into(start, &variable_holder, owner, commands);
 
         let limit = match end_value {
             Some(end_value) => LoopLimit::Constant(end_value),
             None => {
                 let holder = self.next_loop_holder("limit");
-                let mut limit_commands = Vec::new();
-                let value = self.compile_expr(end, owner, &mut limit_commands);
-                self.store_value(&holder, value, &mut limit_commands);
-                for command in limit_commands {
-                    commands.push(command);
-                }
+                self.compile_expr_into(end, &holder, owner, commands);
                 LoopLimit::Holder(holder)
             }
         };
-
-        commands.push(format!(
-            "scoreboard players set {state} {} 0",
-            self.objective
-        ));
-        match start_value {
-            Some(start_value) => commands.push(format!(
-                "scoreboard players set {variable_holder} {} {start_value}",
+        if let Some(state) = &state {
+            commands.push(format!(
+                "scoreboard players set {state} {} 0",
                 self.objective
-            )),
-            None => {
-                let mut start_commands = Vec::new();
-                let value = self.compile_expr(start, owner, &mut start_commands);
-                self.store_value(&variable_holder, value, &mut start_commands);
-                for command in start_commands {
-                    commands.push(command);
-                }
-            }
+            ));
         }
 
         let loop_helper = self.next_helper_path(owner);
         let in_range = self.range_check(&variable_holder, &limit);
-        let loop_commands = vec![
-            format!(
-                "execute if score {state} {} matches 0 {in_range} run function {}:{body_helper}",
-                self.objective, self.program.namespace
-            ),
-            self.break_check(&state),
-            self.continue_reset(&state),
-            format!(
-                "scoreboard players add {variable_holder} {} 1",
-                self.objective
-            ),
-            format!(
-                "execute {in_range} run function {}:{loop_helper}",
-                self.program.namespace
-            ),
-        ];
+        let mut loop_commands = Vec::new();
+        let guard = state.as_ref().map_or_else(String::new, |state| {
+            format!("if score {state} {} matches 0 ", self.objective)
+        });
+        loop_commands.push(format!("execute {guard}{in_range} run {body_command}"));
+        if let Some(state) = &state {
+            loop_commands.push(self.break_check(state));
+            loop_commands.push(self.continue_reset(state));
+        }
+        loop_commands.push(format!(
+            "scoreboard players add {variable_holder} {} 1",
+            self.objective
+        ));
+        loop_commands.push(format!(
+            "execute {in_range} run function {}:{loop_helper}",
+            self.program.namespace
+        ));
         self.functions.insert(loop_helper.clone(), loop_commands);
         commands.push(format!("function {}:{loop_helper}", self.program.namespace));
     }
 
     /// 循环状态计分项：0 = 正常，1 = continue，2 = break。
-    pub(super) fn push_loop(&mut self) -> String {
-        let state = self.next_loop_holder("state");
+    pub(super) fn push_loop(&mut self, has_jump: bool) -> Option<String> {
+        let state = has_jump.then(|| self.next_loop_holder("state"));
         self.loops.push(crate::compiler::codegen::LoopContext {
             state: state.clone(),
         });
@@ -334,6 +361,7 @@ impl Compiler<'_> {
             .expect("语义检查保证 break/continue 只出现在循环体内")
             .state
             .clone()
+            .expect("含 break/continue 的循环必须分配状态")
     }
 
     pub(super) fn break_check(&self, state: &str) -> String {
