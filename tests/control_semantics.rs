@@ -248,6 +248,16 @@ fn control_flow_effects_and_small_command_shapes() {
         );
     }
 
+    let unconditional = function(&output, "forked_execute_unconditional");
+    assert!(
+        unconditional
+            .contains("execute as @e[type=minecraft:zombie] run scoreboard players add #v_counter")
+    );
+    assert!(
+        !unconditional.contains("function control_semantics:__mcl/"),
+        "无条件多来源 execute 的单命令块不需要辅助函数：{unconditional}"
+    );
+
     let assignments = owner_commands(&output, "stored_assignments");
     let stores = assignments
         .lines()

@@ -988,12 +988,12 @@ fn load() {
 }
 ```
 
-条件与 `store.result` 的实际产物（辅助函数里先算标志，再进入带 store 的块体）：
+条件与投掷者 `store.result` 的实际产物：带条件的块直接串入原版 execute；投掷者目标仍在辅助函数里先捕获，再复制回原执行来源。
 
-:::generated example=execute_structured file=data/execute_demo/function/__mcl/load/1.mcfunction title="data/execute_demo/function/__mcl/load/1.mcfunction"
+:::generated example=execute_structured file=data/execute_demo/function/__mcl/load/0.mcfunction title="data/execute_demo/function/__mcl/load/0.mcfunction"
 :::
 
-:::generated example=execute_structured file=data/execute_demo/function/__mcl/load/2.mcfunction title="data/execute_demo/function/__mcl/load/2.mcfunction"
+:::generated example=execute_structured file=data/execute_demo/function/__mcl/load/1.mcfunction title="data/execute_demo/function/__mcl/load/1.mcfunction"
 :::
 
 :::note 字符串子句仍是逃生口

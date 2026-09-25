@@ -198,6 +198,13 @@ fn forked_execute() {
     }
 }
 
+fn forked_execute_unconditional() {
+    counter = 0;
+    execute as(all_zombies) {
+        counter += 1;
+    }
+}
+
 fn forked_at() {
     counter = 0;
     execute at(all_zombies) if counter == 0 {

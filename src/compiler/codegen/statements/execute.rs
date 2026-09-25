@@ -81,9 +81,10 @@ impl Compiler<'_> {
             }
         }
 
+        let needs_per_source_condition_boundary = may_fork && !conditions.is_empty();
         let body_command = self.compile_execute_body(body, owner, plan);
         let mut continuation = self.compile_execute_conditions(conditions, body_command, owner);
-        if may_fork {
+        if needs_per_source_condition_boundary {
             // Native execute prepares conditions for every fork before running
             // any body. Evaluate conditions and the body per source instead.
             let helper = self.next_helper_path(owner);
