@@ -89,31 +89,28 @@ fn control_flow_effects_and_small_command_shapes() {
     ));
     assert!(
         chain.lines().any(|line| {
-            line.contains("matches 1 if function control_semantics:side_effect run")
-                && line.starts_with("execute if score ")
+            line.contains("if function control_semantics:side_effect run")
+                && line.starts_with("execute if function control_semantics:__mcl/")
         }),
         "后一个动态条件必须受前一个条件保护：{chain}"
     );
     let dynamic_root = function(&output, "condition_chain_dynamic");
-    let entry_name = dynamic_root
-        .lines()
-        .find_map(|line| line.strip_prefix("function control_semantics:"))
-        .unwrap();
-    let entry = function(&output, entry_name);
+    let condition_helpers = dynamic_root
+        .split("if function control_semantics:")
+        .skip(1)
+        .map(|part| part.split_whitespace().next().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        condition_helpers.len(),
+        2,
+        "动态条件必须参与原版条件链：{dynamic_root}"
+    );
+    let entry = function(&output, condition_helpers[0]);
     assert!(entry.contains("function control_semantics:false_condition"));
     assert!(!entry.contains("function control_semantics:side_effect"));
-    let guarded_call = entry
-        .lines()
-        .find(|line| {
-            line.contains("matches 1 run function control_semantics:__mcl/condition_chain_dynamic/")
-        })
-        .unwrap();
-    let continuation_name = guarded_call
-        .split("run function control_semantics:")
-        .nth(1)
-        .unwrap();
+    assert!(entry.contains("return run scoreboard players get"));
     assert!(
-        function(&output, continuation_name).contains("function control_semantics:side_effect")
+        function(&output, condition_helpers[1]).contains("function control_semantics:side_effect")
     );
 
     let one_branch = function(&output, "simple_if");
@@ -142,7 +139,12 @@ fn control_flow_effects_and_small_command_shapes() {
     assert!(!simple_while.contains("#t"));
     assert!(!simple_while.contains("#loop_state_"));
     let simple_for = owner_commands(&output, "simple_for");
-    assert!(simple_for.contains("matches ..2 run scoreboard players add #v_counter"));
+    assert!(
+        simple_for
+            .lines()
+            .any(|line| line.starts_with("scoreboard players add #v_counter"))
+    );
+    assert!(!simple_for.contains("matches ..2 run scoreboard players add"));
     assert!(!simple_for.contains("#loop_state_"));
     assert_eq!(
         fs::read_dir(output.join("data/control_semantics/function/__mcl/simple_for"))
@@ -222,12 +224,7 @@ fn control_flow_effects_and_small_command_shapes() {
     assert!(returned.contains("return run function control_semantics:__mcl/return_execute/"));
     assert!(owner_commands(&output, "return_execute").contains("say result boundary"));
 
-    for owner in [
-        "forked_each",
-        "forked_execute",
-        "forked_at",
-        "forked_passengers",
-    ] {
+    for owner in ["forked_each", "forked_nested_if"] {
         let root = function(&output, owner);
         let entry = root
             .lines()
@@ -247,6 +244,73 @@ fn control_flow_effects_and_small_command_shapes() {
             "每个实体必须独立求值并执行：{body}"
         );
     }
+
+    for owner in ["forked_execute", "forked_at", "forked_passengers"] {
+        let root = function(&output, owner);
+        assert!(
+            root.lines().any(|line| line.starts_with("execute ")
+                && line.contains("if score #v_counter ")
+                && line.contains("matches 0 run scoreboard players add #v_counter")),
+            "execute 条件必须先筛选全部来源，再执行块体：{root}"
+        );
+    }
+    let forked_dynamic = function(&output, "forked_dynamic_chain");
+    assert!(
+        forked_dynamic
+            .contains("execute as @e[type=minecraft:zombie] if function control_semantics:__mcl/")
+    );
+    assert!(
+        forked_dynamic
+            .contains("if function control_semantics:side_effect run scoreboard players add")
+    );
+
+    let extreme = function(&output, "empty_extreme_ranges");
+    assert!(!owner_commands(&output, "empty_extreme_ranges").contains("-2147483649"));
+    assert_eq!(
+        extreme
+            .lines()
+            .filter(
+                |line| line.contains("run function control_semantics:__mcl/empty_extreme_ranges/")
+            )
+            .count(),
+        2
+    );
+    assert!(
+        !extreme.lines().any(|line| line.starts_with("function ")),
+        "空动态区间必须在首次进入循环前检查：{extreme}"
+    );
+    let signed = function(&output, "signed_constant_conditions");
+    assert_eq!(
+        signed
+            .lines()
+            .filter(|line| line.starts_with("scoreboard "))
+            .count(),
+        5,
+        "常量运算应与原版 floorDiv/floorMod 一致：{signed}"
+    );
+    assert!(!signed.contains("execute "));
+    let macro_root = function(&output, "macro_condition");
+    let snapshot = "$data modify storage control_semantics:__mcl/macro_conditions/macro_condition arguments set value";
+    assert!(
+        macro_root.contains(snapshot),
+        "宏条件需要保留调用参数：{macro_root}"
+    );
+    let wrapper = macro_root
+        .split("if function control_semantics:")
+        .nth(1)
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap();
+    let wrapper_text = function(&output, wrapper);
+    assert!(wrapper_text.contains("return run function control_semantics:__mcl/macro_condition/"));
+    assert!(wrapper_text.contains(
+        "with storage control_semantics:__mcl/macro_conditions/macro_condition arguments"
+    ));
+    assert!(
+        !wrapper_text.contains("$("),
+        "原版 function 条件只能调用普通函数"
+    );
 
     let unconditional = function(&output, "forked_execute_unconditional");
     assert!(

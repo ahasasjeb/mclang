@@ -43,6 +43,52 @@ impl Compiler<'_> {
         }
     }
 
+    /// `execute if function` cannot supply macro arguments. A plain wrapper
+    /// forwards the current arguments from reserved storage and returns the
+    /// condition's result. Synchronous recursion is rejected, so this owner's
+    /// arguments cannot be replaced by another invocation while it is running.
+    pub(super) fn prepare_macro_condition(
+        &mut self,
+        helper: &str,
+        owner: &str,
+        commands: &mut Vec<String>,
+    ) -> String {
+        let signature = self
+            .program
+            .functions
+            .iter()
+            .find(|function| function.name == owner)
+            .and_then(|function| function.macro_signature.as_ref());
+        let Some(signature) = signature else {
+            return helper.to_owned();
+        };
+        let helper_prefix = format!("function {}:__mcl/{owner}/", self.program.namespace);
+        if !self.functions[helper]
+            .iter()
+            .any(|command| command.contains("$(") || command.contains(&helper_prefix))
+        {
+            return helper.to_owned();
+        }
+        let storage = format!("{}:__mcl/macro_conditions/{owner}", self.program.namespace);
+        let prepare = format!(
+            "data modify storage {storage} arguments set value {{{}}}",
+            forwarded_arguments(signature)
+        );
+        // Several conditions in the same chain share one argument snapshot.
+        if commands.last() != Some(&prepare) {
+            commands.push(prepare);
+        }
+        let wrapper = self.next_helper_path(owner);
+        self.functions.insert(
+            wrapper.clone(),
+            vec![format!(
+                "return run function {}:{helper} with storage {storage} arguments",
+                self.program.namespace
+            )],
+        );
+        wrapper
+    }
+
     /// Native macro arguments must also reach compiler-generated helper functions.
     pub(super) fn finish_macros(&mut self) {
         for function in &self.program.functions {
@@ -56,20 +102,7 @@ impl Compiler<'_> {
                 .filter(|path| path.starts_with(&prefix))
                 .cloned()
                 .collect::<Vec<_>>();
-            let arguments = signature
-                .parameters
-                .iter()
-                .map(|p| {
-                    let placeholder = format!("$({})", p.name);
-                    let value = if matches!(p.kind, MacroType::Text | MacroType::Resource) {
-                        format!("\"{placeholder}\"")
-                    } else {
-                        placeholder
-                    };
-                    format!("\"{}\":{value}", p.name)
-                })
-                .collect::<Vec<_>>()
-                .join(",");
+            let arguments = forwarded_arguments(signature);
             for (path, commands) in &mut self.functions {
                 if path != &function.name && !path.starts_with(&prefix) {
                     continue;
@@ -89,4 +122,21 @@ impl Compiler<'_> {
             }
         }
     }
+}
+
+fn forwarded_arguments(signature: &MacroSignature) -> String {
+    signature
+        .parameters
+        .iter()
+        .map(|parameter| {
+            let placeholder = format!("$({})", parameter.name);
+            let value = if matches!(parameter.kind, MacroType::Text | MacroType::Resource) {
+                format!("\"{placeholder}\"")
+            } else {
+                placeholder
+            };
+            format!("\"{}\":{value}", parameter.name)
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }

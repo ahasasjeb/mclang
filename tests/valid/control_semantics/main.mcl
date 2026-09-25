@@ -205,6 +205,48 @@ fn forked_execute_unconditional() {
     }
 }
 
+fn forked_nested_if() {
+    counter = 0;
+    execute as(all_zombies) {
+        if counter == 0 {
+            counter += 1;
+        }
+    }
+}
+
+fn forked_dynamic_chain() {
+    execute as(all_zombies) if side_effect() == 1 if function(side_effect) {
+        counter += 10;
+    }
+}
+
+fn empty_extreme_ranges(start, end) {
+    for index in start..end {
+        counter += 1;
+    }
+    for index in start..-2147483648 {
+        counter += 10;
+    }
+}
+
+fn signed_constant_conditions() {
+    if -3 / 2 == -2 { counter += 1; }
+    if 3 / -2 == -2 { counter += 2; }
+    if -3 % 2 == 1 { counter += 4; }
+    if 3 % -2 == -1 { counter += 8; }
+    if -2147483648 % -1 == 0 { counter += 16; }
+}
+
+macro fn macro_condition(text path) {
+    execute as(all_zombies) if data.get(storage, "control_semantics:state", "$(path)") == 1 {
+        counter += 1;
+    }
+}
+
+fn invoke_macro_condition() {
+    call macro_condition(nbt { path = "value"; });
+}
+
 fn forked_at() {
     counter = 0;
     execute at(all_zombies) if counter == 0 {

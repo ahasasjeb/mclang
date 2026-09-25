@@ -315,10 +315,9 @@ impl Compiler<'_> {
         let loop_helper = self.next_helper_path(owner);
         let in_range = self.range_check(&variable_holder, &limit);
         let mut loop_commands = Vec::new();
-        let guard = state.as_ref().map_or_else(String::new, |state| {
-            format!("if score {state} {} matches 0 ", self.objective)
-        });
-        loop_commands.push(format!("execute {guard}{in_range} run {body_command}"));
+        // Entry and continuation both check the range; continue is reset before
+        // re-entry and break returns. The body needs no repeated guards.
+        loop_commands.push(body_command);
         if let Some(state) = &state {
             loop_commands.push(self.break_check(state));
             loop_commands.push(self.continue_reset(state));
@@ -332,7 +331,12 @@ impl Compiler<'_> {
             self.program.namespace
         ));
         self.functions.insert(loop_helper.clone(), loop_commands);
-        commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+        // Do not enter an empty dynamic range: the unconditional increment in
+        // the loop would otherwise wrap MAX to MIN and start iterating.
+        commands.push(format!(
+            "execute {in_range} run function {}:{loop_helper}",
+            self.program.namespace
+        ));
     }
 
     /// 循环状态计分项：0 = 正常，1 = continue，2 = break。
@@ -381,6 +385,10 @@ impl Compiler<'_> {
     /// `execute if score <循环变量> <目标> matches ..<上限-1>` 或 `... < <上限>`。
     pub(super) fn range_check(&self, variable: &str, limit: &LoopLimit) -> String {
         match limit {
+            LoopLimit::Constant(end) if *end == i32::MIN => format!(
+                "if score {variable} {} < {variable} {}",
+                self.objective, self.objective
+            ),
             LoopLimit::Constant(end) => format!(
                 "if score {variable} {} matches ..{}",
                 self.objective,

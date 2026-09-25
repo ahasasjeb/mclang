@@ -81,23 +81,24 @@ impl Compiler<'_> {
             }
         }
 
-        let needs_per_source_condition_boundary = may_fork && !conditions.is_empty();
-        let body_command = self.compile_execute_body(body, owner, plan);
-        let mut continuation = self.compile_execute_conditions(conditions, body_command, owner);
-        if needs_per_source_condition_boundary {
-            // Native execute prepares conditions for every fork before running
-            // any body. Evaluate conditions and the body per source instead.
+        let mut body_command = self.compile_execute_body(body, owner, plan);
+        if may_fork && body_command.starts_with("execute ") {
+            // Nested execute modifiers belong to the body. Without a function
+            // boundary Minecraft prepares them for all sources before running
+            // any body's command, changing observations of earlier bodies.
             let helper = self.next_helper_path(owner);
-            self.functions.insert(helper.clone(), vec![continuation]);
-            continuation = format!("function {}:{helper}", self.program.namespace);
+            self.functions.insert(helper.clone(), vec![body_command]);
+            body_command = format!("function {}:{helper}", self.program.namespace);
         }
+        let continuation =
+            self.compile_execute_conditions(conditions, body_command, owner, commands);
         if modifiers.is_empty() {
             commands.push(continuation);
         } else {
-            commands.push(format!(
-                "execute {} run {continuation}",
-                modifiers.join(" ")
-            ));
+            let suffix = continuation
+                .strip_prefix("execute ")
+                .map_or_else(|| format!("run {continuation}"), str::to_owned);
+            commands.push(format!("execute {} {suffix}", modifiers.join(" ")));
         }
     }
 
@@ -148,13 +149,14 @@ impl Compiler<'_> {
         conditions: Vec<(&Condition, bool)>,
         body_command: String,
         owner: &str,
+        commands: &mut Vec<String>,
     ) -> String {
-        // Build the chain from the end. A dynamic condition gets its own
-        // continuation helper; that helper is entered only after all earlier
-        // clauses have passed for the current Minecraft command source.
-        let mut next = body_command;
+        // Native execute filters all current sources at each condition before
+        // moving to the next clause or running any body. Dynamic expressions
+        // must participate as native function conditions, not per-source body
+        // continuations, to preserve this order even across multiple forks.
         let mut direct = Vec::new();
-        for (condition, negated) in conditions.into_iter().rev() {
+        for (condition, negated) in conditions {
             if let Some(value) = constant_condition(condition)
                 && value != negated
             {
@@ -165,28 +167,28 @@ impl Compiler<'_> {
                 continue;
             }
             let mut entry_commands = Vec::new();
-            let flag = self.compile_condition(condition, owner, &mut entry_commands);
-            let test = if negated { "unless" } else { "if" };
-            direct.reverse();
-            let suffix = if direct.is_empty() {
-                String::new()
+            if let Some(value) = constant_condition(condition) {
+                entry_commands.push(format!("return {}", u8::from(value)));
             } else {
-                format!(" {}", direct.join(" "))
-            };
-            direct.clear();
-            entry_commands.push(format!(
-                "execute {test} score {flag} {} matches 1{suffix} run {next}",
-                self.objective
-            ));
+                let flag = self.compile_condition(condition, owner, &mut entry_commands);
+                entry_commands.push(format!(
+                    "return run scoreboard players get {flag} {}",
+                    self.objective
+                ));
+            }
             let helper = self.next_helper_path(owner);
             self.functions.insert(helper.clone(), entry_commands);
-            next = format!("function {}:{helper}", self.program.namespace);
+            let helper = self.prepare_macro_condition(&helper, owner, commands);
+            let test = if negated { "unless" } else { "if" };
+            direct.push(format!(
+                "{test} function {}:{helper}",
+                self.program.namespace
+            ));
         }
-        direct.reverse();
         if direct.is_empty() {
-            next
+            body_command
         } else {
-            format!("execute {} run {next}", direct.join(" "))
+            format!("execute {} run {body_command}", direct.join(" "))
         }
     }
 

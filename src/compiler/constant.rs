@@ -15,13 +15,7 @@ pub(super) fn constant_value(expression: &Expr) -> Option<i32> {
         } => {
             let left = constant_value(left)?;
             let right = constant_value(right)?;
-            match operation {
-                BinaryOp::Add => left.checked_add(right),
-                BinaryOp::Subtract => left.checked_sub(right),
-                BinaryOp::Multiply => left.checked_mul(right),
-                BinaryOp::Divide => left.checked_div(right),
-                BinaryOp::Modulo => left.checked_rem(right),
-            }
+            constant_binary(left, *operation, right)
         }
         ExprKind::CoreCommand(_)
         | ExprKind::EntityCommand(_)
@@ -39,5 +33,30 @@ pub(super) fn constant_value(expression: &Expr) -> Option<i32> {
         | ExprKind::Random { .. }
         | ExprKind::DataGet { .. }
         | ExprKind::Compute { .. } => None,
+    }
+}
+
+/// Match scoreboard's floorDiv/floorMod, including a negative divisor, while
+/// keeping the language's diagnostics for statically known overflow.
+pub(super) fn constant_binary(left: i32, operation: BinaryOp, right: i32) -> Option<i32> {
+    match operation {
+        BinaryOp::Add => left.checked_add(right),
+        BinaryOp::Subtract => left.checked_sub(right),
+        BinaryOp::Multiply => left.checked_mul(right),
+        BinaryOp::Divide | BinaryOp::Modulo => {
+            let left = i64::from(left);
+            let right = i64::from(right);
+            let mut quotient = left.checked_div(right)?;
+            let remainder = left % right;
+            if remainder != 0 && (remainder < 0) != (right < 0) {
+                quotient -= 1;
+            }
+            let result = if operation == BinaryOp::Divide {
+                quotient
+            } else {
+                left - quotient * right
+            };
+            i32::try_from(result).ok()
+        }
     }
 }
