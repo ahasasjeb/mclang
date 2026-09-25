@@ -1,0 +1,1951 @@
+MCLANG 26.3 LLM REFERENCE - ENGLISH KEYWORDS
+===============================================================================
+Plain-text reference for LLMs that write Mclang (.mcl) source for the Mclang
+compiler in this repository. Target: Minecraft Java Edition 26.3, datapack
+pack format 121.0.
+
+HOW TO USE
+- Sections 1-11 are normative rules. Section 14 holds copy-ready complete
+  programs. Every example was compiled with the shipped compiler via
+  `mclang check --deny-raw` (examples 12_macros and 13_raw are marked RAW:
+  they compile normally but --deny-raw rejects them by design).
+- A paired Chinese-keyword edition exists as mclang_llm_zh.txt. The two
+  editions were translated with the repository tooling and compile to
+  byte-identical datapacks, file for file.
+- When this file is silent about a case, prefer the structured syntax over the
+  raw escape hatches (`run "..."`, string-form `execute`). The compiler
+  validates far more of the structured form.
+
+SECTION INDEX
+  1  COMPILER INTERFACE
+  2  LEXICAL GRAMMAR
+  3  PROJECTS AND MODULES
+  4  TOP-LEVEL DECLARATIONS
+  5  STATEMENTS
+  6  EXPRESSIONS AND CONDITIONS
+  7  EXECUTION CONTEXT
+  8  STANDARD LIBRARY
+  9  GENERATED DATAPACK (ABI)
+  10 REGISTRIES AND VALUE DOMAINS
+  11 HARD RULES AND PITFALLS
+  12 KEYWORD TABLE EN <-> ZH
+  13 METHOD AND ENUM ALIAS TABLE
+  14 VERIFIED EXAMPLES (01-14)
+
+===============================================================================
+1 COMPILER INTERFACE
+===============================================================================
+Commands:
+  mclang build <file.mcl|project-dir> [-o <output>] [--zip] [--description <text>] [--deny-raw]
+  mclang check <file.mcl|project-dir> [--deny-raw]
+  mclang lsp
+  mclang help | mclang version
+
+- `check` writes nothing and returns every independent diagnostic in one run;
+  `build` runs the same checks, then writes the datapack only if all pass.
+- Input is one .mcl file (single-module project) or a directory whose entry
+  module is main.mcl. Imports reach the remaining modules.
+- Default output is build/<name>; --zip writes build/<name>.zip. With --zip and
+  -o, the -o path is the zip file.
+- Directory projects may ship assets/pack.png, assets/pack.mcmeta,
+  assets/overlays/<dir>/... and assets/structure/<name>.nbt; they are validated
+  and copied into the pack.
+- --deny-raw (strict mode) recursively rejects: `run "..."`, string-form
+  `execute "..."`, string-form `return run "..."`, runtime macro calls
+  `call f with(...)`, and macro functions that declare `nbt` parameters.
+- Diagnostics are Chinese, carry source spans, and list actual vs expected
+  values. Any error makes the exit code non-zero.
+- Output is reproducible: same sources + flags produce identical bytes.
+
+===============================================================================
+2 LEXICAL GRAMMAR
+===============================================================================
+comments     // to end of line. There are no block comments.
+string       "..." with escapes \" \\ \n \r \t; must not span a line.
+raw string   """...""" may span lines, takes no escapes; used for JSON payloads.
+number       Decimal integers in i32 range; decimals like 1.5, 0.25.
+             NBT suffixes attach directly to digits:
+               b/B byte, s/S short, i/I int, L/l long, f/F float, d/D double
+             A suffix attached to digits is an NBT literal (`1s` = short); the time units`1 s`, `1 d` need the space.
+identifier   Unicode letters/digits/underscore, cannot start with a digit.
+             ASCII declaration names must be lowercase [a-z0-9_], at most 32
+             chars, must not be a keyword or true/false, and must not be a
+             Windows device name (con, nul, com1, lpt1, aux, prn, ...).
+             Non-ASCII names (Chinese etc.) are legal: after semantic checking
+             the compiler rewrites them to stable random 8-letter ASCII aliases,
+             unique per project and collision-free. Never predict the alias.
+keywords     Case sensitive. Each keyword has an English and a Chinese form and
+             both are reserved; the two forms may be mixed in one file.
+punctuation  ; , . .. :: = == != ! && || < <= > >= + - * / %
+             += -= *= /= %= -> @ # ~ ^ ( ) { } [ ]
+             A lone `:` is a lexical error; resource locations live in strings.
+literals     true / false (Chinese 真 / 假) in boolean positions.
+
+Statements end with `;`. A trailing `;` is optional after the `}` of query, item,
+fn_tag and advancement blocks and after a standalone `nbt { ... }` statement.
+An objective written with a block and a function body take no trailing `;`; an
+explicit `;` there is a syntax error.
+
+===============================================================================
+3 PROJECTS AND MODULES
+===============================================================================
+- For directory input the entry module is main.mcl and must declare
+  `namespace <name>;`. The namespace is one lowercase ASCII identifier shared
+  by the whole project. Non-entry modules may omit it or repeat the same value.
+- Module path = source path relative to the project root without extension:
+  lib/math.mcl and lib/math/mod.mcl are both module `lib/math`; the entry is "".
+- Top-level declarations are private by default. `export` exposes them to other
+  modules; the importing module must `import` them.
+    import lib::math;                        // whole module
+    import lib::strings::{banner, on_fire};  // selected names
+    import lib::strings::{banner as wel};    // alias
+- Import paths start at the project root. `import main;` imports the entry
+  module, so import cycles are allowed. Only modules reachable from main.mcl
+  are compiled.
+- Qualified output names: functions, JSON resources, advancements and fn_tags
+  join module segments with `/` (lib/math/sum ->
+  data/<ns>/function/lib/math/sum.mcfunction). Score variables, objectives,
+  queries, items, storages and data_slots join with `.` (lib.state.total).
+- `std::` is reserved for the built-in standard library; projects cannot
+  shadow it.
+- One .mcl file given directly is equivalent to a project whose only module is
+  the entry module: no main.mcl and no imports needed.
+
+===============================================================================
+4 TOP-LEVEL DECLARATIONS
+===============================================================================
+A module contains only declarations. Statements live inside `fn` bodies.
+Trailing `;` is optional after query/item/fn_tag/advancement blocks and after a
+standalone nbt statement; objective blocks and function bodies take none. Plain
+declarations (namespace/score/resource/storage/data_slot/...) require `;`.
+
+4.1 namespace
+    namespace <lowercase_ascii_name>;
+  Exactly one namespace per project, declared by the entry module.
+
+4.2 import / export
+    import a::b;                                 whole module
+    import a::b::{name, other as alias};         selected names
+    export fn ...; export score ...; ...         expose a declaration
+  Imported names can be used anywhere in the importing module; a local
+  declaration with the same name wins. Two whole-module imports that export the
+  same name is an error; use selected imports or `as`.
+
+4.3 score - global persistent score variable
+    score <name> = <i32>;
+  Stored on the fake player `#v_<name>` in the compiler objective. Survives
+  /reload; the generated __mcl/load only seeds values that are missing.
+
+4.4 objective - user scoreboard objective
+    objective <name>;
+    objective <name> {
+        criteria = "dummy";                    // or trigger, deathCount, health,
+                                               // minecraft.custom:minecraft.jump,
+                                               // minecraft.mined:minecraft.stone, ...
+        display_name = text("Label") { ... };  // component or string
+        render_type = "integer";               // integer | hearts
+        number_format = blank | fixed(<component>) | styled("<json style>");
+        display_slot = "sidebar";              // list|sidebar|below_name|sidebar.team.*
+    }
+  Runtime objective name is `<namespace>_<name>`. __mcl/load creates it and
+  applies display settings; /reload never clears existing scores. statistics
+  criteria are validated against the 26.3 registry.
+
+4.5 query - reusable entity selector (no command is emitted for it)
+    query <name> = entity("<entity type or #tag>") {
+        tag("<tag>");                            // repeatable
+        without_tag("<tag>");                    // repeatable
+        without_type("<id or #tag>");            // repeatable, only after entity("#tag")
+        limit(<positive int>);
+        within(<non-negative int>);              // selector distance=..N
+        sort(nearest|furthest|random|arbitrary);
+        name("<name>"); without_name("<name>");
+        scores("<objective>", "<range>");        // repeatable, merged into scores={...}
+        nbt(<SNBT compound>); without_nbt(...);
+        box(<x>, <y>, <z>, <dx>, <dy>, <dz>);
+        distance("<range>");                     // merges with within
+        level("<range>");                        // players only
+        gamemode("survival|creative|adventure|spectator");   // players only
+        team("<team>"); without_team("<team>");
+        rotate("<yaw range>", "<pitch range>");
+        predicate("<ns:id>");
+        advancements("{ns:path=true/false}");
+        item(<slot>) { id = "<id|#tag|predicate>"; count = <n>; custom_name = "<text>"; }
+    }
+  Rules: entity(...) already asserts the positive type, so type(...) is
+  contradictory and rejected. tag/without_tag/without_type/scores may repeat
+  (same value twice is rejected); every other property appears at most once.
+  Ranges accept `a..b`, `a..`, `..b`, single numbers; inverted or negative
+  distance/level bounds are errors. `limit(1)` is required wherever a single
+  entity is needed (data, xp.query, teleport-follow, store.data, data_slot
+  operations, item commands, ...). For `entity("#tag")`, further refinements
+  are only the exclusion properties that vanilla allows.
+
+4.6 item - reusable item stack with components
+    item <name> = item_stack("<item id>") {
+        count = <int, default 1>;
+        custom_name = "<text>";
+        item_name = "<text>";
+        lore("<text>");                          // repeatable
+        enchantment("<enchantment id>", <level>);        // repeatable
+        stored_enchantment("<enchantment id>", <level>); // repeatable
+        damage = <int>;
+        max_damage = <int>;
+        max_stack_size = <int>;
+        rarity = common | uncommon | rare | epic;
+        item_model = "<resource location>";
+        dyed_color = <RGB int>;
+        enchantment_glint_override = true | false;
+        unbreakable = true | false;
+        custom_data = nbt { ... };
+        components = nbt { "minecraft:<component>" = <SNBT>; "!minecraft:<component>" = {}; };
+    }
+  `components` patches arbitrary 26.3 data components; a key prefixed with `!`
+  removes that component. Component names are validated against the registry;
+  duplicate or conflicting settings are errors. `custom_data` writes the
+  minecraft:custom_data component. max_stack_size > 1 forbids max_damage.
+  give counts must be 1..max_stack_size*100 (default max_stack_size is 1).
+
+4.7 storage - item list location for self.save_items/restore_items
+    storage <name> = item_list("<storage resource location>", "<NBT path>");
+  __mcl/load initializes the path to an empty list if missing; /reload does not
+  wipe existing contents.
+
+4.8 data_slot - named NBT position for self.deposit/withdraw/remove_data
+    data_slot <name> = item_data("<path>");      // Item.components."minecraft:custom_data".<path>
+    data_slot <name> = entity_data("<path>");    // data.<path> on the entity
+  Paths are dotted keys with optional [index] and quoted keys, e.g.
+  pc_items, pc_note.name, records[0].payload. item_data slots may only be used
+  with minecraft:item queries; entity_data slots may not target players.
+
+4.9 resource - raw JSON resource
+    resource <kind> <name> = """<json>""";
+  kind is a resource directory from the 26.3 resource registry (see 10.9),
+  e.g. predicate, recipe, loot_table, damage_type, "tags/block",
+  "worldgen/feature". `recipe`, `predicate`, `dialog` also accept the Chinese
+  words. name is an identifier or a quoted string. The JSON is parsed at
+  compile time; predicate inline objects need a registered `type`; recipes and
+  loot_table pools are partially schema-checked. Output path:
+  data/<namespace>/<kind>/<name>.json.
+
+4.10 advancement - the only event entry point of a datapack
+    advancement <name> {
+        parent = <declared advancement> | "<external id>";        // optional
+        criterion <criterion name> {
+            trigger = <26.3 CriteriaTriggers name>;               // may omit minecraft:
+            conditions = """<trigger condition JSON>""";          // optional
+        }                                                          // 1+ required
+        requirements = all | any;                                  // default all
+        reward {
+            function = <declared fn> | "<external id>";
+            experience = <int>;                                     // default 0
+            loot = <declared loot_table> | "<external>";            // repeatable
+            recipe = <declared recipe> | "<external>";              // repeatable
+        }
+        display {
+            icon = <declared item>;                                 // required in display
+            title = "<text>"; description = "<text>";               // required in display
+            frame = task | goal | challenge;                        // default task
+            background = "<texture location>";   // REQUIRED for root, FORBIDDEN for children
+            show_toast = true; announce_to_chat = true; hidden = false;
+        }
+    }
+  An advancement fires once; to make an event repeatable call
+  `advancement.revoke(self, <advancement>)` inside its reward function.
+  requirements=all emits one single-name group per criterion (AND);
+  requirements=any emits one group with all names (OR).
+  conditions keeps the vanilla JSON; known trigger condition fields are checked
+  against the 26.3 snapshot. 26.3 inline loot conditions use `type` as the
+  discriminator, e.g. block match:
+    {"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}
+  and entity predicates are nested:
+    {"entity":{"type":"minecraft:entity_properties","entity":"this",
+               "predicate":{"minecraft:entity_type":"minecraft:zombie"}}}
+
+4.11 fn_tag - function tag
+    fn_tag <name> {
+        value(<declared function>);
+        value(#<declared tag>);
+        value("<external function id>");
+        value("#<external tag id>");
+        replace = true | false;                 // default false
+    }
+  Written to data/<namespace>/tags/function/<name>.json. Local references are
+  checked for existence and cycles. `call #tag()` expands all members and
+  checks their parameter/context requirements.
+
+4.12 fn - functions
+    [@load|@tick|@entity|@player|@non_player] fn <name>(<param>, ...) [-> score] { ... }
+    [@same attributes] macro fn <name>(<type> <macroparam>, ...) { ... }
+  Attributes (mutually exclusive groups):
+    @load   runs on load and /reload. No parameters, no return value.
+    @tick   runs every game tick. No parameters, no return value.
+    @entity         requires any entity context.
+    @non_player     requires a definite non-player entity context.
+    @player         requires a player context.
+    @load/@tick cannot combine with the entity attributes.
+  Ordinary parameters are stored in private fake players `#p_<hash>`; the
+  caller writes them before `function <ns>:<fn>`. Therefore a parameterized
+  function called directly by Minecraft (or by `schedule`) sees stale values;
+  such calls are rejected at compile time. Parameter names must not collide
+  with global score variables (they always exist).
+  A `-> score` function must end with an explicit `return`.
+  macro fn types: integer, decimal, text, resource, nbt. Text/NBT strings may
+  contain `$(name)` placeholders; coordinates may be `macro(name)`. Macro
+  parameters are not score variables and cannot mix with ordinary parameters.
+  Macro functions cannot be @load/@tick and cannot return a value.
+
+===============================================================================
+5 STATEMENTS
+===============================================================================
+Every statement ends with `;` unless it ends with a `}` block.
+
+5.1 ASSIGNMENT AND let
+    let <name> = <expr>;          // lexical local, block scoped
+    <name> = <expr>;              // score variable (global) or local
+    <name> += <expr>;  -=  *=  /=  %=
+  Locals may not shadow global score variables or parameters. Division or
+  modulo by a constant 0 is a compile error. Locals live in `#l_<hash>` slots.
+
+5.2 CONTROL FLOW
+    if <condition> { ... } else { ... }
+    while <condition> { ... }
+    for <name> in <start>..<end> { ... }
+    break;      continue;
+  - Conditions that are constant at compile time are folded: `if 1 == 1`
+    inlines the then-branch, `if 2 < 1` disappears, `while 0 == 1` emits nothing.
+  - `&&` and `||` short-circuit left to right; the left side is always
+    evaluated exactly as written.
+  - `for` is half-open [start, end); the end expression is evaluated once
+    (dynamic ends are stored in a temp slot). An empty constant range emits
+    nothing. break/continue only work inside the innermost for/while; they are
+    rejected in each/spawn.
+  - `return` may appear ONLY directly in the outermost function body. Blocks
+    (if/while/for/each/spawn/execute/in_dimension) lower to helper functions,
+    so a return inside them would only end the helper. Assign a local and
+    return at the end instead.
+
+5.3 ENTITY BLOCKS
+    each(<query>) { ... }
+      Executes the body once per matching entity with @s set; player queries
+      give player context, other queries give non-player entity context.
+    spawn("<entity type>"[, <pos|vec3>]) { ... }
+      Summons at the current position (or the given one); body runs with the
+      new entity, always non-player. minecraft:player and
+      minecraft:fishing_bobber cannot be summoned.
+    in_dimension("<dimension id>") { ... }
+      Runs the body in that dimension; execution entity is unchanged.
+
+5.4 STRUCTURED execute
+    execute [<modifiers>...] [if <condition> | unless <condition>]... [<stores>...] { ... }
+  Clause order is fixed: modifiers, then conditions, then stores. Repeated
+  modifiers or conditions/stores written before modifiers are errors.
+  Modifiers:
+    as(<query>)             run as each matched entity (changes @s)
+    at(<query>)             run at each matched entity (keeps @s)
+    positioned(<pos|vec3>)  set position, reset anchor to feet
+    rotated(rotation(yaw, pitch))
+    facing(pos(<x>,<y>,<z>)) | facing(entity(<query>), eyes|feet)
+    align(x|y|z subset, e.g. xz)   align execution position to blocks
+    anchored(eyes|feet)
+    in("<dimension>")
+    on(<relation>)          relation: owner|leasher|target|attacker|vehicle|
+                            controller|origin|passengers
+    summon("<entity type>") summon and continue as the new entity
+  Conditions reuse the whole condition language (section 6) and short-circuit
+  left to right. Stores capture the last command of the body:
+    store.result(<holder>, <objective>)       command result (int)
+    store.success(<holder>, <objective>)      1 on success, else 0
+    store.result(bossbar, "<id>", value|max)
+    store.success(bossbar, "<id>", value|max)
+    store.data([result|success,] <source>, "<path>", byte|short|int|long|float|double[, scale])
+      <source> is entity,<holder> | block,<pos> | storage,"<id>"
+  Store rules:
+  - The body's last statement MUST be a plain command/assignment/scoreboard
+    set or a call to a `-> score` function. Ending with if/while/each/spawn/
+    execute is rejected.
+  - If conditions do not hold, the body never runs and nothing is stored.
+  - `<holder>` accepts self, origin or a query (query selector may write many
+    entities). origin is captured to a temp and copied with `on origin`, so a
+    miss leaves the target unchanged.
+  - store.data entity sources require limit(1); self requires non-player.
+
+5.5 CALLS AND SCHEDULING
+    call <fn>(<args>...);     |  <fn>(<args>...);      // shorthand
+    call #<fn_tag>();         |  call "<external:fn>"();
+    let <name> = <fn>(<args>...);        // only for -> score functions
+    schedule <fn>() after <number> t|s|d [append|replace];
+    schedule #<fn_tag>() after <number> t|s|d [append|replace];
+    schedule.clear(<fn>);
+  Arguments are evaluated left to right into parameter slots, then
+  `function <ns>:<name>` runs. Argument count, parameter types and context
+  requirements are checked. Tags take no arguments, so every member of a
+  called tag must also be parameter-free. `schedule` runs in a future tick
+  with no entity context, so the target function must have no parameters and
+  no context attribute; default mode is replace. schedule.clear accepts a
+  function only (not a tag). Times round like vanilla: 20 t = 1 s, 24000 t = 1 d.
+
+5.6 give AND self ACTIONS
+    give(<player query>|self, <item>[, <count>]);
+    give(origin, <item>[, <count>]);
+    give(<player query>|origin|self, self.item);
+    self.add_tag("<tag>");
+    self.remove_tag("<tag>");
+    self.remove();
+    self.set_invulnerable(true|false);
+    self.set_no_gravity(true|false);
+    self.save_items(<storage>);
+    self.restore_items(<storage>);
+    self.remove_preserving_items(<storage>);
+    self.remove_preserving_items(<data_slot>, <limit(1) query>);
+    self.deposit(<data_slot>, <limit(1) query>);
+    self.withdraw(<data_slot>, <limit(1) query>);
+    self.remove_data(<data_slot>);
+    self.give_item(<item>[, <count>]);
+    self.clear_items();
+  Context requirements: add_tag/remove_tag/remove need entity; set_*,
+  save/restore/remove_preserving, clear_items, deposit/withdraw/remove_data
+  need a definite non-player entity (they write NBT); give_item needs player.
+  `give(x, self.item)` hands the current entity's item (slot 0) to the target
+  player and only clears the source slot when the copy succeeds.
+  deposit appends @s.Items into the queried entity's slot; withdraw loads and
+  deletes the source slot. remove_preserving_items(slot, q) appends first and
+  kills @s only when the container is empty, so items are never dropped.
+
+5.7 MESSAGES AND SOUND
+    message.all(<component>|"<text>"[, <color>]);
+    message.self(<component>|"<text>"[, <color>]);          // player context
+    message.nearest(<1..30000000>, <component>|"<text>"[, <color>]);
+    message.player(<player query>, <component>|"<text>"[, <color>]);
+    sound.self("<sound id>", <sound category>);              // player context
+    sound.play("<sound id>", <sound category>, <player query>
+               [, <pos|vec3>][, <volume>][, <pitch 0..2>][, <min volume 0..1>]);
+  Optional arguments fill vanilla order; category values: master, music,
+  record, weather, block, hostile, neutral, player, ambient, voice, ui.
+  A trailing color word after a plain string is classic shorthand; structured
+  components use the style block instead.
+
+5.8 TEXT COMPONENTS AND UI COMMANDS
+    text("<text>") { <style> }
+    translate("<key>"[, [<component>, ...]]) { <style> }
+    keybind("<key>") { <style> }
+    object(atlas, "<sprite>"); object(player, "<name>"[, <hat>]) { fallback = <component|string>; }
+    score(<holder>, <declared objective> | "<runtime objective>") { <style> }
+    selector("<selector>" | <query>) { <style> }
+    nbt(entity, <holder>, "<path>") { <style> }
+    nbt(block, <pos>, "<path>") { <style> }
+    nbt(storage, "<id>", "<path>") { <style> }
+  Style keys (each at most once): color (16 color names or "#rrggbb"),
+  bold, italic, underlined, strikethrough, obfuscated (true/false),
+  click = open_url("...")|run_command("/...")|suggest_command("/...")|
+          copy_to_clipboard("...")|change_page(1..2147483647)|
+          show_dialog("<dialog id>")|custom("<event id>"[, nbt {...}]),
+  hover = <component>|show_item("<item id>"[, count])|show_entity("<type>","<uuid>"[, name]),
+  fallback (object only), interpret/plain/separator (nbt component only).
+  Colors: black dark_blue dark_green dark_aqua dark_red dark_purple gold gray
+  dark_gray blue green aqua red light_purple yellow white (Chinese names too).
+
+    title.title(<player target>, <component|string>);
+    title.subtitle(...); title.actionbar(...);
+    title.times(<target>, <fade in>, <stay>, <fade out>);
+    title.clear(<target>); title.reset(<target>);
+    bossbar.add("<id>", <component|string>);
+    bossbar.remove("<id>"); bossbar.list();
+    bossbar.set.name("<id>", <component|string>);
+    bossbar.set.color("<id>", pink|blue|red|green|yellow|purple|white);
+    bossbar.set.style("<id>", progress|notched_6|notched_10|notched_12|notched_20);
+    bossbar.set.value("<id>", <non-negative int>);
+    bossbar.set.max("<id>", <positive int>);
+    bossbar.set.visible("<id>", true|false);
+    bossbar.set.players("<id>"[, <player target>]);        // no target = clear list
+    let <name> = bossbar.get("<id>", value|max|visible|players);
+    dialog.show(<player target>, <declared dialog> | "<external dialog id>");
+    dialog.clear(<player target>);
+    particle("<particle id>"[, nbt { <options> }][, <pos|vec3>
+             [, vec3(<dx>,<dy>,<dz>), <speed>, <count>
+             [, normal|force[, <player target>]]]]);
+    stopsound(<player target>[, <category>|*[, "<sound id>"]]);
+    posteffect.add(<player target>, "<post effect id>");
+    posteffect.clear(<player target>);
+    posteffect.list(<limit(1) player query>);
+    posteffect.remove(<player target>, "<post effect id>");
+    msg(<player target>, "<single line>");
+    teammsg("<single line>");                                  // entity context
+  A "player target" is a player query, `self` (player context) or `origin`
+  inside `execute on(origin)` blocks. Particle types are vanilla 26.3 ids;
+  options are checked against the particle codec. say(...) and me(...) are
+  native broadcasts with the MessageArgument rules (single line, <= 256 UTF-16
+  units, selectors without [...] only).
+
+5.9 EFFECT, XP, clear, STOPWATCH
+    effect.give(<query>, "<effect id>", <seconds 1..1000000>[, <amplifier 0..255>][, <hide particles>]);
+    effect.give_infinite(<query>, "<effect id>"[, <amplifier>][, <hide particles>]);
+    effect.clear(<query>[, "<effect id>"]);
+    xp.add(<player query>, points|levels, <int>);              // negative allowed
+    xp.set(<player query>, points|levels, <non-negative int>);
+    let <name> = xp.query(<limit(1) player query>, points|levels);
+    clear();
+    clear(<player query>);
+    clear(<player query>, "<item|#tag|predicate>");
+    clear(<player query>, <item predicate>, <max count>);
+    clear(self, ...);                                          // player context
+    stopwatch.create("<id>"); stopwatch.restart("<id>"); stopwatch.remove("<id>");
+    let <name> = stopwatch.query("<id>"[, <scale>]);
+  stopwatch data lives in world data; /reload keeps it, so guard create with a
+  score flag when it must run once. Queries that fail yield 0.
+
+5.10 SCOREBOARD
+    scoreboard.set(<holder>, <declared objective>, <expr>);
+    scoreboard.reset(<holder>, <declared objective>);
+    scoreboard.enable(<holder>, <declared objective>);         // criteria=trigger
+    scoreboard.operation(<dest holder>, <dest objective>, <op>, <src holder>, <src objective>);
+        op: set add subtract multiply divide modulo min max swap
+    let <name> = scoreboard.get(<limit(1) holder or self>, <declared objective>);
+    scoreboard.display("<slot>"[, <declared objective>]);      // no objective clears
+    scoreboard.objectives.list(); | .remove(<objective>);
+    scoreboard.objectives.modify.displayname(<objective>, <component|string>);
+    scoreboard.objectives.modify.displayautoupdate(<objective>, true|false);
+    scoreboard.objectives.modify.rendertype(<objective>, integer|hearts);
+    scoreboard.objectives.modify.numberformat(<objective>[, blank|fixed(<component>)|styled("<json>")]);
+    scoreboard.players.list([<holder>]);
+    scoreboard.players.add(<holder>, <objective>, <non-negative int>);
+    scoreboard.players.remove(<holder>, <objective>, <non-negative int>);
+    scoreboard.players.reset(<holder>);
+    scoreboard.players.display.name(<holder>, <objective>[, <component|string>]);
+    scoreboard.players.numberformat(<holder>, <objective>[, <format>]);
+  holder = self (entity context) | origin | declared query. A missing score
+  reads as 0, so `== 0` works as a never-assigned sentinel.
+
+5.11 TELEPORT
+    teleport(<self|origin|query>, pos(<x>,<y>,<z>)|vec3(<x>,<y>,<z>)[, rotation(<yaw>,<pitch>)]);
+    teleport(<self|origin|query>, <limit(1) query>);           // follow position, rotation, dimension
+    teleport(<target>, <position>, facing <holder>[, feet|eyes]);  // or facing <pos>
+  pos/block_pos take integer absolute components; vec3 allows decimals. ~ and ^
+  are supported (with ^ all three components together). following an entity
+  cannot be combined with rotation.
+
+5.12 NBT MERGE
+    nbt { <key> = <value>; ... }         // merges into @s (non-player context)
+  Generates `data merge entity @s {...}`. Top-level keys are checked against
+  the 26.3 entity tag snapshot (unknown keys get a nearest-candidate hint;
+  AddTag-style type checks for CustomName/Tags/Pos/Motion/Rotation/Health and
+  friends). Common entity keys have Chinese aliases (section 10.10);
+  everything inside custom_data / item components is user data and is not
+  translated.
+
+5.13 DATA AND ITEM COMMANDS
+    data.merge(entity, <holder>|block, <pos>|storage, "<id>", nbt {...});
+    data.remove(<target>, "<path>");
+    data.modify(<target>, "<path>", insert, <index>, <source>);
+    data.modify(<target>, "<path>", prepend|append|set|merge, <source>);
+    let <name> = data.get(<target>, "<path>"[, <scale>]);
+    source: from(<target>, "<path>") | value(<SNBT>)
+          | string(<target>, "<path>"[, <start>[, <end>]])
+          | compute(<default|block,<pos>|entity,<holder>>, float|integer, "<provider>"[, scale])
+    item.replace(<target>, "<slot>", with(<item>) | from(<src>, "<slot>"[, "<modifier>"]));
+    item.fill(<target>, "<slot>", with(<item>) | from(...));
+    item.override(<target>, "<slot>", with(<item>) | from(...));
+    item.modify(<target>, "<slot>", "<loot modifier id>");
+  `<target>` for data commands is entity,<holder> (non-player for writes),
+  block,<pos> or storage,"<id>"; for item commands it is entity,<limit(1)
+  query> or block,<pos>. Slot names are vanilla (contents, weapon.mainhand,
+  armor.*, container.0, hotbar.* ...) or a slot_source resource location.
+  data.get failures read 0. `with(item)` writes the full stack and its count
+  (1..99 here). NBT paths support members, quoted members, [n] indices, [] all,
+  [{...}] matching and {k:v} predicates.
+
+5.14 ADVANCEMENT ACTIONS
+    advancement.grant(<holder>, <advancement>[, <criterion>]);
+    advancement.grant_through(<holder>, <advancement>);
+    advancement.grant_from(<holder>, <advancement>);
+    advancement.grant_until(<holder>, <advancement>);
+    advancement.grant_everything(<holder>);
+    advancement.revoke(...); advancement.revoke_through(...); advancement.revoke_from(...);
+    advancement.revoke_until(...); advancement.revoke_everything(...);
+  holder = self (player context), origin or a player query. Declared
+  advancements are used by name; strings are external ids. `_through` covers
+  root..target, `_from` target and descendants, `_until` parents up to target,
+  `_everything` all loaded advancements and takes no advancement argument.
+
+5.15 WORLD AND BLOCKS
+    set_block(<pos>, <block state>[, destroy|keep|replace|strict][, nbt {...}]);
+    fill(<from>, <to>, <block state>[, replace|outline|hollow|destroy|strict|keep]
+         [, <replace filter>][, nbt {...}]);
+        // a replace filter is only allowed together with `replace`
+    fill_biome(<from>, <to>, "<biome>"[, replace, "<biome or #tag>"]);
+    clone(<from>, <to>, <destination>[, replace|masked|filtered, <block predicate>]
+          [, normal|force|move][, strict]
+          [, from_dimension("<dim>")][, to_dimension("<dim>")]);   // options in any order
+    place.feature("<feature>" | nbt { type = "<feature type>"; ... }[, <pos>]);
+    place.structure("<structure>"[, <pos>]);
+    place.jigsaw("<pool>", "<target>", <1..20>[, <pos>]);
+    place.template("<template>", <pos>[, none|clockwise_90|180|counterclockwise_90
+                  [, none|left_right|front_back[, <0.0..1.0>[, <seed>[, strict]]]]]);
+    forceload.add(<column>[, <column>]); forceload.remove(...);
+    forceload.remove_all(); forceload.query([<column>]);
+    time.set(<time>[, "<world clock>"]); time.add(<time>[, "<world clock>"]);
+    time.pause(); time.resume(); time.rate(<0.00001..1000>);
+    let <name> = time.query(["<world clock>"]); let <name> = time.query_gametime();
+    weather.clear(); weather.rain([<duration>]); weather.thunder([<duration>]);
+    gamerule.set("<rule>", true|false|<int>);
+    let <name> = gamerule.query("<rule>");
+    worldborder.add(<size delta>[, <time>]); worldborder.set(<size>[, <time>]);
+    worldborder.center(<x>, <z> | vec2(<x>, <z>));
+    worldborder.damage_amount(<per block>); worldborder.damage_buffer(<distance>);
+    worldborder.warning_distance(<distance>); worldborder.warning_time(<time>);
+    let <name> = worldborder.get();
+    locate.structure("<structure|#tag>"); locate.biome("<biome|#tag>"); locate.poi("<poi|#tag>");
+  Position forms: pos(x, y, z) (alias block_pos) with integer absolute
+  components, ~ relative and ^ local; vec3(...) allows decimals; vec2(...)
+  horizontal; column(x, z) for forceload. Absolute block coordinates:
+  -30000000..29999999 horizontal, -2032..2031 vertical. Block states:
+  block_state("minecraft:id") { property = "value"; ... } or
+  block_state("#tag") as predicate (fill filter / clone filtered only).
+  Time arguments are "<number><space or comma>t|s|d" (tick/second/day).
+  worldborder.set is 1..59999968, center magnitude <= 29999984, damage params
+  0..f32::MAX. max_minecart_speed is rejected (experimental feature).
+  A string form of place.feature names a 26.3 feature; the inline nbt form puts
+  the type fields directly beside `type` (no legacy `config` wrapper).
+
+5.16 RETURN AND RAW ESCAPE HATCHES
+    return;                                  // void function -> `return 0`
+    return <expr>;                           // -> score function, top level only
+    return fail;
+    return run <structured command>;         // strict-mode safe
+    return run "<native command>";           // RAW
+    run "<native command>";                  // RAW
+    execute "<clauses>" { ... }              // RAW, clauses only, no `run`
+  Raw commands may not start with `/`, span lines, be empty, or end with a
+  backslash. Bare `execute` and obviously incomplete branches are rejected.
+  Structured return run accepts one command statement and may generate a helper
+  function to capture its result.
+
+5.17 EXTENDED COMMAND SURFACE (legacy completion layer, all structured)
+    loot.give(<holder>, loot.table(<loot table>));
+    loot.insert(<pos>, loot.kill(<holder>));
+    loot.spawn(<pos>, loot.mine(<pos>[, <tool>]));
+    loot.replace(entity, <holder>|block, <pos>, "<slot>"[, <count>], loot.<source>);
+    loot.fish("<table>", <pos>[, <tool>]);
+    recipe.give(<holder>, <recipe>|*); recipe.take(<holder>, <recipe>|*);
+    let <name> = random.roll(<min>, <max>[, "<sequence>"]);
+    let <name> = random.value(<min>, <max>); random.reset(<sequence>|*, [<seed>[, <world seed>[, <sequence id>]]]);
+    reload();
+    datapack.enable("<name>"[, first|last|before|after[, "<other>"]]);
+    datapack.disable("<name>"); datapack.list([available|enabled]);
+    help(["<command path>"]); version(); seed();
+    say("<message>"); me("<action>");
+    fetchprofile.name("<name>"); fetchprofile.id("<uuid>"); fetchprofile.entity(<holder>);
+    test.run("<test>"[, <times>[, <until failed>[, <rotation>[, <per row>]]]]);
+    test.runmultiple("<test>"[, <times>]); test.runthese(...); test.runclosest(...);
+    test.runthat(...); test.runfailed(<only required>[, ...]); test.verify("<test>");
+    test.locate("<test>"); test.resetclosest/resetthese/resetthat/clearthat/clearthese/stop();
+    test.clearall([<radius>]); test.pos(["<var>"]); test.create("<test>"[, <width>[, <height>, <depth>]]);
+    kill([<holder>]);
+    tag.add(<holder>, "<tag>"); tag.remove(<holder>, "<tag>"); let n = tag.list(<holder>);
+    enchant(<holder>, "<id>"[, <level>]);
+    damage(<holder>, <amount>[, "<type>"[, at <pos|vec3> | by <holder> [from <holder>]]]);
+    let v = attribute.get(<holder>, "<id>"[, <scale>]);       // also attribute.base.get
+    attribute.base.set(<holder>, "<id>", <value>); attribute.base.reset(<holder>, "<id>");
+    attribute.modifier.add(<holder>, "<id>", "<modifier>", <value>, <operation>);
+    attribute.modifier.remove(<holder>, "<id>", "<modifier>");
+    let v = attribute.modifier.value.get(<holder>, "<id>", "<modifier>"[, <scale>]);
+    ride.mount(<holder>, <vehicle>); ride.dismount(<holder>);
+    rotate.to(<holder>, rotation(<yaw>, <pitch>)); rotate.facing(<holder>, <pos>|<holder>[, feet|eyes]);
+    spreadplayers(vec2(<x>,<z>), <spread>, <range>, <respect teams bool>, <holder>[, under <height>]);
+    spectate([<target>[, <player>]]);
+    swing([<holder>[, mainhand|offhand[, none|whack|stab[, <duration>]]]]);
+    trigger(<trigger objective>[, add|set, <value>]);
+    gamemode(<mode>[, <player>]); defaultgamemode(<mode>);
+    difficulty([peaceful|easy|normal|hard]);
+    spawnpoint([<player>[, <pos>[, rotation(yaw, pitch)]]]); setworldspawn([<pos>[, rotation(...)]]);
+    let n = list([<uuids bool>]);
+    team.list(["<name>"]); team.add("<name>"[, <component>]); team.remove("<name>"); team.empty("<name>");
+    team.join("<name>"[, <members>]); team.leave(<members>);
+    team.modify.<option>("<name>", <value>);   // display_name,prefix,suffix,color,friendly_fire,...
+    waypoint.list(); waypoint.modify.color(<holder>, <color>); waypoint.modify.color.hex(<holder>, "<RGB>");
+    waypoint.modify.color.reset(<holder>); waypoint.modify.style.set(<holder>, "<style>");
+    waypoint.modify.style.reset(<holder>);
+  Integer-returning commands can be used in expressions; failures yield 0.
+  Single-entity parameters require limit(1); player parameters require a
+  minecraft:player query. Trigger needs player context and a criteria=trigger
+  objective. datapack.create and kick need permissions a datapack function
+  does not have and are rejected.
+
+===============================================================================
+6 EXPRESSIONS AND CONDITIONS
+===============================================================================
+6.1 EXPRESSIONS (all yield a 32-bit score value)
+    <int>                                   i32 constant, folded at compile time
+    <name>                                  global score, parameter or local
+    <fn>(<args>...)                         call of a -> score function
+    scoreboard.get(<holder>, <objective>)
+    xp.query(<limit(1) player query>, points|levels)
+    stopwatch.query("<id>"[, <scale>])
+    time.query(["<world clock>"]); time.query_gametime()
+    gamerule.query("<rule>"); worldborder.get(); difficulty()
+    bossbar.get("<id>", value|max|visible|players)
+    count(<query>)                          number of matching entities
+    random(<min>, <max>)                    inclusive random int (no sequence)
+    data.get(<source>, "<path>"[, <scale>])
+    compute(<default|block,<pos>|entity,<holder>>, float|integer, "<provider>"[, <scale>])
+    <integer-returning extended command>    e.g. tag.list(...), attribute.get(...)
+  Operators: unary `-`; binary `+ - * / %`; parentheses. `* / %` bind tighter
+  than `+ -`; equal precedence is left-associative. Pure constant expressions
+  are folded; `/0` or i32 overflow in constants is an error. Runtime arithmetic
+  follows vanilla scoreboard i32 semantics with floorDiv/floorMod:
+  -3 / 2 == -2, -3 % 2 == 1, 3 % -2 == -1.
+
+6.2 CONDITIONS
+    <expr> == <expr>    !=    <    <=    >    >=
+    !<condition>   <condition> && <condition>   <condition> || <condition>
+    ( <condition> )
+    predicate(<declared predicate resource>)
+    block(<block pos>, <block state or #tag>)
+    blocks(<from>, <to>, <destination>[, all|masked])
+    biome(<block pos>, "<biome or #tag>")
+    loaded(<block pos>)
+    dimension("<dimension id>")
+    entity(<query>)                          true when the query matches
+    data(entity, <holder>|block, <pos>|storage, "<id>", "<path>")
+    items(entity, <holder>|block, <pos>, "<slot>", <item predicate>)
+    slots(entity, <holder>|block, <pos>, "<slot>")
+    function(<declared fn or #tag>)
+    stopwatch("<id>")
+  Item predicate argument syntax:
+    "<item id>" | "#<item tag>" | item_predicate("*"|"<id>"|"#<tag>") {
+        has("<component>");
+        !has("<component>") || equals("<component>", <SNBT>);
+        matches("<component>", nbt { ... });            // component sub-predicate
+        matches("minecraft:count", nbt { min = 1; max = 64; });
+    }
+  Clauses separated by `;` are ANDed; `||` inside a clause is an OR of
+  alternatives; `!` negates one test. `minecraft:count` is the vanilla
+  pseudo-component for stack counts.
+  Evaluation: `&&`/`||` short-circuit left to right. Conditions run in the
+  current execution context. Failures of entity/block/item/data lookups make
+  the atom false (index misses read 0 for expressions), and negation preserves
+  that boundary: `!data(entity, q, "Health")` is true when q matches nothing.
+
+===============================================================================
+7 EXECUTION CONTEXT
+===============================================================================
+Context lattice (capabilities are not inherited downward):
+    none (@load / @tick)
+      entity (@entity)
+        mob  (@non_player, non-player each/spawn)
+        player (@player, player each, player context)
+  none   : no @s. Only context-free commands.
+  entity : any entity, possibly a player.
+  mob    : definitely not a player; required for entity-NBT writes
+           (data.*, nbt merge, self.set_*, save/restore/deposit/withdraw,
+           remove_data, clear_items, store.data with self).
+  player : definitely a player; required for message.self, self.give_item,
+           xp.*, clear()/give(self,...), title/bossbar/dialog targets when
+           using self, and trigger.
+  Player data is read-only for datapacks; any write to player NBT is rejected
+  by Minecraft and by the compiler.
+Context sources: function attribute; each(query) (player query -> player,
+other -> mob); spawn body (mob); execute as/at/on/summon per vanilla rules.
+at/positioned/rotated/facing/in_dimension do not change @s.
+
+===============================================================================
+8 STANDARD LIBRARY
+===============================================================================
+Import explicitly: `import std::math::{abs};` etc. Modules are compiled only
+when reachable; importing a module emits all of its public functions. std:: is
+reserved. All values are 32-bit scores; boolean helpers return 0 or 1
+(0 = false, anything else = true). Time helpers use 20 ticks/second.
+  std::math   abs(x), min(a,b), max(a,b), clamp(x,lo,hi), sign(x)
+  std::state  normalize(x), toggle(x), latch(previous, signal),
+              rising_edge(previous, current), falling_edge(previous, current)
+  std::time   seconds_to_ticks(s), ticks_to_seconds(t),
+              interval_due(now_tick, last_tick, period),
+              cooldown_ready(now_tick, deadline_tick),
+              remaining(now_tick, deadline_tick)
+  std::random chance(0..100), chance_per_mille(0..1000)
+  interval_due needs a strictly positive period; the caller updates last_tick on
+  fire. cooldown_ready is true on and after the deadline; remaining returns the
+  ticks left and 0 after the deadline. chance values outside 0..100 clamp to the
+  nearest certain outcome. rising_edge/falling_edge need the caller to store the
+  previous value. clamp returns the lower bound when lo > hi.
+
+===============================================================================
+9 GENERATED DATAPACK (ABI)
+===============================================================================
+Layout:
+  build/<name>/pack.mcmeta                     min_format/max_format = [121, 0]
+  build/<name>/.mclang-manifest                rebuild bookkeeping
+  data/minecraft/tags/function/load.json       -> ["<ns>:__mcl/load"]
+  data/minecraft/tags/function/tick.json       @tick functions in source order
+  data/<ns>/function/**.mcfunction             user functions (module path)
+  data/<ns>/function/__mcl/**.mcfunction       helpers and __mcl/load
+  data/<ns>/<kind>/**.json                     resources, advancements, tags
+Compiler-internal names:
+  mcl_<hash>          compiler objective per namespace
+  #v_<name>           fake player for a global score variable
+  #p_<hash>           function parameter slots (stable per parameter)
+  #l_<hash>           local variable slots
+  #t<n>               temporaries for expressions and conditions
+  __mcl/<fn>/<n>      helper functions expanded from blocks
+  __mcl/empty_slot    slot_source used by give(x, self.item)
+Behavior:
+- Every .mcfunction starts with `# Generated by mclang.`
+- __mcl/load creates objectives, seeds only missing score variables, initializes
+  item_list storages, then calls all @load functions in source order.
+- Output is byte-reproducible; the Chinese and English keyword editions produce
+  identical files.
+- /reload does not reset scores, storages or stopwatches.
+
+===============================================================================
+10 REGISTRIES AND VALUE DOMAINS
+===============================================================================
+10.1 Sound categories
+  master music record weather block hostile neutral player ambient voice ui
+10.2 Text / team colors
+  black dark_blue dark_green dark_aqua dark_red dark_purple gold gray dark_gray
+  blue green aqua red light_purple yellow white
+10.3 Game modes / difficulty
+  survival creative adventure spectator
+  peaceful easy normal hard
+10.4 Boss bars
+  colors: pink blue red green yellow purple white
+  styles: progress notched_6 notched_10 notched_12 notched_20
+10.5 Objective display slots
+  list sidebar below_name sidebar.team.<color>
+10.6 Item rarity / entity sort / template options / store data types
+  rarity: common uncommon rare epic
+  sort: nearest furthest random arbitrary
+  template rotation: none clockwise_90 180 counterclockwise_90
+  template mirror: none left_right front_back
+  store.data types: byte short int long float double
+  item condition slots: contents, weapon.mainhand, armor.*, container.N, hotbar.N,
+    ... (vanilla slot names) or a slot_source resource location
+  execute on relations: owner leasher target attacker vehicle controller origin passengers
+10.7 Game rules (name:type; B = boolean, I = integer with range)
+  advance_time:B advance_weather:B allow_entering_nether_using_portals:B
+  block_drops:B block_explosion_drop_decay:B command_blocks_work:B
+  command_block_output:B drowning_damage:B elytra_movement_check:B
+  ender_pearls_vanish_on_death:B entity_drops:B fall_damage:B fire_damage:B
+  fire_spread_radius_around_player:I(-1..) forgive_dead_players:B freeze_damage:B
+  global_sound_events:B immediate_respawn:B keep_inventory:B lava_source_conversion:B
+  limited_crafting:B locator_bar:B log_admin_commands:B
+  max_block_modifications:I(1..) max_command_forks:I(0..)
+  max_command_sequence_length:I(0..) max_entity_cramming:I(0..)
+  max_snow_accumulation_height:I(0..8) mob_drops:B mob_explosion_drop_decay:B
+  mob_griefing:B natural_health_regeneration:B player_movement_check:B
+  players_nether_portal_creative_delay:I(0..) players_nether_portal_default_delay:I(0..)
+  players_sleeping_percentage:I(0..) projectiles_can_break_blocks:B pvp:B raids:B
+  random_tick_speed:I(0..) reduced_debug_info:B respawn_radius:I(0..)
+  send_command_feedback:B show_advancement_messages:B show_death_messages:B
+  spawner_blocks_work:B spawn_mobs:B spawn_monsters:B spawn_patrols:B
+  spawn_phantoms:B spawn_wandering_traders:B spawn_wardens:B
+  spectators_generate_chunks:B spread_vines:B tnt_explodes:B
+  tnt_explosion_drop_decay:B universal_anger:B water_source_conversion:B
+  (max_minecart_speed requires an experimental feature and is rejected.)
+10.8 Advancement triggers (26.3 CriteriaTriggers; minecraft: prefix optional)
+  allay_drop_item_on_block any_block_use avoid_vibration bee_nest_destroyed
+  bred_animals brewed_potion changed_dimension channeled_lightning consume_item
+  construct_beacon crafter_recipe_crafted cured_zombie_villager default_block_use
+  effects_changed enchanted_item enter_block entity_hurt_player entity_killed_player
+  fall_after_explosion fall_from_height filled_bucket fishing_rod_hooked
+  hero_of_the_village impossible inventory_changed item_durability_changed
+  item_used_on_block kill_mob_near_sculk_catalyst killed_by_arrow levitation
+  lightning_strike location nether_travel placed_block
+  player_generates_container_loot player_hurt_entity player_interacted_with_entity
+  player_killed_entity player_sheared_equipment recipe_crafted recipe_unlocked
+  ride_entity_in_lava shot_crossbow slide_down_block slept_in_bed spear_mobs
+  started_riding summoned_entity tame_animal target_hit
+  thrown_item_picked_up_by_entity thrown_item_picked_up_by_player tick
+  used_ender_eye used_totem using_item villager_trade voluntary_exile
+10.9 resource kinds (directory under data/<ns>/)
+  advancement banner_pattern block_transformer cat_sound_variant cat_variant
+  chat_type chicken_sound_variant chicken_variant context_float_provider
+  context_int_provider cow_sound_variant cow_variant damage_type
+  decorated_pot_pattern dialog dimension dimension_type enchantment
+  enchantment_provider frog_variant instrument item_modifier jukebox_song
+  loot_table painting_variant pig_sound_variant pig_variant post_effect predicate
+  recipe sulfur_cube_archetype test_environment test_instance timeline trade_set
+  trial_spawner trim_material trim_pattern villager_trade wolf_sound_variant
+  wolf_variant world_clock
+  worldgen/biome worldgen/block_state_provider worldgen/carver
+  worldgen/density_function worldgen/feature worldgen/flat_level_generator_preset
+  worldgen/material_condition worldgen/material_rule
+  worldgen/multi_noise_biome_source_parameter_list worldgen/noise
+  worldgen/noise_settings worldgen/placed_feature worldgen/processor_list
+  worldgen/structure worldgen/structure_set worldgen/template_pool
+  worldgen/world_preset zombie_nautilus_variant
+  `tags/<registry>` declares a registry tag (block, item, function, ...).
+10.10 Chinese NBT key aliases (only for entity NBT statements / block entity data)
+  CustomName=自定义名称 CustomNameVisible=名称可见 Silent=静音 Glowing=发光
+  Invulnerable=无敌 NoGravity=无重力 Tags=标签 data=自定义数据 Pos=坐标
+  Motion=速度 Rotation=朝向 Fire=着火时间 Air=氧气 OnGround=在地面
+  PortalCooldown=传送门冷却 TicksFrozen=冰冻时间 Team=队伍 Passengers=乘客
+  NoAI=无AI Health=生命 PersistenceRequired=持久化 CanPickUpLoot=可拾取物品
+  LeftHanded=左手 DeathLootTable=死亡战利品表 attributes=属性
+  active_effects=状态效果 equipment=装备 FallFlying=滑翔 InLove=求偶
+  Age=年龄 Tame=已驯服 Sitting=坐下 Crouching=潜行 Invisible=隐身 Marker=标记
+  powered=充能 ExplosionRadius=爆炸半径 IsBaby=幼年 Size=大小 Color=颜色
+  Variant=变种 CollarColor=项圈颜色 Offers=交易列表 VillagerData=村民数据
+  FoodLevel=饥饿值 Score=分数 abilities=能力 XpLevel=经验等级
+  leash=拴绳 Inventory=库存 Items=物品列表 LootTable=战利品表
+  PickupDelay=拾取延迟 PierceLevel=穿透等级 crit=暴击 pickup=可拾取
+  BlockState=方块状态 TileEntityData=方块实体数据 text=文本 background=背景色
+  transformation=变换 view_range=可视距离 shadow_radius=阴影半径
+  width=宽度 height=高度
+  (Many more exist in the snapshot; English keys always work. Section 13.2 lists the full set.)
+
+===============================================================================
+11 HARD RULES AND PITFALLS
+===============================================================================
+Repeat these until they are automatic; each one is enforced by the compiler.
+ 1. `return` is only legal directly in the outermost body of a function.
+    It cannot appear inside if/while/for/each/spawn/in_dimension/execute.
+    For conditional results assign a local and return at the end.
+ 2. A parameterized function may only be called from Mclang code: ordinary
+    calls in statements/expressions or a literal macro call. It cannot be
+    scheduled or invoked by vanilla /function, because parameters live in
+    shared fake players that the caller must write first.
+ 3. `schedule` targets must be parameter-free and context-free; tags are
+    allowed as targets, and every member must satisfy the same rule.
+    schedule.clear takes a function only.
+ 4. Every single-entity parameter requires a query with `limit(1)`; the
+    compiler never picks "the first" entity silently.
+ 5. data/NBT writes require a definite non-player context. Player NBT is
+    read-only.
+ 6. message.self, self.give_item, xp.*, clear()/give(self,...), trigger need a
+    definite player context.
+ 7. An `execute` store whose body ends with a control structure is rejected;
+    the captured value would not be well defined.
+ 8. `--deny-raw` rejects run "..." / execute "..." / return run "..." /
+    runtime `with` macro calls / `nbt` macro parameters. Prefer structured
+    forms so strict mode stays clean.
+ 9. Declaration names must not be keywords (either language) or true/false,
+    and ASCII names must be lowercase, <= 32 chars, no Windows device names.
+10. Chinese (non-ASCII) declaration names are rewritten to stable random
+    ASCII aliases. Their diagnostics keep the source name. Do not write code
+    that depends on the generated alias.
+11. The whole project shares one namespace; every module must either omit
+    `namespace` or repeat the same value.
+12. Constant folding never removes side effects: `side_effect() == 1 && 0 == 1`
+    still calls side_effect() once, and if/else evaluates its condition once.
+13. `for` is half-open and evaluates the end once. `while` re-evaluates the
+    condition every iteration and can exhaust Minecraft's command-chain limit;
+    make sure the body changes the condition or contains `break`.
+14. break/continue escape only the innermost for/while. They are rejected in
+    each/spawn blocks (each entity runs its own helper function).
+15. /reload never resets scoreboard, storage or stopwatch data. Guard one-time
+    creation with a score flag.
+16. Expression queries that fail read 0; conditions that fail are false.
+    `!condition` of a failed lookup is true.
+17. give counts are 1..max_stack_size*100; item.replace/fill/override counts
+    are 1..99. Item definitions default to count 1 / max_stack_size 1.
+18. A `-> score` function must end in `return`; a void function may use bare
+    `return;`. `return fail` does not produce a value.
+19. `nbt { ... }` merges into @s. For block entity data use the nbt argument of
+    set_block/fill. custom_data keys are user data and never aliased.
+20. Generated function lines may not exceed 2,000,000 UTF-16 units; avoid
+    gigantic constant fills.
+21. Message arguments (say/me/msg/teammsg) are single-line strings of at most
+    256 UTF-16 units; selectors with `[...]` are rejected there.
+22. Text component `interpret` and `plain` cannot both be true; `fallback` only
+    works on object components; interpret/plain/separator only on nbt
+    components.
+23. Advancement display rules: a root advancement needs `background`, a child
+    with `parent` must not declare `background`; icon must be a declared item.
+24. An advancement fires once; revoke it in its reward function for repeatable
+    events.
+25. resource JSON is parsed and partially schema-checked, but Minecraft still
+    validates full codecs at load time. Only `predicate` declarations can be
+    referenced from conditions.
+26. `max_minecart_speed` is rejected (experimental feature not enabled by
+    default).
+27. name/value pairs are validated against 26.3 snapshots; do not guess
+    registry names, block state properties or entity NBT keys from memory.
+28. Chunk/data access at the wrong moment is not statically checkable: loaded(),
+    queries and data reads can legitimately fail at runtime. Design for 0/false.
+
+===============================================================================
+12 KEYWORD TABLE (EN=ZH; Chinese forms are exactly equivalent and reserved)
+===============================================================================
+   with=用 macro=宏 item_predicate=物品谓词 loot=战利品 recipe=配方 reload=重载 help=帮助
+   version=版本 seed=世界种子 say=广播 me=动作消息 fetchprofile=获取档案 test=测试命令
+   datapack=数据包 kill=杀死 tag=标签 enchant=施加附魔 damage=伤害 attribute=实体属性 ride=乘骑
+   rotate=旋转 spreadplayers=分散实体 spectate=旁观 swing=挥动 trigger=触发 gamemode=游戏模式
+   defaultgamemode=默认游戏模式 difficulty=难度 spawnpoint=设置出生点
+   setworldspawn=设置世界出生点 team=队伍 waypoint=路径点 list=在线玩家 namespace=命名空间
+   score=计分 objective=目标 scoreboard=计分板 query=查询 entity=实体 data_slot=数据槽
+   item_data=物品数据 entity_data=实体数据 item=物品 item_stack=物品堆 item_list=物品列表
+   storage=存储 resource=资源 advancement=进度 predicate=谓词 fn=函数 fn_tag=函数标签 let=令
+   return=返回 fail=失败 if=如果 unless=除非 store=存值 bossbar=Boss栏 else=否则 while=当
+   for=对于 in=在 break=跳出 continue=跳过 import=导入 export=公开 as=作为 each=遍历 call=调用
+   schedule=调度 after=延后 append=追加 replace=替换 give=给予 origin=投掷者
+   in_dimension=在维度 spawn=召唤 self=自身 message=消息 sound=声音 title=屏幕标题
+   dialog=对话框 particle=粒子 stopsound=停止声音 posteffect=后处理效果 msg=私聊 teammsg=队伍消息
+   effect=效果 xp=经验 clear=清除 stopwatch=秒表 run=原生命令 execute=执行 contents=内容
+   set_block=设置方块 fill=填充 fill_biome=填充生物群系 clone=复制 place=放置 forceload=强制加载
+   time=时间 weather=天气 gamerule=游戏规则 worldborder=世界边界 locate=定位 teleport=传送
+   pos=坐标 block_pos=方块坐标 vec3=精确坐标 vec2=平面坐标 rotation=朝向 column=列坐标
+   block_state=方块状态 nbt=数据 text=文本 translate=翻译 keybind=按键 object=对象内容
+   show_item=展示物品 show_entity=展示实体 selector=选择器 count=计数 random=随机 compute=计算
+   data=数据操作 block=方块 blocks=区域方块 biome=生物群系 loaded=已加载 dimension=维度
+   items=物品条件 slots=槽位条件 function=函数条件
+
+  function attributes:
+   @load=@加载 @tick=@每刻 @entity=@实体 @player=@玩家 @non_player=@非玩家
+
+===============================================================================
+13 METHOD AND ENUM ALIAS TABLE
+===============================================================================
+13.1 Methods, properties and enum values (EN=ZH)
+--- self.* (self_method)
+   add_tag=添加标签 remove_tag=移除标签 set_invulnerable=设置无敌 set_no_gravity=设置无视重力
+   save_items=保存物品 restore_items=恢复物品 remove_preserving_items=保存并移除
+   give_item=给予物品 clear_items=清空物品 deposit=存入 withdraw=取出 remove_data=移除数据
+   remove=移除
+--- scoreboard.* (scoreboard_method)
+   set=设置 reset=重置 get=取 enable=启用 operation=运算 display=显示
+--- scoreboard.operation (score_operation)
+   set=赋值 add=加上 subtract=减去 multiply=乘以 divide=除以 modulo=取余 min=最小值 max=最大值
+   swap=交换
+--- objective { } (objective_property)
+   criteria=准则 display_name=显示名 render_type=渲染类型 number_format=数字格式
+   display_slot=显示槽
+--- objective.render_type (render_type)
+   integer=整数 hearts=爱心
+--- item.* (item_method)
+   replace=替换 fill=填充 override=覆盖 modify=修改
+--- number_format (number_format_kind)
+   blank=空白 fixed=固定 styled=样式
+--- data_slot (data_slot_kind)
+   item_data=物品数据 entity_data=实体数据
+--- message.* (message_target)
+   all=全部 self=自身 nearest=最近 player=玩家
+--- text style (text_style_property)
+   color=颜色 bold=粗体 italic=斜体 underlined=下划线 strikethrough=删除线 obfuscated=混淆
+   click=点击 hover=悬停 fallback=回退 interpret=解释 plain=纯文本 separator=分隔符
+--- click (click_action)
+   open_url=打开链接 run_command=运行命令 suggest_command=建议命令
+   copy_to_clipboard=复制到剪贴板 change_page=翻页 show_dialog=显示对话框 custom=自定义事件
+--- NBT source (nbt_source)
+   entity=实体 block=方块 storage=存储
+--- compute source (compute_source)
+   default=默认 block=方块 entity=实体
+--- compute kind (compute_kind)
+   float=浮点 integer=整数
+--- data.* (data_method)
+   get=取 merge=合并 remove=移除 modify=修改
+--- effect.* (effect_method)
+   give=给予 give_infinite=给予无限 clear=清除
+--- xp.* (xp_method)
+   add=增加 set=设置 query=查询
+--- xp unit (xp_kind)
+   points=点数 levels=等级
+--- stopwatch.* (stopwatch_method)
+   create=创建 query=查询 restart=重启 remove=移除
+--- boolean (boolean_word)
+   true=真 false=假
+--- time unit (time_unit)
+   t=刻 s=秒 d=天
+--- color (text_color)
+   black=黑色 dark_blue=深蓝色 dark_green=深绿色 dark_aqua=深青色 dark_red=深红色
+   dark_purple=深紫色 gold=金色 gray=灰色 dark_gray=深灰色 blue=蓝色 green=绿色 aqua=青色
+   red=红色 light_purple=亮紫色 yellow=黄色 white=白色
+--- sound category (sound_source)
+   master=主音量 music=音乐 record=唱片 weather=天气 block=方块 hostile=敌对 neutral=中立
+   player=玩家 ambient=环境 voice=语音 ui=界面
+--- query { } (query_property)
+   tag=标签 without_tag=排除标签 type=实体类型 without_type=排除类型 limit=上限 within=范围
+   sort=排序 name=名称 without_name=排除名称 scores=分数 nbt=数据 without_nbt=排除数据
+   box=坐标盒 distance=距离 level=等级 gamemode=游戏模式 team=队伍 without_team=排除队伍
+   rotate=旋转 predicate=谓词 advancements=进度过滤 item=物品
+--- gamemode (gamemode_value)
+   survival=生存 creative=创造 adventure=冒险 spectator=旁观
+--- query item { } (item_property)
+   id=类型 count=数量 custom_name=自定义名称
+--- fn_tag { } (function_tag_property)
+   value=值 replace=替换
+--- item { } (item_stack_property)
+   components=组件 count=数量 custom_name=自定义名称 item_name=物品名称 lore=描述
+   enchantment=附魔 stored_enchantment=存储附魔 damage=损伤 max_damage=最大损伤
+   max_stack_size=最大堆叠 rarity=稀有度 item_model=物品模型 dyed_color=染色
+   enchantment_glint_override=附魔光效 unbreakable=无法破坏 custom_data=自定义数据
+--- slot name (slot_name)
+   contents=内容
+--- resource kind (Chinese alias) (resource_kind)
+   recipe=配方 predicate=谓词 dialog=对话框
+--- advancement.* (advancement_method)
+   grant=授予 grant_through=授予至 grant_from=授予从 grant_until=授予直到
+   grant_everything=授予全部 revoke=撤销 revoke_through=撤销至 revoke_from=撤销从
+   revoke_until=撤销直到 revoke_everything=撤销全部
+--- advancement { } (advancement_property)
+   parent=父进度 criterion=准则 requirements=要求 reward=奖励 display=展示
+--- criterion { } (criterion_property)
+   trigger=触发器 conditions=条件
+--- reward { } (reward_property)
+   function=函数 experience=经验 loot=战利品 recipe=配方
+--- display { } (display_property)
+   icon=图标 title=标题 description=描述 frame=框架 background=背景 show_toast=显示提示
+   announce_to_chat=聊天公告 hidden=隐藏
+--- display.frame (advancement_frame)
+   task=任务 goal=目标 challenge=挑战
+--- requirements (advancement_requirements)
+   all=全部 any=任意
+--- rarity (rarity_value)
+   common=普通 uncommon=罕见 rare=稀有 epic=史诗
+--- sort (entity_sort)
+   nearest=最近 furthest=最远 random=随机 arbitrary=任意
+--- set_block mode (set_block_mode)
+   destroy=摧毁 keep=保留 replace=替换 strict=严格
+--- fill mode (fill_mode)
+   replace=替换 outline=轮廓 hollow=空心 destroy=摧毁 strict=严格 keep=保留
+--- clone filter (clone_filter)
+   replace=替换 masked=遮罩 filtered=过滤
+--- clone mode (clone_mode)
+   normal=普通 force=强制 move=移动
+--- template rotation (template_rotation)
+   none=无 clockwise_90=顺时针90 counterclockwise_90=逆时针90
+--- template mirror (template_mirror)
+   none=无 left_right=左右 front_back=前后
+--- clone dimension (clone_dimension)
+   from_dimension=起始维度 to_dimension=目标维度
+--- strict (strict_word)
+   strict=严格
+--- place.* (place_method)
+   feature=地物 jigsaw=拼图 structure=结构 template=模板
+--- forceload.* (forceload_method)
+   add=添加 remove=移除 remove_all=全部移除 query=查询
+--- time.* (time_method)
+   set=设置 add=增加 pause=暂停 resume=恢复 rate=速率 query=查询 query_gametime=查询游戏时间
+--- weather.* (weather_kind)
+   clear=晴朗 rain=下雨 thunder=雷暴
+--- gamerule.* (gamerule_method)
+   set=设置 query=查询
+--- worldborder.* (worldborder_method)
+   add=增加 set=设置 center=中心 damage_amount=伤害量 damage_buffer=伤害缓冲 get=获取
+   warning_distance=警告距离 warning_time=警告时间
+--- locate.* (locate_kind)
+   structure=结构 biome=生物群系 poi=兴趣点
+--- execute clause (execute_clause)
+   as=作为 at=在 positioned=定位于 rotated=转向 facing=面向 align=对齐 anchored=锚点
+   in=进入维度 on=关系 summon=召唤实体
+--- execute on(...) (entity_relation)
+   owner=主人 leasher=拴绳者 target=攻击目标 attacker=攻击者 vehicle=载具 controller=控制者
+   origin=起源 passengers=乘客
+--- anchor (anchor_value)
+   eyes=眼睛 feet=脚
+--- store.* (store_method)
+   result=结果 success=成功 data=数据
+--- store.data mode (store_data_mode)
+   result=结果 success=成功
+--- store bossbar field (bossbar_field)
+   value=值 max=上限
+--- store.data type (store_data_type)
+   byte=字节 short=短整数 int=整数 long=长整数 float=浮点 double=双精度
+--- command options (command_value)
+   integer=整数 decimal=小数 has=存在 equals=等于 matches=匹配 give=给予 take=收回
+   enable=启用 disable=停用 first=最前 last=最后 before=之前 after=之后 available=可用
+   enabled=已启用 roll=掷出 table=表 fish=钓鱼 mine=挖掘 insert=插入 replace=替换 add=添加
+   remove=移除 list=列出 get=取 set=设置 reset=重置 base=基值 modifier=修饰器 value=数值
+   mount=骑上 dismount=下乘 to=转向 facing=面向 by=由 from=来源 under=低于 feet=脚部 eyes=眼部
+   mainhand=主手 offhand=副手 none=无 whack=挥击 stab=刺击 survival=生存 creative=创造
+   adventure=冒险 spectator=旁观者 peaceful=和平 easy=简单 normal=普通 hard=困难
+   add_value=增加数值 add_multiplied_base=增加基值倍率 add_multiplied_total=增加总值倍率
+   empty=清空 join=加入 leave=离开 modify=修改 prefix=前缀 suffix=后缀 color=颜色 hex=十六进制
+   style=样式 friendly_fire=友军伤害 see_friendly_invisibles=看见隐身队友
+   nametag_visibility=名称可见性 death_message_visibility=死亡消息可见性
+   collision_rule=碰撞规则 always=总是 never=从不 runmultiple=运行多份 runthese=运行附近
+   runclosest=运行最近 runthat=运行所指 runfailed=运行失败项 verify=验证 locate=定位
+   resetclosest=重置最近 resetthese=重置附近 resetthat=重置所指 clearthat=清理所指
+   clearthese=清理附近 clearall=清理全部 pos=坐标 create=创建 objectives=目标集 display=显示
+   displayautoupdate=自动更新显示名 rendertype=渲染类型 numberformat=数字格式 operation=运算
+   hide_for_other_teams=对其他队伍隐藏 hide_for_own_team=对本队隐藏 push_own_team=碰撞本队
+   push_other_teams=碰撞其他队伍
+--- UI options (ui_value)
+   subtitle=副标题 name=名称 actionbar=动作栏 times=显示时间 max=最大值 visible=可见
+   players=玩家列表 pink=粉色 purple=紫色 progress=连续进度条 notched_6=六格 notched_10=十格
+   notched_12=十二格 notched_20=二十格 show=显示对话框 force=强制
+
+13.2 Chinese aliases for entity NBT top-level keys (EN=ZH)
+   CustomName=自定义名称 CustomNameVisible=名称可见 Silent=静音 Glowing=发光
+   Invulnerable=无敌 NoGravity=无重力 Tags=标签 data=自定义数据 Pos=坐标 Motion=速度
+   Rotation=朝向 Fire=着火时间 Air=氧气 OnGround=在地面 PortalCooldown=传送门冷却
+   TicksFrozen=冰冻时间 fall_distance=下落距离 invulnerable_time=无敌时间 Team=队伍
+   HasVisualFire=视觉火焰 Passengers=乘客 NoAI=无AI Health=生命
+   PersistenceRequired=持久化 CanPickUpLoot=可拾取物品 LeftHanded=左手
+   DeathLootTable=死亡战利品表 DeathLootTableSeed=死亡战利品表种子 drop_chances=掉落概率
+   home_radius=活动半径 home_pos=活动中心 attributes=属性 active_effects=状态效果
+   equipment=装备 Brain=大脑 FallFlying=滑翔 Sleeping=睡眠中 sleeping_pos=睡觉位置
+   HurtTime=受伤时间 DeathTime=死亡时间 AbsorptionAmount=伤害吸收 InLove=求偶 Age=年龄
+   AgeLocked=年龄锁定 ForcedAge=强制年龄 Bred=已繁殖 Tame=已驯服 Temper=脾气 Sitting=坐下
+   Crouching=潜行 Invisible=隐身 Marker=标记 powered=充能 ExplosionRadius=爆炸半径
+   ExplosionPower=爆炸威力 ignited=已点燃 IsBaby=幼年 CanBreakDoors=可破坏门
+   CanJoinRaid=可参与袭击 Patrolling=巡逻中 PatrolLeader=巡逻队长 SpellTicks=施法时间 Size=大小
+   Color=颜色 Variant=变种 FromBucket=来自桶 Moistness=湿度 GotFish=抓到鱼 HasNectar=有花蜜
+   HasStung=已蜇 CollarColor=项圈颜色 Offers=交易列表 VillagerData=村民数据 Gossips=传闻
+   RestocksToday=今日补货 LastRestock=上次补货 FoodLevel=饥饿值 Score=分数
+   SelectedItemSlot=选中槽位 abilities=能力 XpLevel=经验等级 XpP=经验进度 XpTotal=经验总量
+   XpSeed=经验种子 LastDeathLocation=上次死亡位置 SleepTimer=睡眠计时 RabbitType=兔子类型
+   PuffState=膨胀状态 Pumpkin=南瓜头 Johnny=杀手兔 Trusting=信任 IsChickenJockey=鸡骑士
+   IsImmuneToZombification=免疫僵尸化 IsScreamingGoat=尖叫山羊 HasLeftHorn=有左角
+   HasRightHorn=有右角 EatingHaystack=吃草 ChestedHorse=携带箱子 Strength=驮运强度
+   DespawnDelay=消失延迟 sound_variant=声音变种 variant=注册变种 anger_end_time=愤怒结束时间
+   angry_at=仇恨目标 leash=拴绳 Inventory=库存 Items=物品列表 LootTable=战利品表
+   LootTableSeed=战利品表种子 PickupDelay=拾取延迟 PierceLevel=穿透等级 crit=暴击 pickup=可拾取
+   ShotAtAngle=斜射 BlockState=方块状态 TileEntityData=方块实体数据 text=文本
+   background=背景色 alignment=对齐 line_width=行宽 text_opacity=文本透明度 brightness=亮度
+   glow_color_override=发光颜色 transformation=变换 interpolation_duration=插值时长
+   teleport_duration=传送时长 view_range=可视距离 shadow_radius=阴影半径
+   shadow_strength=阴影强度 width=宽度 height=高度 block_state=展示方块 item_display=展示物品
+   FireworksItem=烟花物品
+
+===============================================================================
+14 VERIFIED EXAMPLES
+===============================================================================
+Each example below is a complete project (one .mcl file, except 11_modules which
+is a directory with main.mcl and lib/math.mcl). They were compiled with the
+shipped compiler; 01-11 and 14 pass `mclang check --deny-raw` and build
+byte-identical datapacks in both keyword editions. 12_macros and 13_raw compile
+normally but are rejected by --deny-raw (marked RAW below).
+
+--- 01_hello.mcl: minimal complete program, @load/@tick, score, query, each ---
+namespace hello;
+
+score ticks = 0;
+query all_players = entity("minecraft:player") {}
+
+@load
+fn load() {
+    message.all("Hello from Mclang", green);
+}
+
+@tick
+fn tick() {
+    ticks += 1;
+    if ticks >= 100 {
+        each(all_players) {
+            message.self("Five seconds passed.", gold);
+            sound.self("minecraft:block.note_block.pling", master);
+        }
+        ticks = 0;
+    }
+}
+
+--- 02_core.mcl: declarations, control flow, functions, returns, schedule, tags ---
+namespace core_demo;
+
+score counter = 0;
+score total = 0;
+score active = 1;
+
+@load
+fn load() {
+    message.all("core demo loaded", green);
+}
+
+@tick
+fn tick() {
+    counter += 1;
+    if counter >= 20 {
+        counter = 0;
+        total = compute_sum(10);
+        if total > 100 {
+            call #batch();
+        }
+    }
+}
+
+fn compute_sum(bound) -> score {
+    let result = 0;
+    for index in 1..bound {
+        if index % 2 == 0 {
+            continue;
+        }
+        if index >= 8 {
+            break;
+        }
+        result += index;
+    }
+    while active < 3 {
+        active += 1;
+    }
+    if result > 10 && active == 3 {
+        result -= 1;
+    } else {
+        result += 1;
+    }
+    return result;
+}
+
+fn reset() {
+    counter = 0;
+    total = 0;
+    active = 1;
+}
+
+fn later() {
+    schedule later() after 1.5 s append;
+}
+
+fn cleanup() {}
+
+fn queue() {
+    schedule cleanup() after 2 d replace;
+    schedule.clear(cleanup);
+}
+
+fn_tag batch {
+    value(reset);
+    value(#announcement);
+}
+
+fn_tag announcement {
+    value(cleanup);
+}
+
+--- 03_entities.mcl: query filters, each/spawn, give, self actions, effects, xp ---
+namespace entities_demo;
+
+score active = 0;
+score ready = 0;
+
+query all_players = entity("minecraft:player") {}
+query one_player = entity("minecraft:player") { limit(1); }
+query nearby_players = entity("minecraft:player") { within(16); sort(nearest); }
+query dropped_gems = entity("minecraft:item") {
+    without_tag("picked");
+    item(contents) {
+        id = "minecraft:emerald";
+        count = 1;
+    }
+}
+query boxes = entity("minecraft:chest_minecart") { tag("box"); }
+query target = entity("minecraft:zombie") { limit(1); }
+
+item gift = item_stack("minecraft:diamond") {
+    count = 1;
+    custom_name = "Gift";
+    lore("From entities_demo");
+    enchantment("minecraft:unbreaking", 1);
+    rarity = rare;
+}
+
+storage saved = item_list("entities_demo:state", "saved");
+data_slot stash = entity_data("stash");
+
+@load
+fn load() {
+    message.all("entities_demo loaded", green);
+    call ensure_watch();
+}
+
+fn ensure_watch() {
+    if ready == 0 {
+        ready = 1;
+        stopwatch.create("entities_demo:timer");
+    }
+}
+
+@player
+fn reward_player() {
+    give(all_players, gift);
+    give(one_player, gift, 5);
+    self.give_item(gift, 2);
+    message.self("This is your gift", gold);
+    sound.self("minecraft:entity.player.levelup", player);
+}
+
+@entity
+fn mark_picked() {
+    self.add_tag("picked");
+}
+
+fn buff() {
+    effect.give(nearby_players, "minecraft:speed", 30, 1, true);
+    effect.give_infinite(one_player, "minecraft:night_vision");
+    effect.clear(nearby_players);
+}
+
+fn adjust_xp() {
+    xp.add(one_player, points, 25);
+    xp.set(one_player, levels, 5);
+    xp.add(one_player, points, -10);
+    let player_level = xp.query(one_player, levels);
+    if player_level >= 5 {
+        message.all("Level reached", aqua);
+    }
+}
+
+fn tidy() {
+    clear(nearby_players, "minecraft:glass_bottle", 8);
+    clear(all_players);
+}
+
+fn timing() {
+    stopwatch.restart("entities_demo:timer");
+    if stopwatch.query("entities_demo:timer", 1000) >= 10000 {
+        message.all("Ten seconds", gold);
+    }
+    stopwatch.remove("entities_demo:timer");
+}
+
+@non_player
+fn prepare_box() {
+    self.add_tag("box");
+    self.set_invulnerable(true);
+    self.restore_items(saved);
+}
+
+fn destroy_box() {
+    each(boxes) {
+        self.remove_preserving_items(stash, target);
+    }
+}
+
+fn store_box() {
+    each(boxes) {
+        self.save_items(saved);
+        self.deposit(stash, target);
+        self.withdraw(stash, target);
+        self.remove_data(stash);
+        self.clear_items();
+        self.remove_tag("box");
+        self.remove();
+    }
+}
+
+@tick
+fn tick() {
+    each(all_players) {
+        reward_player();
+    }
+    each(dropped_gems) {
+        mark_picked();
+        if active == 0 {
+            spawn("minecraft:chest_minecart") {
+                prepare_box();
+            }
+            active = 1;
+            message.nearest(16, "Box out", green);
+            give(origin, self.item);
+        } else {
+            in_dimension("minecraft:overworld") {
+                destroy_box();
+            }
+            active = 0;
+            message.nearest(16, "Box stored", gold);
+            give(origin, self.item);
+        }
+    }
+}
+
+--- 04_scoreboard.mcl: objectives, set/get/reset/operation/display, runtime cmds ---
+namespace scores_demo;
+
+objective visits;
+objective wins {
+    criteria = "dummy";
+    display_name = text("Wins") { color = "gold"; };
+    render_type = "integer";
+    number_format = styled("{\"color\":\"gold\"}");
+    display_slot = "sidebar";
+}
+objective trigger_ready {
+    criteria = "trigger";
+}
+
+query players = entity("minecraft:player") {}
+query one = entity("minecraft:player") { limit(1); }
+
+@load
+fn load() {
+    scoreboard.display("sidebar", visits);
+    message.all("scores_demo loaded", green);
+}
+
+@tick
+fn tick() {
+    each(players) {
+        if scoreboard.get(self, visits) == 0 {
+            scoreboard.set(self, visits, 1);
+            message.self("Welcome", green);
+        } else {
+            let total = scoreboard.get(self, visits) + 1;
+            scoreboard.set(self, visits, total);
+        }
+    }
+}
+
+fn admin() {
+    scoreboard.reset(one, visits);
+    scoreboard.enable(one, trigger_ready);
+    scoreboard.operation(one, wins, add, one, visits);
+    scoreboard.operation(one, wins, min, one, visits);
+    scoreboard.set(one, wins, scoreboard.get(one, visits) + 10);
+    scoreboard.display("list");
+}
+
+fn runtime() {
+    scoreboard.objectives.list();
+    scoreboard.objectives.modify.displayname(wins, "Victories");
+    scoreboard.objectives.modify.displayautoupdate(wins, true);
+    scoreboard.objectives.modify.rendertype(wins, hearts);
+    scoreboard.objectives.modify.numberformat(wins, styled("{\"color\":\"gold\"}"));
+    scoreboard.players.add(one, wins, 1);
+    scoreboard.players.remove(one, wins, 1);
+    scoreboard.players.display.name(one, wins, "Champion");
+    scoreboard.players.numberformat(one, wins, fixed("pts"));
+    scoreboard.players.list();
+    scoreboard.players.reset(one);
+}
+
+--- 05_execute.mcl: structured execute modifiers, conditions and stores ---
+namespace execute_demo;
+
+objective cleared;
+
+query players = entity("minecraft:player") {}
+query zombies = entity("minecraft:zombie") { within(16); }
+query one_zombie = entity("minecraft:zombie") { limit(1); }
+
+item token = item_stack("minecraft:gold_nugget") { count = 3; }
+
+@load
+fn load() {
+    execute as(players) at(players) positioned(pos(0, 64, 0)) rotated(rotation(0, 0)) facing(pos(0, 0, 0)) align(xz) anchored(feet) in("minecraft:overworld") {
+        message.self("Ready", aqua);
+    }
+    execute as(players) if entity(zombies) store.result(self, cleared) {
+        clear(players);
+    }
+    execute as(players) store.success(players, cleared) {
+        give(players, token);
+    }
+    execute as(zombies) store.result(origin, cleared) {
+        self.add_tag("origin");
+    }
+    execute store.result(bossbar, "execute_demo:timer", value) {
+        message.all("tick");
+    }
+    execute as(one_zombie) store.data(entity, self, "data.execute_demo", int, 1) {
+        self.add_tag("marked");
+    }
+    execute store.data(block, pos(0, 64, 0), "Items", byte) {
+        set_block(pos(0, 64, 0), block_state("minecraft:chest"));
+    }
+    execute store.data(storage, "execute_demo:state", "count", double, 1) {
+        message.all("done");
+    }
+    execute as(zombies) if scoreboard.get(self, cleared) > 0 {
+        self.remove_tag("origin");
+    }
+    execute unless loaded(pos(0, 64, 0)) {
+        message.all("chunk not loaded", red);
+    }
+}
+
+--- 06_data.mcl: NBT merge, data.*, item.*, data_slot, storage, self item moves ---
+namespace data_demo;
+
+query players = entity("minecraft:player") { limit(1); }
+query single_item = entity("minecraft:item") { limit(1); }
+
+item prize = item_stack("minecraft:diamond") { count = 2; custom_name = "prize"; };
+
+data_slot note = item_data("demo_note");
+data_slot stash = entity_data("nested.records[0].payload");
+storage backup = item_list("data_demo:state", "backup");
+
+@load
+fn items_edit() {
+    item.replace(entity, players, "weapon.mainhand", with(prize));
+    item.fill(entity, players, "hotbar.*", with(prize));
+    item.override(entity, players, "armor.head", with(prize));
+    item.replace(block, pos(0, 64, 0), "container.0", from(entity, players, "weapon"));
+    item.modify(entity, players, "weapon", "minecraft:set_count");
+}
+
+@non_player
+fn edit() {
+    nbt { Silent = true; Tags = ["stored"]; }
+    data.merge(entity, self, nbt { CustomName = "Store"; Tags = ["a", "b"]; });
+    data.merge(block, pos(0, 64, 0), nbt { label = "chest"; });
+    data.merge(storage, "data_demo:store", nbt { count = 1; });
+    data.remove(entity, self, "Tags[0]");
+    data.modify(entity, self, "Health", set, value(1.5f));
+    data.modify(entity, self, "CustomName", set, value("renamed"));
+    data.modify(entity, self, "data.count", set, value(nbt { n = 1; }));
+    data.modify(block, pos(0, 64, 0), "Items", append, from(entity, self, "Items[0]"));
+    data.modify(storage, "data_demo:store", "names", insert, 0, from(entity, self, "CustomName"));
+    data.modify(entity, self, "CustomName", set, string(storage, "data_demo:store", "names[0]", 0, 3));
+    data.modify(entity, self, "data.count", set, compute(block, pos(1, 2, 3), float, "minecraft:cooking/speed_default"));
+    let health = data.get(entity, self, "Health");
+    let scaled = data.get(entity, self, "Health", 2.5);
+    let label = data.get(block, pos(0, 64, 0), "Items[0].count");
+    let stored = data.get(storage, "data_demo:store", "names[0]");
+}
+
+@non_player
+fn slot_ops() {
+    self.save_items(backup);
+    self.restore_items(backup);
+    self.deposit(note, single_item);
+    self.withdraw(note, single_item);
+    self.remove_data(note);
+    self.remove_preserving_items(stash, single_item);
+    self.clear_items();
+    self.set_invulnerable(true);
+    self.set_no_gravity(false);
+}
+
+--- 07_world.mcl: blocks, biomes, clone, place, forceload, time, weather, rules ---
+namespace world_demo;
+
+score phase = 0;
+score border = 0;
+
+@load
+fn prepare() {
+    fill(pos(0, 64, 0), pos(8, 64, 8), block_state("minecraft:stone_bricks"));
+    fill(pos(0, 65, 0), pos(8, 65, 8), block_state("minecraft:oak_planks"), replace, block_state("#minecraft:planks"));
+    fill(pos(0, 66, 0), pos(8, 66, 8), block_state("minecraft:glass"), outline);
+    set_block(pos(4, 65, 4), block_state("minecraft:oak_stairs") { facing = "south"; half = "bottom"; }, keep);
+    set_block(pos(4, 66, 4), block_state("minecraft:glass"), strict);
+    set_block(pos(5, 66, 4), block_state("minecraft:chest"), nbt { name = "storage"; });
+    fill_biome(pos(0, 64, 0), pos(16, 64, 16), "minecraft:plains");
+    clone(pos(0, 64, 0), pos(8, 64, 8), pos(20, 64, 0), masked, force);
+    clone(pos(0, 64, 0), pos(8, 64, 8), pos(40, 64, 0), filtered, block_state("#minecraft:logs"), move, strict);
+    clone(pos(0, 64, 0), pos(8, 64, 8), pos(60, 64, 0), from_dimension("minecraft:the_nether"), to_dimension("minecraft:overworld"));
+    place.feature("minecraft:oak", pos(0, 64, 20));
+    place.feature(nbt { type = "minecraft:simple_block"; to_place = { id = "minecraft:stone"; }; }, pos(1, 64, 20));
+    place.structure("minecraft:village_plains", pos(32, 64, 20));
+    place.jigsaw("minecraft:village/plains/houses", "minecraft:bottom", 4, pos(64, 64, 20));
+    place.template("minecraft:empty", pos(96, 64, 20), clockwise_90, none, 1.0, 7, strict);
+    forceload.add(column(0, 0), column(31, 31));
+    weather.clear();
+    time.set(6000, t);
+    worldborder.set(1000, 5 s);
+    worldborder.warning_distance(10);
+    worldborder.warning_time(20 s);
+    gamerule.set("random_tick_speed", 5);
+    phase = 1;
+}
+
+@tick
+fn audit() {
+    border = worldborder.get();
+    if border < 1000 {
+        worldborder.add(10, 1 s);
+    }
+    if time.query() >= 13000 {
+        time.set(1000, t, "minecraft:overworld");
+    }
+}
+
+fn landmarks() {
+    locate.biome("#minecraft:is_forest");
+    locate.structure("minecraft:village_plains");
+    locate.poi("minecraft:home");
+    if gamerule.query("keep_inventory") == 1 {
+        weather.thunder(1, d);
+    }
+    time.rate(1.5);
+    time.pause();
+    time.resume();
+    time.add(1, d);
+    weather.rain(10 s);
+    worldborder.damage_amount(0.5);
+    worldborder.damage_buffer(5);
+    worldborder.center(0, 0);
+    border = time.query_gametime();
+    forceload.query();
+    forceload.remove(column(0, 0));
+    forceload.remove_all();
+}
+
+--- 08_advancement.mcl: predicates, loot/recipe resources, advancement + revoke ---
+namespace quest_demo;
+
+item medal = item_stack("minecraft:emerald") {
+    count = 2;
+    custom_name = "Medal";
+    custom_data = nbt { serial = "quest_demo-1"; };
+}
+item badge_icon = item_stack("minecraft:crying_obsidian") {}
+
+resource predicate lucky = """{"type":"minecraft:random_chance","chance":0.5}""";
+resource loot_table trophy = """{"type":"minecraft:generic","pools":[]}""";
+resource recipe token = """{"type":"minecraft:crafting_shapeless","ingredients":["minecraft:stone"],"result":{"id":"minecraft:emerald","count":1}}""";
+
+query players = entity("minecraft:player") {}
+
+fn on_placed() {}
+
+@player
+fn on_self_placed() {
+    advancement.revoke(self, portal_frame);
+    message.self("Core placed", gold);
+}
+
+advancement root_adv {
+    criterion placed {
+        trigger = placed_block;
+        conditions = """{"location":{"type":"minecraft:match_block","blocks":"minecraft:obsidian"}}""";
+    }
+    reward {
+        function = on_placed;
+        experience = 5;
+        loot = trophy;
+        recipe = token;
+    }
+    display {
+        icon = badge_icon;
+        title = "Root";
+        description = "Place obsidian.";
+        frame = goal;
+        background = "minecraft:textures/block/obsidian.png";
+        show_toast = true;
+        announce_to_chat = false;
+    }
+}
+
+advancement portal_frame {
+    parent = root_adv;
+    criterion placed { trigger = placed_block; }
+    criterion ticked { trigger = tick; conditions = """{}"""; }
+    criterion slain {
+        trigger = player_killed_entity;
+        conditions = """{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}""";
+    }
+    requirements = any;
+    reward { function = on_self_placed; }
+    display {
+        icon = medal;
+        title = "Portal frame";
+        description = "Place obsidian.";
+        frame = goal;
+    }
+}
+
+@tick
+fn lucky_tick() {
+    if predicate(lucky) {
+        advancement.grant(players, portal_frame);
+    }
+}
+
+--- 09_ui.mcl: text styles, title, bossbar, dialog, particle, posteffect, chat ---
+namespace ui_demo;
+
+objective points;
+
+query all_players = entity("minecraft:player") {}
+query one_player = entity("minecraft:player") { limit(1); }
+
+resource dialog links = """{"type":"minecraft:server_links","title":{"text":"Links"},"external_title":{"text":"Links"}}""";
+
+fn draw_ui() {
+    title.title(all_players, text("Welcome") { color = "gold"; bold = true; });
+    title.subtitle(all_players, translate("menu.singleplayer"));
+    title.actionbar(all_players, "Status updated");
+    title.times(all_players, 10 t, 3 s, 1 s);
+    title.clear(all_players);
+    title.reset(all_players);
+
+    bossbar.add("ui_demo:task", text("Task") { color = "yellow"; });
+    bossbar.set.name("ui_demo:task", "Phase one");
+    bossbar.set.color("ui_demo:task", purple);
+    bossbar.set.style("ui_demo:task", notched_10);
+    bossbar.set.value("ui_demo:task", 4);
+    bossbar.set.max("ui_demo:task", 10);
+    bossbar.set.visible("ui_demo:task", true);
+    bossbar.set.players("ui_demo:task", all_players);
+    bossbar.set.players("ui_demo:task");
+    let current_value = bossbar.get("ui_demo:task", value);
+    let maximum = bossbar.get("ui_demo:task", max);
+    let visible = bossbar.get("ui_demo:task", visible);
+    let audience = bossbar.get("ui_demo:task", players);
+    bossbar.list();
+    bossbar.remove("ui_demo:task");
+
+    dialog.show(all_players, links);
+    dialog.clear(all_players);
+}
+
+fn sensory() {
+    particle("minecraft:flame");
+    particle("minecraft:dust", nbt { color = 16711680; scale = 1.0f; }, vec3(~, ~1, ~), vec3(0.1, 0.2, 0.1), 0.05, 12, force, all_players);
+    particle("minecraft:block", nbt { block_state = "minecraft:stone"; }, vec3(~, ~, ~), vec3(0, 0, 0), 0, 1, normal, one_player);
+    stopsound(all_players);
+    stopsound(all_players, music);
+    stopsound(all_players, *, "minecraft:entity.player.levelup");
+    posteffect.add(all_players, "minecraft:blur");
+    posteffect.list(one_player);
+    posteffect.remove(all_players, "minecraft:blur");
+    posteffect.clear(all_players);
+    msg(one_player, "Task updated");
+    say("Broadcast message");
+    me("waves");
+}
+
+@player
+fn personal() {
+    title.actionbar(self, "Personal status");
+    dialog.show(self, "minecraft:server_links");
+    teammsg("Assemble!");
+    message.all(text("Hello") {
+        color = "red";
+        bold = true;
+        click = run_command("/say hi");
+        hover = text("Tooltip") { color = "gray"; };
+    });
+    message.all(translate("chat.type.text", [selector("@s"), text("joined")]));
+    message.all(nbt(entity, self, "CustomName") { separator = text(", "); });
+    message.all(score(self, points) { color = "aqua"; });
+}
+
+--- 10_items.mcl: item components, predicates, clear, give, item conditions ---
+namespace items_demo;
+
+query players = entity("minecraft:player") {}
+query equipped = entity("minecraft:player") {
+    item("weapon.mainhand") { id = item_predicate("*") { has("minecraft:custom_data"); }; }
+}
+
+item reward = item_stack("minecraft:diamond_pickaxe") {
+    count = 1;
+    custom_name = "Pioneer";
+    item_name = "Diamond Pickaxe";
+    lore("Generated by Mclang");
+    enchantment("minecraft:efficiency", 3);
+    stored_enchantment("minecraft:fortune", 1);
+    damage = 10;
+    max_damage = 1561;
+    rarity = rare;
+    item_model = "minecraft:diamond_pickaxe";
+    dyed_color = 255;
+    enchantment_glint_override = true;
+    unbreakable = true;
+    custom_data = nbt { serial = 1; };
+}
+
+item tool = item_stack("minecraft:diamond_pickaxe") {
+    components = nbt {
+        "minecraft:custom_data" = { owner = "Alex"; };
+        "minecraft:enchantment_glint_override" = true;
+        "!minecraft:damage" = {};
+    };
+}
+
+fn inventory() {
+    give(players, item_stack("minecraft:stone") {
+        components = nbt {
+            "minecraft:max_stack_size" = 99;
+            "minecraft:custom_data" = { group = "building"; };
+        };
+    }, 9900);
+    give(players, tool);
+    clear(players, item_predicate("*") {
+        has("minecraft:custom_data");
+        !has("minecraft:damage") || equals("minecraft:damage", 0);
+        matches("minecraft:custom_data", nbt { owner = "Alex"; });
+        matches("minecraft:count", nbt { min = 1; max = 64; });
+    }, 0);
+    clear(players, "#minecraft:logs", 10);
+    clear(equipped);
+    if items(entity, players, "weapon.mainhand", item_predicate("*") { equals("minecraft:damage", 0); }) {
+        message.all("Ready");
+    }
+}
+
+@player
+fn sender_inventory() {
+    clear();
+    clear(self, "minecraft:stone", 0);
+    give(self, item_stack("minecraft:stone") {});
+}
+
+--- 11_modules: modules, selected imports, export, std library ---
+----- 11_modules/main.mcl -----
+namespace module_demo;
+
+import lib::math::{sum, product};
+import std::state::{toggle};
+
+export score total = 0;
+score enabled = 0;
+
+@load
+fn load() {
+    message.all("module demo loaded", green);
+    total = sum(1, 2) + product(3, 4);
+    enabled = toggle(enabled);
+}
+
+----- 11_modules/lib/math.mcl -----
+export fn sum(left, right) -> score {
+    return left + right;
+}
+
+export fn product(left, right) -> score {
+    return left * right;
+}
+
+--- 12_macros.mcl (RAW: runtime `with` call is rejected by --deny-raw) ---
+namespace macro_demo;
+
+query players = entity("minecraft:player") {}
+score active = 1;
+
+macro fn welcome(text label, integer x, decimal z) {
+    message.all(text("Hello $(label)"));
+    teleport(players, vec3(macro(x), 64, macro(z)));
+    if active == 1 {
+        message.all(text("$(label) arrived"));
+    }
+}
+
+fn_tag greetings {
+    value(welcome);
+}
+
+fn invoke() {
+    call welcome(nbt { label = "Alex"; x = 5; z = 0.5d; });
+    call #greetings(nbt { label = "Steve"; x = 6; z = 1.5d; });
+    call "external:plain"();
+    schedule "external:plain"() after 1 s;
+    schedule.clear("external:plain");
+}
+
+fn dynamic() {
+    call welcome with(storage, "macro_demo:args", "payload");
+}
+
+--- 13_raw.mcl (RAW: run / execute string / return run are rejected by --deny-raw) ---
+namespace raw_demo;
+
+score uses = 0;
+
+@load
+fn load() {
+    run "say direct native command";
+    execute "as @a at @s" {
+        run "particle minecraft:happy_villager ~ ~1 ~ 0.2 0.2 0.2 0 3";
+    }
+    uses += 1;
+}
+
+fn raw_return() -> score {
+    return run "time query gametime";
+}
+
+--- 14_chinese_id.mcl: Chinese identifiers are legal and compiler-aliased ---
+namespace chinese_id;
+
+score 次数 = 0;
+score ascii_counter = 0;
+
+fn 计时() -> score {
+    次数 += 1;
+    ascii_counter = 次数;
+    return ascii_counter;
+}

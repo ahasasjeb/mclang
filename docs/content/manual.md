@@ -133,6 +133,8 @@ build/hello/
 - 数字：十进制整数（32 位范围内）与小数（`1.5`、`0.25`）；NBT 的类型后缀见[结构化 NBT](#basics-nbt)。
 - 标识符：字母、数字与下划线，不能以数字开头。ASCII 名必须是小写字母、数字与下划线，不超过 32 个字符，且不能是保留字（中英文关键词都是保留字）。中文等非 ASCII 字母也允许，编译时会被换成随机 ASCII 别名，见[中文标识符](#basics-identifiers)。
 
+语句以 `;` 结束。`query`、`item`、`fn_tag`、`advancement` 的 `}` 之后，以及独立的 `nbt { ... }` 数据语句之后，可以再写一个可选分号；带块的 `objective` 声明与函数体之后不能写分号。`namespace`、`score`、`storage`、`data_slot`、`resource` 这类非块声明必须写 `;`。
+
 ### 程序结构与模块
 
 项目是一个目录，入口模块固定叫 `main.mcl`：`mclang build <目录>` 从入口出发，沿 `import` 边加载其他 `.mcl` 模块；入口到不了的 `.mcl` 文件不参与编译（入口只 import 一次就够，即使不引用它的名字，模块里的进度、函数标签等资源也会生效）。
@@ -200,6 +202,8 @@ export fn product(left, right) -> score {
 | `std::time` | `seconds_to_ticks`、`ticks_to_seconds`、`interval_due`、`cooldown_ready`、`remaining` | 周期任务、冷却与倒计时 |
 | `std::random` | `chance`、`chance_per_mille` | 按百分比或千分比触发事件 |
 
+精确签名：`abs(value)`、`min(left, right)`、`max(left, right)`、`clamp(value, low, high)`、`sign(value)`；`normalize(value)`、`toggle(value)`、`latch(previous, signal)`、`rising_edge(previous, current)`、`falling_edge(previous, current)`；`seconds_to_ticks(seconds)`、`ticks_to_seconds(ticks)`、`interval_due(now_tick, last_tick, period)`、`cooldown_ready(now_tick, deadline_tick)`、`remaining(now_tick, deadline_tick)`；`chance(percent)`、`chance_per_mille(rate)`。函数名与参数名都是 API 标识符，不随中英文关键词切换。
+
 ```mcl title="标准库导入（examples/stdlib_demo）" fragment
 import std::state::{toggle};
 import std::time::{interval_due, seconds_to_ticks};
@@ -222,7 +226,7 @@ fn tick() {
 }
 ```
 
-所有函数使用 32 位计分整数。布尔函数把 0 视为假、其他值视为真，并返回 0 或 1；`rising_edge` 和 `falling_edge` 的调用方需要保存上一刻的状态。时间函数使用每秒 20 刻的换算，`interval_due` 的周期必须大于 0，调用方在触发后更新 `last_tick`。`chance` 接受 0–100，`chance_per_mille` 接受 0–1000，超出范围时分别按 0 或必定触发处理。`clamp` 的下界高于上界时返回下界。计分运算仍遵循原版 32 位行为，调用方应避免乘法及时间差溢出。
+所有函数使用 32 位计分整数。布尔函数把 0 视为假、其他值视为真，并返回 0 或 1；`rising_edge` 和 `falling_edge` 的调用方需要保存上一刻的状态。时间函数使用每秒 20 刻的换算，`interval_due` 的周期必须大于 0，调用方在触发后更新 `last_tick`；`cooldown_ready` 在到达截止刻及之后返回 1，`remaining` 返回截止刻之前的剩余刻数、过期后为 0。`chance` 接受 0–100，`chance_per_mille` 接受 0–1000，超出范围时分别按 0 或必定触发处理。`clamp` 的下界高于上界时返回下界。计分运算仍遵循原版 32 位行为，调用方应避免乘法及时间差溢出。
 
 ### 中英关键词
 
