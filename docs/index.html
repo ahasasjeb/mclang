@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mclang 语言手册 — 面向 Minecraft Java 26.3 的数据包编程语言</title>
+<meta name="theme-color" content="#14251e">
+<title>Mclang 0.5.0 · Minecraft 26.3 数据包语言手册</title>
 <meta name="description" content="Mclang 0.5.0 语言手册：语法、语义、执行上下文、编译产物、双语关键词与完整示例。">
 <link rel="stylesheet" href="assets/manual.css">
 <script>
@@ -19,16 +20,31 @@
 </script>
 </head>
 <body>
+<a class="skip-link" href="#intro">跳到手册正文</a>
 <header class="topbar">
-  <button id="nav-toggle" type="button" aria-label="打开目录">目录</button>
-  <a class="brand" href="#top">Mclang 语言手册 <small>v0.5.0 · Minecraft Java 26.3</small></a>
+  <button id="nav-toggle" type="button" aria-controls="toc" aria-expanded="false" aria-label="打开章节目录">目录</button>
+  <a class="brand" href="#top" aria-label="Mclang 手册首页">
+    <span class="brand-mark" aria-hidden="true">M</span>
+    <span class="brand-name">Mclang <small>语言手册</small></span>
+  </a>
+  <nav class="top-links" aria-label="页面导航">
+    <a href="#quickstart">快速开始</a>
+    <a href="#appendix-keywords">关键词索引</a>
+  </nav>
   <span class="spacer"></span>
+  <span class="version-chip">v0.5.0 <span>·</span> Java 26.3</span>
   <button id="keyword-toggle" type="button" title="切换代码块与行内关键词的语言">中文关键词</button>
   <button id="theme-toggle" type="button" title="切换深浅色">深色</button>
 </header>
 <div class="layout">
   <nav class="toc" id="toc" aria-label="目录">
-    <div class="toc-title">目录</div>
+    <div class="toc-title"><span>本手册</span><span class="toc-count">74</span></div>
+    <label class="toc-search">
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input id="toc-search" type="search" placeholder="搜索章节" aria-label="搜索手册章节" autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+    <div class="toc-links">
 <a class="lvl-2" href="#intro">认识 Mclang</a>
 <a class="lvl-2" href="#quickstart">安装与第一个数据包</a>
 <a class="lvl-3" href="#sec-构建编译器">构建编译器</a>
@@ -103,14 +119,55 @@
 <a class="lvl-2" href="#appendix-registry">附录 C：游戏规则与 JSON 资源类型</a>
 <a class="lvl-2" href="#appendix-triggers">附录 D：进度触发器</a>
 <a class="lvl-2" href="#appendix-nbt-aliases">附录 E：实体 NBT 中文别名</a>
+    </div>
+    <p id="toc-empty" class="toc-empty" hidden>没有找到匹配的章节</p>
+    <a class="toc-source" href="#appendix-keywords">查看中英关键词对照 <span aria-hidden="true">↗</span></a>
   </nav>
   <main id="top">
-<p class="lede">Mclang 是一门面向 Minecraft Java Edition 26.3 的数据包编程语言。作者用命名、类型和结构化语法描述实体查询、物品、消息、控制流与世界命令，实体选择器、execute 上下文、NBT 路径、文本组件 JSON、计分板 ABI 与数据包目录全部由编译器生成并检查。</p>
+    <section class="hero" aria-labelledby="welcome-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> LANGUAGE FOR MINECRAFT</p>
+        <h1 id="welcome-title">用 MCL 写 Minecraft<br><span>数据包。</span></h1>
+        <p class="hero-lede">Mclang 是面向 Minecraft Java Edition 26.3 的数据包编程语言。用结构化语法描述数据包功能，编译器检查源码并生成 Minecraft 函数、资源文件与数据包目录。</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#quickstart">开始使用 <span aria-hidden="true">↗</span></a>
+          <a class="button button-secondary" href="#examples-core">浏览完整示例 <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="hero-meta">
+          <span><strong>15</strong> 个手册示例经编译器验证</span>
+          <span class="hero-meta-divider" aria-hidden="true"></span>
+          <span>中文与 English 关键词</span>
+        </div>
+      </div>
+      <div class="hero-visual" role="img" aria-label="Mclang 将源码检查并编译为 Minecraft 数据包">
+        <div class="visual-heading"><span>从源码到数据包</span><span class="visual-version">JAVA 26.3</span></div>
+        <div class="flow-step flow-source">
+          <span class="flow-number">01</span><span class="flow-icon">{ }</span>
+          <span class="flow-copy"><strong>main.mcl</strong><small>结构化源码</small></span>
+          <span class="flow-state">MCL</span>
+        </div>
+        <div class="flow-connector"><i></i></div>
+        <div class="flow-step flow-compiler">
+          <span class="flow-number">02</span><span class="flow-icon">✓</span>
+          <span class="flow-copy"><strong>编译器检查</strong><small>语法 · 类型 · 资源</small></span>
+          <span class="flow-state">OK</span>
+        </div>
+        <div class="flow-connector"><i></i></div>
+        <div class="flow-step flow-pack">
+          <span class="flow-number">03</span><span class="flow-icon">▤</span>
+          <span class="flow-copy"><strong>数据包</strong><small>可放入世界的 datapacks/</small></span>
+          <span class="flow-state">PACK</span>
+        </div>
+        <div class="visual-footer"><span>目标版本</span><strong>Minecraft Java Edition 26.3</strong></div>
+      </div>
+      <span class="hero-orbit hero-orbit-one" aria-hidden="true"></span>
+      <span class="hero-orbit hero-orbit-two" aria-hidden="true"></span>
+    </section>
 <div class="callout note"><p class="callout-title">本手册怎么读</p><p>语法模板里的尖括号是占位符，例如 <code class="kw"><span class="kw-en">give(&lt;players&gt;, &lt;stack&gt;)</span><span class="kw-zh">给予(&lt;players&gt;, &lt;stack&gt;)</span></code>；标注“编译器验证通过”的完整示例由 <code>docs/tools/build.mjs</code> 分别用英文与中文关键词编译过，两种写法的数据包<strong>逐字节一致</strong>，示例里的 <code>.mcfunction</code> 片段是编译器实际产物。顶栏的 <strong>“English keywords / 中文关键词”</strong> 按钮会把页面上的 Mclang 代码块、行内关键词、方法名与枚举值整体切换；只翻译关键词，注释、字符串与标识符保持原样；生成的命令与目录树不参与切换。</p>
 </div>
 <h2 id="intro">认识 Mclang</h2>
 <p>手写 <code>.mcfunction</code> 时，一个“每五秒给所有玩家发一次奖励”就需要同时处理计分板假玩家、<code class="kw"><span class="kw-en">execute as</span><span class="kw-zh">执行 作为</span></code>/<code>at</code> 上下文、函数标签、<code>tellraw</code> 的 JSON 和 <code class="kw"><span class="kw-en">give</span><span class="kw-zh">给予</span></code> 的物品组件语法。Mclang 把源码分成了明确的层：</p>
-<ul><li><strong>声明层</strong>：<code class="kw"><span class="kw-en">namespace</span><span class="kw-zh">命名空间</span></code>、<code class="kw"><span class="kw-en">score</span><span class="kw-zh">计分</span></code>、<code class="kw"><span class="kw-en">objective</span><span class="kw-zh">目标</span></code>、<code class="kw"><span class="kw-en">query</span><span class="kw-zh">查询</span></code>、<code class="kw"><span class="kw-en">item</span><span class="kw-zh">物品</span></code>、<code class="kw"><span class="kw-en">storage</span><span class="kw-zh">存储</span></code>、<code class="kw"><span class="kw-en">data_slot</span><span class="kw-zh">数据槽</span></code>、<code class="kw"><span class="kw-en">resource</span><span class="kw-zh">资源</span></code>、<code class="kw"><span class="kw-en">fn_tag</span><span class="kw-zh">函数标签</span></code>、<code class="kw"><span class="kw-en">fn</span><span class="kw-zh">函数</span></code>，编译器检查重名、类型与资源位置。</li><li><strong>语句层</strong>：<code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code>、<code class="kw"><span class="kw-en">each</span><span class="kw-zh">遍历</span></code>、<code class="kw"><span class="kw-en">spawn</span><span class="kw-zh">召唤</span></code>、<code class="kw"><span class="kw-en">give</span><span class="kw-zh">给予</span></code>、<code class="kw"><span class="kw-en">self.*</span><span class="kw-zh">自身.*</span></code>、<code class="kw"><span class="kw-en">message.*</span><span class="kw-zh">消息.*</span></code>、<code class="kw"><span class="kw-en">title.*</span><span class="kw-zh">屏幕标题.*</span></code>、<code class="kw"><span class="kw-en">bossbar.*</span><span class="kw-zh">Boss栏.*</span></code>、<code class="kw"><span class="kw-en">dialog.*</span><span class="kw-zh">对话框.*</span></code>、<code class="kw"><span class="kw-en">particle</span><span class="kw-zh">粒子</span></code>、<code class="kw"><span class="kw-en">stopsound</span><span class="kw-zh">停止声音</span></code>、<code class="kw"><span class="kw-en">posteffect.*</span><span class="kw-zh">后处理效果.*</span></code>、<code class="kw"><span class="kw-en">effect.*</span><span class="kw-zh">效果.*</span></code>、<code class="kw"><span class="kw-en">xp.*</span><span class="kw-zh">经验.*</span></code>、<code class="kw"><span class="kw-en">scoreboard.*</span><span class="kw-zh">计分板.*</span></code>、<code class="kw"><span class="kw-en">teleport</span><span class="kw-zh">传送</span></code>、<code class="kw"><span class="kw-en">schedule</span><span class="kw-zh">调度</span></code>、<code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code>/<code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 以及 <code class="kw"><span class="kw-en">set_block</span><span class="kw-zh">设置方块</span></code>、<code class="kw"><span class="kw-en">fill</span><span class="kw-zh">填充</span></code>、<code class="kw"><span class="kw-en">clone</span><span class="kw-zh">复制</span></code> 等世界命令，每条都有结构化 AST 表示。</li><li><strong>表达式层</strong>：整数、计分值、带返回值的函数调用与 <code class="kw"><span class="kw-en">scoreboard.get</span><span class="kw-zh">计分板.取</span></code>、<code class="kw"><span class="kw-en">xp.query</span><span class="kw-zh">经验.查询</span></code>、<code class="kw"><span class="kw-en">stopwatch.query</span><span class="kw-zh">秒表.查询</span></code>、<code class="kw"><span class="kw-en">time.query</span><span class="kw-zh">时间.查询</span></code>、<code class="kw"><span class="kw-en">gamerule.query</span><span class="kw-zh">游戏规则.查询</span></code>、<code class="kw"><span class="kw-en">worldborder.get</span><span class="kw-zh">世界边界.获取</span></code> 等查询表达式。</li><li><strong>逃生口</strong>：<code class="kw"><span class="kw-en">run</span><span class="kw-zh">原生命令</span></code>、字符串形式的 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 与 <code class="kw"><span class="kw-en">return run</span><span class="kw-zh">返回 原生命令</span></code> 接受原生命令文本，<code>--deny-raw</code> 可以强制项目完全停留在标准层。</li></ul><div class="callout tip"><p class="callout-title">中英关键词完全等价</p><p>每个关键词、函数属性、方法和枚举值都有英文与中文写法，两种写法可以在同一个文件、同一条语句里混用。编译器保证两种写法生成<strong>逐字节相同</strong>的数据包；本手册的构建脚本会在每次生成时重新验证这一点。</p>
+<ul><li><strong>声明层</strong>：<code class="kw"><span class="kw-en">namespace</span><span class="kw-zh">命名空间</span></code>、<code class="kw"><span class="kw-en">score</span><span class="kw-zh">计分</span></code>、<code class="kw"><span class="kw-en">objective</span><span class="kw-zh">目标</span></code>、<code class="kw"><span class="kw-en">query</span><span class="kw-zh">查询</span></code>、<code class="kw"><span class="kw-en">item</span><span class="kw-zh">物品</span></code>、<code class="kw"><span class="kw-en">storage</span><span class="kw-zh">存储</span></code>、<code class="kw"><span class="kw-en">data_slot</span><span class="kw-zh">数据槽</span></code>、<code class="kw"><span class="kw-en">resource</span><span class="kw-zh">资源</span></code>、<code class="kw"><span class="kw-en">fn_tag</span><span class="kw-zh">函数标签</span></code>、<code class="kw"><span class="kw-en">fn</span><span class="kw-zh">函数</span></code>，编译器检查重名、类型与资源位置。</li><li><strong>语句层</strong>：<code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code>、<code class="kw"><span class="kw-en">each</span><span class="kw-zh">遍历</span></code>、<code class="kw"><span class="kw-en">spawn</span><span class="kw-zh">召唤</span></code>、<code class="kw"><span class="kw-en">give</span><span class="kw-zh">给予</span></code>、<code class="kw"><span class="kw-en">self.*</span><span class="kw-zh">自身.*</span></code>、<code class="kw"><span class="kw-en">message.*</span><span class="kw-zh">消息.*</span></code>、<code class="kw"><span class="kw-en">title.*</span><span class="kw-zh">屏幕标题.*</span></code>、<code class="kw"><span class="kw-en">bossbar.*</span><span class="kw-zh">Boss栏.*</span></code>、<code class="kw"><span class="kw-en">dialog.*</span><span class="kw-zh">对话框.*</span></code>、<code class="kw"><span class="kw-en">particle</span><span class="kw-zh">粒子</span></code>、<code class="kw"><span class="kw-en">stopsound</span><span class="kw-zh">停止声音</span></code>、<code class="kw"><span class="kw-en">posteffect.*</span><span class="kw-zh">后处理效果.*</span></code>、<code class="kw"><span class="kw-en">effect.*</span><span class="kw-zh">效果.*</span></code>、<code class="kw"><span class="kw-en">xp.*</span><span class="kw-zh">经验.*</span></code>、<code class="kw"><span class="kw-en">scoreboard.*</span><span class="kw-zh">计分板.*</span></code>、<code class="kw"><span class="kw-en">teleport</span><span class="kw-zh">传送</span></code>、<code class="kw"><span class="kw-en">schedule</span><span class="kw-zh">调度</span></code>、<code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code>/<code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 以及 <code class="kw"><span class="kw-en">set_block</span><span class="kw-zh">设置方块</span></code>、<code class="kw"><span class="kw-en">fill</span><span class="kw-zh">填充</span></code>、<code class="kw"><span class="kw-en">clone</span><span class="kw-zh">复制</span></code> 等世界命令，每条都有结构化 AST 表示。</li><li><strong>表达式层</strong>：整数、计分值、带返回值的函数调用与 <code class="kw"><span class="kw-en">scoreboard.get</span><span class="kw-zh">计分板.取</span></code>、<code class="kw"><span class="kw-en">xp.query</span><span class="kw-zh">经验.查询</span></code>、<code class="kw"><span class="kw-en">stopwatch.query</span><span class="kw-zh">秒表.查询</span></code>、<code class="kw"><span class="kw-en">time.query</span><span class="kw-zh">时间.查询</span></code>、<code class="kw"><span class="kw-en">gamerule.query</span><span class="kw-zh">游戏规则.查询</span></code>、<code class="kw"><span class="kw-en">worldborder.get</span><span class="kw-zh">世界边界.获取</span></code> 等查询表达式。</li><li><strong>底层逃生口与严格模式</strong>：<code class="kw"><span class="kw-en">run</span><span class="kw-zh">原生命令</span></code>、字符串形式的 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 与 <code class="kw"><span class="kw-en">return run</span><span class="kw-zh">返回 原生命令</span></code> 接受原生命令文本。<code>--deny-raw</code> 会拒绝这些写法，也会拒绝运行期 <code class="kw"><span class="kw-en">with</span><span class="kw-zh">用</span></code> 宏调用和声明 <code class="kw"><span class="kw-en">nbt</span><span class="kw-zh">数据</span></code> 参数的宏函数。</li></ul><div class="callout tip"><p class="callout-title">中英关键词完全等价</p><p>每个关键词、函数属性、方法和枚举值都有英文与中文写法，两种写法可以在同一个文件、同一条语句里混用。编译器保证两种写法生成<strong>逐字节相同</strong>的数据包；本手册的构建脚本会在每次生成时重新验证这一点。</p>
 </div>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">一个最小的完整程序</span><span class="code-actions"><span class="badge ok">编译器验证通过</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">hello</span>;
 
@@ -171,13 +228,14 @@ scoreboard players set #v_ticks mcl_d84680aabd0b 0</code></pre></figure>
 <figure class="code" data-lang="text"><figcaption><span class="code-title">用法</span><span class="code-actions"><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code>mclang build &lt;源文件.mcl|项目目录&gt; [-o &lt;输出目录&gt;] [--description &lt;文本&gt;] [--deny-raw]
 mclang check &lt;源文件.mcl|项目目录&gt; [--deny-raw]
 mclang lsp
-mclang help | version</code></pre></figure>
+mclang help
+mclang version</code></pre></figure>
 <div class="table-wrap"><table>
 <thead><tr><th>命令</th><th>作用</th></tr></thead>
 <tbody>
 <tr><td><code>mclang check &lt;输入&gt;</code></td><td>只做检查、不写文件，全部诊断一次返回，通过后打印资源统计</td></tr>
 <tr><td><code>mclang build &lt;输入&gt; [-o 目录]</code></td><td>通过全部检查后写出数据包，默认输出到 <code>build/&lt;名字&gt;</code></td></tr>
-<tr><td><code>--deny-raw</code></td><td>严格模式：项目里出现底层 <code class="kw"><span class="kw-en">run</span><span class="kw-zh">原生命令</span></code>、字符串 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> 或字符串形式的 <code class="kw"><span class="kw-en">return run</span><span class="kw-zh">返回 原生命令</span></code> 就拒绝构建</td></tr>
+<tr><td><code>--deny-raw</code></td><td>严格模式：检查或构建时拒绝 <code class="kw"><span class="kw-en">run</span><span class="kw-zh">原生命令</span></code>、字符串形式的 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code> / <code class="kw"><span class="kw-en">return run</span><span class="kw-zh">返回 原生命令</span></code>、运行期 <code class="kw"><span class="kw-en">with</span><span class="kw-zh">用</span></code> 宏调用，以及声明 <code class="kw"><span class="kw-en">nbt</span><span class="kw-zh">数据</span></code> 参数的宏函数</td></tr>
 <tr><td><code>--description &lt;文本&gt;</code></td><td>写入 <code>pack.mcmeta</code> 的描述，默认 <code>Generated by mclang</code></td></tr>
 <tr><td><code>mclang lsp</code></td><td>在标准输入输出上启动语言服务器，供编辑器插件使用</td></tr>
 </tbody></table></div>
@@ -1687,7 +1745,7 @@ execute if score #t0 mcl_dfa18818c216 matches 1 run function execute_demo:__mcl/
 }</code></pre></figure>
 <p>用严格模式检查这个文件可以看到拒绝信息：</p>
 <figure class="code" data-lang="text"><figcaption><span class="code-title">&quot;--deny-raw</span><span class="code-actions"><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code>$ cargo run -- check raw_escape.mcl --deny-raw
-严格模式检查失败：项目包含 4 条底层 run/execute 语句</code></pre></figure>
+严格模式检查失败：项目包含 4 条底层语句或不安全宏（run/execute/return run/运行期 with/nbt 宏片段）</code></pre></figure>
 <h3 id="statements-world">世界与方块</h3>
 <p>世界命令的参数也由编译器检查：坐标范围、方块资源位置、方块属性字符、枚举值、时间单位与数值范围都在编译期验证。位置统一写成 <code class="kw"><span class="kw-en">pos(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span><span class="kw-zh">坐标(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span></code>（中文 <code class="kw"><span class="kw-en">pos(...)</span><span class="kw-zh">坐标(...)</span></code>，别名 <code class="kw"><span class="kw-en">block_pos(...)</span><span class="kw-zh">方块坐标(...)</span></code>）：分量可以是整数绝对坐标、<code>~[±偏移]</code> 相对坐标或 <code>^[±偏移]</code> 局部坐标；<code>^</code> 三个分量必须同时使用，不能与另外两种混用。绝对坐标的水平范围是 -30000000 到 29999999，垂直范围是 -2032 到 2031。</p>
 <p>需要小数坐标时写 <code class="kw"><span class="kw-en">vec3(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span><span class="kw-zh">精确坐标(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span></code>（精确坐标，如传送落点），水平两分量用 <code class="kw"><span class="kw-en">vec2(&lt;x&gt;, &lt;z&gt;)</span><span class="kw-zh">平面坐标(&lt;x&gt;, &lt;z&gt;)</span></code>（如 <code>worldborder.center</code> 的另一种写法）；两者的绝对分量允许小数，范围与方块坐标一致。<code class="kw"><span class="kw-en">vec2</span><span class="kw-zh">平面坐标</span></code> 不支持 <code>^</code>。</p>

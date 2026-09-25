@@ -52,17 +52,37 @@
   /* ---------- 移动端目录 ---------- */
   var toc = $("#toc");
   var navButton = $("#nav-toggle");
+  function setNavOpen(open) {
+    if (!toc || !navButton) return;
+    var isMobile = window.matchMedia && window.matchMedia("(max-width: 980px)").matches;
+    var isOpen = Boolean(open && isMobile);
+    toc.classList.toggle("open", isOpen);
+    toc.inert = Boolean(isMobile && !isOpen);
+    navButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    navButton.setAttribute("aria-label", isOpen ? "关闭章节目录" : "打开章节目录");
+  }
   if (navButton && toc) {
+    setNavOpen(false);
     navButton.addEventListener("click", function () {
-      toc.classList.toggle("open");
+      setNavOpen(!toc.classList.contains("open"));
     });
     toc.addEventListener("click", function (event) {
-      if (event.target.tagName === "A") toc.classList.remove("open");
+      if (event.target.closest("a")) setNavOpen(false);
+    });
+    document.addEventListener("click", function (event) {
+      if (
+        toc.classList.contains("open") &&
+        !toc.contains(event.target) &&
+        !navButton.contains(event.target)
+      ) setNavOpen(false);
+    });
+    window.addEventListener("resize", function () {
+      setNavOpen(toc.classList.contains("open"));
     });
   }
 
   /* ---------- 目录高亮当前章节 ---------- */
-  var tocLinks = toc ? $$("a", toc) : [];
+  var tocLinks = toc ? $$(".toc-links a", toc) : [];
   var sections = tocLinks
     .map(function (link) {
       var id = link.getAttribute("href").slice(1);
@@ -87,6 +107,43 @@
     );
     sections.forEach(function (item) { observer.observe(item.heading); });
   }
+
+  /* ---------- 目录搜索 ---------- */
+  var tocSearch = $("#toc-search");
+  var tocEmpty = $("#toc-empty");
+  if (tocSearch) {
+    tocSearch.addEventListener("input", function () {
+      var query = tocSearch.value.trim().toLocaleLowerCase();
+      var matches = 0;
+      tocLinks.forEach(function (link) {
+        var match = query === "" || link.textContent.toLocaleLowerCase().indexOf(query) !== -1;
+        link.hidden = !match;
+        if (match) matches += 1;
+      });
+      if (tocEmpty) tocEmpty.hidden = matches > 0;
+    });
+  }
+
+  document.addEventListener("keydown", function (event) {
+    var target = event.target;
+    var isEditing = target && (
+      target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
+    );
+    if (event.key === "Escape") {
+      if (tocSearch && tocSearch.value) {
+        tocSearch.value = "";
+        tocSearch.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      setNavOpen(false);
+      if (tocSearch && document.activeElement === tocSearch) tocSearch.blur();
+    } else if (event.key === "/" && !isEditing && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      if (tocSearch) {
+        setNavOpen(true);
+        tocSearch.focus();
+      }
+    }
+  });
 
   /* ---------- 回到顶部 ---------- */
   var toTop = $("#to-top");

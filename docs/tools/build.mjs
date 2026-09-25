@@ -443,13 +443,18 @@ function composePage({ content, headings, data, stats, examples }) {
   const version = /^version\s*=\s*"([^"]+)"/m.exec(
     readFileSync(path.join(repoRoot, "Cargo.toml"), "utf8"),
   )?.[1];
-  const toc = headings
-    .filter((heading) => heading.level === 2 || heading.level === 3)
+  const navigationHeadings = headings.filter(
+    (heading) => heading.level === 2 || heading.level === 3,
+  );
+  const toc = navigationHeadings
     .map(
       (heading) =>
         `<a class="lvl-${heading.level}" href="#${heading.id}">${escapeHtml(heading.text)}</a>`,
     )
     .join("\n");
+  const lead = /<p class="lede">([\s\S]*?)<\/p>\s*/.exec(content);
+  if (!lead) fail("手册正文缺少 :::lede 首页简介");
+  const articleContent = content.replace(lead[0], "");
   const verifiedList = examples
     .map((example) => `<code>${escapeHtml(example.id)}</code>`)
     .join("、");
@@ -459,7 +464,8 @@ function composePage({ content, headings, data, stats, examples }) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mclang 语言手册 — 面向 Minecraft Java 26.3 的数据包编程语言</title>
+<meta name="theme-color" content="#14251e">
+<title>Mclang ${escapeHtml(version ?? "")} · Minecraft 26.3 数据包语言手册</title>
 <meta name="description" content="Mclang ${version} 语言手册：语法、语义、执行上下文、编译产物、双语关键词与完整示例。">
 <link rel="stylesheet" href="assets/manual.css">
 <script>
@@ -475,20 +481,77 @@ function composePage({ content, headings, data, stats, examples }) {
 </script>
 </head>
 <body>
+<a class="skip-link" href="#intro">跳到手册正文</a>
 <header class="topbar">
-  <button id="nav-toggle" type="button" aria-label="打开目录">目录</button>
-  <a class="brand" href="#top">Mclang 语言手册 <small>v${escapeHtml(version ?? "")} · Minecraft Java 26.3</small></a>
+  <button id="nav-toggle" type="button" aria-controls="toc" aria-expanded="false" aria-label="打开章节目录">目录</button>
+  <a class="brand" href="#top" aria-label="Mclang 手册首页">
+    <span class="brand-mark" aria-hidden="true">M</span>
+    <span class="brand-name">Mclang <small>语言手册</small></span>
+  </a>
+  <nav class="top-links" aria-label="页面导航">
+    <a href="#quickstart">快速开始</a>
+    <a href="#appendix-keywords">关键词索引</a>
+  </nav>
   <span class="spacer"></span>
+  <span class="version-chip">v${escapeHtml(version ?? "")} <span>·</span> Java 26.3</span>
   <button id="keyword-toggle" type="button" title="切换代码块与行内关键词的语言">中文关键词</button>
   <button id="theme-toggle" type="button" title="切换深浅色">深色</button>
 </header>
 <div class="layout">
   <nav class="toc" id="toc" aria-label="目录">
-    <div class="toc-title">目录</div>
+    <div class="toc-title"><span>本手册</span><span class="toc-count">${navigationHeadings.length}</span></div>
+    <label class="toc-search">
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input id="toc-search" type="search" placeholder="搜索章节" aria-label="搜索手册章节" autocomplete="off">
+      <kbd>/</kbd>
+    </label>
+    <div class="toc-links">
 ${toc}
+    </div>
+    <p id="toc-empty" class="toc-empty" hidden>没有找到匹配的章节</p>
+    <a class="toc-source" href="#appendix-keywords">查看中英关键词对照 <span aria-hidden="true">↗</span></a>
   </nav>
   <main id="top">
-${content}
+    <section class="hero" aria-labelledby="welcome-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> LANGUAGE FOR MINECRAFT</p>
+        <h1 id="welcome-title">用 MCL 写 Minecraft<br><span>数据包。</span></h1>
+        <p class="hero-lede">${lead[1]}</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#quickstart">开始使用 <span aria-hidden="true">↗</span></a>
+          <a class="button button-secondary" href="#examples-core">浏览完整示例 <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="hero-meta">
+          <span><strong>${stats.examples}</strong> 个手册示例经编译器验证</span>
+          <span class="hero-meta-divider" aria-hidden="true"></span>
+          <span>中文与 English 关键词</span>
+        </div>
+      </div>
+      <div class="hero-visual" role="img" aria-label="Mclang 将源码检查并编译为 Minecraft 数据包">
+        <div class="visual-heading"><span>从源码到数据包</span><span class="visual-version">JAVA 26.3</span></div>
+        <div class="flow-step flow-source">
+          <span class="flow-number">01</span><span class="flow-icon">{ }</span>
+          <span class="flow-copy"><strong>main.mcl</strong><small>结构化源码</small></span>
+          <span class="flow-state">MCL</span>
+        </div>
+        <div class="flow-connector"><i></i></div>
+        <div class="flow-step flow-compiler">
+          <span class="flow-number">02</span><span class="flow-icon">✓</span>
+          <span class="flow-copy"><strong>编译器检查</strong><small>语法 · 类型 · 资源</small></span>
+          <span class="flow-state">OK</span>
+        </div>
+        <div class="flow-connector"><i></i></div>
+        <div class="flow-step flow-pack">
+          <span class="flow-number">03</span><span class="flow-icon">▤</span>
+          <span class="flow-copy"><strong>数据包</strong><small>可放入世界的 datapacks/</small></span>
+          <span class="flow-state">PACK</span>
+        </div>
+        <div class="visual-footer"><span>目标版本</span><strong>Minecraft Java Edition 26.3</strong></div>
+      </div>
+      <span class="hero-orbit hero-orbit-one" aria-hidden="true"></span>
+      <span class="hero-orbit hero-orbit-two" aria-hidden="true"></span>
+    </section>
+${articleContent}
   </main>
 </div>
 <footer>
