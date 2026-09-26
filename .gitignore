@@ -5,3 +5,4 @@ minecraft_client_26.3
 # VSCode 插件
 node_modules/
 editors/vscode/*.vsix
+.commandcode
