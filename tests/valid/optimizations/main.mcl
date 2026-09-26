@@ -76,6 +76,67 @@ fn upper_range(value) {
     }
 }
 
+fn for_loop_ranges() {
+    for index in 0..4 {
+        if index >= 0 {
+            if index > -1 {
+                if index < 4 { counter += 1; }
+            }
+        }
+        if index > 10 {
+            if index < 4 { counter += 100; }
+        }
+    }
+}
+
+fn nested_for_loop_ranges() {
+    for outer in -2..3 {
+        for inner in 1..4 {
+            if outer >= -2 {
+                if outer < 3 {
+                    if inner >= 1 {
+                        if inner < 4 { counter += 1; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn mutated_for_loop_range() {
+    for index in 0..4 {
+        index = 10;
+        if index < 4 { counter += 1; }
+    }
+}
+
+fn counted_while_ranges() {
+    let index = 0;
+    while index < 4 {
+        if index >= 0 {
+            if index > -1 {
+                if index < 4 { counter += 1; }
+            }
+        }
+        index += 1;
+    }
+}
+
+fn overflowing_while_range() {
+    let index = 2147483646;
+    while index < 2147483647 {
+        if index >= 2147483646 { counter += 1; }
+        index += 2;
+    }
+}
+
+fn known_empty_while() {
+    let index = 4;
+    while index < 4 {
+        counter += 1;
+    }
+}
+
 fn boolean_identities() {
     if counter > 0 && 1 == 1 { counter += 1; }
     if counter > 0 || 1 == 0 { counter += 1; }

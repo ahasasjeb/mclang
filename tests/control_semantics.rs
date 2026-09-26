@@ -134,10 +134,28 @@ fn control_flow_effects_and_small_command_shapes() {
 
     let simple_while = owner_commands(&output, "simple_while");
     assert!(
-        simple_while.contains("matches ..2 run function control_semantics:__mcl/simple_while/")
+        simple_while.contains("matches ..2 run return 0"),
+        "while helper 应在反向入口条件上直接退出：{simple_while}"
     );
     assert!(!simple_while.contains("#t"));
     assert!(!simple_while.contains("#loop_state_"));
+    assert_eq!(
+        fs::read_dir(output.join("data/control_semantics/function/__mcl/simple_while"))
+            .unwrap()
+            .count(),
+        1,
+        "简单 while 应使用单个带入口早退的自递归辅助函数"
+    );
+    let compound_while = owner_commands(&output, "compound_while");
+    assert_eq!(compound_while.matches("matches 1..").count(), 2);
+    assert!(!compound_while.contains("run return 0"));
+    assert_eq!(
+        fs::read_dir(output.join("data/control_semantics/function/__mcl/compound_while"))
+            .unwrap()
+            .count(),
+        2,
+        "合取条件不能被错误地翻转成单条入口早退"
+    );
     let simple_for = owner_commands(&output, "simple_for");
     assert!(
         simple_for
@@ -402,9 +420,14 @@ fn raw_return_keeps_a_function_boundary() {
         .unwrap()
         .map(|entry| fs::read_to_string(entry.unwrap().path()).unwrap())
         .collect::<Vec<_>>();
-    assert!(helper_text.iter().any(|text| text.contains("return 0")));
+    assert!(
+        helper_text
+            .iter()
+            .any(|text| text.lines().any(|line| line.trim() == "return 0"))
+    );
     assert!(helper_text.iter().any(|text| {
-        text.contains("function raw_boundary:__mcl/probe/") && !text.contains("return 0")
+        text.contains("function raw_boundary:__mcl/probe/")
+            && !text.lines().any(|line| line.trim() == "return 0")
     }));
     assert!(
         build_file(

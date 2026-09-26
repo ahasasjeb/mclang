@@ -1,10 +1,13 @@
 use crate::ast::*;
 
+use crate::compiler::codegen::condition_facts::ScoreFacts;
 use crate::compiler::codegen::emit::entity_query_clause;
 use crate::compiler::codegen::world;
 use crate::compiler::codegen::{Compiler, Value};
 
-use super::helpers::{LoopLimit, constant_condition, constant_integer, contains_current_loop_jump};
+use super::helpers::{
+    LoopLimit, constant_condition, constant_integer, contains_current_loop_jump, writes_variable,
+};
 
 impl Compiler<'_> {
     pub(super) fn compile_each(
@@ -175,9 +178,10 @@ impl Compiler<'_> {
         ));
     }
 
-    /// `while` 循环：循环辅助函数在每轮开头求值条件，命中就调用循环体辅助函数，
-    /// 再按循环状态处理 `break`/`continue`。条件为常量时省去标志求值；
-    /// `while 0` 不生成任何命令。
+    /// `while` 循环：无跳转的原生条件循环只用一个自递归辅助函数；首次条件
+    /// 未知时在入口反向早退，紧邻常量赋值已证明首次成立时改在尾部判断。
+    /// 带 `break`/`continue` 的循环仍通过状态计分项分派。`while 0` 与首次
+    /// 已知为假的循环不生成任何循环命令。
     pub(super) fn compile_while(
         &mut self,
         condition: &Condition,
@@ -189,13 +193,18 @@ impl Compiler<'_> {
         if constant == Some(false) {
             return;
         }
+        let known_entry = self.preceding_condition_truth(condition);
+        if known_entry == Some(false) {
+            return;
+        }
 
+        let body_facts = self.while_body_facts(condition, body, owner);
         let state = self.push_loop(body.iter().any(contains_current_loop_jump));
         if state.is_none()
             && constant.is_none()
             && let Some(clause) = self.direct_condition_clause(condition, false, owner)
         {
-            let mut body_commands = self.compile_block(body, owner);
+            let mut body_commands = self.compile_block_with_facts(body, owner, body_facts);
             self.pop_loop();
             // A native `return` in a raw command must exit the body helper,
             // not the recursive while continuation.
@@ -210,21 +219,41 @@ impl Compiler<'_> {
                 self.functions.insert(body_helper.clone(), body_commands);
                 body_commands = vec![format!("function {}:{body_helper}", self.program.namespace)];
             }
-            let loop_helper = self.next_helper_path(owner);
-            let continuation = self.next_helper_path(owner);
-            body_commands.push(format!("function {}:{loop_helper}", self.program.namespace));
-            self.functions.insert(continuation.clone(), body_commands);
-            self.functions.insert(
-                loop_helper.clone(),
-                vec![format!(
-                    "execute {clause} run function {}:{continuation}",
+            if known_entry == Some(true) {
+                let loop_helper = self.next_helper_path(owner);
+                body_commands.push(format!(
+                    "execute {clause} run function {}:{loop_helper}",
                     self.program.namespace
-                )],
-            );
-            commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+                ));
+                self.functions.insert(loop_helper.clone(), body_commands);
+                commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+            } else if let Some(exit_clause) = self.direct_condition_clause(condition, true, owner) {
+                let loop_helper = self.next_helper_path(owner);
+                body_commands.insert(0, format!("execute {exit_clause} run return 0"));
+                body_commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+                self.functions.insert(loop_helper.clone(), body_commands);
+                commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+            } else {
+                // Some positive clauses cannot be negated safely: a compound
+                // `A && B` needs short-circuiting OR on failure, while native
+                // predicate errors are not interchangeable under `unless`.
+                // Keep a tiny positive guard helper for those conditions.
+                let loop_helper = self.next_helper_path(owner);
+                let continuation = self.next_helper_path(owner);
+                body_commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+                self.functions.insert(continuation.clone(), body_commands);
+                self.functions.insert(
+                    loop_helper.clone(),
+                    vec![format!(
+                        "execute {clause} run function {}:{continuation}",
+                        self.program.namespace
+                    )],
+                );
+                commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+            }
             return;
         }
-        let body_command = self.compile_small_block(body, owner);
+        let body_command = self.compile_small_block_with_facts(body, owner, body_facts);
         self.pop_loop();
 
         let loop_helper = self.next_helper_path(owner);
@@ -289,7 +318,8 @@ impl Compiler<'_> {
 
         let state = self.push_loop(body.iter().any(contains_current_loop_jump));
         let variable_holder = self.variable_holder(owner, variable);
-        let body_command = self.compile_small_block(body, owner);
+        let body_facts = self.for_body_facts(variable, start_value, end_value, body);
+        let body_command = self.compile_small_block_with_facts(body, owner, body_facts);
         self.pop_loop();
 
         // The start is stored before evaluating the end: both boundaries may
@@ -314,8 +344,9 @@ impl Compiler<'_> {
         let loop_helper = self.next_helper_path(owner);
         let in_range = self.range_check(&variable_holder, &limit);
         let mut loop_commands = Vec::new();
-        // Entry and continuation both check the range; continue is reset before
-        // re-entry and break returns. The body needs no repeated guards.
+        // The continuation checks the range; continue is reset before re-entry
+        // and break returns. A known non-empty constant range can enter the
+        // first iteration directly because `variable` was just initialized.
         loop_commands.push(body_command);
         if let Some(state) = &state {
             loop_commands.push(self.break_check(state));
@@ -332,10 +363,144 @@ impl Compiler<'_> {
         self.functions.insert(loop_helper.clone(), loop_commands);
         // Do not enter an empty dynamic range: the unconditional increment in
         // the loop would otherwise wrap MAX to MIN and start iterating.
-        commands.push(format!(
-            "execute {in_range} run function {}:{loop_helper}",
-            self.program.namespace
-        ));
+        if matches!((start_value, end_value), (Some(start), Some(end)) if start < end) {
+            commands.push(format!("function {}:{loop_helper}", self.program.namespace));
+        } else {
+            commands.push(format!(
+                "execute {in_range} run function {}:{loop_helper}",
+                self.program.namespace
+            ));
+        }
+    }
+
+    /// Compile a block under facts guaranteed by the control-flow edge that
+    /// enters it, restoring the enclosing facts before returning.
+    fn compile_block_with_facts(
+        &mut self,
+        body: &[Statement],
+        owner: &str,
+        facts: ScoreFacts,
+    ) -> Vec<String> {
+        let enclosing = std::mem::replace(&mut self.condition_facts, facts);
+        let commands = self.compile_block(body, owner);
+        self.condition_facts = enclosing;
+        commands
+    }
+
+    fn compile_small_block_with_facts(
+        &mut self,
+        body: &[Statement],
+        owner: &str,
+        facts: ScoreFacts,
+    ) -> String {
+        let enclosing = std::mem::replace(&mut self.condition_facts, facts);
+        let command = self.compile_small_block(body, owner);
+        self.condition_facts = enclosing;
+        command
+    }
+
+    /// A `for` body is entered only while `start <= variable < end`. The lower
+    /// and upper halves remain useful independently when just one boundary is
+    /// constant. Source assignments to the induction variable disable the
+    /// facts because they may no longer hold on a later iteration.
+    fn for_body_facts(
+        &self,
+        variable: &str,
+        start: Option<i32>,
+        end: Option<i32>,
+        body: &[Statement],
+    ) -> ScoreFacts {
+        let mut facts = self.condition_facts.clone();
+        if body
+            .iter()
+            .any(|statement| writes_variable(statement, variable))
+        {
+            return facts;
+        }
+        if let Some(start) = start {
+            facts.assume_score(variable, Comparison::GreaterEqual, start);
+        }
+        if let Some(end) = end {
+            facts.assume_score(variable, Comparison::Less, end);
+        }
+        facts
+    }
+
+    /// Propagate the true comparison at a `while` entry when its score is not
+    /// changed until the final statement. For the canonical
+    /// `x = initial; while x < end { ...; x += step; }` shape, a positive step
+    /// also preserves `x >= initial` as long as it cannot overflow before the
+    /// upper-bound check stops the loop.
+    fn while_body_facts(
+        &self,
+        condition: &Condition,
+        body: &[Statement],
+        owner: &str,
+    ) -> ScoreFacts {
+        let mut facts = self.condition_facts.clone();
+        let Some((variable, comparison, bound)) = score_constant_condition(condition) else {
+            return facts;
+        };
+        // A called function may mutate any global score, but it cannot address
+        // the caller's hashed parameter/local holders. Keep loop facts scoped
+        // to those caller-owned values.
+        if !self.holders.contains_key(&(owner, variable)) {
+            return facts;
+        }
+
+        let (last, prefix) = match body.split_last() {
+            Some(parts) => parts,
+            None => return facts,
+        };
+        let writes_before_last = prefix
+            .iter()
+            .any(|statement| writes_variable(statement, variable));
+        let last_writes_variable = writes_variable(last, variable);
+        let last_is_direct_assignment = matches!(
+            &last.kind,
+            StatementKind::Assign { target, .. } if target == variable
+        );
+        if writes_before_last || (last_writes_variable && !last_is_direct_assignment) {
+            return facts;
+        }
+
+        facts.assume_score(variable, comparison, bound);
+
+        let Some((initial_variable, initial)) = &self.preceding_constant_assignment else {
+            return facts;
+        };
+        if initial_variable != variable {
+            return facts;
+        }
+        let StatementKind::Assign {
+            target,
+            operation: AssignOp::Add,
+            value,
+        } = &last.kind
+        else {
+            return facts;
+        };
+        if target != variable {
+            return facts;
+        }
+        let Some(step) = constant_integer(value).filter(|step| *step > 0) else {
+            return facts;
+        };
+        let maximum_before_step = match comparison {
+            Comparison::Less => i64::from(bound) - 1,
+            Comparison::LessEqual => i64::from(bound),
+            _ => return facts,
+        };
+        if maximum_before_step + i64::from(step) <= i64::from(i32::MAX) {
+            facts.assume_score(variable, Comparison::GreaterEqual, *initial);
+        }
+        facts
+    }
+
+    fn preceding_condition_truth(&self, condition: &Condition) -> Option<bool> {
+        let (variable, comparison, bound) = score_constant_condition(condition)?;
+        let (assigned, value) = self.preceding_constant_assignment.as_ref()?;
+        (assigned == variable).then(|| compare_integers(*value, comparison, bound))
     }
 
     /// 循环状态计分项：0 = 正常，1 = continue，2 = break。
@@ -398,5 +563,47 @@ impl Compiler<'_> {
                 self.objective, self.objective
             ),
         }
+    }
+}
+
+fn score_constant_condition(condition: &Condition) -> Option<(&str, Comparison, i32)> {
+    let Condition::Compare {
+        left,
+        comparison,
+        right,
+    } = condition
+    else {
+        return None;
+    };
+    match (&left.kind, &right.kind) {
+        (ExprKind::Score(name), _) => Some((name, *comparison, constant_integer(right)?)),
+        (_, ExprKind::Score(name)) => Some((
+            name,
+            reverse_comparison(*comparison),
+            constant_integer(left)?,
+        )),
+        _ => None,
+    }
+}
+
+fn reverse_comparison(comparison: Comparison) -> Comparison {
+    match comparison {
+        Comparison::Equal => Comparison::Equal,
+        Comparison::NotEqual => Comparison::NotEqual,
+        Comparison::Less => Comparison::Greater,
+        Comparison::LessEqual => Comparison::GreaterEqual,
+        Comparison::Greater => Comparison::Less,
+        Comparison::GreaterEqual => Comparison::LessEqual,
+    }
+}
+
+fn compare_integers(left: i32, comparison: Comparison, right: i32) -> bool {
+    match comparison {
+        Comparison::Equal => left == right,
+        Comparison::NotEqual => left != right,
+        Comparison::Less => left < right,
+        Comparison::LessEqual => left <= right,
+        Comparison::Greater => left > right,
+        Comparison::GreaterEqual => left >= right,
     }
 }

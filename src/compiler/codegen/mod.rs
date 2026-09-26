@@ -77,6 +77,12 @@ pub(super) struct Compiler<'a> {
     constants: BTreeSet<i32>,
     /// A surrounding `return run` or `store` observes the command result.
     preserve_command_result: bool,
+    /// Score facts guaranteed by the control-flow edge into the block that is
+    /// currently being lowered. These are scoped while compiling loop bodies.
+    condition_facts: condition_facts::ScoreFacts,
+    /// A constant assignment immediately before the current statement. This
+    /// lets a canonical counted `while` prove its initial induction bound.
+    preceding_constant_assignment: Option<(String, i32)>,
     /// 是否使用了 `give(..., self.item)` 需要的空槽来源资源。
     uses_empty_slot: bool,
     selector_overrides: HashMap<String, String>,
@@ -122,6 +128,8 @@ impl<'a> Compiler<'a> {
             loop_counter: 0,
             constants: BTreeSet::new(),
             preserve_command_result: false,
+            condition_facts: condition_facts::ScoreFacts::default(),
+            preceding_constant_assignment: None,
             uses_empty_slot: false,
             selector_overrides: HashMap::new(),
             selector_objectives: BTreeMap::new(),

@@ -286,6 +286,89 @@ fn duplicate_pure_guards_are_merged() {
     );
 }
 
+/// Loop entry edges carry range facts into their bodies. This removes guards
+/// already enforced by a counted loop, while a source write or a potentially
+/// overflowing induction step must keep the runtime test.
+#[test]
+fn loop_ranges_propagate_without_crossing_mutations_or_overflow() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = repo.join("target/control-optimization-test");
+    build_file(
+        &repo.join("tests/valid/optimizations"),
+        &output,
+        &BuildOptions {
+            description: "控制流优化回归".to_owned(),
+            deny_raw: true,
+        },
+    )
+    .unwrap();
+
+    let counted_for = owner_commands(&output, "for_loop_ranges");
+    assert!(
+        !counted_for.contains("matches 0..") && !counted_for.contains("matches 11.."),
+        "for 的循环范围应删除体内冗余与矛盾 guard：{counted_for}"
+    );
+    assert_eq!(
+        counted_for.matches("matches ..3").count(),
+        1,
+        "只应保留循环回边的上界检查：{counted_for}"
+    );
+    assert!(
+        !counted_for.contains(" 100"),
+        "矛盾分支应消失：{counted_for}"
+    );
+
+    let nested = owner_commands(&output, "nested_for_loop_ranges");
+    assert!(!nested.contains("matches -2.."), "外层下界已知：{nested}");
+    assert!(!nested.contains("matches 1.."), "内层下界已知：{nested}");
+    assert_eq!(nested.matches("matches ..2").count(), 1, "{nested}");
+    assert_eq!(nested.matches("matches ..3").count(), 1, "{nested}");
+
+    let mutated = owner_commands(&output, "mutated_for_loop_range");
+    assert_eq!(
+        mutated.matches("matches ..3").count(),
+        2,
+        "源码改写循环变量后，体内 guard 与循环回边都必须保留：{mutated}"
+    );
+
+    let counted_while = owner_commands(&output, "counted_while_ranges");
+    assert!(
+        !counted_while.contains("matches 0.."),
+        "单调下界已知：{counted_while}"
+    );
+    assert_eq!(
+        counted_while.matches("matches ..3").count(),
+        1,
+        "while 条件本身只应在循环入口求值：{counted_while}"
+    );
+    assert!(
+        counted_while
+            .contains("matches ..3 run function optimizations:__mcl/counted_while_ranges/"),
+        "已知首次成立的计数 while 应使用尾部条件递归：{counted_while}"
+    );
+    assert_eq!(
+        fs::read_dir(output.join("data/optimizations/function/__mcl/counted_while_ranges"))
+            .unwrap()
+            .count(),
+        1,
+        "计数 while 不需要单独的条件转发 helper"
+    );
+
+    let overflowing = owner_commands(&output, "overflowing_while_range");
+    assert!(
+        overflowing.contains("matches 2147483646.."),
+        "可能溢出的步进不能传播错误下界：{overflowing}"
+    );
+
+    let known_empty = owner_commands(&output, "known_empty_while");
+    assert_eq!(
+        commands(&known_empty).len(),
+        1,
+        "紧邻常量赋值已使首次条件为假，while 本身不应生成命令：{known_empty}"
+    );
+    assert!(!known_empty.contains("function optimizations:__mcl/"));
+}
+
 /// `&&` 右侧是比较时，编译期不再为它单独分配标志计分项；
 /// 用解释器在边界值上核对生成的命令与源码语义一致。
 #[test]

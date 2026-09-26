@@ -130,6 +130,13 @@ fn simple_while() {
     }
 }
 
+fn compound_while(left, right) {
+    while left > 0 && right > 0 {
+        left -= 1;
+        right -= 1;
+    }
+}
+
 fn simple_for() {
     for index in 0..3 {
         counter += 1;

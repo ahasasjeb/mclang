@@ -20,12 +20,16 @@ impl Compiler<'_> {
         owner: &str,
     ) -> Vec<String> {
         let mut commands = Vec::new();
+        let inherited_assignment = self.preceding_constant_assignment.take();
         for (index, statement) in statements.iter().enumerate() {
             if !self.preserve_command_result
                 && is_superseded_constant_assignment(statement, statements.get(index + 1))
             {
                 continue;
             }
+            self.preceding_constant_assignment = index
+                .checked_sub(1)
+                .and_then(|previous| constant_assignment(&statements[previous]));
             self.compile_statement(statement, owner, &mut commands);
             if let Some(state) = self.loops.last().and_then(|context| context.state.clone())
                 && contains_current_loop_jump(statement)
@@ -41,6 +45,7 @@ impl Compiler<'_> {
                 break;
             }
         }
+        self.preceding_constant_assignment = inherited_assignment;
         commands
     }
 
@@ -495,6 +500,18 @@ fn is_superseded_constant_assignment(statement: &Statement, next: Option<&Statem
             } if next_target == target && constant_value(next_value).is_some()
         )
     })
+}
+
+fn constant_assignment(statement: &Statement) -> Option<(String, i32)> {
+    match &statement.kind {
+        StatementKind::Let { name, value, .. } => Some((name.clone(), constant_value(value)?)),
+        StatementKind::Assign {
+            target,
+            operation: AssignOp::Set,
+            value,
+        } => Some((target.clone(), constant_value(value)?)),
+        _ => None,
+    }
 }
 
 fn nbt_source_holders(source: &NbtComponentSource) -> Vec<&Holder> {

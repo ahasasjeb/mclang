@@ -111,3 +111,32 @@ pub(super) fn contains_current_loop_jump(statement: &Statement) -> bool {
         _ => false,
     }
 }
+
+/// Whether a source statement can assign an MCL score variable with this
+/// name. Function calls have their own parameter/local holders, so they cannot
+/// mutate a caller's loop variable.
+pub(super) fn writes_variable(statement: &Statement, name: &str) -> bool {
+    match &statement.kind {
+        StatementKind::Let { name: target, .. } | StatementKind::Assign { target, .. } => {
+            target == name
+        }
+        StatementKind::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            then_body.iter().any(|item| writes_variable(item, name))
+                || else_body.iter().any(|item| writes_variable(item, name))
+        }
+        StatementKind::Execute { body, .. }
+        | StatementKind::Each { body, .. }
+        | StatementKind::InDimension { body, .. }
+        | StatementKind::Spawn { body, .. }
+        | StatementKind::While { body, .. } => body.iter().any(|item| writes_variable(item, name)),
+        StatementKind::For { variable, body, .. } => {
+            variable == name || body.iter().any(|item| writes_variable(item, name))
+        }
+        StatementKind::Return(ReturnKind::Command(command)) => writes_variable(command, name),
+        _ => false,
+    }
+}

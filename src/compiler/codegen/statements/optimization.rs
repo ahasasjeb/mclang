@@ -91,7 +91,10 @@ impl Compiler<'_> {
             leaf = then_body;
         }
 
-        let mut chain = Chain::default();
+        let mut chain = Chain {
+            facts: self.condition_facts.clone(),
+            required: Vec::new(),
+        };
         let mut clauses = Vec::new();
         let mut prior_effects = false;
         for condition in conditions {

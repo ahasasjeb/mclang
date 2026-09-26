@@ -1,0 +1,94 @@
+namespace optimization_lab;
+
+score visits = 0;
+score checksum = 0;
+score scratch = 0;
+
+// Nested counted loops with overlapping guards. Loop bounds propagate into
+// the body, so equivalent nested guards and contradictory ranges disappear.
+fn nested_grid() -> score {
+    let result = 0;
+    for row in 0..6 {
+        for col in 0..6 {
+            if row >= 0 {
+                if row > -1 {
+                    if row < 6 {
+                        if col >= 0 {
+                            if col > -1 {
+                                if col < 6 {
+                                    result += row * 6 + col;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if row > 10 {
+                if row < 5 {
+                    result += 999;
+                }
+            }
+        }
+    }
+    return result;
+}
+
+// Break and continue target the nearest loop, while the body still benefits
+// from nested guard simplification.
+fn nested_control_flow() {
+    for row in 0..8 {
+        for col in 0..8 {
+            if col == 2 {
+                continue;
+            }
+            if row == 5 {
+                break;
+            }
+            if row >= 0 {
+                if row > -1 {
+                    if col >= 0 {
+                        if col > -1 {
+                            visits += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Canonical counted while loops propagate their safe induction ranges too.
+fn nested_while() {
+    let row = 0;
+    while row < 4 {
+        let col = 0;
+        while col < 4 {
+            if row >= 0 {
+                if row > -1 {
+                    checksum += row + col;
+                }
+            }
+            col += 1;
+        }
+        row += 1;
+    }
+}
+
+// Constant branches and overwritten writes should not inflate the loop body.
+fn folded_work() {
+    for index in 0..4 {
+        scratch = 1;
+        scratch = 2;
+        if 2 + 2 == 4 {
+            visits += index;
+        } else {
+            visits += 1000;
+        }
+        if 3 < 1 {
+            visits += 2000;
+        }
+    }
+    while 0 == 1 {
+        visits += 3000;
+    }
+}

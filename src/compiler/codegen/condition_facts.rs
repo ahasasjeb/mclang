@@ -32,7 +32,7 @@ impl Default for IntRange {
 /// Facts learned from the true path of score-versus-constant comparisons.
 /// The deliberately small domain keeps this useful without guessing about
 /// calls, random values, or general arithmetic relationships.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct ScoreFacts {
     ranges: HashMap<String, IntRange>,
 }
@@ -102,6 +102,13 @@ impl ScoreFacts {
             }
             _ => {}
         }
+    }
+
+    /// Add a score-versus-constant fact supplied by control-flow structure
+    /// rather than by a source-level `if` guard. Loop lowering uses this for
+    /// facts such as `start <= index < end` that hold whenever the body runs.
+    pub(super) fn assume_score(&mut self, name: &str, comparison: Comparison, value: i32) {
+        self.constrain(name, comparison, value);
     }
 
     pub(super) fn is_impossible(&self) -> bool {
