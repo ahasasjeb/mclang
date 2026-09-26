@@ -249,7 +249,9 @@ fn duplicate_pure_guards_are_merged() {
     let duplicated = commands(&duplicates);
     assert_eq!(duplicated.len(), 2, "{duplicates}");
     assert_eq!(
-        duplicates.matches("run scoreboard players add #v_counter").count(),
+        duplicates
+            .matches("run scoreboard players add #v_counter")
+            .count(),
         2,
         "两个分支各自只保留一条命令：{duplicates}"
     );
@@ -337,6 +339,117 @@ fn run_guard(commands: &[&str], left: i32, right: i32) -> i32 {
     simulator.get("#v_counter")
 }
 
+/// 比较表达式编译出的 `matches` 范围必须与原版语义逐值一致。
+///
+/// 覆盖六种运算符、常量在左右两侧、以及 `i32` 边界常量：
+/// `x < c` 会编译成 `matches ..c-1`、`c > x` 会翻转成 `matches ..c-1`，
+/// 越界字面量与矛盾范围则完全不生成条件（原版 `Integer.parseInt` 会拒绝
+/// `..-2147483649`，`min > max` 会抛 `ERROR_SWAPPED`）。
+#[test]
+fn comparison_ranges_match_source_semantics() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let constants = [i32::MIN, i32::MIN + 1, -1, 0, 1, 2147483646, i32::MAX];
+    let operators = ["<", "<=", ">", ">=", "==", "!="];
+    let mut source =
+        String::from("namespace range_semantics;\n\nscore left = 0;\nscore counter = 0;\n\n");
+    let mut cases = Vec::new();
+    for operator in operators {
+        for (constant_index, constant) in constants.iter().enumerate() {
+            let constant = *constant;
+            for constant_first in [false, true] {
+                let name = format!(
+                    "case_{}_{}_{}",
+                    match operator {
+                        "<" => "lt",
+                        "<=" => "le",
+                        ">" => "gt",
+                        ">=" => "ge",
+                        "==" => "eq",
+                        _ => "ne",
+                    },
+                    constant_index,
+                    u8::from(constant_first),
+                );
+                let condition = if constant_first {
+                    format!("{constant} {operator} left")
+                } else {
+                    format!("left {operator} {constant}")
+                };
+                source.push_str(&format!(
+                    "fn {name}() {{\n    if {condition} {{ counter += 1; }}\n}}\n\n"
+                ));
+                cases.push((name, operator, constant, constant_first));
+            }
+        }
+    }
+
+    let project = repo.join("target/range-semantics-source");
+    let _ = fs::remove_dir_all(&project);
+    fs::create_dir_all(&project).unwrap();
+    fs::write(project.join("main.mcl"), source).unwrap();
+    let output = repo.join("target/range-semantics-test");
+    build_file(
+        &project,
+        &output,
+        &BuildOptions {
+            description: "范围语义回归".to_owned(),
+            deny_raw: true,
+        },
+    )
+    .unwrap();
+
+    let mut values = vec![i32::MIN, i32::MIN + 1, i32::MIN + 2, -2, -1, 0, 1, 2];
+    values.extend([2147483644, 2147483645, 2147483646, i32::MAX - 1, i32::MAX]);
+    for constant in constants {
+        for offset in [-1i32, 0, 1] {
+            values.push(constant.saturating_add(offset));
+        }
+    }
+    values.sort_unstable();
+    values.dedup();
+
+    for (name, operator, constant, constant_first) in cases {
+        let text = fs::read_to_string(
+            output.join(format!("data/range_semantics/function/{name}.mcfunction")),
+        )
+        .unwrap();
+        let commands = commands(&text);
+        let condition = if constant_first {
+            format!("{constant} {operator} left")
+        } else {
+            format!("left {operator} {constant}")
+        };
+        for value in &values {
+            let expected = if constant_first {
+                match operator {
+                    "<" => constant < *value,
+                    "<=" => constant <= *value,
+                    ">" => constant > *value,
+                    ">=" => constant >= *value,
+                    "==" => constant == *value,
+                    _ => constant != *value,
+                }
+            } else {
+                match operator {
+                    "<" => *value < constant,
+                    "<=" => *value <= constant,
+                    ">" => *value > constant,
+                    ">=" => *value >= constant,
+                    "==" => *value == constant,
+                    _ => *value != constant,
+                }
+            };
+            let mut scores = Simulator::new(&[("#v_left", *value)]);
+            scores.run(&commands);
+            assert_eq!(
+                scores.get("#v_counter"),
+                i32::from(expected),
+                "`{condition}` 在 left={value} 上不一致：{commands:?}"
+            );
+        }
+    }
+}
+
 fn owner_commands(root: &Path, owner: &str) -> String {
     let mut text = function(root, owner);
     let helpers = root.join(format!("data/optimizations/function/__mcl/{owner}"));
@@ -422,7 +535,16 @@ impl Simulator {
                 let updated = self.get(holder).wrapping_sub(value);
                 self.scores.insert((*holder).to_owned(), updated);
             }
-            ["scoreboard", "players", "operation", holder, _, "=", source, _] => {
+            [
+                "scoreboard",
+                "players",
+                "operation",
+                holder,
+                _,
+                "=",
+                source,
+                _,
+            ] => {
                 let value = self.get(source);
                 self.scores.insert((*holder).to_owned(), value);
             }

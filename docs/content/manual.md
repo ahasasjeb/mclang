@@ -111,7 +111,7 @@ build/hello/
         └── ...
 ```
 
-每次构建都会重写 `.mclang-manifest`，下一次构建先删除上次清单里的文件再写新文件；清单损坏、含绝对路径或 `..` 时构建直接失败，目录里的其他文件不会被碰。写完新文件后，编译器会回收 `data/` 下不再包含文件的空目录，因此函数改名或模块删除不会在产物里留下空文件夹。
+构建会更新 `.mclang-manifest`，下一次构建比对上次清单：只删除「上次有、这次不再生成」的文件，内容没变的文件不重写（保留原来的写入时间），只有内容变化的文件才会被替换；清单损坏、含绝对路径或 `..` 时构建直接失败，目录里的其他文件不会被碰。写完新文件后，编译器会回收 `data/` 下不再包含文件的空目录，因此函数改名或模块删除不会在产物里留下空文件夹。
 
 :::generated example=hello file=pack.mcmeta title="build/hello/pack.mcmeta"
 :::
@@ -597,7 +597,7 @@ advancement <名称> {
 
 `requirements = all` 要求每条准则都完成，是默认策略；`requirements = any` 在任意一条准则完成时触发。生成的原版二维数组对外层分组做 AND、对同一内层分组里的准则名做 OR，因此 `all` 生成多个单元素组，`any` 生成一个包含全部准则名的组。
 
-`conditions` 保持触发器的原始 JSON（`location`、`blocks` 等字段由原版定义）；编译期检查 JSON 语法、触发器名与准则重名，并按源码快照校验已知触发器的条件字段——字段名必须属于该触发器，战利品条件字段需要谓词资源字符串或带 `type` 的内联条件对象。注意 26.3 的内联战利品条件用 `type` 作判别键（`condition` 现在只用于引用谓词资源），例如 `{"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}`；需要实体谓词时套 `minecraft:entity_properties`，实体填 `"entity":"this"`，类型字段写 `minecraft:entity_type`，例如击杀僵尸：`{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}`。`parent`、`reward.function`、`reward.loot`、`reward.recipe` 引用本命名空间声明时要求存在，字符串形式按外部资源位置处理；`reward.loot` 与 `reward.recipe` 引用 `resource loot_table` / `resource recipe` 声明。`display.icon` 引用已声明的 `item` 定义，图标会带上它的组件。显示规则与原版一致：**根进度的 `display` 必须声明 `background`，带 `parent` 的进度不能声明 `background`**。
+`conditions` 保持触发器的原始 JSON（`location`、`blocks` 等字段由原版定义）；编译期检查 JSON 语法、触发器名与准则重名，并按源码快照校验已知触发器的条件字段——字段名必须属于该触发器，战利品条件字段需要谓词资源字符串或带 `type` 的内联条件对象。内联条件的 `type` 必须是 26.3 注册的 loot condition（`minecraft:` 前缀可省略，写错会给出最接近的候选），`all_of`/`any_of` 的 `terms`、`inverted` 的 `term` 会递归校验；`victims`、`items`、`ingredients` 这些 `listOf()` 字段只接受数组。注意 26.3 的内联战利品条件用 `type` 作判别键（`condition` 现在只用于引用谓词资源），例如 `{"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}`；需要实体谓词时套 `minecraft:entity_properties`，实体填 `"entity":"this"`，类型字段写 `minecraft:entity_type`，例如击杀僵尸：`{"entity":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}`。`parent`、`reward.function`、`reward.loot`、`reward.recipe` 引用本命名空间声明时要求存在，字符串形式按外部资源位置处理；`reward.loot` 与 `reward.recipe` 引用 `resource loot_table` / `resource recipe` 声明。`display.icon` 引用已声明的 `item` 定义，图标会带上它的组件。显示规则与原版一致：**根进度的 `display` 必须声明 `background`，带 `parent` 的进度不能声明 `background`**。
 
 `reward` 与 `display` 都可以省略：只有触发逻辑的隐形进度是数据包的常规用法。
 
@@ -696,7 +696,9 @@ for <变量> in <起点>..<终点> {
 
 **编译期能确定的条件会被折叠**：`if 1 == 1` 直接把真分支展开进当前函数（不生成标志，也不分配辅助函数），`if 2 < 1` 整段省略（`else` 分支同理）；`while 0 == 1` 不生成任何循环命令。
 
-`&&`、`||` 从左到右短路。右侧即使是恒假或恒真条件，也不会删除必须执行的左侧调用，例如 `side_effect() == 1 && 0 == 1` 仍然执行一次 `side_effect()`。
+连续嵌套的 `if` 会合并成同一条原版条件链，而不是嵌套 `execute`：`if a > 0 { if b > 0 { ... } }` 生成 `execute if score a … if score b … run …`。同一条链里编译期已经成立的条件不会再判断一次，例如 `if a && a`、`if x > 10 { if x > 5 { … } }` 里的第二个条件直接省略；`if x > 10 { if x < 5 { … } }` 这种矛盾组合整段不生成命令。前提是条件本身没有副作用：`function(...)`、`predicate(...)` 这类可能重复产生效果的判断保留原来的求值路径。
+
+`&&`、`||` 从左到右短路。右侧即使是恒假或恒真条件，也不会删除必须执行的左侧调用，例如 `side_effect() == 1 && 0 == 1` 仍然执行一次 `side_effect()`，`side_effect() == 1 || 1 == 1` 同样先执行一次 `side_effect()`。`&&` 右侧是比较时不会为它单独分配标志计分项：`x == 1 && charge(price()) == 1` 只在左侧成立时求值右侧，并把右侧的否定直接并进合并命令。
 
 `for` 是半开区间循环，起止都可以是表达式：常量终点直接生成 `matches ..<终点-1>` 比较，动态终点只求值一次并存入循环上限计分项；常量空区间（起点 ≥ 终点）不生成命令。循环变量是循环体内的局部计分项，兄弟循环可以复用同一个名字，但不能与参数、`let` 或全局计分变量重名。
 
@@ -1657,6 +1659,8 @@ if !(ticks < 100) || ready == 1 {
 
 :::note 条件如何求值
 条件可以直接生成原版条件链，或先生成 0/1 的标志计分项。计分值与整数常量比较时使用 `execute if/unless score … matches <范围>`，不会为常量创建额外假玩家；两个运行期计分值之间的比较使用 `execute if/unless score A <symbol> B`。`&&` 与 `||` 按从左到右的短路语义求值，因此右侧函数调用及其它运行期查询只在确有需要时执行。需要保存结果的条件使用临时计分项（`#t<序号>`），同一份源码的分配结果稳定可复现。结构化 `execute` 的 `if`/`unless` 子句复用同一套求值。
+
+比较编译出的范围与原版一致：`x < c` 是 `matches ..c-1`、`x <= c` 是 `matches ..c`、`x > c` 是 `matches c+1..`、`x >= c` 是 `matches c..`、`x == c` 是 `matches c`、`x != c` 是 `unless … matches c`；常量写在左侧时按同样规则翻转。原版的范围是闭区间，且 `matches` 的字面量必须落在 i32 内、上下界不能颠倒（否则命令在加载时直接报错），因此 `x < -2147483648`、`x > 2147483647` 这类不可能成立的条件不生成任何判定命令，也不会把越界字面量写进产物。计分变量在 `__mcl/load` 里补齐初始值后始终存在，所以 `x >= -2147483648` 这种恒真条件同样可以省略。
 
 可能查询失败的条件先捕获布尔结果，再进行 `!` 或 `unless` 取反。例如 `data(entity, q, "Health")` 在查询没有匹配实体时为假，取反后为真；添加 `else` 不会改变条件结果。方块、物品槽位等可能失败的查询也保留这一求值边界。
 :::

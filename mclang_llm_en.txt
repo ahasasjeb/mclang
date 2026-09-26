@@ -255,7 +255,11 @@ declarations (namespace/score/resource/storage/data_slot/...) require `;`.
   requirements=all emits one single-name group per criterion (AND);
   requirements=any emits one group with all names (OR).
   conditions keeps the vanilla JSON; known trigger condition fields are checked
-  against the 26.3 snapshot. 26.3 inline loot conditions use `type` as the
+  against the 26.3 snapshot. An inline condition `type` must be a registered
+  26.3 loot condition (the `minecraft:` prefix is optional, near misses get a
+  suggestion); `all_of`/`any_of` `terms` and `inverted` `term` are checked
+  recursively, and `listOf()` fields (`victims`, `items`, `ingredients`) only
+  accept arrays. 26.3 inline loot conditions use `type` as the
   discriminator, e.g. block match:
     {"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}
   and entity predicates are nested:
@@ -314,8 +318,19 @@ Every statement ends with `;` unless it ends with a `}` block.
     break;      continue;
   - Conditions that are constant at compile time are folded: `if 1 == 1`
     inlines the then-branch, `if 2 < 1` disappears, `while 0 == 1` emits nothing.
+  - Consecutive nested `if` statements merge into ONE vanilla condition chain
+    (`execute if ... if ...`), and a condition already implied by the chain is
+    not tested twice (`if a && a`, `if x > 10 { if x > 5 { ... } }`); a
+    contradictory chain (`if x > 10 { if x < 5 { ... } }`) emits nothing.
+    Conditions with side effects (function/predicate) keep the original path.
   - `&&` and `||` short-circuit left to right; the left side is always
-    evaluated exactly as written.
+    evaluated exactly as written, and a provably true right side never removes
+    the left call. When the right side of `&&` is a comparison it gets no
+    separate flag score.
+  - Comparison ranges render exactly like vanilla: `x < c` is `matches ..c-1`,
+    `x > c` is `matches c+1..`, `x == c` is `matches c`, `x != c` is
+    `unless ... matches c`; literals always stay inside i32, so impossible
+    comparisons (`x < -2147483648`, `x > 2147483647`) emit no test at all.
   - `for` is half-open [start, end); the end expression is evaluated once
     (dynamic ends are stored in a temp slot). An empty constant range emits
     nothing. break/continue only work inside the innermost for/while; they are
@@ -725,6 +740,10 @@ Every statement ends with `;` unless it ends with a `}` block.
   current execution context. Failures of entity/block/item/data lookups make
   the atom false (index misses read 0 for expressions), and negation preserves
   that boundary: `!data(entity, q, "Health")` is true when q matches nothing.
+  A score compared with a constant renders a vanilla `matches` range (closed
+  bounds): `x < c` is `..c-1`, `x > c` is `c+1..`, `x == c` is `c`, `x != c` is
+  `unless ... matches c`; literals always stay inside i32 and an impossible
+  comparison emits no test.
 
 ===============================================================================
 7 EXECUTION CONTEXT

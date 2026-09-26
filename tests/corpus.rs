@@ -491,9 +491,9 @@ fn vanilla_advancement_criteria_pass_validation() {
             let trigger = trigger
                 .strip_prefix("minecraft:")
                 .unwrap_or_else(|| panic!("原版触发器应当带命名空间：{trigger}"));
-            let conditions = criterion.get("conditions").map(|conditions| {
-                serde_json::to_string(conditions).expect("条件必须可序列化")
-            });
+            let conditions = criterion
+                .get("conditions")
+                .map(|conditions| serde_json::to_string(conditions).expect("条件必须可序列化"));
             criteria.insert((trigger.to_owned(), conditions));
         }
     }
