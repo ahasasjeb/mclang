@@ -349,19 +349,26 @@ fn validate_conditions(
 }
 
 /// 检测本命名空间 `parent` 链里的环；环会让原版进度树无法加载。
+/// 映射表本身无序，按声明顺序排序后再遍历，保证诊断顺序稳定。
 fn detect_parent_cycles(
     advancements: &HashMap<&str, &AdvancementDecl>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    for (name, advancement) in advancements {
+    let mut declarations = advancements
+        .iter()
+        .map(|(name, advancement)| (*name, *advancement))
+        .collect::<Vec<_>>();
+    declarations
+        .sort_by_key(|(_, advancement)| (advancement.span.source, advancement.span.start));
+    for (name, advancement) in declarations {
         let mut visited = HashSet::new();
-        let mut current = *advancement;
+        let mut current = advancement;
         while let Some(parent) = &current.parent {
             if parent.external {
                 break;
             }
             let parent_name = parent.name.as_str();
-            if parent_name == *name || !visited.insert(parent_name) {
+            if parent_name == name || !visited.insert(parent_name) {
                 diagnostics.push(Diagnostic::new(
                     format!("进度 `{name}` 的 parent 链形成循环"),
                     advancement.span,
