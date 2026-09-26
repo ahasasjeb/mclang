@@ -176,8 +176,8 @@ fn add_standard_modules(
             continue;
         };
         let mut imported = std::collections::BTreeSet::new();
-        for index in members.iter().copied() {
-            let Some(program) = programs_by_source.get(&index) else {
+        for index in members.iter() {
+            let Some(program) = programs_by_source.get(index) else {
                 continue;
             };
             for import in &program.imports {
