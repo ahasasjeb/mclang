@@ -4,6 +4,7 @@ use crate::compiler::codegen::Compiler;
 use crate::compiler::codegen::emit::nbt_text;
 use crate::compiler::codegen::names::user_objective_name;
 use crate::compiler::codegen::world;
+use crate::compiler::constant::constant_value;
 
 use super::helpers::contains_current_loop_jump;
 
@@ -19,7 +20,12 @@ impl Compiler<'_> {
         owner: &str,
     ) -> Vec<String> {
         let mut commands = Vec::new();
-        for statement in statements {
+        for (index, statement) in statements.iter().enumerate() {
+            if !self.preserve_command_result
+                && is_superseded_constant_assignment(statement, statements.get(index + 1))
+            {
+                continue;
+            }
             self.compile_statement(statement, owner, &mut commands);
             if let Some(state) = self.loops.last().and_then(|context| context.state.clone())
                 && contains_current_loop_jump(statement)
@@ -28,6 +34,11 @@ impl Compiler<'_> {
                     "execute unless score {state} {} matches 0 run return 0",
                     self.objective
                 ));
+            }
+            // `return` exits the generated function (which may be a branch
+            // helper), so later commands in this same block cannot run.
+            if matches!(&statement.kind, StatementKind::Return(_)) {
+                break;
             }
         }
         commands
@@ -460,6 +471,30 @@ impl Compiler<'_> {
             StatementKind::Return(kind) => self.compile_return(kind, owner, commands),
         }
     }
+}
+
+fn is_superseded_constant_assignment(statement: &Statement, next: Option<&Statement>) -> bool {
+    let StatementKind::Assign {
+        target,
+        operation: AssignOp::Set,
+        value,
+    } = &statement.kind
+    else {
+        return false;
+    };
+    if constant_value(value).is_none() {
+        return false;
+    }
+    next.is_some_and(|next| {
+        matches!(
+            &next.kind,
+            StatementKind::Assign {
+                target: next_target,
+                operation: AssignOp::Set,
+                value: next_value,
+            } if next_target == target && constant_value(next_value).is_some()
+        )
+    })
 }
 
 fn nbt_source_holders(source: &NbtComponentSource) -> Vec<&Holder> {

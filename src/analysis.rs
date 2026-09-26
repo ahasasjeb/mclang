@@ -169,8 +169,10 @@ fn add_standard_modules(
     groups: &mut [(usize, HashSet<usize>)],
     programs: &[(usize, ast::Program)],
 ) {
-    let programs_by_source: HashMap<usize, &ast::Program> =
-        programs.iter().map(|(index, program)| (*index, program)).collect();
+    let programs_by_source: HashMap<usize, &ast::Program> = programs
+        .iter()
+        .map(|(index, program)| (*index, program))
+        .collect();
     for (root, members) in groups {
         let Some(directory) = sources[*root].path.parent().map(|path| path.to_path_buf()) else {
             continue;
@@ -234,6 +236,20 @@ pub(crate) fn parse_all(sources: &[SourceFile]) -> (Vec<(usize, ast::Program)>, 
     parse_from(sources, 0)
 }
 
+/// Parse one source using the same lexer/parser path as [`parse_all`].
+///
+/// The disk project loader uses the parsed imports to discover reachable modules,
+/// then hands this result to the frontend so it does not need to parse the file again.
+pub(crate) fn parse_source(
+    source: &SourceFile,
+    source_id: usize,
+) -> Result<ast::Program, Vec<Diagnostic>> {
+    match lex(&source.text, source_id) {
+        Ok(tokens) => parse(tokens),
+        Err(errors) => Err(errors),
+    }
+}
+
 fn parse_from(
     sources: &[SourceFile],
     start: usize,
@@ -241,11 +257,8 @@ fn parse_from(
     let mut programs = Vec::new();
     let mut diagnostics = Vec::new();
     for (source_id, source) in sources.iter().enumerate().skip(start) {
-        match lex(&source.text, source_id) {
-            Ok(tokens) => match parse(tokens) {
-                Ok(program) => programs.push((source_id, program)),
-                Err(mut errors) => diagnostics.append(&mut errors),
-            },
+        match parse_source(source, source_id) {
+            Ok(program) => programs.push((source_id, program)),
             Err(mut errors) => diagnostics.append(&mut errors),
         }
     }

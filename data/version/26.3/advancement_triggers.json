@@ -37,7 +37,7 @@
     },
     "channeled_lightning": {
       "player": "loot_condition",
-      "victims": "loot_condition"
+      "victims": "loot_condition_list"
     },
     "construct_beacon": {
       "level": "range",
@@ -48,7 +48,7 @@
       "player": "loot_condition"
     },
     "crafter_recipe_crafted": {
-      "ingredients": "item_predicate",
+      "ingredients": "item_predicate_list",
       "player": "loot_condition",
       "recipes": "id_or_list"
     },
@@ -110,7 +110,7 @@
       "player": "loot_condition"
     },
     "inventory_changed": {
-      "items": "item_predicate",
+      "items": "item_predicate_list",
       "player": "loot_condition",
       "slots": "other"
     },
@@ -133,7 +133,7 @@
       "fired_from_weapon": "item_predicate",
       "player": "loot_condition",
       "unique_entity_types": "range",
-      "victims": "loot_condition"
+      "victims": "loot_condition_list"
     },
     "levitation": {
       "distance": "other",
@@ -182,7 +182,7 @@
       "player": "loot_condition"
     },
     "recipe_crafted": {
-      "ingredients": "item_predicate",
+      "ingredients": "item_predicate_list",
       "player": "loot_condition",
       "recipes": "id_or_list"
     },

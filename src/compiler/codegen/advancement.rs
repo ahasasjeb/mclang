@@ -38,11 +38,10 @@ pub(super) fn advancement_json(
             Value::String(format!("minecraft:{}", trigger_name(&criterion.trigger))),
         );
         if let Some(conditions) = &criterion.conditions {
-            entry.insert(
-                "conditions".to_owned(),
-                serde_json::from_str(conditions)
-                    .expect("semantic validation guarantees valid conditions JSON"),
-            );
+            let crate::ast::AdvancementConditions::Parsed(value) = conditions else {
+                unreachable!("semantic validation guarantees valid conditions JSON");
+            };
+            entry.insert("conditions".to_owned(), value.clone());
         }
         criteria.insert(criterion.name.clone(), Value::Object(entry));
     }

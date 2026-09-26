@@ -140,8 +140,14 @@ pub(super) fn codec_before(text: &str, index: usize) -> &str {
 }
 
 /// 编解码表达式的粗类型；识别不了的归为 `other`，校验时只看字段名。
+///
+/// `listOf()` 会改变字段接受的 JSON 形状（数组而不是单值），所以必须体现在
+/// 类型里：26.3 的 `KilledByArrowTrigger.victims` 是
+/// `LootItemCondition.CODEC.listOf()`，`RecipeCraftedTrigger.ingredients` 是
+/// `ItemPredicate.CODEC.listOf()`，两者都只接受数组。分类只看编解码表达式
+/// 本身，不按字段名做特例。
 pub(super) fn codec_kind(codec: &str) -> &'static str {
-    if codec.contains("LootItemCondition") {
+    let kind = if codec.contains("LootItemCondition") {
         "loot_condition"
     } else if codec.contains("ItemPredicate") {
         "item_predicate"
@@ -161,6 +167,18 @@ pub(super) fn codec_kind(codec: &str) -> &'static str {
     } else if codec.contains("MinMaxBounds") {
         "range"
     } else {
-        "other"
+        return "other";
+    };
+    if !codec.contains(".listOf()") {
+        return kind;
+    }
+    match kind {
+        "loot_condition" => "loot_condition_list",
+        "item_predicate" => "item_predicate_list",
+        "entity_predicate" => "entity_predicate_list",
+        "id" => "id_or_list",
+        // `holderSet`/`LIST_CODEC` 本身已经表示列表；其余带 `listOf()` 的
+        // 组合没有对应校验逻辑，保留基类型以免出现无人消费的新分类。
+        other => other,
     }
 }

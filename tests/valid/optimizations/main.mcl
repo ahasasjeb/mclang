@@ -1,0 +1,144 @@
+namespace optimizations;
+
+score x = 0;
+score counter = 0;
+score calls = 0;
+score left = 0;
+score right = 0;
+
+fn and_fusion_scores() {
+    if left > 3 && left < right { counter += 1; }
+}
+
+fn and_fusion_literals() {
+    if left > 3 && left != 7 { counter += 1; }
+}
+
+fn and_fusion_computed() {
+    if left > 3 && left + 1 < right { counter += 1; }
+}
+
+fn and_fusion_reversed() {
+    if left > 3 && 7 > left + 1 { counter += 1; }
+}
+
+fn nested(a, b, c) {
+    if a > 0 {
+        if b > 0 {
+            if c > 0 { counter += 1; }
+        }
+    }
+}
+
+fn constants() {
+    if 1 == 1 { counter += 1; }
+    if 1 + 2 == 3 { counter += 2; }
+    if 1 > 10 { counter += 3; }
+}
+
+fn nested_ranges(value) {
+    if value > 10 {
+        if value > 5 {
+            if value != 13 { counter += 1; }
+        }
+    }
+}
+
+fn impossible_range(value) {
+    if value > 10 {
+        if value < 5 { counter += 1; }
+    }
+}
+
+fn contradictory_condition(value) {
+    if value > 10 && value < 5 { counter += 1; }
+}
+
+fn equality_ranges(value) {
+    if value == 5 {
+        if value >= 5 {
+            if value > 4 {
+                if value != 6 { counter += 1; }
+            }
+        }
+    }
+}
+
+fn impossible_equality(value) {
+    if value == 5 {
+        if value != 5 { counter += 1; }
+    }
+}
+
+fn upper_range(value) {
+    if value <= 5 {
+        if value < 6 { counter += 1; }
+    }
+}
+
+fn boolean_identities() {
+    if counter > 0 && 1 == 1 { counter += 1; }
+    if counter > 0 || 1 == 0 { counter += 1; }
+}
+
+fn repeated_effect() -> score {
+    calls += 1;
+    return 1;
+}
+
+fn effectful_guards() {
+    if repeated_effect() == 1 {
+        if repeated_effect() == 1 { counter += 1; }
+    }
+}
+
+fn effectful_contradiction() {
+    if function(repeated_effect) && x > 10 && x < 5 { counter += 1; }
+}
+
+fn effectful_proven_true(value) {
+    if value > 10 {
+        if function(repeated_effect) || value > 5 { counter += 1; }
+    }
+}
+
+fn effectful_proven_true_right(value) {
+    if value > 10 {
+        if value > 5 || function(repeated_effect) { counter += 1; }
+    }
+}
+
+fn duplicate_guards(lower, upper) {
+    if lower < upper && lower < upper { counter += 1; }
+    if block(pos(0, 64, 0), block_state("minecraft:stone")) {
+        if block(pos(0, 64, 0), block_state("minecraft:stone")) { counter += 1; }
+    }
+}
+
+fn duplicate_effectful_guards() {
+    if function(repeated_effect) {
+        if function(repeated_effect) { counter += 1; }
+    }
+}
+
+fn mutate_between_guards(value) {
+    if value > 10 {
+        value = 0;
+        if value < 5 { counter += 1; }
+    }
+}
+
+fn short_circuit_effect() {
+    if counter < 0 && repeated_effect() == 1 { counter += 1; }
+}
+
+fn return_stops_block() {
+    counter += 1;
+    return;
+    counter += 2;
+}
+
+fn dead_assignment() {
+    x = 1;
+    x = 2;
+}

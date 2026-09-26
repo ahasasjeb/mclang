@@ -77,6 +77,32 @@ advancement all_gate {
     requirements = all;
 }
 
+// Minecraft 26.3 原版 adventure/two_birds_one_arrow.json：victims 是
+// LootItemCondition.CODEC.listOf()，应接受条件对象数组。
+advancement vanilla_two_birds_conditions {
+    criterion two_birds {
+        trigger = killed_by_arrow;
+        conditions = """{"fired_from_weapon":{"items":"minecraft:crossbow"},"victims":[{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:phantom"}},{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:phantom"}}]}""";
+    }
+}
+
+// Minecraft 26.3 原版 adventure/very_very_frightening.json：同一个 listOf
+// 字段只含一个元素时仍是数组。
+advancement vanilla_very_frightening {
+    criterion struck_villager {
+        trigger = channeled_lightning;
+        conditions = """{"victims":[{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:villager"}}]}""";
+    }
+}
+
+// 组合条件应递归校验子条件的 type 与结构。
+advancement nested_loot_conditions {
+    criterion nested {
+        trigger = player_killed_entity;
+        conditions = """{"entity":{"type":"minecraft:all_of","terms":[{"type":"minecraft:any_of","terms":[{"type":"minecraft:killed_by_player"},{"type":"minecraft:inverted","term":{"type":"minecraft:survives_explosion"}}]}]}}""";
+    }
+}
+
 @tick
 fn lucky_tick() {
     if predicate(lucky) {

@@ -437,6 +437,91 @@ fn version_snapshot_matches_minecraft_source() {
         .unwrap_or_else(|error| panic!("版本数据快照过期：\n{error}"));
 }
 
+/// Minecraft 26.3 随附进度的 `criteria` 只是数据，mclang 的校验必须全部接受。
+///
+/// 这是 loot condition 校验的回归语料：`killed_by_arrow.victims` 与
+/// `channeled_lightning.victims` 是条件数组，`inventory_changed.items`、
+/// `recipe_crafted.ingredients` 同样只接受数组；任何“把数组当单值”的过度
+/// 校验都会在这里暴露。
+#[test]
+fn vanilla_advancement_criteria_pass_validation() {
+    let root = repo_root().join("minecraft_client_26.3/data/minecraft/advancement");
+    if !root.is_dir() {
+        // 本地开发语料（见 .gitignore）；缺失时不假装通过。
+        eprintln!("跳过：找不到 {}", root.display());
+        return;
+    }
+
+    let mut source = String::from("namespace vanilla_advancements;\n\n");
+    // 原版 4030 条准则里大量重复（例如 `inventory_changed` 只有几十种形状），
+    // 去重后仍覆盖全部 (trigger, conditions) 组合，但编译时间可控。
+    let mut criteria = std::collections::BTreeSet::new();
+    let mut files = Vec::new();
+    let mut stack = vec![root.clone()];
+    while let Some(directory) = stack.pop() {
+        let mut entries = fs::read_dir(&directory)
+            .expect("无法读取原版进度目录")
+            .map(|entry| entry.expect("无法读取目录项").path())
+            .collect::<Vec<_>>();
+        entries.sort();
+        for path in entries {
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().and_then(|value| value.to_str()) == Some("json") {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+
+    for path in files {
+        let text = fs::read_to_string(&path).expect("无法读取原版进度");
+        let data: serde_json::Value = serde_json::from_str(&text)
+            .unwrap_or_else(|error| panic!("{}：{error}", path.display()));
+        let Some(entries) = data.get("criteria").and_then(|value| value.as_object()) else {
+            continue;
+        };
+        let mut names: Vec<&String> = entries.keys().collect();
+        names.sort();
+        for name in names {
+            let criterion = &entries[name];
+            let Some(trigger) = criterion.get("trigger").and_then(|value| value.as_str()) else {
+                continue;
+            };
+            let trigger = trigger
+                .strip_prefix("minecraft:")
+                .unwrap_or_else(|| panic!("原版触发器应当带命名空间：{trigger}"));
+            let conditions = criterion.get("conditions").map(|conditions| {
+                serde_json::to_string(conditions).expect("条件必须可序列化")
+            });
+            criteria.insert((trigger.to_owned(), conditions));
+        }
+    }
+    assert!(criteria.len() > 100, "原版进度语料过少：{}", criteria.len());
+
+    for (index, (trigger, conditions)) in criteria.iter().enumerate() {
+        source.push_str(&format!("advancement vanilla_{} {{\n", index + 1));
+        source.push_str(&format!(
+            "    criterion regression {{\n        trigger = {trigger};\n"
+        ));
+        if let Some(conditions) = conditions {
+            source.push_str(&format!("        conditions = \"\"\"{conditions}\"\"\";\n"));
+        }
+        source.push_str("    }\n}\n\n");
+    }
+
+    let project = repo_root().join("target/vanilla-advancement-source");
+    let _ = fs::remove_dir_all(&project);
+    fs::create_dir_all(&project).expect("无法创建原版进度语料工程");
+    fs::write(project.join("main.mcl"), source).expect("无法写入原版进度语料");
+    check_file(&project).unwrap_or_else(|error| {
+        panic!(
+            "原版进度条件的合法写法被拒绝（{} 种 trigger/conditions 组合）：\n{error}",
+            criteria.len()
+        )
+    });
+}
+
 #[test]
 fn function_permission_limit_is_enforced() {
     let directory = output_directory("permission");

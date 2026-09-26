@@ -15,6 +15,7 @@ mod actions;
 mod advancement;
 mod command_targets;
 mod components;
+mod condition_facts;
 mod conditions;
 mod core_commands;
 mod emit;
@@ -234,12 +235,10 @@ impl<'a> Compiler<'a> {
                 .join(&self.program.namespace)
                 .join("function")
                 .join(format!("{name}.mcfunction"));
-            let source_span = self
-                .functions_by_name
-                .get(name.as_str())
-                .map_or_else(|| self.program.namespace_span.unwrap_or_default(), |function| {
-                    function.span
-                });
+            let source_span = self.functions_by_name.get(name.as_str()).map_or_else(
+                || self.program.namespace_span.unwrap_or_default(),
+                |function| function.span,
+            );
             for (index, command) in commands.iter().enumerate() {
                 if command.encode_utf16().count() > 2_000_000 {
                     diagnostics.push(Diagnostic::new(

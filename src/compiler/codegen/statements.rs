@@ -9,3 +9,4 @@ mod compile;
 mod control;
 mod execute;
 pub(super) mod helpers;
+mod optimization;

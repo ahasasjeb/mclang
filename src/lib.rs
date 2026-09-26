@@ -15,7 +15,7 @@ use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use analysis::parse_all;
+use analysis::parse_source;
 use compiler::{CompileOptions, CompiledPack, compile};
 use diagnostic::Diagnostic;
 
@@ -60,8 +60,8 @@ pub struct CheckSummary {
 }
 
 pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
-    let loaded = read_project(source_path)?;
-    let mut program = frontend(&loaded)?;
+    let mut loaded = read_project(source_path)?;
+    let mut program = frontend(&mut loaded)?;
     compile(
         &mut program,
         &CompileOptions {
@@ -115,8 +115,8 @@ pub fn build_zip_file(
 }
 
 fn prepare_pack(source_path: &Path, options: &BuildOptions) -> Result<CompiledPack, String> {
-    let loaded = read_project(source_path)?;
-    let mut program = frontend(&loaded)?;
+    let mut loaded = read_project(source_path)?;
+    let mut program = frontend(&mut loaded)?;
     let raw_statements = raw_statement_count(&program.functions);
     if options.deny_raw && raw_statements > 0 {
         return Err(format!(
@@ -233,6 +233,9 @@ fn raw_count_in_block(statements: &[ast::Statement]) -> usize {
 /// 从磁盘加载的项目：可达模块的源文件与入口在其中的下标。
 struct LoadedSources {
     sources: Vec<SourceFile>,
+    /// Parse results are populated while following imports, then consumed by `frontend`.
+    /// `None` exists only for a source that has been queued but not visited yet.
+    parsed: Vec<Option<Result<ast::Program, Vec<Diagnostic>>>>,
     root: usize,
     directory: PathBuf,
 }
@@ -262,52 +265,55 @@ fn read_project(path: &Path) -> Result<LoadedSources, String> {
     };
 
     let mut sources: Vec<SourceFile> = Vec::new();
+    let mut parsed = Vec::new();
     let mut indices: HashMap<PathBuf, usize> = HashMap::new();
     let mut queue: VecDeque<PathBuf> = VecDeque::new();
     let root = push_source(&mut sources, &mut indices, &entry)?;
+    parsed.push(None);
     queue.push_back(entry);
 
     while let Some(file) = queue.pop_front() {
         let index = indices[&file];
-        let text = &sources[index].text;
-        // 语法错误会在统一的解析阶段报告；这里拿不到导入表就停止展开该分支。
-        let imports = match lexer::lex(text, index) {
-            Ok(tokens) => parser::parse(tokens).map(|program| program.imports).ok(),
-            Err(_) => None,
-        };
-        let Some(imports) = imports else {
-            continue;
-        };
-        for import in imports {
-            if import.path.first().is_some_and(|segment| segment == "std") {
-                if let Some(text) = stdlib::source(&import.path) {
-                    let target = stdlib::virtual_path(&directory, &import.path[1]);
-                    if !indices.contains_key(&target) {
-                        let target_index = sources.len();
-                        indices.insert(target.clone(), target_index);
-                        sources.push(SourceFile {
-                            path: target.clone(),
-                            text: text.to_owned(),
-                        });
-                        queue.push_back(target);
+        // Preserve the complete parser result: the frontend will report these exact
+        // diagnostics, while successful ASTs are reused for module resolution.
+        let result = parse_source(&sources[index], index);
+        if let Ok(program) = &result {
+            for import in &program.imports {
+                if import.path.first().is_some_and(|segment| segment == "std") {
+                    if let Some(text) = stdlib::source(&import.path) {
+                        let target = stdlib::virtual_path(&directory, &import.path[1]);
+                        if !indices.contains_key(&target) {
+                            let target_index = sources.len();
+                            indices.insert(target.clone(), target_index);
+                            sources.push(SourceFile {
+                                path: target.clone(),
+                                text: text.to_owned(),
+                            });
+                            parsed.push(None);
+                            queue.push_back(target);
+                        }
                     }
+                    continue;
                 }
-                continue;
+
+                let Some(target) = module_file(&directory, &import.path) else {
+                    continue;
+                };
+                if indices.contains_key(&target) {
+                    continue;
+                }
+                let target_index = push_source(&mut sources, &mut indices, &target)?;
+                parsed.push(None);
+                sources[target_index].path = target.clone();
+                queue.push_back(target);
             }
-            let Some(target) = module_file(&directory, &import.path) else {
-                continue;
-            };
-            if indices.contains_key(&target) {
-                continue;
-            }
-            let target_index = push_source(&mut sources, &mut indices, &target)?;
-            sources[target_index].path = target.clone();
-            queue.push_back(target);
         }
+        parsed[index] = Some(result);
     }
 
     Ok(LoadedSources {
         sources,
+        parsed,
         root,
         directory,
     })
@@ -343,8 +349,21 @@ fn module_file(directory: &Path, segments: &[String]) -> Option<PathBuf> {
     directory_module.is_file().then_some(directory_module)
 }
 
-fn frontend(loaded: &LoadedSources) -> Result<ast::Program, String> {
-    let (programs, diagnostics) = parse_all(&loaded.sources);
+fn frontend(loaded: &mut LoadedSources) -> Result<ast::Program, String> {
+    let mut programs = Vec::new();
+    let mut diagnostics = Vec::new();
+    for (source_id, result) in std::mem::take(&mut loaded.parsed).into_iter().enumerate() {
+        match result {
+            Some(Ok(program)) => programs.push((source_id, program)),
+            Some(Err(mut errors)) => diagnostics.append(&mut errors),
+            None => {
+                return Err(format!(
+                    "内部错误：模块 `{}` 尚未解析",
+                    loaded.sources[source_id].path.display()
+                ));
+            }
+        }
+    }
     if !diagnostics.is_empty() {
         return Err(render(&loaded.sources, diagnostics));
     }
@@ -394,7 +413,14 @@ fn write_pack(output: &Path, pack: &CompiledPack) -> Result<(), String> {
     fs::create_dir_all(output)
         .map_err(|error| format!("无法创建输出目录 {}：{error}", output.display()))?;
     let manifest_path = output.join(".mclang-manifest");
-    remove_old_outputs(output, &manifest_path)?;
+    let previous_outputs = read_manifest(&manifest_path)?;
+    let current_outputs = pack
+        .files
+        .keys()
+        .chain(pack.binary_files.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    remove_stale_outputs(output, &previous_outputs, &current_outputs)?;
 
     // 新构建本身不会产生空目录：目录只作为文件的父路径创建。空目录来自重建时
     // 被清单删掉的旧文件，所以无论本次写入是否完整，最后都清理一次 data/ 下的
@@ -404,16 +430,13 @@ fn write_pack(output: &Path, pack: &CompiledPack) -> Result<(), String> {
     files_result?;
     prune_result?;
 
-    let manifest = pack
-        .files
-        .keys()
-        .chain(pack.binary_files.keys())
+    let manifest = current_outputs
+        .iter()
         .map(|path| path.to_string_lossy().replace('\\', "/"))
         .collect::<Vec<_>>()
         .join("\n")
         + "\n";
-    fs::write(&manifest_path, manifest)
-        .map_err(|error| format!("无法写入 {}：{error}", manifest_path.display()))
+    write_if_changed(&manifest_path, manifest.as_bytes())
 }
 
 fn write_files(output: &Path, pack: &CompiledPack) -> Result<(), String> {
@@ -423,8 +446,7 @@ fn write_files(output: &Path, pack: &CompiledPack) -> Result<(), String> {
             fs::create_dir_all(parent)
                 .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
         }
-        fs::write(&path, contents)
-            .map_err(|error| format!("无法写入 {}：{error}", path.display()))?;
+        write_if_changed(&path, contents.as_bytes())?;
     }
     for (relative, contents) in &pack.binary_files {
         let path = output.join(relative);
@@ -432,8 +454,7 @@ fn write_files(output: &Path, pack: &CompiledPack) -> Result<(), String> {
             fs::create_dir_all(parent)
                 .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
         }
-        fs::write(&path, contents)
-            .map_err(|error| format!("无法写入 {}：{error}", path.display()))?;
+        write_if_changed(&path, contents)?;
     }
     Ok(())
 }
@@ -842,9 +863,11 @@ fn remove_empty_directories(directory: &Path) -> Result<(), String> {
         .map_err(|error| format!("无法删除空目录 {}：{error}", directory.display()))
 }
 
-fn remove_old_outputs(output: &Path, manifest: &Path) -> Result<(), String> {
-    let Ok(contents) = fs::read_to_string(manifest) else {
-        return Ok(());
+fn read_manifest(manifest: &Path) -> Result<BTreeSet<PathBuf>, String> {
+    let contents = match fs::read_to_string(manifest) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(BTreeSet::new()),
+        Err(error) => return Err(format!("无法读取 {}：{error}", manifest.display())),
     };
     let mut paths = BTreeSet::new();
     for line in contents.lines() {
@@ -859,7 +882,15 @@ fn remove_old_outputs(output: &Path, manifest: &Path) -> Result<(), String> {
         }
         paths.insert(relative.to_path_buf());
     }
-    for relative in paths {
+    Ok(paths)
+}
+
+fn remove_stale_outputs(
+    output: &Path,
+    previous: &BTreeSet<PathBuf>,
+    current: &BTreeSet<PathBuf>,
+) -> Result<(), String> {
+    for relative in previous.difference(current) {
         let path = output.join(relative);
         match fs::remove_file(&path) {
             Ok(()) => {}
@@ -868,4 +899,14 @@ fn remove_old_outputs(output: &Path, manifest: &Path) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn write_if_changed(path: &Path, contents: &[u8]) -> Result<(), String> {
+    match fs::read(path) {
+        Ok(existing) if existing == contents => return Ok(()),
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(format!("无法读取现有文件 {}：{error}", path.display())),
+    }
+    fs::write(path, contents).map_err(|error| format!("无法写入 {}：{error}", path.display()))
 }

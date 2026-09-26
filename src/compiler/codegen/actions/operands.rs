@@ -214,10 +214,7 @@ impl<'a> Compiler<'a> {
             .expect("semantic validation guarantees the item stack exists")
     }
 
-    pub(in crate::compiler::codegen) fn function(
-        &self,
-        name: &str,
-    ) -> &'a crate::ast::Function {
+    pub(in crate::compiler::codegen) fn function(&self, name: &str) -> &'a crate::ast::Function {
         self.functions_by_name
             .get(name)
             .copied()

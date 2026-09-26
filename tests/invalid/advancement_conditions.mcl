@@ -2,11 +2,17 @@
 //
 // 26.3 的内联战利品条件用 `type` 作判别键（旧版本的 `condition` 已失效），
 // 实体谓词的类型字段是带命名空间的 `minecraft:entity_type`；字段名也必须
-// 来自对应触发器。全部四条声明与谓词资源都必须被拒绝：
+// 来自对应触发器。以下错误声明与谓词资源都必须被拒绝：
 //   - old_key：      `condition` 应为 `type`
 //   - missing_type： 内联战利品条件缺少 `type`
 //   - unknown_field: 触发器没有 `mob` 字段（应为 `entity`）
 //   - 谓词资源 old_style：predicate 正文缺少 `type`
+//   - unknown_type： Minecraft 26.3 未注册该 loot condition type
+//   - unknown_namespace_type：未知命名空间也不能伪装为原版 type
+//   - nested_unknown_type：组合条件的子节点也必须验证注册
+//   - victims_not_list：listOf codec 必须收到数组
+//   - terms_not_list：组合条件 terms 必须是数组或标签引用
+//   - ingredients_not_list：item_predicate 的 listOf 字段同样只能是数组
 //
 // 验证：
 //   cargo run --bin mclang -- check tests/invalid/advancement_conditions.mcl
@@ -15,22 +21,64 @@ namespace advancement_conditions;
 resource predicate old_style = """{"condition":"minecraft:random_chance","chance":0.5}""";
 
 advancement old_key {
-    criterion kill {
+    criterion slain {
         trigger = player_killed_entity;
         conditions = """{"entity":{"condition":"minecraft:entity_properties","entity":"this","predicate":{"entity_type":"minecraft:zombie"}}}""";
     }
 }
 
 advancement missing_type {
-    criterion kill {
+    criterion slain {
         trigger = player_killed_entity;
         conditions = """{"entity":{"entity_type":"minecraft:zombie"}}""";
     }
 }
 
 advancement unknown_field {
-    criterion kill {
+    criterion slain {
         trigger = player_killed_entity;
         conditions = """{"mob":{"type":"minecraft:entity_properties","entity":"this","predicate":{"minecraft:entity_type":"minecraft:zombie"}}}""";
+    }
+}
+
+advancement unknown_type {
+    criterion placed {
+        trigger = placed_block;
+        conditions = """{"location":{"type":"minecraft:definitely_not_a_real_loot_condition"}}""";
+    }
+}
+
+advancement unknown_namespace_type {
+    criterion placed {
+        trigger = placed_block;
+        conditions = """{"location":{"type":"example:random_chance"}}""";
+    }
+}
+
+advancement nested_unknown_type {
+    criterion nested {
+        trigger = player_killed_entity;
+        conditions = """{"entity":{"type":"minecraft:all_of","terms":[{"type":"minecraft:random_chance","chance":0.5},{"type":"minecraft:not_a_registered_child"}]}}""";
+    }
+}
+
+advancement victims_not_list {
+    criterion arrow {
+        trigger = killed_by_arrow;
+        conditions = """{"victims":{"type":"minecraft:killed_by_player"}}""";
+    }
+}
+
+advancement terms_not_list {
+    criterion combination {
+        trigger = player_killed_entity;
+        conditions = """{"entity":{"type":"minecraft:any_of","terms":{"type":"minecraft:killed_by_player"}}}""";
+    }
+}
+
+advancement ingredients_not_list {
+    criterion crafted {
+        trigger = recipe_crafted;
+        conditions = """{"recipes":"minecraft:bread","ingredients":{"items":"minecraft:wheat"}}""";
     }
 }

@@ -1,7 +1,7 @@
 //! 进度声明：触发器、准则、奖励与展示字段的检查。
 //!
-//! 触发器名来自 26.3 `CriteriaTriggers` 注册表；`criteria` 里的条件保持
-//! 原始 JSON（触发器的条件结构属于原版战利品条件树，后续批次再建模）。
+//! 触发器名来自 26.3 `CriteriaTriggers` 注册表；`criteria` 条件按触发器字段
+//! 快照校验，并递归检查战利品条件的类型注册与常用组合节点结构。
 //! 其余引用（父进度、奖励函数、战利品表、配方、图标）在本命名空间内要求
 //! 声明存在，字符串形式的外部引用只校验资源位置。
 
@@ -175,20 +175,21 @@ fn validate_advancement(
         }
         if let Some(json) = &criterion.conditions {
             let span = criterion.conditions_span.unwrap_or(criterion.span);
-            match serde_json::from_str::<serde_json::Value>(json) {
-                Ok(conditions) => {
+            match json {
+                crate::ast::AdvancementConditions::Parsed(conditions) => {
                     if let Some(trigger) = normalize_trigger(&criterion.trigger) {
-                        validate_conditions(trigger, &conditions, span, diagnostics);
+                        validate_conditions(trigger, conditions, span, diagnostics);
                     }
                 }
-                Err(error) => {
+                crate::ast::AdvancementConditions::Invalid {
+                    line,
+                    column,
+                    message,
+                } => {
                     diagnostics.push(Diagnostic::new(
                         format!(
                             "准则 `{}` 的 conditions JSON 无效（JSON 第 {} 行第 {} 列）：{}",
-                            criterion.name,
-                            error.line(),
-                            error.column(),
-                            error
+                            criterion.name, line, column, message
                         ),
                         span,
                     ));
@@ -279,9 +280,8 @@ fn validate_advancement(
 /// 校验已知触发器的 `conditions` 结构。
 ///
 /// 字段表来自 26.3 源码里各触发器的 `TriggerInstance` 记录（见
-/// `data/version/26.3/advancement_triggers.json`）；战利品条件字段
-/// 需要谓词资源字符串或带 `type` 的内联条件对象——26.3 把旧版本的判别键
-/// `condition` 改成了 `type`，写错时原版只会给出「Failed to parse」。
+/// `data/version/26.3/advancement_triggers.json`）；战利品条件字段可以是单个
+/// holder 或 holder 列表。26.3 将旧版本的判别键 `condition` 改为 `type`。
 fn validate_conditions(
     trigger: &str,
     conditions: &serde_json::Value,
@@ -312,39 +312,191 @@ fn validate_conditions(
             diagnostics.push(Diagnostic::new(message, span));
             continue;
         };
-        if kind != "loot_condition" {
-            continue;
+        match kind.as_str() {
+            "loot_condition" => validate_loot_condition(field, value, span, diagnostics),
+            "loot_condition_list" => validate_loot_condition_list(field, value, span, diagnostics),
+            // `listOf()` 字段只接受数组；元素本身的具体字段留给各自的 schema。
+            "item_predicate_list" | "entity_predicate_list" if !value.is_array() => {
+                diagnostics.push(Diagnostic::new(
+                    format!(
+                        "触发器 `{trigger}` 的 `{field}` 需要数组；26.3 的 codec 是 `listOf()`，单个对象或字符串不是合法写法"
+                    ),
+                    span,
+                ));
+            }
+            _ => {}
         }
-        match value {
-            serde_json::Value::String(reference) => {
-                if !valid_resource_location(reference) {
-                    diagnostics.push(Diagnostic::new(
-                        format!("`{field}` 的谓词引用 `{reference}` 不是有效的资源位置"),
-                        span,
-                    ));
-                }
+    }
+}
+
+fn validate_loot_condition_list(
+    label: &str,
+    value: &serde_json::Value,
+    span: crate::ast::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(conditions) = value.as_array() else {
+        diagnostics.push(Diagnostic::new(
+            format!("`{label}` 需要战利品条件数组"),
+            span,
+        ));
+        return;
+    };
+    for (index, condition) in conditions.iter().enumerate() {
+        let item_label = format!("{label}[{}]", index + 1);
+        validate_loot_condition(&item_label, condition, span, diagnostics);
+    }
+}
+
+fn validate_loot_condition(
+    label: &str,
+    value: &serde_json::Value,
+    span: crate::ast::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match value {
+        serde_json::Value::String(reference) => {
+            if !valid_resource_location(reference) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{label}` 的谓词引用 `{reference}` 不是有效的资源位置"),
+                    span,
+                ));
             }
-            serde_json::Value::Object(condition) => {
-                if !condition
-                    .get("type")
-                    .is_some_and(serde_json::Value::is_string)
-                {
-                    let mut message = format!(
-                        "`{field}` 的内联战利品条件缺少 `type`；26.3 的判别键是 `type` 而不是 `condition`，例如 {{\"type\":\"minecraft:entity_properties\",\"entity\":\"this\",\"predicate\":{{\"minecraft:entity_type\":\"minecraft:zombie\"}}}}"
-                    );
-                    if condition.contains_key("condition") {
-                        message = format!(
-                            "`{field}` 使用了 `condition` 作判别键，26.3 已改为 `type`；例如 {{\"type\":\"minecraft:entity_properties\",\"entity\":\"this\",\"predicate\":{{\"minecraft:entity_type\":\"minecraft:zombie\"}}}}"
-                        );
-                    }
-                    diagnostics.push(Diagnostic::new(message, span));
-                }
+        }
+        serde_json::Value::Object(condition) => {
+            validate_loot_condition_object(label, condition, span, diagnostics);
+        }
+        _ => diagnostics.push(Diagnostic::new(
+            format!("`{label}` 需要谓词资源字符串或带 `type` 的内联条件对象"),
+            span,
+        )),
+    }
+}
+
+fn validate_loot_condition_object(
+    label: &str,
+    condition: &serde_json::Map<String, serde_json::Value>,
+    span: crate::ast::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(raw_type) = condition.get("type").and_then(serde_json::Value::as_str) else {
+        let message = if condition.contains_key("condition") {
+            format!("`{label}` 使用了 `condition` 作判别键，26.3 已改为 `type`")
+        } else {
+            format!("`{label}` 的内联战利品条件缺少字符串 `type`；26.3 的判别键是 `type`")
+        };
+        diagnostics.push(Diagnostic::new(message, span));
+        return;
+    };
+
+    let condition_type = canonical_resource_location(raw_type);
+    if !valid_resource_location(&condition_type) {
+        diagnostics.push(Diagnostic::new(
+            format!("`{label}` 的战利品条件 type `{raw_type}` 不是有效的资源位置"),
+            span,
+        ));
+        return;
+    }
+    if crate::version::snapshot::snapshot()
+        .registry_contains_exact("loot_condition_type", &condition_type)
+        == Some(false)
+    {
+        let mut message = format!(
+            "`{label}` 的战利品条件 type `{condition_type}` 未在 Minecraft 26.3 的 loot condition 注册表中"
+        );
+        if let Some(candidate) = crate::version::snapshot::snapshot()
+            .suggest_registry_id("loot_condition_type", &condition_type)
+        {
+            message.push_str(&format!("；是否想写 `{candidate}`？"));
+        }
+        diagnostics.push(Diagnostic::new(message, span));
+        return;
+    }
+
+    match condition_type.as_str() {
+        "minecraft:inverted" => match condition.get("term") {
+            Some(term) => {
+                validate_loot_condition_reference(&format!("{label}.term"), term, span, diagnostics)
             }
-            _ => diagnostics.push(Diagnostic::new(
-                format!("`{field}` 需要谓词资源字符串或带 `type` 的内联条件对象"),
+            None => diagnostics.push(Diagnostic::new(
+                format!("`{label}` 的 inverted 条件缺少 `term`"),
                 span,
             )),
+        },
+        "minecraft:all_of" | "minecraft:any_of" => {
+            validate_loot_condition_terms(label, condition.get("terms"), span, diagnostics);
         }
+        _ => {}
+    }
+}
+
+fn validate_loot_condition_terms(
+    label: &str,
+    terms: Option<&serde_json::Value>,
+    span: crate::ast::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match terms {
+        Some(serde_json::Value::Array(terms)) => {
+            for (index, term) in terms.iter().enumerate() {
+                validate_loot_condition_reference(
+                    &format!("{label}.terms[{}]", index + 1),
+                    term,
+                    span,
+                    diagnostics,
+                );
+            }
+        }
+        Some(serde_json::Value::String(tag)) if tag.starts_with('#') => {
+            if !valid_resource_location(&canonical_resource_location(&tag[1..])) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{label}` 的组合条件 terms 标签引用 `{tag}` 无效"),
+                    span,
+                ));
+            }
+        }
+        Some(_) => diagnostics.push(Diagnostic::new(
+            format!("`{label}` 的组合条件 `terms` 必须是条件数组或 #标签引用"),
+            span,
+        )),
+        None => diagnostics.push(Diagnostic::new(
+            format!("`{label}` 的组合条件缺少 `terms`"),
+            span,
+        )),
+    }
+}
+
+fn validate_loot_condition_reference(
+    label: &str,
+    value: &serde_json::Value,
+    span: crate::ast::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match value {
+        serde_json::Value::String(reference) => {
+            let canonical = canonical_resource_location(reference);
+            if !valid_resource_location(&canonical) {
+                diagnostics.push(Diagnostic::new(
+                    format!("`{label}` 的谓词引用 `{reference}` 不是有效的资源位置"),
+                    span,
+                ));
+            }
+        }
+        serde_json::Value::Object(condition) => {
+            validate_loot_condition_object(label, condition, span, diagnostics);
+        }
+        _ => diagnostics.push(Diagnostic::new(
+            format!("`{label}` 需要资源引用字符串或带 `type` 的内联条件对象"),
+            span,
+        )),
+    }
+}
+
+fn canonical_resource_location(value: &str) -> String {
+    if value.contains(':') {
+        value.to_owned()
+    } else {
+        format!("minecraft:{value}")
     }
 }
 

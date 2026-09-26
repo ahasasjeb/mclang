@@ -126,10 +126,9 @@ impl Compiler<'_> {
         match tool {
             None => String::new(),
             Some(LootTool::Hand(hand)) => format!(" {hand}"),
-            Some(LootTool::Item(name)) => format!(
-                " {}",
-                item_stack_argument(self.item_stack(name))
-            ),
+            Some(LootTool::Item(name)) => {
+                format!(" {}", item_stack_argument(self.item_stack(name)))
+            }
         }
     }
 }

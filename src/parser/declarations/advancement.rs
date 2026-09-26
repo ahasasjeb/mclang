@@ -167,7 +167,7 @@ impl Parser {
                     self.expect(TokenKind::Equal, "conditions 后需要 `=`")?;
                     let (json, span) = self.string("conditions 需要 JSON 字符串")?;
                     self.expect(TokenKind::Semicolon, "conditions 后需要 `;`")?;
-                    conditions = Some((json, span));
+                    conditions = Some((AdvancementConditions::parse(&json), span));
                 }
                 _ => unreachable!(),
             }
@@ -177,13 +177,15 @@ impl Parser {
         let Some((trigger, trigger_span)) = trigger else {
             return Err(Diagnostic::new("准则必须声明 trigger", span));
         };
+        let (conditions, conditions_span) =
+            conditions.map_or((None, None), |(value, span)| (Some(value), Some(span)));
         Ok(AdvancementCriterion {
             name,
             name_span,
             trigger,
             trigger_span,
-            conditions: conditions.as_ref().map(|(json, _)| json.clone()),
-            conditions_span: conditions.map(|(_, span)| span),
+            conditions,
+            conditions_span,
             span,
         })
     }

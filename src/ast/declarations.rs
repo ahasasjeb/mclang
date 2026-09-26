@@ -264,16 +264,43 @@ pub struct AdvancementDecl {
     pub span: Span,
 }
 
-/// 单条准则：`trigger` 是 26.3 注册的触发器名，`conditions` 是触发条件的原始 JSON。
+/// 单条准则：`trigger` 是 26.3 注册的触发器名，conditions 在解析时只做一次 JSON parse。
 #[derive(Debug)]
 pub struct AdvancementCriterion {
     pub name: String,
     pub name_span: Span,
     pub trigger: String,
     pub trigger_span: Span,
-    pub conditions: Option<String>,
+    pub conditions: Option<AdvancementConditions>,
     pub conditions_span: Option<Span>,
     pub span: Span,
+}
+
+/// 进度条件 JSON 的解析结果。
+///
+/// 将解析失败也保存在 AST 中，校验阶段仍能在原 conditions span 报告错误，
+/// 同时成功解析的 JSON 可直接供校验和代码生成共用。
+#[derive(Debug)]
+pub enum AdvancementConditions {
+    Parsed(serde_json::Value),
+    Invalid {
+        line: usize,
+        column: usize,
+        message: String,
+    },
+}
+
+impl AdvancementConditions {
+    pub fn parse(source: &str) -> Self {
+        match serde_json::from_str(source) {
+            Ok(value) => Self::Parsed(value),
+            Err(error) => Self::Invalid {
+                line: error.line(),
+                column: error.column(),
+                message: error.to_string(),
+            },
+        }
+    }
 }
 
 /// `requirements` 的两种策略，对应 `AdvancementRequirements.Strategy`。

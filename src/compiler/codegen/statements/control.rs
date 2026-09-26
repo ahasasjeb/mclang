@@ -136,13 +136,17 @@ impl Compiler<'_> {
             }
             None => {}
         }
-        if else_body.is_empty()
-            && !then_body.is_empty()
-            && let Some(clause) = self.direct_condition_clause(condition, false, owner)
-        {
-            let block = self.compile_small_block(then_body, owner);
-            commands.push(format!("execute {clause} run {block}"));
-            return;
+        if else_body.is_empty() && !then_body.is_empty() {
+            if self.compile_direct_if_chain(condition, then_body, owner, commands) {
+                return;
+            }
+            // The fact pass can decline a condition to preserve effects or
+            // expression evaluation order; retain the existing native lowering.
+            if let Some(clause) = self.direct_condition_clause(condition, false, owner) {
+                let block = self.compile_small_block(then_body, owner);
+                commands.push(format!("execute {clause} run {block}"));
+                return;
+            }
         }
         let flag = self.compile_condition(condition, owner, commands);
         self.compile_conditional_branch(&flag, true, then_body, owner, commands);

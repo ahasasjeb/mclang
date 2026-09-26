@@ -68,7 +68,7 @@
 | predicate | 部分 | 建 typed predicate schema，并与 execute/item/advancement 复用。 |
 | loot table | 部分 | 分阶段覆盖 pools、entries、functions、conditions、number providers。 |
 | item modifier | 部分 | 与 loot function 模型共用 schema。 |
-| advancement | 部分 | `requirements = all/any` 已按原版“外层 AND、内层 OR”生成；继续将 conditions 等 raw JSON 字段逐步结构化。 |
+| advancement | 部分 | `requirements = all/any` 已按原版“外层 AND、内层 OR”生成；conditions 会按 26.3 trigger codec 检查常见形状、注册 loot condition type 并递归验证组合节点，`victims`/`items`/`ingredients` 这类 `listOf()` 字段按数组校验；继续结构化其余条件 codec。 |
 | recipe | 部分 | 覆盖常用 vanilla recipe serializer。 |
 | dialog | 部分 | 根据 26.3 dialog codec 建 typed schema。 |
 | enchantment / provider / trade / timeline 等动态注册表资源 | 部分 | 使用通用 codec schema 框架提供字段校验。 |
@@ -101,7 +101,27 @@
 | 多版本数据 | 待实现 | 把版本号和生成快照路径从散落常量收敛到统一版本配置；支持 26.3，并保留扩展其它版本的数据结构。 |
 | 本地库 | 待实现 | 支持只读 library roots、稳定解析顺序和冲突诊断。 |
 
-`examples/monster_market` 的复杂市场语料用于检查真实产物。当前产物为 540 条函数命令、66 个 mcfunction，其中 24 个位于 `__mcl`；安全单命令块与简单条件已直接内联，算术赋值直接写入目标，复用的常量在加载时统一初始化。多实体执行仍保留逐来源求值边界，store 不会丢失自赋值结果，查询失败后的取反与是否带 else 无关。对应回归语料位于 `tests/valid/control_semantics/`。仍可继续优化：让 `scoreboard.get(self, objective)` 保留原目标作为表达式操作数，避免复制到内部临时项；合并同一计分值上的区间条件。
+`examples/monster_market` 的复杂市场语料用于检查真实产物。当前产物为 528 条函数命令、66 个 mcfunction，其中 24 个位于 `__mcl`；安全单命令块与简单条件已直接内联，算术赋值直接写入目标，复用的常量在加载时统一初始化。多实体执行仍保留逐来源求值边界，store 不会丢失自赋值结果，查询失败后的取反与是否带 else 无关。
+
+编译期优化的分层与适用条件：
+
+- **原生条件链**：连续嵌套 `if` 合并成一条 `execute if a if b if c run …`，不再产生 `run execute …` 的嵌套派发；`a && a`、`if a { if a { … } }` 这类同一纯条件只保留一次，含函数调用或随机 predicate 的条件不去重。
+- **整数范围传播**：沿同一条条件链维护 `x ∈ [min, max]` 与单个排除值，`x > 10` 之后 `x > 5` 直接判定为真、`x < 5` 判定为假，矛盾条件整段删除，`== v` 会收紧成单点。
+- **副作用保护**：`f() || 已知为真` 仍必须调用 `f()`，所以“编译期可判定为真”的条件只有在无副作用时才允许删除；带副作用的条件退回原标志路径（`ScoreFacts` 对含调用/谓词/随机的条件一律返回 Unknown）。
+- **`&&` 右侧比较折叠**：右侧是比较且左侧已算出 0/1 标志时，把右侧的否定子句直接并进合并命令，省掉第二个标志计分项的 `set 0` / `run set 1` 两条命令（例如 `choice == 1 && charge(price()) == 1`）。
+- **常量与不可达**：常量条件在编译期选定分支，`return` 之后同一生成块里的语句不再输出，被紧跟其后的常量赋值覆盖的赋值也会裁掉。
+
+对应回归语料位于 `tests/valid/control_semantics/` 和 `tests/valid/optimizations/`；`tests/control_optimization.rs` 里的 mini 解释器会在边界值上对比源码语义与生成命令语义。在 `examples/**` + `tests/valid/**` 共 54 个语料上，优化后命令总数 3029 → 2970、`execute` 1080 → 1026、`scoreboard` 1434 → 1376、临时计分项 409 → 383、产物字节数 −2.4%（monster_market 540 → 528）。
+
+**有意不做的优化**（都会改变运行时行为，或收益不抵风险）：
+
+- `if c { A } else { B }` 不能改写成 `execute if c run A` + `execute unless c run B`：两条命令之间 B 的求值发生在 A 之后，A 若写入 `c` 读取的计分项，`unless` 会看到新值而多执行一次 B。除非能证明 A/B 不写 `c` 的输入，否则保留一次性标志。
+- 不用 `execute store success … run execute if …` 合并标志：26.3 的 `ExecuteCommand.addConditional(...).executes(...)` 在条件为假时抛 `ERROR_CONDITIONAL_FAILED`（见 `createNumericConditionalHandler`），裸条件没有 `run` 就没有 fork 兜底。
+- `&&` 之外的标志合并、跨语句的区间传播（例如 `if x > 10 { …; if x > 5 { … } }`）需要先有“语句是否写入某计分项”的写集分析；本次没有引入，相关形状保持原样。
+
+后续可继续让 `scoreboard.get(self, objective)` 保留原目标作为表达式操作数，避免复制到内部临时项，并把区间传播扩展到能证明无写入的跨语句分支。
+
+编译器自身重复工作的消除（1024 个 advancement 的压力语料，release 构建，均为最小值）：`check` 63.02 ms → 26.02 ms，目录构建 402 ms → 384 ms，无变化的重复构建 485 ms → 137 ms。收益来自模块只解析一次、conditions 只做一次 JSON parse、版本快照按注册表/枚举/命令/触发器分别惰性解析，以及“内容未变不重写文件、只删除清单里消失的文件”的增量输出。
 
 版本数据生成器建议补一份机器可读命令可用性文件，记录根命令、别名、注册条件、权限节点和可执行叶；命令覆盖统计由该文件校验。
 

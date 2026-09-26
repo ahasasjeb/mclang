@@ -258,44 +258,9 @@ impl Compiler<'_> {
                 comparison,
                 right,
             } => {
-                let left_value = self.compile_expr(left, owner, commands);
-                let left_value = self.freeze_before_effect(left_value, right, commands);
-                let right_value = self.compile_expr(right, owner, commands);
+                let values = self.compile_comparison_operands(left, right, owner, commands);
                 let flag = self.temporary();
-                match (left_value, right_value) {
-                    (Value::Integer(left), Value::Integer(right)) => commands.push(format!(
-                        "scoreboard players set {flag} {} {}",
-                        self.objective,
-                        i32::from(compare_integers(left, *comparison, right))
-                    )),
-                    (Value::Score(score), Value::Integer(value)) => self
-                        .compile_score_constant_comparison(
-                            &flag,
-                            &score,
-                            *comparison,
-                            value,
-                            commands,
-                        ),
-                    (Value::Integer(value), Value::Score(score)) => self
-                        .compile_score_constant_comparison(
-                            &flag,
-                            &score,
-                            reverse_comparison(*comparison),
-                            value,
-                            commands,
-                        ),
-                    (Value::Score(left), Value::Score(right)) => {
-                        commands.push(format!(
-                            "scoreboard players set {flag} {} 0",
-                            self.objective
-                        ));
-                        let (prefix, symbol) = comparison_operator(*comparison);
-                        commands.push(format!(
-                            "execute {prefix} score {left} {} {symbol} {right} {} run scoreboard players set {flag} {} 1",
-                            self.objective, self.objective, self.objective
-                        ));
-                    }
-                }
+                self.comparison_flag(&flag, *comparison, values, commands);
                 flag
             }
             Condition::Not(condition) => {
@@ -331,6 +296,9 @@ impl Compiler<'_> {
                             self.objective
                         ));
                     }
+                    return left;
+                }
+                if self.fuse_condition_and(&left, right, owner, commands) {
                     return left;
                 }
                 let mut right_commands = Vec::new();
@@ -373,6 +341,136 @@ impl Compiler<'_> {
                 ));
                 left
             }
+        }
+    }
+
+    /// 比较两侧按源码顺序求值；右侧可能改变左侧读取的状态时先冻结左值。
+    fn compile_comparison_operands(
+        &mut self,
+        left: &Expr,
+        right: &Expr,
+        owner: &str,
+        commands: &mut Vec<String>,
+    ) -> (Value, Value) {
+        let left_value = self.compile_expr(left, owner, commands);
+        let left_value = self.freeze_before_effect(left_value, right, commands);
+        let right_value = self.compile_expr(right, owner, commands);
+        (left_value, right_value)
+    }
+
+    /// 把已经求值的比较固化成 0/1 标志计分项。
+    fn comparison_flag(
+        &self,
+        flag: &str,
+        comparison: Comparison,
+        values: (Value, Value),
+        commands: &mut Vec<String>,
+    ) {
+        match values {
+            (Value::Integer(left), Value::Integer(right)) => commands.push(format!(
+                "scoreboard players set {flag} {} {}",
+                self.objective,
+                i32::from(compare_integers(left, comparison, right))
+            )),
+            (Value::Score(score), Value::Integer(value)) => {
+                self.compile_score_constant_comparison(flag, &score, comparison, value, commands);
+            }
+            (Value::Integer(value), Value::Score(score)) => self.compile_score_constant_comparison(
+                flag,
+                &score,
+                reverse_comparison(comparison),
+                value,
+                commands,
+            ),
+            (Value::Score(left), Value::Score(right)) => {
+                commands.push(format!(
+                    "scoreboard players set {flag} {} 0",
+                    self.objective
+                ));
+                let (prefix, symbol) = comparison_operator(comparison);
+                commands.push(format!(
+                    "execute {prefix} score {left} {} {symbol} {right} {} run scoreboard players set {flag} {} 1",
+                    self.objective, self.objective, self.objective
+                ));
+            }
+        }
+    }
+
+    /// `left && right` 中右侧是比较时，右侧只需要一个真假值：把它的否定直接
+    /// 折进合并命令，省掉第二个标志计分项。
+    ///
+    /// 只有在能给出原生否定子句时才折进；否则右侧仍按原来的两步固化生成，
+    /// 行为与旧路径逐条一致。
+    fn fuse_condition_and(
+        &mut self,
+        left_flag: &str,
+        right: &Condition,
+        owner: &str,
+        commands: &mut Vec<String>,
+    ) -> bool {
+        let Condition::Compare {
+            left,
+            comparison,
+            right: right_operand,
+        } = right
+        else {
+            return false;
+        };
+
+        // `&&` 短路：右侧只在左侧为真时求值，因此这些命令都带左侧守卫。
+        let mut nested = Vec::new();
+        let values = self.compile_comparison_operands(left, right_operand, owner, &mut nested);
+        match self.negated_comparison_clause(*comparison, &values) {
+            Some(clause) => nested.push(format!(
+                "execute {clause} run scoreboard players set {left_flag} {} 0",
+                self.objective
+            )),
+            None => {
+                let flag = self.temporary();
+                self.comparison_flag(&flag, *comparison, values, &mut nested);
+                nested.push(format!(
+                    "execute unless score {flag} {} matches 1 run scoreboard players set {left_flag} {} 0",
+                    self.objective, self.objective
+                ));
+            }
+        }
+        self.append_guarded_commands(left_flag, 1, nested, commands);
+        true
+    }
+
+    /// 已求值比较的否定原生子句；无法用单条 `execute` 条件表达时返回 `None`。
+    fn negated_comparison_clause(
+        &self,
+        comparison: Comparison,
+        values: &(Value, Value),
+    ) -> Option<String> {
+        match values {
+            (Value::Score(score), Value::Integer(value)) => {
+                let (test, range) = score_constant_clause(comparison, *value)?;
+                Some(format!(
+                    "{} score {score} {} matches {range}",
+                    invert_test(test),
+                    self.objective
+                ))
+            }
+            (Value::Integer(value), Value::Score(score)) => {
+                let (test, range) = score_constant_clause(reverse_comparison(comparison), *value)?;
+                Some(format!(
+                    "{} score {score} {} matches {range}",
+                    invert_test(test),
+                    self.objective
+                ))
+            }
+            (Value::Score(left), Value::Score(right)) => {
+                let (test, symbol) = comparison_operator(comparison);
+                Some(format!(
+                    "{} score {left} {} {symbol} {right} {}",
+                    invert_test(test),
+                    self.objective,
+                    self.objective
+                ))
+            }
+            _ => None,
         }
     }
 
