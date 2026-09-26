@@ -159,6 +159,7 @@ pub(super) fn validate_function_bodies(
             advancements: &declarations.advancements,
             advancement_resources: &declarations.advancement_resources,
             function_tags: &declarations.function_tags,
+            reachable_tag_functions: &declarations.reachable_tag_functions,
         };
         validate_statements(
             &function.body,

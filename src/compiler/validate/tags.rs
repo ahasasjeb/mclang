@@ -10,6 +10,7 @@ use crate::ast::{FunctionTagDecl, FunctionTagEntry, Program};
 use crate::diagnostic::Diagnostic;
 
 use super::Signature;
+use super::graph::cyclic_nodes;
 use super::rules::{valid_resource_location, validate_identifier};
 
 /// 收集函数标签声明并检查名称与重复。
@@ -30,13 +31,22 @@ pub(super) fn collect_function_tags<'a>(
     tags
 }
 
+/// 按声明顺序排列标签：映射表本身无序，直接遍历会让诊断顺序随哈希种子变化。
+fn tags_in_declaration_order<'a>(
+    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
+) -> Vec<&'a FunctionTagDecl> {
+    let mut declarations = tags.values().copied().collect::<Vec<_>>();
+    declarations.sort_by_key(|tag| (tag.span.source, tag.span.start));
+    declarations
+}
+
 /// 检查标签条目的引用与循环；必须在签名表建立之后调用。
 pub(super) fn validate_function_tags(
     tags: &HashMap<&str, &FunctionTagDecl>,
     signatures: &HashMap<&str, Signature>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    for tag in tags.values() {
+    for tag in tags_in_declaration_order(tags) {
         for entry in &tag.values {
             match entry {
                 FunctionTagEntry::Function(name, span) => {
@@ -70,24 +80,6 @@ pub(super) fn validate_function_tags(
     detect_cycles(tags, diagnostics);
 }
 
-/// 展开标签（含嵌套标签引用）后可达的全部本命名空间函数，按声明顺序去重。
-pub(super) fn reachable_functions<'a>(
-    tag: &str,
-    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
-) -> Vec<&'a str> {
-    let mut reachable = Vec::new();
-    let mut visited = HashSet::new();
-    let mut seen_functions = HashSet::new();
-    collect_functions(
-        tag,
-        tags,
-        &mut visited,
-        &mut seen_functions,
-        &mut reachable,
-    );
-    reachable
-}
-
 fn collect_functions<'a>(
     tag: &str,
     tags: &HashMap<&'a str, &'a FunctionTagDecl>,
@@ -118,40 +110,149 @@ fn collect_functions<'a>(
     }
 }
 
+/// 为每个标签预先展开可达函数，使函数体内的每个标签调用只需查表。
+pub(super) fn reachable_functions_by_tag<'a>(
+    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
+) -> HashMap<&'a str, Vec<&'a str>> {
+    let graph = tag_graph(tags);
+    let cyclic = cyclic_nodes(tags.keys().copied(), &graph);
+
+    // 沿反向边标记所有能到达环的标签。合法的剩余子图是 DAG，可从叶节点开始
+    // 动态展开；有环的无效输入沿用逐根 DFS，保留原有的去重和声明顺序语义。
+    let mut reverse = tags
+        .keys()
+        .map(|&name| (name, Vec::new()))
+        .collect::<HashMap<_, _>>();
+    for (&name, children) in &graph {
+        for &child in children {
+            reverse.entry(child).or_default().push(name);
+        }
+    }
+    let mut reaches_cycle = cyclic.clone();
+    let mut pending: Vec<&str> = cyclic.iter().copied().collect();
+    while let Some(name) = pending.pop() {
+        if let Some(parents) = reverse.get(name) {
+            for &parent in parents {
+                if reaches_cycle.insert(parent) {
+                    pending.push(parent);
+                }
+            }
+        }
+    }
+
+    let mut remaining_children = tags
+        .keys()
+        .filter(|name| !reaches_cycle.contains(**name))
+        .map(|&name| (name, 0usize))
+        .collect::<HashMap<_, _>>();
+    let mut parents = HashMap::<&str, Vec<&str>>::new();
+    for &name in remaining_children.keys() {
+        parents.entry(name).or_default();
+    }
+    for (&name, children) in &graph {
+        if reaches_cycle.contains(name) {
+            continue;
+        }
+        for &child in children {
+            *remaining_children
+                .get_mut(name)
+                .expect("acyclic tag must be indexed") += 1;
+            parents.entry(child).or_default().push(name);
+        }
+    }
+
+    let mut ready: Vec<&str> = remaining_children
+        .iter()
+        .filter_map(|(&name, &count)| (count == 0).then_some(name))
+        .collect();
+    let mut reachable = HashMap::with_capacity(tags.len());
+    while let Some(name) = ready.pop() {
+        let Some(declaration) = tags.get(name) else {
+            continue;
+        };
+        let mut functions = Vec::new();
+        let mut seen_functions = HashSet::new();
+        for entry in &declaration.values {
+            match entry {
+                FunctionTagEntry::Function(function, _) => {
+                    let function = function.as_str();
+                    if seen_functions.insert(function) {
+                        functions.push(function);
+                    }
+                }
+                FunctionTagEntry::Tag(child, _) => {
+                    if let Some(child_functions) = reachable.get(child.as_str()) {
+                        for &function in child_functions {
+                            if seen_functions.insert(function) {
+                                functions.push(function);
+                            }
+                        }
+                    }
+                }
+                FunctionTagEntry::External(_, _) => {}
+            }
+        }
+        reachable.insert(name, functions);
+
+        if let Some(dependent_tags) = parents.get(name) {
+            for &parent in dependent_tags {
+                let remaining = remaining_children
+                    .get_mut(parent)
+                    .expect("dependent tag must be indexed");
+                *remaining -= 1;
+                if *remaining == 0 {
+                    ready.push(parent);
+                }
+            }
+        }
+    }
+
+    for &name in &reaches_cycle {
+        let mut functions = Vec::new();
+        let mut visited_tags = HashSet::new();
+        let mut seen_functions = HashSet::new();
+        collect_functions(
+            name,
+            tags,
+            &mut visited_tags,
+            &mut seen_functions,
+            &mut functions,
+        );
+        reachable.insert(name, functions);
+    }
+    reachable
+}
+
+fn tag_graph<'a>(
+    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
+) -> HashMap<&'a str, HashSet<&'a str>> {
+    let mut graph = HashMap::with_capacity(tags.len());
+    for (&name, declaration) in tags {
+        let children = declaration
+            .values
+            .iter()
+            .filter_map(|entry| {
+                let FunctionTagEntry::Tag(child, _) = entry else {
+                    return None;
+                };
+                tags.get_key_value(child.as_str()).map(|(key, _)| *key)
+            })
+            .collect();
+        graph.insert(name, children);
+    }
+    graph
+}
+
 fn detect_cycles(tags: &HashMap<&str, &FunctionTagDecl>, diagnostics: &mut Vec<Diagnostic>) {
-    for (name, declaration) in tags {
-        let mut visited = HashSet::new();
-        if reaches_tag(name, name, tags, &mut visited) {
+    let graph = tag_graph(tags);
+    let cyclic = cyclic_nodes(tags.keys().copied(), &graph);
+    for declaration in tags_in_declaration_order(tags) {
+        let name = declaration.name.as_str();
+        if cyclic.contains(name) {
             diagnostics.push(Diagnostic::new(
                 format!("函数标签 `{name}` 形成循环引用"),
                 declaration.span,
             ));
         }
     }
-}
-
-fn reaches_tag<'a>(
-    current: &str,
-    target: &str,
-    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
-    visited: &mut HashSet<&'a str>,
-) -> bool {
-    let Some(declaration) = tags.get(current) else {
-        return false;
-    };
-    for entry in &declaration.values {
-        let FunctionTagEntry::Tag(name, _) = entry else {
-            continue;
-        };
-        let Some((&reference, _)) = tags.get_key_value(name.as_str()) else {
-            continue;
-        };
-        if reference == target {
-            return true;
-        }
-        if visited.insert(reference) && reaches_tag(reference, target, tags, visited) {
-            return true;
-        }
-    }
-    false
 }

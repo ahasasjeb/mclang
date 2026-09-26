@@ -11,6 +11,7 @@ mod entity_commands;
 mod entity_nbt;
 mod expressions;
 mod functions;
+mod graph;
 mod item_components;
 mod items;
 mod macros;
@@ -58,6 +59,7 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
     let function_tags = collect_function_tags(program, &mut diagnostics);
     let signatures = collect_signatures(program, &scores, &mut diagnostics);
     validate_function_tags(&function_tags, &signatures, &mut diagnostics);
+    let reachable_tag_functions = tags::reachable_functions_by_tag(&function_tags);
     let resources = validate_resources(program, &mut diagnostics);
     let item_stacks = collect_item_stacks(program, &mut diagnostics);
     let advancements = collect_advancements(
@@ -76,6 +78,7 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
         advancement_resources: resources.advancements.clone(),
         advancements,
         function_tags,
+        reachable_tag_functions,
         signatures,
         scores,
         objectives,
@@ -87,7 +90,11 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
     };
 
     validate_function_bodies(program, &declarations, &mut diagnostics);
-    validate_synchronous_recursion(program, &mut diagnostics);
+    validate_synchronous_recursion(
+        program,
+        &declarations.reachable_tag_functions,
+        &mut diagnostics,
+    );
     diagnostics
 }
 
@@ -106,5 +113,6 @@ struct Declarations<'a> {
     advancement_resources: HashSet<&'a str>,
     advancements: HashMap<&'a str, &'a AdvancementDecl>,
     function_tags: HashMap<&'a str, &'a FunctionTagDecl>,
+    reachable_tag_functions: HashMap<&'a str, Vec<&'a str>>,
     signatures: HashMap<&'a str, Signature>,
 }

@@ -76,7 +76,14 @@ pub(super) fn validate_macro_call(
             if !ctx.symbols.function_tags.contains_key(name.as_str()) {
                 diagnostics.push(Diagnostic::new(format!("找不到函数标签 `#{name}`"), span));
             }
-            for function in super::tags::reachable_functions(name, ctx.symbols.function_tags) {
+            for function in ctx
+                .symbols
+                .reachable_tag_functions
+                .get(name.as_str())
+                .into_iter()
+                .flatten()
+                .copied()
+            {
                 validate_local_macro_call(function, arguments, span, ctx, diagnostics);
             }
         }

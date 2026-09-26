@@ -358,27 +358,52 @@ fn detect_parent_cycles(
         .iter()
         .map(|(name, advancement)| (*name, *advancement))
         .collect::<Vec<_>>();
-    declarations
-        .sort_by_key(|(_, advancement)| (advancement.span.source, advancement.span.start));
-    for (name, advancement) in declarations {
-        let mut visited = HashSet::new();
-        let mut current = advancement;
-        while let Some(parent) = &current.parent {
-            if parent.external {
-                break;
+    declarations.sort_by_key(|(_, advancement)| (advancement.span.source, advancement.span.start));
+    let mut reaches_cycle = HashMap::with_capacity(declarations.len());
+    let mut path = Vec::new();
+    let mut visited = HashSet::new();
+    for &(name, _) in &declarations {
+        if reaches_cycle.contains_key(name) {
+            continue;
+        }
+
+        path.clear();
+        visited.clear();
+        let mut current_name = name;
+        let reaches_cycle_from_start = loop {
+            if let Some(&reaches_cycle) = reaches_cycle.get(current_name) {
+                break reaches_cycle;
             }
-            let parent_name = parent.name.as_str();
-            if parent_name == name || !visited.insert(parent_name) {
-                diagnostics.push(Diagnostic::new(
-                    format!("进度 `{name}` 的 parent 链形成循环"),
-                    advancement.span,
-                ));
-                break;
+            if !visited.insert(current_name) {
+                break true;
             }
-            let Some(next) = advancements.get(parent_name).copied() else {
-                break;
+            path.push(current_name);
+
+            let Some(current) = advancements.get(current_name) else {
+                break false;
             };
-            current = next;
+            let Some(parent) = &current.parent else {
+                break false;
+            };
+            if parent.external {
+                break false;
+            }
+            current_name = parent.name.as_str();
+            if !advancements.contains_key(current_name) {
+                break false;
+            }
+        };
+        for name in &path {
+            reaches_cycle.insert(*name, reaches_cycle_from_start);
+        }
+    }
+
+    for (name, advancement) in declarations {
+        if reaches_cycle.get(name) == Some(&true) {
+            diagnostics.push(Diagnostic::new(
+                format!("进度 `{name}` 的 parent 链形成循环"),
+                advancement.span,
+            ));
         }
     }
 }

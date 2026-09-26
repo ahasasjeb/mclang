@@ -95,4 +95,5 @@ pub(super) struct StatementSymbols<'a> {
     pub(super) advancements: &'a HashMap<&'a str, &'a AdvancementDecl>,
     pub(super) advancement_resources: &'a HashSet<&'a str>,
     pub(super) function_tags: &'a HashMap<&'a str, &'a FunctionTagDecl>,
+    pub(super) reachable_tag_functions: &'a HashMap<&'a str, Vec<&'a str>>,
 }

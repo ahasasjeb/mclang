@@ -27,8 +27,6 @@ use super::expressions::{
 use super::items::validate_give_count;
 use super::registry::{validate_enum, validate_id};
 use super::rules::{valid_entity_tag, valid_resource_location, validate_identifier};
-use super::tags::reachable_functions;
-
 mod actions;
 mod advancement;
 mod entities;

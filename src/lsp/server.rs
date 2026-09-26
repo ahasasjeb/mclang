@@ -4,9 +4,10 @@
 //! 重新分析整个项目，因为命名空间、跨文件引用和函数标签本来就是项目级概念。项目
 //! 规模很小，全量分析换来的是与命令行完全一致的诊断。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{self, BufReader, BufWriter};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde_json::{Value, json};
 
@@ -46,6 +47,13 @@ struct Project {
     analysis: ProjectAnalysis,
 }
 
+/// 由发现到的源文件构建的项目查找索引；文件发现失效前可跨刷新复用。
+struct DiscoveryIndex {
+    files: Vec<PathBuf>,
+    direct_files: HashMap<PathBuf, Vec<usize>>,
+    subtree_files: HashMap<PathBuf, Vec<usize>>,
+}
+
 #[derive(Default)]
 pub struct Session {
     roots: Vec<PathBuf>,
@@ -54,6 +62,7 @@ pub struct Session {
     /// 每个工作区根目录下已发现的 `.mcl` 文件；避免每次按键都递归扫描大目录。
     discovered: BTreeMap<PathBuf, Vec<PathBuf>>,
     discovery_dirty: bool,
+    discovery_index: Option<Arc<DiscoveryIndex>>,
     /// 每个文件的命名空间，用于推断打开文档属于哪个项目。
     namespaces: BTreeMap<PathBuf, Option<String>>,
     /// 上次发布的诊断，用于跳过没有变化的通知。

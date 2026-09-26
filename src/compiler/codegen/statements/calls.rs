@@ -68,12 +68,19 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         let mut values = Vec::new();
+        let mut later_effects = Vec::with_capacity(arguments.len());
+        let mut next_effect = None;
+        for argument in arguments.iter().rev() {
+            later_effects.push(next_effect);
+            if expression_may_modify_state(argument) {
+                next_effect = Some(argument);
+            }
+        }
+        later_effects.reverse();
+
         for (index, argument) in arguments.iter().enumerate() {
             let value = self.compile_expr(argument, owner, commands);
-            let value = if let Some(later) = arguments[index + 1..]
-                .iter()
-                .find(|later| expression_may_modify_state(later))
-            {
+            let value = if let Some(later) = later_effects[index] {
                 self.freeze_before_effect(value, later, commands)
             } else {
                 value

@@ -58,29 +58,20 @@ impl Session {
     /// 同命名空间的文件。每个项目单独分析，符号表与诊断不会互相污染。
     fn collect_projects(&mut self) -> Vec<Project> {
         self.ensure_discovered();
-        let discovered = self.discovered_files();
-        let mut direct_files: HashMap<PathBuf, Vec<usize>> = HashMap::new();
-        let mut subtree_files: HashMap<PathBuf, Vec<usize>> = HashMap::new();
-        for (index, path) in discovered.iter().enumerate() {
-            if let Some(parent) = path.parent() {
-                direct_files
-                    .entry(parent.to_path_buf())
-                    .or_default()
-                    .push(index);
+        let index = match &self.discovery_index {
+            Some(index) => Arc::clone(index),
+            None => {
+                let index = Arc::new(self.build_discovery_index());
+                self.discovery_index = Some(Arc::clone(&index));
+                index
             }
-            for ancestor in path.ancestors().skip(1) {
-                subtree_files
-                    .entry(ancestor.to_path_buf())
-                    .or_default()
-                    .push(index);
-            }
-        }
+        };
         let open_paths: Vec<PathBuf> = self.open.keys().cloned().collect();
 
         let mut keys: Vec<(PathBuf, Option<String>)> = Vec::new();
         let mut seen_keys = HashSet::new();
         for path in &open_paths {
-            let key = self.project_root(path, &discovered, &direct_files);
+            let key = self.project_root(path, &index.files, &index.direct_files);
             if seen_keys.insert(key.clone()) {
                 keys.push(key);
             }
@@ -94,9 +85,9 @@ impl Session {
         keys.into_iter()
             .map(|(root, namespace)| {
                 let mut texts: BTreeMap<PathBuf, String> = BTreeMap::new();
-                if let Some(indices) = subtree_files.get(&root) {
-                    for index in indices.iter().take(MAX_PROJECT_FILES) {
-                        let path = &discovered[*index];
+                if let Some(indices) = index.subtree_files.get(&root) {
+                    for file_index in indices.iter().take(MAX_PROJECT_FILES) {
+                        let path = &index.files[*file_index];
                         if !self.namespace_matches(path, &namespace) {
                             continue;
                         }
@@ -139,9 +130,40 @@ impl Session {
             .find(|project| project.sources.iter().any(|source| source.path == path))
     }
 
+    fn build_discovery_index(&self) -> DiscoveryIndex {
+        let files = self.discovered_files();
+        let mut direct_files: HashMap<PathBuf, Vec<usize>> = HashMap::new();
+        let mut subtree_files: HashMap<PathBuf, Vec<usize>> = HashMap::new();
+        for (index, path) in files.iter().enumerate() {
+            if let Some(parent) = path.parent() {
+                direct_files
+                    .entry(parent.to_path_buf())
+                    .or_default()
+                    .push(index);
+            }
+            for ancestor in path.ancestors().skip(1) {
+                subtree_files
+                    .entry(ancestor.to_path_buf())
+                    .or_default()
+                    .push(index);
+            }
+        }
+        DiscoveryIndex {
+            files,
+            direct_files,
+            subtree_files,
+        }
+    }
+
     fn ensure_discovered(&mut self) {
+        let dirty = self.discovery_dirty;
+        if dirty {
+            let roots = self.roots.clone();
+            self.discovered.retain(|root, _| roots.contains(root));
+        }
+        let mut changed = dirty;
         for root in &self.roots {
-            if self.discovery_dirty || !self.discovered.contains_key(root) {
+            if dirty || !self.discovered.contains_key(root) {
                 let directory = if root.is_file() {
                     root.parent().map_or(root.as_path(), |parent| parent)
                 } else {
@@ -154,9 +176,13 @@ impl Session {
                 paths.sort();
                 paths.truncate(MAX_PROJECT_FILES);
                 self.discovered.insert(root.clone(), paths);
+                changed = true;
             }
         }
         self.discovery_dirty = false;
+        if changed {
+            self.discovery_index = None;
+        }
     }
 
     fn discovered_files(&self) -> Vec<PathBuf> {
@@ -250,6 +276,9 @@ impl Session {
     fn publish_diagnostics(&mut self) -> Vec<Value> {
         let mut grouped: BTreeMap<PathBuf, Vec<Value>> = BTreeMap::new();
         for project in &self.projects {
+            if project.analysis.diagnostics.is_empty() {
+                continue;
+            }
             let sources: HashMap<&Path, &SourceFile> = project
                 .sources
                 .iter()

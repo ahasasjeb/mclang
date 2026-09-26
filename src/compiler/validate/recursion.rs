@@ -6,35 +6,32 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{
-    CallTarget, Condition, Expr, ExprKind, FunctionTagDecl, Program, Statement, StatementKind,
-};
+use crate::ast::{CallTarget, Condition, Expr, ExprKind, Program, Statement, StatementKind};
 use crate::diagnostic::Diagnostic;
 
-use super::tags::reachable_functions;
+use super::graph::cyclic_nodes;
 
-pub(super) fn validate_synchronous_recursion(program: &Program, diagnostics: &mut Vec<Diagnostic>) {
+pub(super) fn validate_synchronous_recursion<'a>(
+    program: &'a Program,
+    reachable_tag_functions: &HashMap<&'a str, Vec<&'a str>>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let known_functions = program
         .functions
         .iter()
         .map(|function| function.name.as_str())
         .collect::<HashSet<_>>();
-    let tags = program
-        .function_tags
-        .iter()
-        .map(|tag| (tag.name.as_str(), tag))
-        .collect::<HashMap<&str, &FunctionTagDecl>>();
     let mut graph = HashMap::<&str, HashSet<&str>>::new();
     for function in &program.functions {
         let mut calls = HashSet::new();
-        collect_synchronous_calls(&function.body, &tags, &mut calls);
+        collect_synchronous_calls(&function.body, reachable_tag_functions, &mut calls);
         calls.retain(|callee| known_functions.contains(callee));
         graph.insert(&function.name, calls);
     }
 
+    let cyclic = cyclic_nodes(known_functions.iter().copied(), &graph);
     for function in &program.functions {
-        let mut visited = HashSet::new();
-        if reaches_function(&function.name, &function.name, &graph, &mut visited) {
+        if cyclic.contains(function.name.as_str()) {
             diagnostics.push(Diagnostic::new(
                 format!(
                     "函数 `{}` 位于同步递归调用环中；请改用 schedule 推迟下一次调用",
@@ -48,7 +45,7 @@ pub(super) fn validate_synchronous_recursion(program: &Program, diagnostics: &mu
 
 fn collect_synchronous_calls<'a>(
     statements: &'a [Statement],
-    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
+    reachable_tag_functions: &HashMap<&'a str, Vec<&'a str>>,
     calls: &mut HashSet<&'a str>,
 ) {
     for statement in statements {
@@ -63,7 +60,13 @@ fn collect_synchronous_calls<'a>(
                 target: CallTarget::Tag(name),
                 ..
             } => {
-                calls.extend(reachable_functions(name, tags));
+                calls.extend(
+                    reachable_tag_functions
+                        .get(name.as_str())
+                        .into_iter()
+                        .flatten()
+                        .copied(),
+                );
             }
             StatementKind::MacroCall { .. } => {}
             StatementKind::CoreCommand(_) | StatementKind::EntityCommand(_) => {}
@@ -74,7 +77,13 @@ fn collect_synchronous_calls<'a>(
                         calls.insert(function);
                     }
                     CallTarget::Tag(tag) => {
-                        calls.extend(reachable_functions(tag, tags));
+                        calls.extend(
+                            reachable_tag_functions
+                                .get(tag.as_str())
+                                .into_iter()
+                                .flatten()
+                                .copied(),
+                        );
                     }
                 }
                 for argument in arguments {
@@ -88,19 +97,19 @@ fn collect_synchronous_calls<'a>(
                 ..
             } => {
                 collect_condition_calls(condition, calls);
-                collect_synchronous_calls(then_body, tags, calls);
-                collect_synchronous_calls(else_body, tags, calls);
+                collect_synchronous_calls(then_body, reachable_tag_functions, calls);
+                collect_synchronous_calls(else_body, reachable_tag_functions, calls);
             }
             StatementKind::While { condition, body } => {
                 collect_condition_calls(condition, calls);
-                collect_synchronous_calls(body, tags, calls);
+                collect_synchronous_calls(body, reachable_tag_functions, calls);
             }
             StatementKind::For {
                 start, end, body, ..
             } => {
                 collect_expr_calls(start, calls);
                 collect_expr_calls(end, calls);
-                collect_synchronous_calls(body, tags, calls);
+                collect_synchronous_calls(body, reachable_tag_functions, calls);
             }
             StatementKind::Execute { clauses, body } => {
                 if let crate::ast::ExecuteClauses::Structured(clauses) = clauses {
@@ -112,18 +121,24 @@ fn collect_synchronous_calls<'a>(
                         }
                     }
                 }
-                collect_synchronous_calls(body, tags, calls);
+                collect_synchronous_calls(body, reachable_tag_functions, calls);
             }
             StatementKind::Each { body, .. }
             | StatementKind::InDimension { body, .. }
-            | StatementKind::Spawn { body, .. } => collect_synchronous_calls(body, tags, calls),
+            | StatementKind::Spawn { body, .. } => {
+                collect_synchronous_calls(body, reachable_tag_functions, calls)
+            }
             StatementKind::Assign { value, .. } | StatementKind::Let { value, .. } => {
                 collect_expr_calls(value, calls)
             }
             StatementKind::Return(kind) => match kind {
                 crate::ast::ReturnKind::Value(value) => collect_expr_calls(value, calls),
                 crate::ast::ReturnKind::Command(command) => {
-                    collect_synchronous_calls(std::slice::from_ref(command.as_ref()), tags, calls);
+                    collect_synchronous_calls(
+                        std::slice::from_ref(command.as_ref()),
+                        reachable_tag_functions,
+                        calls,
+                    );
                 }
                 _ => {}
             },
@@ -237,24 +252,4 @@ fn collect_expr_calls<'a>(expression: &'a Expr, calls: &mut HashSet<&'a str>) {
         | ExprKind::DataGet { .. }
         | ExprKind::Compute { .. } => {}
     }
-}
-
-fn reaches_function<'a>(
-    current: &'a str,
-    target: &str,
-    graph: &HashMap<&'a str, HashSet<&'a str>>,
-    visited: &mut HashSet<&'a str>,
-) -> bool {
-    let Some(callees) = graph.get(current) else {
-        return false;
-    };
-    for callee in callees {
-        if *callee == target {
-            return true;
-        }
-        if visited.insert(callee) && reaches_function(callee, target, graph, visited) {
-            return true;
-        }
-    }
-    false
 }

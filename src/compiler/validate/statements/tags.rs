@@ -15,7 +15,14 @@ pub(super) fn validate_tag_call<'a>(
             span,
         )),
         Some(_) => {
-            for function in reachable_functions(tag, ctx.symbols.function_tags) {
+            for function in ctx
+                .symbols
+                .reachable_tag_functions
+                .get(tag)
+                .into_iter()
+                .flatten()
+                .copied()
+            {
                 let Some(signature) = ctx.symbols.functions.get(function) else {
                     continue;
                 };
@@ -57,7 +64,14 @@ pub(super) fn validate_tag_schedule(
         diagnostics.push(Diagnostic::new(format!("找不到函数标签 `{tag}`"), span));
         return;
     }
-    for function in reachable_functions(tag, ctx.symbols.function_tags) {
+    for function in ctx
+        .symbols
+        .reachable_tag_functions
+        .get(tag)
+        .into_iter()
+        .flatten()
+        .copied()
+    {
         let Some(signature) = ctx.symbols.functions.get(function) else {
             continue;
         };

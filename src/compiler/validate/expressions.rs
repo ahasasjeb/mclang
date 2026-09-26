@@ -172,7 +172,14 @@ pub(super) fn validate_condition(
                 if !ctx.symbols.function_tags.contains_key(tag.as_str()) {
                     diagnostics.push(Diagnostic::new(format!("找不到函数标签 `#{tag}`"), *span));
                 }
-                for name in super::tags::reachable_functions(tag, ctx.symbols.function_tags) {
+                for name in ctx
+                    .symbols
+                    .reachable_tag_functions
+                    .get(tag.as_str())
+                    .into_iter()
+                    .flatten()
+                    .copied()
+                {
                     if let Some(signature) = ctx.symbols.functions.get(name) {
                         if signature.parameters != 0 { diagnostics.push(Diagnostic::new(format!("函数条件标签 `#{tag}` 中的 `{name}` 需要参数"), *span)); }
                         validate_call_context(name, *signature, *span, ctx, diagnostics);
