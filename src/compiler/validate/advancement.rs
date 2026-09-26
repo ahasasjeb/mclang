@@ -356,7 +356,7 @@ fn validate_loot_condition(
 ) {
     match value {
         serde_json::Value::String(reference) => {
-            if !valid_resource_location(reference) {
+            if !valid_resource_location(&canonical_resource_location(reference)) {
                 diagnostics.push(Diagnostic::new(
                     format!("`{label}` 的谓词引用 `{reference}` 不是有效的资源位置"),
                     span,

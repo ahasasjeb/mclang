@@ -6,3 +6,4 @@ minecraft_client_26.3
 node_modules/
 editors/vscode/*.vsix
 .commandcode
+/%SP%/

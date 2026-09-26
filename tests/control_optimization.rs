@@ -220,6 +220,22 @@ fn proven_conditions_keep_their_side_effects() {
         "`已知为真 || f()` 按短路语义不会调用右侧：{right_effect}"
     );
 
+    for owner in ["mutating_guards_nested", "mutating_guards_and"] {
+        let mutation = owner_commands(&output, owner);
+        assert_eq!(
+            mutation.matches("matches 11..").count(),
+            2,
+            "函数条件可能修改计分项，调用后的 guard 必须重新读取：{owner}: {mutation}"
+        );
+        assert_eq!(
+            mutation
+                .matches("function optimizations:reset_guard_score")
+                .count(),
+            1,
+            "修改计分项的函数条件必须且只需执行一次：{owner}: {mutation}"
+        );
+    }
+
     let contradiction = owner_commands(&output, "effectful_contradiction");
     assert_eq!(
         contradiction

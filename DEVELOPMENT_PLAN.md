@@ -98,7 +98,6 @@
 | 诊断 | 较高 | 增加诊断码、warning 等级、JSON 输出、related span、fix-it。 |
 | 项目配置 | 待实现 | 增加项目配置文件，保存 namespace、description、output、strict policy、libraries、pack metadata 等。 |
 | source map | 待实现 | 记录生成 `.mcfunction` 行与源文件 span/symbol 的对应关系。 |
-| 多版本数据 | 待实现 | 把版本号和生成快照路径从散落常量收敛到统一版本配置；支持 26.3，并保留扩展其它版本的数据结构。 |
 | 本地库 | 待实现 | 支持只读 library roots、稳定解析顺序和冲突诊断。 |
 
 `examples/monster_market` 的复杂市场语料用于检查真实产物。当前产物为 528 条函数命令、66 个 mcfunction，其中 24 个位于 `__mcl`；安全单命令块与简单条件已直接内联，算术赋值直接写入目标，复用的常量在加载时统一初始化。多实体执行仍保留逐来源求值边界，store 不会丢失自赋值结果，查询失败后的取反与是否带 else 无关。

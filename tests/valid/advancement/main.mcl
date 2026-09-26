@@ -103,6 +103,14 @@ advancement nested_loot_conditions {
     }
 }
 
+// Identifier.CODEC 会为无命名空间的谓词引用补上 minecraft:。
+advancement unqualified_predicate_reference {
+    criterion referenced {
+        trigger = player_killed_entity;
+        conditions = """{"entity":"adventure/entity_hurt_player"}""";
+    }
+}
+
 @tick
 fn lucky_tick() {
     if predicate(lucky) {

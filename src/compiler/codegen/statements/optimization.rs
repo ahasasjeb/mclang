@@ -37,6 +37,19 @@ impl Chain {
     fn require(&mut self, clause: &str) {
         self.required.push(clause.to_owned());
     }
+
+    /// Record the state after a guard has evaluated true. A function or other
+    /// effectful condition may have changed any score or world predicate while
+    /// producing its result, so facts and duplicate-clause knowledge learned
+    /// before it cannot be reused by later guards.
+    fn observe_true(&mut self, condition: &Condition) {
+        if has_condition_effects(condition) {
+            self.facts = ScoreFacts::default();
+            self.required.clear();
+        } else {
+            self.facts.assume_true(condition);
+        }
+    }
 }
 
 enum Guard {
@@ -93,7 +106,7 @@ impl Compiler<'_> {
                 Guard::Clause(clause) => clauses.push(clause),
                 Guard::Unavailable => return false,
             }
-            chain.facts.assume_true(condition);
+            chain.observe_true(condition);
             if chain.facts.is_impossible() {
                 if prior_effects || has_condition_effects(condition) {
                     return false;
@@ -134,7 +147,7 @@ impl Compiler<'_> {
                     Guard::Impossible => Guard::Impossible,
                     Guard::Unavailable => Guard::Unavailable,
                     Guard::Clause(left_clause) => {
-                        chain.facts.assume_true(left);
+                        chain.observe_true(left);
                         let right_guard = self.guard_clause(right, owner, chain);
                         match right_guard {
                             Guard::AlwaysTrue => Guard::Clause(left_clause),
@@ -182,7 +195,7 @@ impl Compiler<'_> {
                     }
                     chain.require(&clause);
                 }
-                chain.facts.assume_true(condition);
+                chain.observe_true(condition);
                 Guard::Clause(clause)
             }
         }

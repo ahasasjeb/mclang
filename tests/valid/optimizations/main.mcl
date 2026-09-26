@@ -108,6 +108,23 @@ fn effectful_proven_true_right(value) {
     }
 }
 
+fn reset_guard_score() -> score {
+    x = 0;
+    return 1;
+}
+
+fn mutating_guards_nested() {
+    if x > 10 {
+        if function(reset_guard_score) {
+            if x > 10 { counter += 1; }
+        }
+    }
+}
+
+fn mutating_guards_and() {
+    if x > 10 && function(reset_guard_score) && x > 10 { counter += 1; }
+}
+
 fn duplicate_guards(lower, upper) {
     if lower < upper && lower < upper { counter += 1; }
     if block(pos(0, 64, 0), block_state("minecraft:stone")) {
