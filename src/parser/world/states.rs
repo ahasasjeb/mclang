@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::ast::*;
 use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
@@ -25,6 +27,7 @@ impl Parser {
             .span;
         let mut span = start.span.merge(end);
         let mut properties = Vec::new();
+        let mut seen_properties = HashSet::new();
         if self.take(&TokenKind::LeftBrace).is_some() {
             while !self.check(&TokenKind::RightBrace) {
                 if self.check(&TokenKind::Eof) {
@@ -34,10 +37,7 @@ impl Parser {
                 self.expect(TokenKind::Equal, "方块属性后需要 `=`")?;
                 let (value, value_span) = self.string("方块属性值需要字符串，例如 \"east\"")?;
                 self.expect(TokenKind::Semicolon, "方块属性后需要 `;`")?;
-                if properties
-                    .iter()
-                    .any(|property: &BlockProperty| property.name == name)
-                {
+                if !seen_properties.insert(name.clone()) {
                     return Err(Diagnostic::new(
                         format!("方块属性 `{name}` 重复声明"),
                         name_span,

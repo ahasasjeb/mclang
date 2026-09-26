@@ -77,7 +77,14 @@ pub(super) fn reachable_functions<'a>(
 ) -> Vec<&'a str> {
     let mut reachable = Vec::new();
     let mut visited = HashSet::new();
-    collect_functions(tag, tags, &mut visited, &mut reachable);
+    let mut seen_functions = HashSet::new();
+    collect_functions(
+        tag,
+        tags,
+        &mut visited,
+        &mut seen_functions,
+        &mut reachable,
+    );
     reachable
 }
 
@@ -85,6 +92,7 @@ fn collect_functions<'a>(
     tag: &str,
     tags: &HashMap<&'a str, &'a FunctionTagDecl>,
     visited: &mut HashSet<&'a str>,
+    seen_functions: &mut HashSet<&'a str>,
     reachable: &mut Vec<&'a str>,
 ) {
     let Some(declaration) = tags.get(tag) else {
@@ -94,7 +102,7 @@ fn collect_functions<'a>(
         match entry {
             FunctionTagEntry::Function(name, _) => {
                 let name = name.as_str();
-                if !reachable.contains(&name) {
+                if seen_functions.insert(name) {
                     reachable.push(name);
                 }
             }
@@ -102,7 +110,7 @@ fn collect_functions<'a>(
                 if let Some((&reference, _)) = tags.get_key_value(name.as_str())
                     && visited.insert(reference)
                 {
-                    collect_functions(reference, tags, visited, reachable);
+                    collect_functions(reference, tags, visited, seen_functions, reachable);
                 }
             }
             FunctionTagEntry::External(_, _) => {}

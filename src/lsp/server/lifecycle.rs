@@ -1,6 +1,6 @@
 use super::*;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 
 use crate::analysis::analyze;
@@ -59,12 +59,29 @@ impl Session {
     fn collect_projects(&mut self) -> Vec<Project> {
         self.ensure_discovered();
         let discovered = self.discovered_files();
+        let mut direct_files: HashMap<PathBuf, Vec<usize>> = HashMap::new();
+        let mut subtree_files: HashMap<PathBuf, Vec<usize>> = HashMap::new();
+        for (index, path) in discovered.iter().enumerate() {
+            if let Some(parent) = path.parent() {
+                direct_files
+                    .entry(parent.to_path_buf())
+                    .or_default()
+                    .push(index);
+            }
+            for ancestor in path.ancestors().skip(1) {
+                subtree_files
+                    .entry(ancestor.to_path_buf())
+                    .or_default()
+                    .push(index);
+            }
+        }
         let open_paths: Vec<PathBuf> = self.open.keys().cloned().collect();
 
         let mut keys: Vec<(PathBuf, Option<String>)> = Vec::new();
+        let mut seen_keys = HashSet::new();
         for path in &open_paths {
-            let key = self.project_root(path, &discovered);
-            if !keys.contains(&key) {
+            let key = self.project_root(path, &discovered, &direct_files);
+            if seen_keys.insert(key.clone()) {
                 keys.push(key);
             }
         }
@@ -77,16 +94,15 @@ impl Session {
         keys.into_iter()
             .map(|(root, namespace)| {
                 let mut texts: BTreeMap<PathBuf, String> = BTreeMap::new();
-                for path in discovered
-                    .iter()
-                    .filter(|path| path.starts_with(&root))
-                    .take(MAX_PROJECT_FILES)
-                {
-                    if !self.namespace_matches(path, &namespace) {
-                        continue;
-                    }
-                    if let Ok(text) = fs::read_to_string(path) {
-                        texts.insert(path.clone(), text);
+                if let Some(indices) = subtree_files.get(&root) {
+                    for index in indices.iter().take(MAX_PROJECT_FILES) {
+                        let path = &discovered[*index];
+                        if !self.namespace_matches(path, &namespace) {
+                            continue;
+                        }
+                        if let Ok(text) = fs::read_to_string(path) {
+                            texts.insert(path.clone(), text);
+                        }
                     }
                 }
                 // 打开的文档覆盖磁盘内容，未保存的编辑也能得到诊断。
@@ -151,7 +167,12 @@ impl Session {
     }
 
     /// 打开文档所属项目：项目根目录与命名空间。
-    fn project_root(&mut self, file: &Path, discovered: &[PathBuf]) -> (PathBuf, Option<String>) {
+    fn project_root(
+        &mut self,
+        file: &Path,
+        discovered: &[PathBuf],
+        direct_files: &HashMap<PathBuf, Vec<usize>>,
+    ) -> (PathBuf, Option<String>) {
         let namespace = self.namespace_of(file);
         let boundary = self.workspace_boundary(file);
         let mut root = file
@@ -162,7 +183,12 @@ impl Session {
                 break;
             };
             if !parent.starts_with(&boundary)
-                || !self.directory_compatible(&parent, namespace.as_deref(), discovered)
+                || !self.directory_compatible(
+                    &parent,
+                    namespace.as_deref(),
+                    discovered,
+                    direct_files,
+                )
             {
                 break;
             }
@@ -190,15 +216,17 @@ impl Session {
         directory: &Path,
         namespace: Option<&str>,
         discovered: &[PathBuf],
+        direct_files: &HashMap<PathBuf, Vec<usize>>,
     ) -> bool {
         let Some(namespace) = namespace else {
             return true;
         };
-        discovered
-            .iter()
-            .filter(|path| path.parent() == Some(directory))
-            .all(|path| {
-                self.namespace_of(path)
+        direct_files
+            .get(directory)
+            .into_iter()
+            .flatten()
+            .all(|index| {
+                self.namespace_of(&discovered[*index])
                     .is_none_or(|actual| actual == namespace)
             })
     }
@@ -222,12 +250,13 @@ impl Session {
     fn publish_diagnostics(&mut self) -> Vec<Value> {
         let mut grouped: BTreeMap<PathBuf, Vec<Value>> = BTreeMap::new();
         for project in &self.projects {
+            let sources: HashMap<&Path, &SourceFile> = project
+                .sources
+                .iter()
+                .map(|source| (source.path.as_path(), source))
+                .collect();
             for diagnostic in &project.analysis.diagnostics {
-                let Some(source) = project
-                    .sources
-                    .iter()
-                    .find(|source| source.path == diagnostic.path)
-                else {
+                let Some(source) = sources.get(diagnostic.path.as_path()) else {
                     continue;
                 };
                 grouped

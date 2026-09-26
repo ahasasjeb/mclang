@@ -41,23 +41,13 @@ impl Compiler<'_> {
                 commands.push(format!("{prefix}give @s {argument} {count}"));
             }
             GiveItem::Definition(name) => {
-                let item = self
-                    .program
-                    .item_stacks
-                    .iter()
-                    .find(|candidate| candidate.name == *name)
-                    .expect("semantic validation guarantees the item definition exists");
+                let item = self.item_stack(name);
                 let argument = item_stack_argument(item);
                 let count = count.unwrap_or(item.count);
                 match target {
                     GiveTarget::SelfEntity => commands.push(format!("give @s {argument} {count}")),
                     GiveTarget::Query(name) => {
-                        let query = self
-                            .program
-                            .queries
-                            .iter()
-                            .find(|candidate| candidate.name == *name)
-                            .expect("semantic validation guarantees the entity query exists");
+                        let query = self.query(name);
                         commands.push(format!(
                             "execute {} run give @s {argument} {count}",
                             entity_query_clause(query),
@@ -101,12 +91,7 @@ impl Compiler<'_> {
                 "execute on origin if entity @s[type=minecraft:player] store success score {flag} {objective} run {replace}"
             )),
             GiveTarget::Query(name) => {
-                let query = self
-                    .program
-                    .queries
-                    .iter()
-                    .find(|candidate| candidate.name == *name)
-                    .expect("semantic validation guarantees the entity query exists");
+                let query = self.query(name);
                 let helper = self.next_helper_path(owner);
                 let helper_commands = vec![format!(
                     "execute if score {flag} {objective} matches 0 store success score {flag} {objective} run {replace}"
@@ -182,12 +167,7 @@ impl Compiler<'_> {
                 ]
             }
             SelfAction::GiveItem { item, count, .. } => {
-                let item = self
-                    .program
-                    .item_stacks
-                    .iter()
-                    .find(|candidate| candidate.name == *item)
-                    .expect("semantic validation guarantees the item definition exists");
+                let item = self.item_stack(item);
                 vec![format!(
                     "give @s {} {}",
                     item_stack_argument(item),
@@ -255,12 +235,7 @@ impl Compiler<'_> {
         let mut command = format!("item {} {target} {slots}", method.as_str());
         match action {
             ItemActionKind::With(item, _) => {
-                let definition = self
-                    .program
-                    .item_stacks
-                    .iter()
-                    .find(|candidate| candidate.name == *item)
-                    .expect("semantic validation guarantees the item stack exists");
+                let definition = self.item_stack(item);
                 command.push_str(&format!(" with {}", item_stack_argument(definition)));
                 if definition.count != 1 {
                     command.push_str(&format!(" {}", definition.count));

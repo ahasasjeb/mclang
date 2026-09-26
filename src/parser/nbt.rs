@@ -9,6 +9,8 @@
 //! 解析期完成全部静态检查：数值范围、浮点有限性、数组元素后缀、重复键；
 //! 进入 AST 的 [`NbtValue`] 一定可以序列化为原版能解析的 SNBT。
 
+use std::collections::HashSet;
+
 use crate::ast::*;
 use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
@@ -109,6 +111,7 @@ impl Parser {
     ) -> Result<NbtValue, Diagnostic> {
         self.expect(TokenKind::LeftBrace, "NBT 复合后需要 `{`")?;
         let mut entries: Vec<NbtEntry> = Vec::new();
+        let mut seen_keys = HashSet::new();
         while !self.check(&TokenKind::RightBrace) {
             if self.check(&TokenKind::Eof) {
                 return Err(Diagnostic::new(
@@ -131,7 +134,7 @@ impl Parser {
             self.expect(TokenKind::Equal, "NBT 键后需要 `=`")?;
             let value = self.nbt_value()?;
             self.expect(TokenKind::Semicolon, "NBT 条目后需要 `;`")?;
-            if entries.iter().any(|entry| entry.key == key) {
+            if !seen_keys.insert(key.clone()) {
                 return Err(Diagnostic::new(format!("NBT 键 `{key}` 重复"), key_span));
             }
             entries.push(NbtEntry {

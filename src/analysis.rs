@@ -8,7 +8,7 @@
 //! 模块系统就位后，一组源文件会先按“最近的 main.mcl 祖先”分组，每个项目
 //! 各自沿 `import` 解析；不属于任何入口的单个 `.mcl` 文件按单文件项目的入口处理。
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::ast;
@@ -101,23 +101,35 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
         })
         .collect::<Vec<_>>();
     let mut groups = project_groups(sources);
-    add_standard_modules(&mut expanded, &mut groups);
-    let (programs, mut diagnostics) = parse_all(&expanded);
+    let (mut programs, mut diagnostics) = parse_all(&expanded);
+    let parsed_source_count = expanded.len();
+    add_standard_modules(&mut expanded, &mut groups, &programs);
+    if expanded.len() > parsed_source_count {
+        let (mut standard_programs, mut standard_diagnostics) =
+            parse_from(&expanded, parsed_source_count);
+        programs.append(&mut standard_programs);
+        diagnostics.append(&mut standard_diagnostics);
+    }
     let symbols = collect_symbols(&expanded, &programs);
 
     if diagnostics.is_empty() {
-        let mut remaining = programs;
-        for (root, members) in groups {
-            let mut group = Vec::new();
-            let mut rest = Vec::new();
-            for (index, program) in remaining.drain(..) {
-                if members.contains(&index) {
-                    group.push((index, program));
-                } else {
-                    rest.push((index, program));
-                }
+        let mut root_by_member = HashMap::new();
+        for (root, members) in &groups {
+            for member in members {
+                root_by_member.insert(*member, *root);
             }
-            remaining = rest;
+        }
+        let mut programs_by_root: BTreeMap<usize, Vec<(usize, ast::Program)>> = BTreeMap::new();
+        for (index, program) in programs {
+            if let Some(root) = root_by_member.get(&index) {
+                programs_by_root
+                    .entry(*root)
+                    .or_default()
+                    .push((index, program));
+            }
+        }
+        for (root, _) in groups {
+            let group = programs_by_root.remove(&root).unwrap_or_default();
             match crate::modules::resolve(group, &expanded, root) {
                 Ok(mut program) => {
                     if let Err(mut errors) = compile(
@@ -152,20 +164,23 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
 }
 
 /// Mirror the CLI's embedded-module loading for unsaved editor buffers.
-fn add_standard_modules(sources: &mut Vec<SourceFile>, groups: &mut [(usize, HashSet<usize>)]) {
+fn add_standard_modules(
+    sources: &mut Vec<SourceFile>,
+    groups: &mut [(usize, HashSet<usize>)],
+    programs: &[(usize, ast::Program)],
+) {
+    let programs_by_source: HashMap<usize, &ast::Program> =
+        programs.iter().map(|(index, program)| (*index, program)).collect();
     for (root, members) in groups {
         let Some(directory) = sources[*root].path.parent().map(|path| path.to_path_buf()) else {
             continue;
         };
         let mut imported = std::collections::BTreeSet::new();
         for index in members.iter().copied() {
-            let Ok(tokens) = lex(&sources[index].text, index) else {
+            let Some(program) = programs_by_source.get(&index) else {
                 continue;
             };
-            let Ok(program) = parse(tokens) else {
-                continue;
-            };
-            for import in program.imports {
+            for import in &program.imports {
                 if let Some(text) = crate::stdlib::source(&import.path) {
                     imported.insert((import.path[1].clone(), text));
                 }
@@ -185,22 +200,22 @@ fn add_standard_modules(sources: &mut Vec<SourceFile>, groups: &mut [(usize, Has
 /// 把源文件按项目分组：每个文件属于离它最近的 `main.mcl` 祖先；没有祖先时
 /// 自己就是单文件项目的入口。
 fn project_groups(sources: &[SourceFile]) -> Vec<(usize, HashSet<usize>)> {
-    let entries: Vec<usize> = sources
-        .iter()
-        .enumerate()
-        .filter(|(_, source)| is_main_module(&source.path))
-        .map(|(index, _)| index)
-        .collect();
+    let mut entries = HashMap::new();
+    for (index, source) in sources.iter().enumerate() {
+        if is_main_module(&source.path)
+            && let Some(directory) = source.path.parent()
+        {
+            entries.entry(directory).or_insert(index);
+        }
+    }
     let mut groups: BTreeMap<usize, HashSet<usize>> = BTreeMap::new();
     for (index, source) in sources.iter().enumerate() {
         let mut root = index;
         let mut directory = source.path.parent();
-        'search: while let Some(current) = directory {
-            for candidate in &entries {
-                if sources[*candidate].path.parent() == Some(current) {
-                    root = *candidate;
-                    break 'search;
-                }
+        while let Some(current) = directory {
+            if let Some(candidate) = entries.get(current) {
+                root = *candidate;
+                break;
             }
             directory = current.parent();
         }
@@ -216,9 +231,16 @@ fn is_main_module(path: &std::path::Path) -> bool {
 
 /// 按源文件顺序解析所有文件，返回解析成功的程序与全部词法/语法诊断。
 pub(crate) fn parse_all(sources: &[SourceFile]) -> (Vec<(usize, ast::Program)>, Vec<Diagnostic>) {
+    parse_from(sources, 0)
+}
+
+fn parse_from(
+    sources: &[SourceFile],
+    start: usize,
+) -> (Vec<(usize, ast::Program)>, Vec<Diagnostic>) {
     let mut programs = Vec::new();
     let mut diagnostics = Vec::new();
-    for (source_id, source) in sources.iter().enumerate() {
+    for (source_id, source) in sources.iter().enumerate().skip(start) {
         match lex(&source.text, source_id) {
             Ok(tokens) => match parse(tokens) {
                 Ok(program) => programs.push((source_id, program)),

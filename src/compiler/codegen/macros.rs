@@ -54,10 +54,9 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) -> String {
         let signature = self
-            .program
-            .functions
-            .iter()
-            .find(|function| function.name == owner)
+            .functions_by_name
+            .get(owner)
+            .copied()
             .and_then(|function| function.macro_signature.as_ref());
         let Some(signature) = signature else {
             return helper.to_owned();
@@ -95,22 +94,26 @@ impl Compiler<'_> {
             let Some(signature) = &function.macro_signature else {
                 continue;
             };
-            let prefix = format!("__mcl/{}/", function.name);
             let helpers = self
-                .functions
-                .keys()
-                .filter(|path| path.starts_with(&prefix))
+                .helpers_by_owner
+                .get(&function.name)
                 .cloned()
+                .unwrap_or_default();
+            let helper_calls = helpers
+                .iter()
+                .map(|helper| format!("function {}:{helper}", self.program.namespace))
                 .collect::<Vec<_>>();
             let arguments = forwarded_arguments(signature);
-            for (path, commands) in &mut self.functions {
-                if path != &function.name && !path.starts_with(&prefix) {
+            let mut paths = Vec::with_capacity(helpers.len() + 1);
+            paths.push(function.name.clone());
+            paths.extend(helpers);
+            for path in paths {
+                let Some(commands) = self.functions.get_mut(&path) else {
                     continue;
-                }
+                };
                 for command in commands {
-                    for helper in &helpers {
-                        let call = format!("function {}:{helper}", self.program.namespace);
-                        if command.ends_with(&call) {
+                    for call in &helper_calls {
+                        if command.ends_with(call) {
                             command.push_str(&format!(" {{{arguments}}}"));
                             break;
                         }

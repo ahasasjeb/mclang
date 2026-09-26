@@ -14,12 +14,7 @@ impl Compiler<'_> {
         owner: &str,
         commands: &mut Vec<String>,
     ) {
-        let query = self
-            .program
-            .queries
-            .iter()
-            .find(|candidate| candidate.name == query_name)
-            .expect("semantic validation guarantees the entity query exists");
+        let query = self.query(query_name);
         let clause = entity_query_clause(query);
         let block = if query.limit == Some(1) {
             self.compile_small_block(body, owner)

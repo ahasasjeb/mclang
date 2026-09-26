@@ -101,43 +101,45 @@ pub(super) fn validate_function_bodies(
     declarations: &Declarations<'_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let function_declarations = program
+        .functions
+        .iter()
+        .map(|f| (f.name.as_str(), f))
+        .collect();
+    let loot_tables = program
+        .resources
+        .iter()
+        .filter(|r| r.kind == "loot_table")
+        .map(|r| r.name.as_str())
+        .collect();
+    let recipes = program
+        .resources
+        .iter()
+        .filter(|r| r.kind == "recipe")
+        .map(|r| r.name.as_str())
+        .collect();
+    let dialogs = program
+        .resources
+        .iter()
+        .filter(|r| r.kind == "dialog")
+        .map(|r| r.name.as_str())
+        .collect();
+    let empty_scores = HashSet::new();
+
     for function in &program.functions {
         // Embedded std modules cannot see project globals, so their local names
         // must not be constrained by unrelated project-level score declarations.
         let local_scores = if function.name.starts_with("std/") {
-            HashSet::new()
+            &empty_scores
         } else {
-            declarations.scores.clone()
+            &declarations.scores
         };
-        let function_declarations = program
-            .functions
-            .iter()
-            .map(|f| (f.name.as_str(), f))
-            .collect();
-        let loot_tables = program
-            .resources
-            .iter()
-            .filter(|r| r.kind == "loot_table")
-            .map(|r| r.name.as_str())
-            .collect();
-        let recipes = program
-            .resources
-            .iter()
-            .filter(|r| r.kind == "recipe")
-            .map(|r| r.name.as_str())
-            .collect();
-        let dialogs = program
-            .resources
-            .iter()
-            .filter(|r| r.kind == "dialog")
-            .map(|r| r.name.as_str())
-            .collect();
         let parameters = function
             .parameters
             .iter()
             .map(|parameter| parameter.name.as_str())
             .collect::<HashSet<_>>();
-        collect_local_declarations(&function.body, &local_scores, &parameters, diagnostics);
+        collect_local_declarations(&function.body, local_scores, &parameters, diagnostics);
         let mut visible_locals = HashSet::new();
         let symbols = StatementSymbols {
             function_declarations: &function_declarations,

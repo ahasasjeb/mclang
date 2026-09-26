@@ -5,6 +5,8 @@
 //! 只在偏离原版默认值时写出，`requirements` 总是显式生成，因此同一份
 //! 声明的产物稳定可复现。
 
+use std::collections::HashMap;
+
 use serde_json::{Map, Value, json};
 
 use crate::ast::*;
@@ -15,7 +17,7 @@ use super::emit::reference_id;
 pub(super) fn advancement_json(
     namespace: &str,
     advancement: &AdvancementDecl,
-    item_stacks: &[ItemStackDecl],
+    item_stacks: &HashMap<&str, &ItemStackDecl>,
 ) -> String {
     let mut root = Map::new();
     if let Some(parent) = &advancement.parent {
@@ -119,10 +121,13 @@ fn trigger_name(value: &str) -> &str {
     value.strip_prefix("minecraft:").unwrap_or(value)
 }
 
-fn display_json(display: &AdvancementDisplay, item_stacks: &[ItemStackDecl]) -> Value {
+fn display_json(
+    display: &AdvancementDisplay,
+    item_stacks: &HashMap<&str, &ItemStackDecl>,
+) -> Value {
     let item = item_stacks
-        .iter()
-        .find(|item| item.name == display.icon)
+        .get(display.icon.as_str())
+        .copied()
         .expect("semantic validation guarantees the icon item exists");
     let mut object = Map::new();
     object.insert("icon".to_owned(), item_stack_template_json(item));

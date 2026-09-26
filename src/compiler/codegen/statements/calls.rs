@@ -80,18 +80,9 @@ impl Compiler<'_> {
             };
             values.push(value);
         }
-        let parameters = self
-            .program
-            .functions
-            .iter()
-            .find(|candidate| candidate.name == function)
-            .expect("semantic validation guarantees the called function exists")
-            .parameters
-            .iter()
-            .map(|parameter| parameter.name.clone())
-            .collect::<Vec<_>>();
+        let parameters = &self.function(function).parameters;
         for (parameter, value) in parameters.iter().zip(values) {
-            let target = parameter_holder(function, parameter);
+            let target = parameter_holder(function, &parameter.name);
             match value {
                 Value::Integer(value) => commands.push(format!(
                     "scoreboard players set {target} {} {value}",

@@ -1,6 +1,6 @@
 use super::*;
 
-impl Compiler<'_> {
+impl<'a> Compiler<'a> {
     /// 运算的来源操作数：`@s` 或显式选择器（`origin` 已在语义阶段拒绝）。
     pub(super) fn score_operand(&self, holder: &Holder) -> String {
         match holder {
@@ -180,27 +180,47 @@ impl Compiler<'_> {
         commands.push(format!("{prefix}{command}"));
     }
 
-    pub(in crate::compiler::codegen) fn query(&self, name: &str) -> &crate::ast::EntityQueryDecl {
-        self.program
-            .queries
-            .iter()
-            .find(|candidate| candidate.name == name)
+    pub(in crate::compiler::codegen) fn query(
+        &self,
+        name: &str,
+    ) -> &'a crate::ast::EntityQueryDecl {
+        self.queries_by_name
+            .get(name)
+            .copied()
             .expect("semantic validation guarantees the entity query exists")
     }
 
-    pub(super) fn storage(&self, name: &str) -> &crate::ast::StorageDecl {
-        self.program
-            .storages
-            .iter()
-            .find(|candidate| candidate.name == name)
+    pub(super) fn storage(&self, name: &str) -> &'a crate::ast::StorageDecl {
+        self.storages_by_name
+            .get(name)
+            .copied()
             .expect("semantic validation guarantees the item storage exists")
     }
 
-    pub(super) fn data_slot(&self, name: &str) -> &DataSlotDecl {
-        self.program
-            .data_slots
-            .iter()
-            .find(|candidate| candidate.name == name)
+    pub(super) fn data_slot(&self, name: &str) -> &'a DataSlotDecl {
+        self.data_slots_by_name
+            .get(name)
+            .copied()
             .expect("semantic validation guarantees the data slot exists")
+    }
+
+    pub(in crate::compiler::codegen) fn item_stack(
+        &self,
+        name: &str,
+    ) -> &'a crate::ast::ItemStackDecl {
+        self.item_stacks_by_name
+            .get(name)
+            .copied()
+            .expect("semantic validation guarantees the item stack exists")
+    }
+
+    pub(in crate::compiler::codegen) fn function(
+        &self,
+        name: &str,
+    ) -> &'a crate::ast::Function {
+        self.functions_by_name
+            .get(name)
+            .copied()
+            .expect("semantic validation guarantees the function exists")
     }
 }

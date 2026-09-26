@@ -58,8 +58,15 @@ pub(super) struct Compiler<'a> {
     objective: String,
     /// `<函数名, 变量名> -> 假玩家`，构造时一次算好。
     holders: HashMap<(&'a str, &'a str), String>,
+    /// 代码生成热路径使用的声明索引；语义校验已保证名称唯一。
+    queries_by_name: HashMap<&'a str, &'a EntityQueryDecl>,
+    storages_by_name: HashMap<&'a str, &'a StorageDecl>,
+    data_slots_by_name: HashMap<&'a str, &'a DataSlotDecl>,
+    item_stacks_by_name: HashMap<&'a str, &'a ItemStackDecl>,
+    functions_by_name: HashMap<&'a str, &'a Function>,
     functions: BTreeMap<String, Vec<String>>,
     helper_counters: HashMap<String, usize>,
+    helpers_by_owner: HashMap<String, Vec<String>>,
     temporary_counter: usize,
     /// 当前嵌套的循环栈；栈顶是最近一层 `for`/`while`。
     loops: Vec<LoopContext>,
@@ -81,8 +88,34 @@ impl<'a> Compiler<'a> {
             program,
             objective: objective_name(&program.namespace),
             holders: build_holders(program),
+            queries_by_name: program
+                .queries
+                .iter()
+                .map(|query| (query.name.as_str(), query))
+                .collect(),
+            storages_by_name: program
+                .storages
+                .iter()
+                .map(|storage| (storage.name.as_str(), storage))
+                .collect(),
+            data_slots_by_name: program
+                .data_slots
+                .iter()
+                .map(|slot| (slot.name.as_str(), slot))
+                .collect(),
+            item_stacks_by_name: program
+                .item_stacks
+                .iter()
+                .map(|item| (item.name.as_str(), item))
+                .collect(),
+            functions_by_name: program
+                .functions
+                .iter()
+                .map(|function| (function.name.as_str(), function))
+                .collect(),
             functions: BTreeMap::new(),
             helper_counters: HashMap::new(),
+            helpers_by_owner: HashMap::new(),
             temporary_counter: 0,
             loops: Vec::new(),
             loop_counter: 0,
@@ -202,14 +235,11 @@ impl<'a> Compiler<'a> {
                 .join("function")
                 .join(format!("{name}.mcfunction"));
             let source_span = self
-                .program
-                .functions
-                .iter()
-                .find(|function| function.name == name)
-                .map_or_else(
-                    || self.program.namespace_span.unwrap_or_default(),
-                    |function| function.span,
-                );
+                .functions_by_name
+                .get(name.as_str())
+                .map_or_else(|| self.program.namespace_span.unwrap_or_default(), |function| {
+                    function.span
+                });
             for (index, command) in commands.iter().enumerate() {
                 if command.encode_utf16().count() > 2_000_000 {
                     diagnostics.push(Diagnostic::new(
@@ -266,7 +296,7 @@ impl<'a> Compiler<'a> {
                 advancement::advancement_json(
                     &self.program.namespace,
                     advancement,
-                    &self.program.item_stacks,
+                    &self.item_stacks_by_name,
                 ),
             );
         }

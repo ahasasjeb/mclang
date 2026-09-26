@@ -157,12 +157,7 @@ impl Compiler<'_> {
                 Value::Score(target)
             }
             ExprKind::XpQuery { target, kind } => {
-                let query = self
-                    .program
-                    .queries
-                    .iter()
-                    .find(|candidate| candidate.name == *target)
-                    .expect("semantic validation guarantees the entity query exists");
+                let query = self.query(target);
                 let result = self.temporary();
                 commands.push(format!(
                     "scoreboard players set {result} {} 0",
@@ -189,12 +184,7 @@ impl Compiler<'_> {
                     Holder::SelfEntity => "execute ".to_owned(),
                     Holder::Origin => "execute on origin ".to_owned(),
                     Holder::Query(name, _) => {
-                        let query = self
-                            .program
-                            .queries
-                            .iter()
-                            .find(|candidate| candidate.name == *name)
-                            .expect("semantic validation guarantees the entity query exists");
+                        let query = self.query(name);
                         format!("execute {} ", entity_query_clause(query))
                     }
                 };

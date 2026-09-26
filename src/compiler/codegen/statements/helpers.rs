@@ -37,6 +37,10 @@ impl Compiler<'_> {
         let counter = self.helper_counters.entry(owner.to_owned()).or_default();
         let path = format!("__mcl/{owner}/{}", *counter);
         *counter += 1;
+        self.helpers_by_owner
+            .entry(owner.to_owned())
+            .or_default()
+            .push(path.clone());
         path
     }
 }

@@ -35,9 +35,11 @@ use crate::lexer::{Token, TokenKind};
 use keywords::{keyword_alias, word_matches};
 
 pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
+    let paren_matches = matching_parens(&tokens);
     Parser {
         tokens,
         cursor: 0,
+        paren_matches,
         active_macro_parameters: std::collections::HashMap::new(),
         active_macro_uses: Vec::new(),
         active_macro_coordinates: Vec::new(),
@@ -46,9 +48,29 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
     .map_err(|error| vec![error])
 }
 
+fn matching_parens(tokens: &[Token]) -> Vec<Option<usize>> {
+    let mut matches = vec![None; tokens.len()];
+    let mut stack = Vec::new();
+    for (index, token) in tokens.iter().enumerate() {
+        match &token.kind {
+            TokenKind::LeftParen => stack.push(index),
+            TokenKind::RightParen => {
+                if let Some(open) = stack.pop() {
+                    matches[open] = Some(index);
+                    matches[index] = Some(open);
+                }
+            }
+            _ => {}
+        }
+    }
+    matches
+}
+
 struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
+    /// 每个圆括号记号对应的配对位置；解析条件分组时可 O(1) 判断后继记号。
+    paren_matches: Vec<Option<usize>>,
     active_macro_parameters: std::collections::HashMap<String, MacroType>,
     active_macro_uses: Vec<(String, Span)>,
     active_macro_coordinates: Vec<(String, MacroCoordinateKind)>,

@@ -232,42 +232,36 @@ impl Parser {
 
     /// 判断 `(` 是条件分组还是带括号的算术表达式。
     ///
-    /// 扫描到配对的 `)` 后，若其后的记号是算术运算符，说明这是比较条件的左操作数。
+    /// 利用解析器预先建立的括号配对表找到 `)`；若其后的记号是算术运算符，
+    /// 说明这是比较条件的左操作数。
     fn condition_group_starts(&self) -> bool {
         if !self.check(&TokenKind::LeftParen) {
             return false;
         }
-        let mut depth = 0_usize;
-        for index in self.cursor..self.tokens.len() {
-            match self.tokens[index].kind {
-                TokenKind::LeftParen => depth += 1,
-                TokenKind::RightParen => {
-                    depth -= 1;
-                    if depth == 0 {
-                        let Some(next) = self.tokens.get(index + 1) else {
-                            return true;
-                        };
-                        return !matches!(
-                            &next.kind,
-                            TokenKind::Plus
-                                | TokenKind::Minus
-                                | TokenKind::Star
-                                | TokenKind::Slash
-                                | TokenKind::Percent
-                                | TokenKind::EqualEqual
-                                | TokenKind::BangEqual
-                                | TokenKind::Less
-                                | TokenKind::LessEqual
-                                | TokenKind::Greater
-                                | TokenKind::GreaterEqual
-                        );
-                    }
-                }
-                TokenKind::Eof => return true,
-                _ => {}
-            }
-        }
-        true
+        let Some(close) = self
+            .paren_matches
+            .get(self.cursor)
+            .and_then(|position| *position)
+        else {
+            return true;
+        };
+        let Some(next) = self.tokens.get(close + 1) else {
+            return true;
+        };
+        !matches!(
+            &next.kind,
+            TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::Star
+                | TokenKind::Slash
+                | TokenKind::Percent
+                | TokenKind::EqualEqual
+                | TokenKind::BangEqual
+                | TokenKind::Less
+                | TokenKind::LessEqual
+                | TokenKind::Greater
+                | TokenKind::GreaterEqual
+        )
     }
 
     fn comparison_condition(&mut self) -> Result<Condition, Diagnostic> {

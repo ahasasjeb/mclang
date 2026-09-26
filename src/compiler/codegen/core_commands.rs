@@ -128,13 +128,7 @@ impl Compiler<'_> {
             Some(LootTool::Hand(hand)) => format!(" {hand}"),
             Some(LootTool::Item(name)) => format!(
                 " {}",
-                item_stack_argument(
-                    self.program
-                        .item_stacks
-                        .iter()
-                        .find(|item| item.name == *name)
-                        .expect("validated item")
-                )
+                item_stack_argument(self.item_stack(name))
             ),
         }
     }

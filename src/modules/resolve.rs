@@ -174,12 +174,21 @@ pub(crate) fn resolve(
         let program = &by_source[index];
         let segments = module_paths.get(index).cloned().unwrap_or_default();
         let declarations = collect_declarations(program);
+        let declaration_names = declarations
+            .iter()
+            .map(|(_, name, _, _)| name.clone())
+            .collect();
         let mut exports = Vec::new();
+        let mut exports_by_name: HashMap<String, Vec<(NameRole, String)>> = HashMap::new();
         let mut scope = HashMap::new();
         for (role, name, exported, _) in &declarations {
             let qualified = qualify(*role, &segments, name);
             if *exported {
                 exports.push((*role, name.clone(), qualified.clone()));
+                exports_by_name
+                    .entry(name.clone())
+                    .or_default()
+                    .push((*role, qualified.clone()));
             }
             scope.insert((*role, name.clone()), qualified);
         }
@@ -188,7 +197,9 @@ pub(crate) fn resolve(
             ModuleState {
                 segments,
                 declarations,
+                declaration_names,
                 exports,
+                exports_by_name,
                 scope,
             },
         );
@@ -217,9 +228,6 @@ pub(crate) fn resolve(
             let Some(target) = by_module_path.get(&import.path.join("/")) else {
                 continue;
             };
-            if !reachable.contains(target) {
-                continue;
-            }
             let target_module = &modules[target];
             match &import.items {
                 None => {
@@ -241,17 +249,8 @@ pub(crate) fn resolve(
                 Some(items) => {
                     for item in items {
                         let effective = item.alias.as_deref().unwrap_or(&item.name);
-                        let matches: Vec<&(NameRole, String, String)> = target_module
-                            .exports
-                            .iter()
-                            .filter(|(_, name, _)| name == &item.name)
-                            .collect();
-                        if matches.is_empty() {
-                            let exists = target_module
-                                .declarations
-                                .iter()
-                                .any(|(_, name, _, _)| name == &item.name);
-                            if exists {
+                        let Some(matches) = target_module.exports_by_name.get(&item.name) else {
+                            if target_module.declaration_names.contains(&item.name) {
                                 diagnostics.push(Diagnostic::new(
                                     format!(
                                         "`{}` 在模块 `{}` 中存在但没有 export，其他模块不能导入",
@@ -280,8 +279,8 @@ pub(crate) fn resolve(
                                 ));
                             }
                             continue;
-                        }
-                        for (role, _, qualified) in matches {
+                        };
+                        for (role, qualified) in matches {
                             bind_import(
                                 &mut scope,
                                 &mut diagnostics,
@@ -356,8 +355,11 @@ pub(crate) fn resolve(
 struct ModuleState {
     segments: Vec<String>,
     declarations: Vec<(NameRole, String, bool, Span)>,
+    declaration_names: HashSet<String>,
     /// 公开声明：`(类别, 原名, 限定名)`。
     exports: Vec<(NameRole, String, String)>,
+    /// 选择性导入按原名查公开声明；同名可以对应多个 NameRole。
+    exports_by_name: HashMap<String, Vec<(NameRole, String)>>,
     /// 可见名字：`(类别, 本地名) -> 限定名`。
     scope: HashMap<(NameRole, String), String>,
 }
