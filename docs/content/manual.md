@@ -1664,7 +1664,7 @@ fn release() {
 | --- | --- | --- |
 | `predicate(<本命名空间谓词>)` | `if predicate ns:name` | 谓词资源 |
 | `block(<方块坐标>, <方块状态或 #标签>)` | `if block <pos> <block>` | 方块谓词，可带属性 |
-| `blocks(<起点>, <终点>, <目标>[, masked])` | `if blocks … [masked]` | 区域方块比较，默认 `all` |
+| `blocks(<起点>, <终点>, <目标>[, masked])` | `if blocks … all\|masked` | 区域方块比较；省略模式时按 `all` 生成，两种模式都会显式写出 |
 | `biome(<方块坐标>, "<生物群系或 #标签>")` | `if biome <pos> <biome>` | |
 | `loaded(<方块坐标>)` | `if loaded <pos>` | 区块已加载 |
 | `dimension("<维度>")` | `if dimension <id>` | 当前维度 |

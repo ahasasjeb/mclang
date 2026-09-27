@@ -146,6 +146,11 @@ fn native_command_shapes_and_macro_forwarding() {
     )
     .unwrap();
     assert!(condition_checks.contains("stopwatch conditions_test:timer 0.."));
+    assert!(
+        condition_checks.contains("if blocks 0 64 0 2 64 2 10 64 0 all"),
+        "省略模式的 if blocks 必须显式写 all（26.3 的命令树要求）：{condition_checks}"
+    );
+    assert!(condition_checks.contains("if blocks 0 64 0 2 64 2 10 64 0 masked"));
     let advancement_output = root.join("target/command-outputs/advancement");
     build_file(
         &root.join("tests/valid/advancement"),

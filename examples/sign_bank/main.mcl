@@ -41,6 +41,8 @@ query pending_registrations = entity("minecraft:player") { scores("auth_mode", "
         maintenance_ticks = 0;
         maintain_public_signs();
         maintain_room_signs();
+        // 预留清理是兜底路径：跟随每秒维护执行，不必每刻扫描 32 个槽位。
+        cleanup_orphan_reservations();
     }
 
     each(all_players) {
@@ -72,7 +74,6 @@ query pending_registrations = entity("minecraft:player") { scores("auth_mode", "
             cancel_auth();
         }
     }
-    cleanup_orphan_reservations();
 
     if users > 1 {
         each(terminal_players) {
@@ -86,6 +87,11 @@ query pending_registrations = entity("minecraft:player") { scores("auth_mode", "
 }
 
 fn install_world() {
+    // 清除早期测试版的高位和远端告示牌；这些位置当前布局不再写入，装一次就够。
+    set_block(pos(-3, 66, 1), block_state("minecraft:air"));
+    set_block(pos(3, 66, 1), block_state("minecraft:air"));
+    set_block(pos(0, 68, 1), block_state("minecraft:air"));
+
     fill(pos(-10, 63, -12), pos(10, 63, 12), block_state("minecraft:smooth_stone"));
     fill(pos(-8, 64, 0), pos(8, 70, 0), block_state("minecraft:polished_deepslate"));
     fill(pos(-8, 64, 11), pos(8, 66, 11), block_state("minecraft:polished_deepslate"));
@@ -113,11 +119,6 @@ fn terminal_ready() -> score {
 }
 
 fn maintain_public_signs() {
-    // 清除早期测试版的高位和远端告示牌。
-    set_block(pos(-3, 66, 1), block_state("minecraft:air"));
-    set_block(pos(3, 66, 1), block_state("minecraft:air"));
-    set_block(pos(0, 68, 1), block_state("minecraft:air"));
-
     let users = count(terminal_players);
     if users != 1 {
         show_home_menu();
@@ -325,12 +326,13 @@ export @player fn login_account() {
             } else {
                 scoreboard.set(self, pending_slot, slot);
                 scoreboard.set(self, auth_mode, 2);
+                // 只有真正进入下一页才擦除输入牌；失败时保留账号，方便重试。
+                set_input_sign();
                 title.actionbar(self, "账号存在：请输入密码");
                 sound.self("minecraft:block.note_block.pling", master);
             }
         }
     }
-    set_input_sign();
     maintain_public_signs();
 }
 
@@ -369,12 +371,13 @@ export @player fn register_account() {
         reserve_account(slot);
         scoreboard.set(self, pending_slot, slot);
         scoreboard.set(self, auth_mode, 4);
+        // 只有真正进入下一页才擦除输入牌；失败时保留账号，方便重试。
+        set_input_sign();
         title.actionbar(self, "账号可用：请设置密码");
         sound.self("minecraft:block.note_block.pling", master);
     } else {
         sound.self("minecraft:block.note_block.bass", master);
     }
-    set_input_sign();
     maintain_public_signs();
 }
 

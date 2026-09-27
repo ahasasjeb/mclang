@@ -716,6 +716,8 @@ Every statement ends with `;` unless it ends with a `}` block.
     predicate(<declared predicate resource>)
     block(<block pos>, <block state or #tag>)
     blocks(<from>, <to>, <destination>[, all|masked])
+      The generated `if blocks` always writes the mode explicitly (`all` when
+      omitted here); 26.3 rejects the incomplete 3-argument form.
     biome(<block pos>, "<biome or #tag>")
     loaded(<block pos>)
     dimension("<dimension id>")

@@ -41,6 +41,9 @@ query room30_players = entity("minecraft:player") { box(506, 63, 0, 11, 7, 13); 
 query room31_players = entity("minecraft:player") { box(520, 63, 0, 11, 7, 13); }
 query room32_players = entity("minecraft:player") { box(534, 63, 0, 11, 7, 13); }
 
+// 32 间仓库的并集（x 100..545）：空仓库时整轮审计只花一次查询。
+query room_area_players = entity("minecraft:player") { box(100, 63, 0, 445, 7, 13); }
+
 item one_emerald = item_stack("minecraft:emerald") {}
 
 export fn build_room_shells() {
@@ -80,38 +83,40 @@ export fn maintain_room_signs() {
 }
 
 export fn tick_rooms() {
-    audit_room1();
-    audit_room2();
-    audit_room3();
-    audit_room4();
-    audit_room5();
-    audit_room6();
-    audit_room7();
-    audit_room8();
-    audit_room9();
-    audit_room10();
-    audit_room11();
-    audit_room12();
-    audit_room13();
-    audit_room14();
-    audit_room15();
-    audit_room16();
-    audit_room17();
-    audit_room18();
-    audit_room19();
-    audit_room20();
-    audit_room21();
-    audit_room22();
-    audit_room23();
-    audit_room24();
-    audit_room25();
-    audit_room26();
-    audit_room27();
-    audit_room28();
-    audit_room29();
-    audit_room30();
-    audit_room31();
-    audit_room32();
+    if count(room_area_players) > 0 {
+        audit_room1();
+        audit_room2();
+        audit_room3();
+        audit_room4();
+        audit_room5();
+        audit_room6();
+        audit_room7();
+        audit_room8();
+        audit_room9();
+        audit_room10();
+        audit_room11();
+        audit_room12();
+        audit_room13();
+        audit_room14();
+        audit_room15();
+        audit_room16();
+        audit_room17();
+        audit_room18();
+        audit_room19();
+        audit_room20();
+        audit_room21();
+        audit_room22();
+        audit_room23();
+        audit_room24();
+        audit_room25();
+        audit_room26();
+        audit_room27();
+        audit_room28();
+        audit_room29();
+        audit_room30();
+        audit_room31();
+        audit_room32();
+    }
 }
 
 fn audit_room1() {
@@ -607,39 +612,14 @@ export @player fn enter_account(slot) {
     scoreboard.set(self, pending_slot, 0);
     scoreboard.set(self, session, slot);
     scoreboard.set(self, in_room, 1);
-    // 落点是小数坐标，而小数分量只接受字面量（编译期表达式是整数语义），这里保留显式展开。
-    if slot == 1 { teleport(self, vec3(102.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 2 { teleport(self, vec3(116.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 3 { teleport(self, vec3(130.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 4 { teleport(self, vec3(144.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 5 { teleport(self, vec3(158.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 6 { teleport(self, vec3(172.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 7 { teleport(self, vec3(186.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 8 { teleport(self, vec3(200.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 9 { teleport(self, vec3(214.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 10 { teleport(self, vec3(228.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 11 { teleport(self, vec3(242.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 12 { teleport(self, vec3(256.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 13 { teleport(self, vec3(270.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 14 { teleport(self, vec3(284.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 15 { teleport(self, vec3(298.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 16 { teleport(self, vec3(312.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 17 { teleport(self, vec3(326.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 18 { teleport(self, vec3(340.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 19 { teleport(self, vec3(354.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 20 { teleport(self, vec3(368.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 21 { teleport(self, vec3(382.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 22 { teleport(self, vec3(396.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 23 { teleport(self, vec3(410.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 24 { teleport(self, vec3(424.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 25 { teleport(self, vec3(438.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 26 { teleport(self, vec3(452.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 27 { teleport(self, vec3(466.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 28 { teleport(self, vec3(480.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 29 { teleport(self, vec3(494.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 30 { teleport(self, vec3(508.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 31 { teleport(self, vec3(522.5, 64.0, 2.5), rotation(180, 0)); }
-    if slot == 32 { teleport(self, vec3(536.5, 64.0, 2.5), rotation(180, 0)); }
+    // 落点是房间中心：整数格再补 0.5 偏移，不必为每个槽位写一条小数坐标。
+    unroll for index in 1..33 {
+        if index == slot {
+            execute positioned(pos(100 + 14 * (index - 1) + 2, 64, 2)) {
+                teleport(self, vec3(~0.5, ~0.0, ~0.5), rotation(180, 0));
+            }
+        }
+    }
     show_status();
 }
 

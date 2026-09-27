@@ -44,6 +44,10 @@ fn checks() {
     if blocks(pos(0, 64, 0), pos(2, 64, 2), pos(10, 64, 0), masked) || !loaded(pos(0, 0, 0)) {
         ready = 1;
     }
+    // 省略模式的区域比较：生成的命令必须显式写 `all`。
+    if blocks(pos(0, 64, 0), pos(2, 64, 2), pos(10, 64, 0)) {
+        ready = 2;
+    }
     if biome(pos(0, 64, 0), "#minecraft:is_forest") && dimension("minecraft:overworld") {
         ready = 1;
     }

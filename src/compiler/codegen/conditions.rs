@@ -58,7 +58,7 @@ impl Compiler<'_> {
                 super::world::position_text(start),
                 super::world::position_text(end),
                 super::world::position_text(destination),
-                if *masked { " masked" } else { "" }
+                blocks_mode(*masked)
             ),
             Condition::Biome { pos, biome, .. } => {
                 format!("biome {} {biome}", super::world::position_text(pos))
@@ -186,7 +186,7 @@ impl Compiler<'_> {
                 masked,
                 ..
             } => {
-                let mode = if *masked { " masked" } else { "" };
+                let mode = blocks_mode(*masked);
                 self.compile_atomic_condition(
                     format!(
                         "blocks {} {} {}{mode}",
@@ -601,4 +601,11 @@ fn comparison_operator(comparison: Comparison) -> (&'static str, &'static str) {
         Comparison::Greater => ("if", ">"),
         Comparison::GreaterEqual => ("if", ">="),
     }
+}
+
+/// `execute if blocks` 的比较模式。26.3 的命令树把 `all`/`masked` 放在
+/// destination 之后，省略模式会解析成不完整命令（条件永远不成立），
+/// 因此默认模式也必须显式写出。
+fn blocks_mode(masked: bool) -> &'static str {
+    if masked { " masked" } else { " all" }
 }
