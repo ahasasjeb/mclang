@@ -58,6 +58,18 @@ pub fn compile(
     program: &mut Program,
     options: &CompileOptions,
 ) -> Result<CompiledPack, Vec<Diagnostic>> {
+    crate::stack::run(|| compile_inner(program, options)).unwrap_or_else(|error| {
+        Err(vec![Diagnostic::new(
+            format!("无法创建编译工作线程：{error}"),
+            crate::ast::Span::default(),
+        )])
+    })
+}
+
+fn compile_inner(
+    program: &mut Program,
+    options: &CompileOptions,
+) -> Result<CompiledPack, Vec<Diagnostic>> {
     let diagnostics = validate::validate(program);
     if !diagnostics.is_empty() {
         return Err(diagnostics);

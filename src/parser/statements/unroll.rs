@@ -70,6 +70,7 @@ impl Parser {
         let block_coordinates = self.active_macro_coordinates.len();
         let mut expanded = Vec::new();
         for index in 0..iterations {
+            let diagnostic_count = self.diagnostics.len();
             let value = start_value + index as i32;
             self.constant_bindings.push((variable.clone(), value));
             self.constant_variables.push(variable.clone());
@@ -77,6 +78,10 @@ impl Parser {
             let (body, end_span) = self.block()?;
             self.constant_variables.pop();
             self.constant_bindings.pop();
+            // 恢复模式已检查过整个循环体；不要为每次展开重复解析错误源码。
+            if self.diagnostics.len() > diagnostic_count {
+                return Ok(Vec::new());
+            }
             if index > 0 {
                 // 循环体只随首次迭代登记宏信息，避免重复诊断。
                 self.active_macro_uses.truncate(block_uses);

@@ -23,8 +23,10 @@ mod expressions;
 mod item_predicates;
 mod items;
 pub(crate) mod keywords;
+mod limits;
 mod macros;
 mod nbt;
+mod recovery;
 mod statements;
 mod world;
 
@@ -35,8 +37,18 @@ use crate::lexer::{Token, TokenKind};
 use keywords::{keyword_alias, word_matches};
 
 pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
+    let span = tokens.first().map(|token| token.span).unwrap_or_default();
+    crate::stack::run(|| parse_inner(tokens)).unwrap_or_else(|error| {
+        Err(vec![Diagnostic::new(
+            format!("无法创建解析工作线程：{error}"),
+            span,
+        )])
+    })
+}
+
+fn parse_inner(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
     let paren_matches = matching_parens(&tokens);
-    Parser {
+    let mut parser = Parser {
         tokens,
         cursor: 0,
         paren_matches,
@@ -49,9 +61,21 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
         runtime_loop_variables: Vec::new(),
         function_parameters: Vec::new(),
         unroll_budget: statements::EXPANSION_BUDGET,
+        nesting_depth: 0,
+        diagnostics: Vec::new(),
+    };
+    let program = parser.program();
+    parser
+        .diagnostics
+        .sort_by_key(|error| (error.span.start, error.span.end));
+    parser
+        .diagnostics
+        .dedup_by(|a, b| a.span == b.span && a.message == b.message);
+    if parser.diagnostics.is_empty() {
+        Ok(program)
+    } else {
+        Err(parser.diagnostics)
     }
-    .program()
-    .map_err(|error| vec![error])
 }
 
 fn matching_parens(tokens: &[Token]) -> Vec<Option<usize>> {
@@ -92,6 +116,8 @@ struct Parser {
     function_parameters: Vec<String>,
     /// 本文件剩余的编译期展开预算；嵌套循环按层重复计入，属于保守上限。
     unroll_budget: usize,
+    nesting_depth: usize,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl Parser {
@@ -121,16 +147,24 @@ impl Parser {
             .any(|variable| variable == name)
     }
 
-    fn program(&mut self) -> Result<Program, Diagnostic> {
+    fn program(&mut self) -> Program {
         // 命名空间只在入口模块必需；其他模块可以省略，写了则必须与入口一致。
         let mut namespace = String::new();
         let mut namespace_span = None;
         if self.check_word("namespace") {
-            let start = self.advance().span;
-            let (name, span) = self.ident("命名空间名称")?;
-            self.expect(TokenKind::Semicolon, "命名空间声明后需要 `;`")?;
-            namespace = name;
-            namespace_span = Some(start.merge(span));
+            let cursor = self.cursor;
+            let result = (|| {
+                let start = self.advance().span;
+                let (name, span) = self.ident("命名空间名称")?;
+                self.expect(TokenKind::Semicolon, "命名空间声明后需要 `;`")?;
+                namespace = name;
+                namespace_span = Some(start.merge(span));
+                Ok(())
+            })();
+            if let Err(error) = result {
+                self.diagnostics.push(error);
+                self.synchronize(cursor, false);
+            }
         }
 
         let mut imports = Vec::new();
@@ -145,54 +179,63 @@ impl Parser {
         let mut function_tags = Vec::new();
         let mut functions = Vec::new();
         while !self.check(&TokenKind::Eof) {
-            if self.check_word("import") {
-                imports.push(self.import()?);
-                continue;
+            let cursor = self.cursor;
+            let result = (|| {
+                if self.check_word("import") {
+                    imports.push(self.import()?);
+                    return Ok(());
+                }
+                let exported = self.take_word("export").is_some();
+                if self.check_word("score") {
+                    let mut declaration = self.score()?;
+                    declaration.exported = exported;
+                    scores.push(declaration);
+                } else if self.check_word("objective") {
+                    let mut declaration = self.objective()?;
+                    declaration.exported = exported;
+                    objectives.push(declaration);
+                } else if self.check_word("query") {
+                    let mut declaration = self.query()?;
+                    declaration.exported = exported;
+                    queries.push(declaration);
+                } else if self.check_word("item") {
+                    let mut declaration = self.item_stack()?;
+                    declaration.exported = exported;
+                    item_stacks.push(declaration);
+                } else if self.check_word("storage") {
+                    let mut declaration = self.storage()?;
+                    declaration.exported = exported;
+                    storages.push(declaration);
+                } else if self.check_word("data_slot") {
+                    let mut declaration = self.data_slot()?;
+                    declaration.exported = exported;
+                    data_slots.push(declaration);
+                } else if self.check_word("resource") {
+                    let mut declaration = self.resource()?;
+                    declaration.exported = exported;
+                    resources.push(declaration);
+                } else if self.check_word("advancement") {
+                    let mut declaration = self.advancement()?;
+                    declaration.exported = exported;
+                    advancements.push(declaration);
+                } else if self.check_word("fn_tag") {
+                    let mut declaration = self.function_tag()?;
+                    declaration.exported = exported;
+                    function_tags.push(declaration);
+                } else {
+                    let mut function = self.function()?;
+                    function.exported = exported;
+                    functions.push(function);
+                }
+                Ok(())
+            })();
+            if let Err(error) = result {
+                self.diagnostics.push(error);
+                self.synchronize(cursor, false);
             }
-            let exported = self.take_word("export").is_some();
-            if self.check_word("score") {
-                let mut declaration = self.score()?;
-                declaration.exported = exported;
-                scores.push(declaration);
-            } else if self.check_word("objective") {
-                let mut declaration = self.objective()?;
-                declaration.exported = exported;
-                objectives.push(declaration);
-            } else if self.check_word("query") {
-                let mut declaration = self.query()?;
-                declaration.exported = exported;
-                queries.push(declaration);
-            } else if self.check_word("item") {
-                let mut declaration = self.item_stack()?;
-                declaration.exported = exported;
-                item_stacks.push(declaration);
-            } else if self.check_word("storage") {
-                let mut declaration = self.storage()?;
-                declaration.exported = exported;
-                storages.push(declaration);
-            } else if self.check_word("data_slot") {
-                let mut declaration = self.data_slot()?;
-                declaration.exported = exported;
-                data_slots.push(declaration);
-            } else if self.check_word("resource") {
-                let mut declaration = self.resource()?;
-                declaration.exported = exported;
-                resources.push(declaration);
-            } else if self.check_word("advancement") {
-                let mut declaration = self.advancement()?;
-                declaration.exported = exported;
-                advancements.push(declaration);
-            } else if self.check_word("fn_tag") {
-                let mut declaration = self.function_tag()?;
-                declaration.exported = exported;
-                function_tags.push(declaration);
-            } else {
-                let mut function = self.function()?;
-                function.exported = exported;
-                functions.push(function);
-            }
+            self.clear_function_context();
         }
-        Ok(Program {
+        Program {
             namespace,
             namespace_span,
             imports,
@@ -206,7 +249,7 @@ impl Parser {
             advancements,
             function_tags,
             functions,
-        })
+        }
     }
 
     /// `import 数学::几何;` 或 `import 数学::{加法, 减法 as 减};`

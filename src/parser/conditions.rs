@@ -8,7 +8,9 @@ use super::Parser;
 
 impl Parser {
     pub(super) fn condition(&mut self) -> Result<Condition, Diagnostic> {
-        self.condition_or()
+        let condition = self.condition_or()?;
+        self.check_condition_depth(&condition)?;
+        Ok(condition)
     }
 
     fn condition_or(&mut self) -> Result<Condition, Diagnostic> {
@@ -16,6 +18,7 @@ impl Parser {
         while self.take(&TokenKind::OrOr).is_some() {
             let right = self.condition_and()?;
             condition = Condition::Or(Box::new(condition), Box::new(right));
+            self.check_condition_depth(&condition)?;
         }
         Ok(condition)
     }
@@ -25,11 +28,16 @@ impl Parser {
         while self.take(&TokenKind::AndAnd).is_some() {
             let right = self.condition_not()?;
             condition = Condition::And(Box::new(condition), Box::new(right));
+            self.check_condition_depth(&condition)?;
         }
         Ok(condition)
     }
 
     fn condition_not(&mut self) -> Result<Condition, Diagnostic> {
+        self.nested(Self::condition_not_inner)
+    }
+
+    fn condition_not_inner(&mut self) -> Result<Condition, Diagnostic> {
         if self.take(&TokenKind::Bang).is_some() {
             return Ok(Condition::Not(Box::new(self.condition_not()?)));
         }

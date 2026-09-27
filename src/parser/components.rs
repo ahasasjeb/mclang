@@ -60,6 +60,10 @@ impl Parser {
 
     /// 尝试解析文本组件；返回 `None` 表示当前位置不是组件构造器。
     pub(super) fn try_text_component(&mut self) -> Result<Option<TextComponent>, Diagnostic> {
+        self.nested(Self::try_text_component_inner)
+    }
+
+    fn try_text_component_inner(&mut self) -> Result<Option<TextComponent>, Diagnostic> {
         if let Some(start) = self.take_word("text") {
             self.expect(TokenKind::LeftParen, "text 后需要 `(`")?;
             let (text, _) = self.string("text 需要字符串")?;

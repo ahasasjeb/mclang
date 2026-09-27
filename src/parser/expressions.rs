@@ -12,7 +12,9 @@ use super::keywords::{
 
 impl Parser {
     pub(super) fn expression(&mut self) -> Result<Expr, Diagnostic> {
-        self.additive()
+        let expression = self.additive()?;
+        self.check_expression_depth(&expression)?;
+        Ok(expression)
     }
 
     fn additive(&mut self) -> Result<Expr, Diagnostic> {
@@ -36,6 +38,7 @@ impl Parser {
                 },
                 span,
             };
+            self.check_expression_depth(&expression)?;
         }
         Ok(expression)
     }
@@ -63,11 +66,16 @@ impl Parser {
                 },
                 span,
             };
+            self.check_expression_depth(&expression)?;
         }
         Ok(expression)
     }
 
     fn unary(&mut self) -> Result<Expr, Diagnostic> {
+        self.nested(Self::unary_inner)
+    }
+
+    fn unary_inner(&mut self) -> Result<Expr, Diagnostic> {
         if let Some(minus) = self.take(&TokenKind::Minus) {
             if let TokenKind::Number(number) = &self.current().kind {
                 let number = *number;

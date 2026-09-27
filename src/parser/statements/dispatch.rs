@@ -6,17 +6,29 @@ use crate::parser::Parser;
 
 impl Parser {
     pub(in crate::parser) fn block(&mut self) -> Result<(Vec<Statement>, Span), Diagnostic> {
+        self.nested(Self::block_inner)
+    }
+
+    fn block_inner(&mut self) -> Result<(Vec<Statement>, Span), Diagnostic> {
         self.expect(TokenKind::LeftBrace, "这里需要 `{`")?;
         let mut statements = Vec::new();
         while !self.check(&TokenKind::RightBrace) {
-            if self.check(&TokenKind::Eof) {
+            if self.check(&TokenKind::Eof) || self.function_starts() {
                 return Err(Diagnostic::new("代码块缺少 `}`", self.current().span));
             }
-            if self.check_word("unroll") {
-                statements.extend(self.compile_time_unroll()?);
-                continue;
+            let cursor = self.cursor;
+            let context = self.recovery_context();
+            let result = if self.check_word("unroll") {
+                self.compile_time_unroll()
+                    .map(|body| statements.extend(body))
+            } else {
+                self.statement().map(|statement| statements.push(statement))
+            };
+            if let Err(error) = result {
+                self.diagnostics.push(error);
+                self.restore_context(context);
+                self.synchronize(cursor, true);
             }
-            statements.push(self.statement()?);
         }
         let end = self.advance().span;
         Ok((statements, end))
@@ -168,7 +180,7 @@ impl Parser {
                     self.expect(TokenKind::Semicolon, "return run 后需要 `;`")?;
                     ReturnKind::Run(command)
                 } else {
-                    let command = self.statement()?;
+                    let command = self.nested(Self::statement)?;
                     if !matches!(
                         command.kind,
                         StatementKind::CoreCommand(_)

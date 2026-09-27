@@ -9,6 +9,7 @@ mod lsp;
 mod modules;
 mod name_walk;
 mod parser;
+mod stack;
 mod stdlib;
 mod translate;
 pub mod version;
