@@ -184,6 +184,10 @@
 
 ## 8. 测试与覆盖清单
 
+- [x] `examples/sign_bank` 端到端压力测试：纯结构化 MCL 实现 32 槽双牌账号/密码、独立余额、3×3→10×10 基岩仓库、light 照明、text_display 清理。2026-09-27 在 Minecraft 26.3 GameTest 服务端实际点击命令牌，368 项断言通过；入口 `examples/sign_bank/verification/run.ps1`。
+- [ ] 补足告示牌方块实体 NBT 的字段级 codec 校验：区分 `front_text.color` 染料色与文本组件 `color` 聊天色。当前严格模式不能阻止二者混用，必须检查原版加载日志。
+- [ ] 编译期相对坐标表达式（例如 `~(width - 6)`）；目前可用 `unroll for` 绝对坐标展开完成相同布局。
+
 建议维护三份机器可检查清单：
 
 - `command_coverage.json`：68 个命令族和 5 个别名，记录状态、已覆盖叶、排除叶和对应测试。

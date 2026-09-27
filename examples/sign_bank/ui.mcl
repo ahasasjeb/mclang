@@ -30,7 +30,7 @@ export fn show_home_menu() {
         is_waxed = true;
     });
     set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【登录账户】"; color = "cyan"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/button_login"; }; }, "进入账号登录", "━━━━━━"]; color = "cyan"; has_glowing_text = true; };
+        front_text = { messages = ["━━━━━━", { text = "【登录账户】"; color = "aqua"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/button_login"; }; }, "进入账号登录", "━━━━━━"]; color = "cyan"; has_glowing_text = true; };
         back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
         allow_op_features = true; is_waxed = true;
     });

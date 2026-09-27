@@ -98,7 +98,7 @@ export fn reset() {
 fn finish_reset() {
     in_dimension("minecraft:overworld") {
         let ready = 1;
-        if !loaded(pos(-10, 64, -10)) || !loaded(pos(10, 64, 10)) { ready = 0; }
+        if !loaded(pos(-10, 64, -10)) || !loaded(pos(10, 64, -10)) || !loaded(pos(-10, 64, 10)) || !loaded(pos(10, 64, 10)) { ready = 0; }
         unroll for index in 1..33 {
             if !loaded(pos(100 + 16 * (index - 1), 64, 0)) { ready = 0; }
         }
@@ -158,6 +158,13 @@ fn cleanup_reservations() {
 export @player fn cancel_auth() {
     let slot = scoreboard.get(self, pending_slot);
     if scoreboard.get(self, auth_mode) == 4 { release_slot(slot); }
+    if scoreboard.get(self, auth_mode) != 0 {
+        in_dimension("minecraft:overworld") {
+            reset_scratch();
+            clone(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7), force);
+            set_input_sign();
+        }
+    }
     scoreboard.set(self, pending_slot, 0);
     scoreboard.set(self, auth_mode, 0);
 }
