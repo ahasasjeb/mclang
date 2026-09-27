@@ -1,0 +1,918 @@
+// 告示牌银行 v2：首屏菜单 -> 独立账号页 -> 独立密码页。
+// 账户是否占用直接由机房记录牌表示；余额与尺寸保存在账户 marker 上。
+namespace sign_bank;
+
+import rooms;
+
+score installed = 0;
+score maintenance_ticks = 0;
+
+export objective session;
+export objective transfer;
+export objective view_balance;
+export objective view_size;
+export objective leave_count { criteria = "minecraft.custom:minecraft.leave_game"; }
+export objective leave_seen;
+export objective in_room;
+export objective in_terminal;
+// 0=首屏, 1=登录账号, 2=登录密码, 3=注册账号, 4=注册密码。
+export objective auth_mode;
+export objective pending_slot;
+
+export query all_players = entity("minecraft:player") {}
+query terminal_players = entity("minecraft:player") { box(-8, 64, 1, 16, 6, 10); }
+query terminal_player = entity("minecraft:player") { box(-8, 64, 1, 16, 6, 10); limit(1); }
+query pending_registrations = entity("minecraft:player") { scores("auth_mode", "4"); }
+
+@load fn load() {
+    forceload.add(column(-16, -16), column(559, 15));
+    if installed == 0 {
+        install_world();
+        installed = 1;
+    }
+    maintain_public_signs();
+    maintain_room_signs();
+    message.all("告示牌银行 v2 已加载：请从大厅首屏选择登录或注册。", green);
+}
+
+@tick fn tick() {
+    maintenance_ticks += 1;
+    if maintenance_ticks >= 20 {
+        maintenance_ticks = 0;
+        maintain_public_signs();
+        maintain_room_signs();
+    }
+
+    each(all_players) {
+        scoreboard.set(self, in_room, 0);
+        scoreboard.set(self, in_terminal, 0);
+        let leaves = scoreboard.get(self, leave_count);
+        if leaves != scoreboard.get(self, leave_seen) {
+            scoreboard.set(self, leave_seen, leaves);
+            if scoreboard.get(self, auth_mode) != 0 { cancel_auth(); }
+            if scoreboard.get(self, session) != 0 { force_logout(); }
+        }
+    }
+
+    tick_rooms();
+    each(all_players) {
+        if scoreboard.get(self, session) != 0 && scoreboard.get(self, in_room) == 0 {
+            title.actionbar(self, "已离开安全仓库，会话注销");
+            force_logout();
+        }
+    }
+
+    let users = count(terminal_players);
+    each(terminal_players) {
+        scoreboard.set(self, in_terminal, 1);
+    }
+    each(all_players) {
+        if scoreboard.get(self, auth_mode) != 0 && scoreboard.get(self, in_terminal) == 0 {
+            title.actionbar(self, "离开登录区，认证取消");
+            cancel_auth();
+        }
+    }
+    cleanup_orphan_reservations();
+
+    if users > 1 {
+        each(terminal_players) {
+            if scoreboard.get(self, auth_mode) != 0 {
+                title.actionbar(self, "登录区出现第二名玩家，认证取消");
+                cancel_auth();
+            }
+        }
+        show_home_menu();
+    }
+}
+
+fn install_world() {
+    fill(pos(-10, 63, -12), pos(10, 63, 12), block_state("minecraft:smooth_stone"));
+    fill(pos(-8, 64, 0), pos(8, 70, 0), block_state("minecraft:polished_deepslate"));
+    fill(pos(-8, 64, 11), pos(8, 66, 11), block_state("minecraft:polished_deepslate"));
+    fill(pos(-8, 64, 1), pos(-8, 66, 10), block_state("minecraft:polished_deepslate"));
+    fill(pos(8, 64, 1), pos(8, 66, 10), block_state("minecraft:polished_deepslate"));
+
+    fill(pos(-10, 63, -10), pos(10, 82, -2), block_state("minecraft:barrier"));
+    fill(pos(-9, 64, -9), pos(9, 81, -3), block_state("minecraft:air"));
+    fill(pos(-9, 64, -8), pos(9, 81, -8), block_state("minecraft:barrier"));
+
+    show_home_menu();
+    build_room_shells();
+}
+
+fn terminal_ready() -> score {
+    let ready = 0;
+    if count(terminal_players) == 1 { ready = 1; }
+    return ready;
+}
+
+@player fn deny_terminal() {
+    title.actionbar(self, "登录区必须只有你一名玩家");
+    sound.self("minecraft:block.note_block.bass", master);
+    cancel_auth();
+}
+
+fn maintain_public_signs() {
+    // 清除早期测试版的高位和远端告示牌。
+    set_block(pos(-3, 66, 1), block_state("minecraft:air"));
+    set_block(pos(3, 66, 1), block_state("minecraft:air"));
+    set_block(pos(0, 68, 1), block_state("minecraft:air"));
+
+    let users = count(terminal_players);
+    if users != 1 {
+        show_home_menu();
+    }
+    if users == 1 {
+        let page = scoreboard.get(terminal_player, auth_mode);
+        if page == 0 { show_home_menu(); }
+        if page == 1 { show_login_account(); }
+        if page == 2 { show_login_password(); }
+        if page == 3 { show_register_account(); }
+        if page == 4 { show_register_password(); }
+        if page < 0 || page > 4 { show_home_menu(); }
+    }
+}
+
+fn show_home_menu() {
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["告示牌账户银行", "账户系统首屏", "32个账户槽位", "下方选择登录或注册"]; color = "gold"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["欢迎使用", "注册费 1 绿宝石", "仓库 3×3 至 10×10", "选择后开放输入牌"]; color = "aqua"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【登录账户】"; color = "aqua"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:button_login"; }; }, "进入账号登录", "━━━━━━"]; color = "dark_aqua"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_block(pos(1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【注册账户】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:button_register"; }; }, "创建新账户", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+}
+
+fn show_login_account() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["登录 / 第1步", "编辑中间输入牌", "第1行只写账号", "确认后才询问密码"]; color = "yellow"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交登录账号】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:login_account"; }; }, "检查账户是否存在", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+fn show_login_password() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["登录 / 第2步", "账号已经确认", "第1行只写密码", "错误后返回账号页"]; color = "gold"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交登录密码】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:login_password"; }; }, "核对账户凭据", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+fn show_register_account() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["注册 / 第1步", "编辑中间输入牌", "第1行只写新账号", "需要 1 枚绿宝石"]; color = "green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交注册账号】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:register_account"; }; }, "检查账号并预留", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+fn show_register_password() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["注册 / 第2步", "账号已经临时保留", "第1行设置密码", "提交后扣 1 绿宝石"]; color = "gold"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交注册密码】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:register_password"; }; }, "扣费并创建账户", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+fn ensure_input_sign() {
+    if !block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }) {
+        set_input_sign();
+    }
+}
+
+fn set_input_sign() {
+    set_block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = false;
+    });
+}
+
+fn set_back_sign() {
+    set_block(pos(1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = {
+            messages = ["━━━━━━", { text = "【返回首屏】"; color = "red"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:button_home"; }; }, "取消本次操作", "━━━━━━"];
+            color = "dark_red"; has_glowing_text = true;
+        };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true;
+        is_waxed = true;
+    });
+}
+
+fn reset_stages() {
+    set_block(pos(5, 66, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    clone(pos(5, 66, -7), pos(5, 66, -7), pos(6, 66, -7), force);
+    clone(pos(5, 66, -7), pos(5, 66, -7), pos(7, 66, -7), force);
+    clone(pos(5, 66, -7), pos(5, 66, -7), pos(8, 66, -7), force);
+}
+
+fn copy_account_input() {
+    data.modify(block, pos(6, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
+}
+
+fn prepare_credential(slot) {
+    reset_stages();
+    if slot == 1 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 74, -7), "front_text.messages[0]")); }
+    if slot == 2 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 74, -7), "front_text.messages[0]")); }
+    if slot == 3 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 74, -7), "front_text.messages[0]")); }
+    if slot == 4 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 74, -7), "front_text.messages[0]")); }
+    if slot == 5 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 74, -7), "front_text.messages[0]")); }
+    if slot == 6 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 74, -7), "front_text.messages[0]")); }
+    if slot == 7 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 74, -7), "front_text.messages[0]")); }
+    if slot == 8 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 74, -7), "front_text.messages[0]")); }
+    if slot == 9 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 76, -7), "front_text.messages[0]")); }
+    if slot == 10 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 76, -7), "front_text.messages[0]")); }
+    if slot == 11 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 76, -7), "front_text.messages[0]")); }
+    if slot == 12 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 76, -7), "front_text.messages[0]")); }
+    if slot == 13 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 76, -7), "front_text.messages[0]")); }
+    if slot == 14 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 76, -7), "front_text.messages[0]")); }
+    if slot == 15 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 76, -7), "front_text.messages[0]")); }
+    if slot == 16 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 76, -7), "front_text.messages[0]")); }
+    if slot == 17 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 78, -7), "front_text.messages[0]")); }
+    if slot == 18 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 78, -7), "front_text.messages[0]")); }
+    if slot == 19 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 78, -7), "front_text.messages[0]")); }
+    if slot == 20 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 78, -7), "front_text.messages[0]")); }
+    if slot == 21 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 78, -7), "front_text.messages[0]")); }
+    if slot == 22 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 78, -7), "front_text.messages[0]")); }
+    if slot == 23 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 78, -7), "front_text.messages[0]")); }
+    if slot == 24 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 78, -7), "front_text.messages[0]")); }
+    if slot == 25 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 80, -7), "front_text.messages[0]")); }
+    if slot == 26 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 80, -7), "front_text.messages[0]")); }
+    if slot == 27 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 80, -7), "front_text.messages[0]")); }
+    if slot == 28 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 80, -7), "front_text.messages[0]")); }
+    if slot == 29 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 80, -7), "front_text.messages[0]")); }
+    if slot == 30 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 80, -7), "front_text.messages[0]")); }
+    if slot == 31 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 80, -7), "front_text.messages[0]")); }
+    if slot == 32 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 80, -7), "front_text.messages[0]")); }
+    data.modify(block, pos(5, 66, -7), "front_text.messages[1]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
+    data.modify(block, pos(7, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
+}
+
+export @player fn button_login() {
+    if terminal_ready() == 1 {
+        scoreboard.set(self, auth_mode, 1);
+        scoreboard.set(self, pending_slot, 0);
+        set_input_sign();
+        maintain_public_signs();
+        title.actionbar(self, "登录第1步：请输入账号");
+        sound.self("minecraft:block.note_block.hat", master);
+    } else { deny_terminal(); }
+}
+
+export @player fn button_register() {
+    if terminal_ready() == 1 {
+        scoreboard.set(self, auth_mode, 3);
+        scoreboard.set(self, pending_slot, 0);
+        set_input_sign();
+        maintain_public_signs();
+        title.actionbar(self, "注册第1步：请输入新账号");
+        sound.self("minecraft:block.note_block.hat", master);
+    } else { deny_terminal(); }
+}
+
+export @player fn button_home() {
+    cancel_auth();
+    show_home_menu();
+    title.actionbar(self, "已返回首屏");
+    sound.self("minecraft:block.note_block.hat", master);
+}
+
+export @player fn login_account() {
+    if terminal_ready() == 1 {
+        title.actionbar(self, "正在检查登录账号……");
+        sound.self("minecraft:block.note_block.hat", master);
+        process_login_account();
+    } else { deny_terminal(); }
+}
+
+@player fn process_login_account() {
+    reset_stages();
+    copy_account_input();
+    let slot = 0;
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(8, 66, -7)) {
+        title.actionbar(self, "账号不能为空");
+        sound.self("minecraft:block.note_block.bass", master);
+    } else {
+        slot = find_account();
+        if slot == 0 {
+            title.actionbar(self, "账号不存在");
+            sound.self("minecraft:block.note_block.bass", master);
+        } else {
+            if account_online(slot) == 1 {
+                title.actionbar(self, "这个账户已经在线");
+                sound.self("minecraft:block.note_block.bass", master);
+            } else {
+                scoreboard.set(self, pending_slot, slot);
+                scoreboard.set(self, auth_mode, 2);
+                title.actionbar(self, "账号存在：请输入密码");
+                sound.self("minecraft:block.note_block.pling", master);
+            }
+        }
+    }
+    set_input_sign();
+    maintain_public_signs();
+}
+
+export @player fn register_account() {
+    if terminal_ready() == 1 {
+        title.actionbar(self, "正在检查注册账号……");
+        sound.self("minecraft:block.note_block.hat", master);
+        process_register_account();
+    } else { deny_terminal(); }
+}
+
+@player fn process_register_account() {
+    reset_stages();
+    copy_account_input();
+    let valid = 1;
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(8, 66, -7)) {
+        valid = 0;
+        title.actionbar(self, "账号不能为空");
+    }
+    if account_exists() == 1 {
+        valid = 0;
+        title.actionbar(self, "这个账号已经存在");
+    }
+    let slot = first_free_slot();
+    if slot == 0 {
+        valid = 0;
+        title.actionbar(self, "32 个账户槽位已经用完");
+    }
+    scoreboard.set(self, transfer, 0);
+    execute store.result(self, transfer) { clear(self, "minecraft:emerald", 0); }
+    if scoreboard.get(self, transfer) < 1 {
+        valid = 0;
+        title.actionbar(self, "注册需要 1 枚绿宝石");
+    }
+    if valid == 1 {
+        reserve_account(slot);
+        scoreboard.set(self, pending_slot, slot);
+        scoreboard.set(self, auth_mode, 4);
+        title.actionbar(self, "账号可用：请设置密码");
+        sound.self("minecraft:block.note_block.pling", master);
+    } else {
+        sound.self("minecraft:block.note_block.bass", master);
+    }
+    set_input_sign();
+    maintain_public_signs();
+}
+
+export @player fn login_password() {
+    if terminal_ready() == 1 {
+        title.actionbar(self, "正在核对登录密码……");
+        sound.self("minecraft:block.note_block.hat", master);
+        process_login_password();
+    } else { deny_terminal(); }
+}
+
+@player fn process_login_password() {
+    let slot = scoreboard.get(self, pending_slot);
+    prepare_credential(slot);
+    if blocks(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7)) {
+        title.actionbar(self, "密码不能为空");
+        sound.self("minecraft:block.note_block.bass", master);
+    } else {
+        if credential_matches(slot) == 1 && account_online(slot) == 0 {
+            create_account_marker(slot);
+            scoreboard.set(self, auth_mode, 0);
+            scoreboard.set(self, pending_slot, 0);
+            title.actionbar(self, "登录成功");
+            enter_account(slot);
+        } else {
+            scoreboard.set(self, auth_mode, 1);
+            scoreboard.set(self, pending_slot, 0);
+            title.actionbar(self, "密码错误：请重新输入账号");
+            sound.self("minecraft:block.note_block.bass", master);
+        }
+    }
+    set_input_sign();
+    maintain_public_signs();
+}
+
+export @player fn register_password() {
+    if terminal_ready() == 1 {
+        title.actionbar(self, "正在创建账户……");
+        sound.self("minecraft:block.note_block.hat", master);
+        process_register_password();
+    } else { deny_terminal(); }
+}
+
+@player fn process_register_password() {
+    let slot = scoreboard.get(self, pending_slot);
+    prepare_credential(slot);
+    if blocks(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7)) {
+        title.actionbar(self, "密码不能为空");
+        sound.self("minecraft:block.note_block.bass", master);
+    } else {
+        scoreboard.set(self, transfer, 0);
+        execute store.result(self, transfer) { clear(self, "minecraft:emerald", 0); }
+        if scoreboard.get(self, transfer) < 1 {
+            title.actionbar(self, "缺少注册所需的绿宝石");
+            sound.self("minecraft:block.note_block.bass", master);
+            cancel_auth();
+        } else {
+            clear(self, "minecraft:emerald", 1);
+            store_credential(slot);
+            create_account_marker(slot);
+            scoreboard.set(self, auth_mode, 0);
+            scoreboard.set(self, pending_slot, 0);
+            activate_new_account(slot);
+            title.actionbar(self, "注册成功");
+            sound.self("minecraft:block.enchantment_table.use", master);
+        }
+    }
+    set_input_sign();
+    maintain_public_signs();
+}
+
+fn find_account() -> score {
+    let found = 0;
+    if found == 0 && block(pos(-4, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 74, -7)) { found = 1; }
+    if found == 0 && block(pos(-3, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 74, -7)) { found = 2; }
+    if found == 0 && block(pos(-2, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 74, -7)) { found = 3; }
+    if found == 0 && block(pos(-1, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 74, -7)) { found = 4; }
+    if found == 0 && block(pos(0, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 74, -7)) { found = 5; }
+    if found == 0 && block(pos(1, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 74, -7)) { found = 6; }
+    if found == 0 && block(pos(2, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 74, -7)) { found = 7; }
+    if found == 0 && block(pos(3, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 74, -7)) { found = 8; }
+    if found == 0 && block(pos(-4, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 76, -7)) { found = 9; }
+    if found == 0 && block(pos(-3, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 76, -7)) { found = 10; }
+    if found == 0 && block(pos(-2, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 76, -7)) { found = 11; }
+    if found == 0 && block(pos(-1, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 76, -7)) { found = 12; }
+    if found == 0 && block(pos(0, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 76, -7)) { found = 13; }
+    if found == 0 && block(pos(1, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 76, -7)) { found = 14; }
+    if found == 0 && block(pos(2, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 76, -7)) { found = 15; }
+    if found == 0 && block(pos(3, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 76, -7)) { found = 16; }
+    if found == 0 && block(pos(-4, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 78, -7)) { found = 17; }
+    if found == 0 && block(pos(-3, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 78, -7)) { found = 18; }
+    if found == 0 && block(pos(-2, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 78, -7)) { found = 19; }
+    if found == 0 && block(pos(-1, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 78, -7)) { found = 20; }
+    if found == 0 && block(pos(0, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 78, -7)) { found = 21; }
+    if found == 0 && block(pos(1, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 78, -7)) { found = 22; }
+    if found == 0 && block(pos(2, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 78, -7)) { found = 23; }
+    if found == 0 && block(pos(3, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 78, -7)) { found = 24; }
+    if found == 0 && block(pos(-4, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 80, -7)) { found = 25; }
+    if found == 0 && block(pos(-3, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 80, -7)) { found = 26; }
+    if found == 0 && block(pos(-2, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 80, -7)) { found = 27; }
+    if found == 0 && block(pos(-1, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 80, -7)) { found = 28; }
+    if found == 0 && block(pos(0, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 80, -7)) { found = 29; }
+    if found == 0 && block(pos(1, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 80, -7)) { found = 30; }
+    if found == 0 && block(pos(2, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 80, -7)) { found = 31; }
+    if found == 0 && block(pos(3, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 80, -7)) { found = 32; }
+    return found;
+}
+
+fn credential_matches(slot) -> score {
+    let matched = 0;
+    if slot == 1 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 66, -7)) { matched = 1; }
+    if slot == 2 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 66, -7)) { matched = 1; }
+    if slot == 3 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 66, -7)) { matched = 1; }
+    if slot == 4 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 66, -7)) { matched = 1; }
+    if slot == 5 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 66, -7)) { matched = 1; }
+    if slot == 6 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 66, -7)) { matched = 1; }
+    if slot == 7 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 66, -7)) { matched = 1; }
+    if slot == 8 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 66, -7)) { matched = 1; }
+    if slot == 9 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 68, -7)) { matched = 1; }
+    if slot == 10 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 68, -7)) { matched = 1; }
+    if slot == 11 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 68, -7)) { matched = 1; }
+    if slot == 12 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 68, -7)) { matched = 1; }
+    if slot == 13 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 68, -7)) { matched = 1; }
+    if slot == 14 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 68, -7)) { matched = 1; }
+    if slot == 15 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 68, -7)) { matched = 1; }
+    if slot == 16 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 68, -7)) { matched = 1; }
+    if slot == 17 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 70, -7)) { matched = 1; }
+    if slot == 18 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 70, -7)) { matched = 1; }
+    if slot == 19 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 70, -7)) { matched = 1; }
+    if slot == 20 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 70, -7)) { matched = 1; }
+    if slot == 21 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 70, -7)) { matched = 1; }
+    if slot == 22 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 70, -7)) { matched = 1; }
+    if slot == 23 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 70, -7)) { matched = 1; }
+    if slot == 24 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 70, -7)) { matched = 1; }
+    if slot == 25 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 72, -7)) { matched = 1; }
+    if slot == 26 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 72, -7)) { matched = 1; }
+    if slot == 27 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 72, -7)) { matched = 1; }
+    if slot == 28 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 72, -7)) { matched = 1; }
+    if slot == 29 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 72, -7)) { matched = 1; }
+    if slot == 30 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 72, -7)) { matched = 1; }
+    if slot == 31 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 72, -7)) { matched = 1; }
+    if slot == 32 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 72, -7)) { matched = 1; }
+    return matched;
+}
+
+fn account_exists() -> score {
+    let found = 0;
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 74, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 76, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 78, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 80, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 80, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 80, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 80, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 80, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 80, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 80, -7)) { found = 1; }
+    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 80, -7)) { found = 1; }
+    return found;
+}
+
+fn first_free_slot() -> score {
+    let slot = 0;
+    if slot == 0 && !block(pos(-4, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 1; }
+    if slot == 0 && !block(pos(-3, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 2; }
+    if slot == 0 && !block(pos(-2, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 3; }
+    if slot == 0 && !block(pos(-1, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 4; }
+    if slot == 0 && !block(pos(0, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 5; }
+    if slot == 0 && !block(pos(1, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 6; }
+    if slot == 0 && !block(pos(2, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 7; }
+    if slot == 0 && !block(pos(3, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 8; }
+    if slot == 0 && !block(pos(-4, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 9; }
+    if slot == 0 && !block(pos(-3, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 10; }
+    if slot == 0 && !block(pos(-2, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 11; }
+    if slot == 0 && !block(pos(-1, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 12; }
+    if slot == 0 && !block(pos(0, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 13; }
+    if slot == 0 && !block(pos(1, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 14; }
+    if slot == 0 && !block(pos(2, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 15; }
+    if slot == 0 && !block(pos(3, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 16; }
+    if slot == 0 && !block(pos(-4, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 17; }
+    if slot == 0 && !block(pos(-3, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 18; }
+    if slot == 0 && !block(pos(-2, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 19; }
+    if slot == 0 && !block(pos(-1, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 20; }
+    if slot == 0 && !block(pos(0, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 21; }
+    if slot == 0 && !block(pos(1, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 22; }
+    if slot == 0 && !block(pos(2, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 23; }
+    if slot == 0 && !block(pos(3, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 24; }
+    if slot == 0 && !block(pos(-4, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 25; }
+    if slot == 0 && !block(pos(-3, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 26; }
+    if slot == 0 && !block(pos(-2, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 27; }
+    if slot == 0 && !block(pos(-1, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 28; }
+    if slot == 0 && !block(pos(0, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 29; }
+    if slot == 0 && !block(pos(1, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 30; }
+    if slot == 0 && !block(pos(2, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 31; }
+    if slot == 0 && !block(pos(3, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 32; }
+    return slot;
+}
+
+fn reserve_account(slot) {
+    if slot == 1 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 74, -7), force); }
+    if slot == 2 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 74, -7), force); }
+    if slot == 3 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 74, -7), force); }
+    if slot == 4 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 74, -7), force); }
+    if slot == 5 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 74, -7), force); }
+    if slot == 6 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 74, -7), force); }
+    if slot == 7 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 74, -7), force); }
+    if slot == 8 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 74, -7), force); }
+    if slot == 9 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 76, -7), force); }
+    if slot == 10 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 76, -7), force); }
+    if slot == 11 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 76, -7), force); }
+    if slot == 12 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 76, -7), force); }
+    if slot == 13 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 76, -7), force); }
+    if slot == 14 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 76, -7), force); }
+    if slot == 15 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 76, -7), force); }
+    if slot == 16 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 76, -7), force); }
+    if slot == 17 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 78, -7), force); }
+    if slot == 18 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 78, -7), force); }
+    if slot == 19 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 78, -7), force); }
+    if slot == 20 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 78, -7), force); }
+    if slot == 21 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 78, -7), force); }
+    if slot == 22 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 78, -7), force); }
+    if slot == 23 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 78, -7), force); }
+    if slot == 24 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 78, -7), force); }
+    if slot == 25 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 80, -7), force); }
+    if slot == 26 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 80, -7), force); }
+    if slot == 27 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 80, -7), force); }
+    if slot == 28 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 80, -7), force); }
+    if slot == 29 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 80, -7), force); }
+    if slot == 30 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 80, -7), force); }
+    if slot == 31 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 80, -7), force); }
+    if slot == 32 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 80, -7), force); }
+}
+
+fn store_credential(slot) {
+    if slot == 1 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 66, -7), force); }
+    if slot == 2 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 66, -7), force); }
+    if slot == 3 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 66, -7), force); }
+    if slot == 4 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 66, -7), force); }
+    if slot == 5 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 66, -7), force); }
+    if slot == 6 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 66, -7), force); }
+    if slot == 7 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 66, -7), force); }
+    if slot == 8 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 66, -7), force); }
+    if slot == 9 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 68, -7), force); }
+    if slot == 10 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 68, -7), force); }
+    if slot == 11 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 68, -7), force); }
+    if slot == 12 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 68, -7), force); }
+    if slot == 13 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 68, -7), force); }
+    if slot == 14 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 68, -7), force); }
+    if slot == 15 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 68, -7), force); }
+    if slot == 16 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 68, -7), force); }
+    if slot == 17 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 70, -7), force); }
+    if slot == 18 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 70, -7), force); }
+    if slot == 19 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 70, -7), force); }
+    if slot == 20 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 70, -7), force); }
+    if slot == 21 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 70, -7), force); }
+    if slot == 22 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 70, -7), force); }
+    if slot == 23 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 70, -7), force); }
+    if slot == 24 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 70, -7), force); }
+    if slot == 25 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 72, -7), force); }
+    if slot == 26 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 72, -7), force); }
+    if slot == 27 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 72, -7), force); }
+    if slot == 28 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 72, -7), force); }
+    if slot == 29 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 72, -7), force); }
+    if slot == 30 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 72, -7), force); }
+    if slot == 31 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 72, -7), force); }
+    if slot == 32 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 72, -7), force); }
+}
+
+fn release_reservation(slot) {
+    if slot == 1 && !block(pos(-4, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-4, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 2 && !block(pos(-3, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-3, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 3 && !block(pos(-2, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-2, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 4 && !block(pos(-1, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-1, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 5 && !block(pos(0, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(0, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 6 && !block(pos(1, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(1, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 7 && !block(pos(2, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(2, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 8 && !block(pos(3, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(3, 74, -7), block_state("minecraft:air"));
+    }
+    if slot == 9 && !block(pos(-4, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-4, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 10 && !block(pos(-3, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-3, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 11 && !block(pos(-2, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-2, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 12 && !block(pos(-1, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-1, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 13 && !block(pos(0, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(0, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 14 && !block(pos(1, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(1, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 15 && !block(pos(2, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(2, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 16 && !block(pos(3, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(3, 76, -7), block_state("minecraft:air"));
+    }
+    if slot == 17 && !block(pos(-4, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-4, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 18 && !block(pos(-3, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-3, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 19 && !block(pos(-2, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-2, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 20 && !block(pos(-1, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-1, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 21 && !block(pos(0, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(0, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 22 && !block(pos(1, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(1, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 23 && !block(pos(2, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(2, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 24 && !block(pos(3, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(3, 78, -7), block_state("minecraft:air"));
+    }
+    if slot == 25 && !block(pos(-4, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-4, 80, -7), block_state("minecraft:air"));
+    }
+    if slot == 26 && !block(pos(-3, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-3, 80, -7), block_state("minecraft:air"));
+    }
+    if slot == 27 && !block(pos(-2, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-2, 80, -7), block_state("minecraft:air"));
+    }
+    if slot == 28 && !block(pos(-1, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(-1, 80, -7), block_state("minecraft:air"));
+    }
+    if slot == 29 && !block(pos(0, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(0, 80, -7), block_state("minecraft:air"));
+    }
+    if slot == 30 && !block(pos(1, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(1, 80, -7), block_state("minecraft:air"));
+    }
+    if slot == 31 && !block(pos(2, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(2, 80, -7), block_state("minecraft:air"));
+    }
+    if slot == 32 && !block(pos(3, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(3, 80, -7), block_state("minecraft:air"));
+    }
+}
+
+fn cleanup_orphan_reservations() {
+    if count(pending_registrations) == 0 {
+        if block(pos(-4, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-4, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-3, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-3, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-2, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-2, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-1, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-1, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(0, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(0, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(1, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(1, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(2, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(2, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(3, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 66, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(3, 74, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-4, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-4, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-3, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-3, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-2, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-2, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-1, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-1, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(0, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(0, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(1, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(1, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(2, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(2, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(3, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 68, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(3, 76, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-4, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-4, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-3, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-3, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-2, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-2, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-1, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-1, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(0, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(0, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(1, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(1, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(2, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(2, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(3, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 70, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(3, 78, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-4, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-4, 80, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-3, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-3, 80, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-2, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-2, 80, -7), block_state("minecraft:air"));
+        }
+        if block(pos(-1, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-1, 80, -7), block_state("minecraft:air"));
+        }
+        if block(pos(0, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(0, 80, -7), block_state("minecraft:air"));
+        }
+        if block(pos(1, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(1, 80, -7), block_state("minecraft:air"));
+        }
+        if block(pos(2, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(2, 80, -7), block_state("minecraft:air"));
+        }
+        if block(pos(3, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 72, -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(3, 80, -7), block_state("minecraft:air"));
+        }
+    }
+}
+
+fn account_online(slot) -> score {
+    let online = 0;
+    each(all_players) {
+        if scoreboard.get(self, session) == slot { online = 1; }
+    }
+    return online;
+}
+
+@player fn cancel_auth() {
+    let page = scoreboard.get(self, auth_mode);
+    let slot = scoreboard.get(self, pending_slot);
+    if page == 4 { release_reservation(slot); }
+    scoreboard.set(self, auth_mode, 0);
+    scoreboard.set(self, pending_slot, 0);
+    set_input_sign();
+    maintain_public_signs();
+}
+
+export @player fn force_logout() {
+    cancel_auth();
+    scoreboard.set(self, session, 0);
+    scoreboard.set(self, in_room, 0);
+    teleport(self, vec3(0.5, 64.0, 5.5), rotation(180, 0));
+    title.actionbar(self, "银行会话已结束");
+}
+

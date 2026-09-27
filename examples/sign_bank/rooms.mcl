@@ -1,0 +1,2240 @@
+namespace sign_bank;
+
+import main;
+
+export objective account_slot;
+export objective account_balance;
+export objective account_size;
+
+export query account_markers = entity("minecraft:marker") { tag("sb_account"); }
+
+query room1_players = entity("minecraft:player") { box(100, 63, 0, 11, 7, 13); }
+query room2_players = entity("minecraft:player") { box(114, 63, 0, 11, 7, 13); }
+query room3_players = entity("minecraft:player") { box(128, 63, 0, 11, 7, 13); }
+query room4_players = entity("minecraft:player") { box(142, 63, 0, 11, 7, 13); }
+query room5_players = entity("minecraft:player") { box(156, 63, 0, 11, 7, 13); }
+query room6_players = entity("minecraft:player") { box(170, 63, 0, 11, 7, 13); }
+query room7_players = entity("minecraft:player") { box(184, 63, 0, 11, 7, 13); }
+query room8_players = entity("minecraft:player") { box(198, 63, 0, 11, 7, 13); }
+query room9_players = entity("minecraft:player") { box(212, 63, 0, 11, 7, 13); }
+query room10_players = entity("minecraft:player") { box(226, 63, 0, 11, 7, 13); }
+query room11_players = entity("minecraft:player") { box(240, 63, 0, 11, 7, 13); }
+query room12_players = entity("minecraft:player") { box(254, 63, 0, 11, 7, 13); }
+query room13_players = entity("minecraft:player") { box(268, 63, 0, 11, 7, 13); }
+query room14_players = entity("minecraft:player") { box(282, 63, 0, 11, 7, 13); }
+query room15_players = entity("minecraft:player") { box(296, 63, 0, 11, 7, 13); }
+query room16_players = entity("minecraft:player") { box(310, 63, 0, 11, 7, 13); }
+query room17_players = entity("minecraft:player") { box(324, 63, 0, 11, 7, 13); }
+query room18_players = entity("minecraft:player") { box(338, 63, 0, 11, 7, 13); }
+query room19_players = entity("minecraft:player") { box(352, 63, 0, 11, 7, 13); }
+query room20_players = entity("minecraft:player") { box(366, 63, 0, 11, 7, 13); }
+query room21_players = entity("minecraft:player") { box(380, 63, 0, 11, 7, 13); }
+query room22_players = entity("minecraft:player") { box(394, 63, 0, 11, 7, 13); }
+query room23_players = entity("minecraft:player") { box(408, 63, 0, 11, 7, 13); }
+query room24_players = entity("minecraft:player") { box(422, 63, 0, 11, 7, 13); }
+query room25_players = entity("minecraft:player") { box(436, 63, 0, 11, 7, 13); }
+query room26_players = entity("minecraft:player") { box(450, 63, 0, 11, 7, 13); }
+query room27_players = entity("minecraft:player") { box(464, 63, 0, 11, 7, 13); }
+query room28_players = entity("minecraft:player") { box(478, 63, 0, 11, 7, 13); }
+query room29_players = entity("minecraft:player") { box(492, 63, 0, 11, 7, 13); }
+query room30_players = entity("minecraft:player") { box(506, 63, 0, 11, 7, 13); }
+query room31_players = entity("minecraft:player") { box(520, 63, 0, 11, 7, 13); }
+query room32_players = entity("minecraft:player") { box(534, 63, 0, 11, 7, 13); }
+
+item one_emerald = item_stack("minecraft:emerald") {}
+
+export fn build_room_shells() {
+    fill(pos(100, 63, 0), pos(111, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(114, 63, 0), pos(125, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(128, 63, 0), pos(139, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(142, 63, 0), pos(153, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(156, 63, 0), pos(167, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(170, 63, 0), pos(181, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(184, 63, 0), pos(195, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(198, 63, 0), pos(209, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(212, 63, 0), pos(223, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(226, 63, 0), pos(237, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(240, 63, 0), pos(251, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(254, 63, 0), pos(265, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(268, 63, 0), pos(279, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(282, 63, 0), pos(293, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(296, 63, 0), pos(307, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(310, 63, 0), pos(321, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(324, 63, 0), pos(335, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(338, 63, 0), pos(349, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(352, 63, 0), pos(363, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(366, 63, 0), pos(377, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(380, 63, 0), pos(391, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(394, 63, 0), pos(405, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(408, 63, 0), pos(419, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(422, 63, 0), pos(433, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(436, 63, 0), pos(447, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(450, 63, 0), pos(461, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(464, 63, 0), pos(475, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(478, 63, 0), pos(489, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(492, 63, 0), pos(503, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(506, 63, 0), pos(517, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(520, 63, 0), pos(531, 70, 13), block_state("minecraft:barrier"));
+    fill(pos(534, 63, 0), pos(545, 70, 13), block_state("minecraft:barrier"));
+}
+
+export fn maintain_room_signs() {
+    set_block(pos(5, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【存入全部】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/deposit"; }; }, "背包绿宝石入账", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
+    });
+    set_block(pos(6, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【取出1枚】"; color = "aqua"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/withdraw"; }; }, "从余额取绿宝石", "━━━━━━"]; color = "dark_aqua"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
+    });
+    set_block(pos(7, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【升级仓库】"; color = "gold"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/upgrade"; }; }, "扩建下一圈空间", "━━━━━━"]; color = "yellow"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
+    });
+    set_block(pos(8, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【安全退出】"; color = "red"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/logout"; }; }, "注销并返回大厅", "━━━━━━"]; color = "dark_red"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
+    });
+    if block(pos(-4, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(102, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(101, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(103, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(101, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(103, 66, 1), force);
+    }
+    if block(pos(-3, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(116, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(115, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(117, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(115, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(117, 66, 1), force);
+    }
+    if block(pos(-2, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(130, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(129, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(131, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(129, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(131, 66, 1), force);
+    }
+    if block(pos(-1, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(144, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(143, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(145, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(143, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(145, 66, 1), force);
+    }
+    if block(pos(0, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(158, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(157, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(159, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(157, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(159, 66, 1), force);
+    }
+    if block(pos(1, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(172, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(171, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(173, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(171, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(173, 66, 1), force);
+    }
+    if block(pos(2, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(186, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(185, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(187, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(185, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(187, 66, 1), force);
+    }
+    if block(pos(3, 66, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(200, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(199, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(201, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(199, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(201, 66, 1), force);
+    }
+    if block(pos(-4, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(214, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(213, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(215, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(213, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(215, 66, 1), force);
+    }
+    if block(pos(-3, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(228, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(227, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(229, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(227, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(229, 66, 1), force);
+    }
+    if block(pos(-2, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(242, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(241, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(243, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(241, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(243, 66, 1), force);
+    }
+    if block(pos(-1, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(256, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(255, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(257, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(255, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(257, 66, 1), force);
+    }
+    if block(pos(0, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(270, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(269, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(271, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(269, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(271, 66, 1), force);
+    }
+    if block(pos(1, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(284, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(283, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(285, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(283, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(285, 66, 1), force);
+    }
+    if block(pos(2, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(298, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(297, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(299, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(297, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(299, 66, 1), force);
+    }
+    if block(pos(3, 68, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(312, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(311, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(313, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(311, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(313, 66, 1), force);
+    }
+    if block(pos(-4, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(326, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(325, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(327, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(325, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(327, 66, 1), force);
+    }
+    if block(pos(-3, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(340, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(339, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(341, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(339, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(341, 66, 1), force);
+    }
+    if block(pos(-2, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(354, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(353, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(355, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(353, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(355, 66, 1), force);
+    }
+    if block(pos(-1, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(368, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(367, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(369, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(367, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(369, 66, 1), force);
+    }
+    if block(pos(0, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(382, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(381, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(383, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(381, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(383, 66, 1), force);
+    }
+    if block(pos(1, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(396, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(395, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(397, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(395, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(397, 66, 1), force);
+    }
+    if block(pos(2, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(410, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(409, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(411, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(409, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(411, 66, 1), force);
+    }
+    if block(pos(3, 70, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(424, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(423, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(425, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(423, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(425, 66, 1), force);
+    }
+    if block(pos(-4, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(438, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(437, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(439, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(437, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(439, 66, 1), force);
+    }
+    if block(pos(-3, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(452, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(451, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(453, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(451, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(453, 66, 1), force);
+    }
+    if block(pos(-2, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(466, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(465, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(467, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(465, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(467, 66, 1), force);
+    }
+    if block(pos(-1, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(480, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(479, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(481, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(479, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(481, 66, 1), force);
+    }
+    if block(pos(0, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(494, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(493, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(495, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(493, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(495, 66, 1), force);
+    }
+    if block(pos(1, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(508, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(507, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(509, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(507, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(509, 66, 1), force);
+    }
+    if block(pos(2, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(522, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(521, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(523, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(521, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(523, 66, 1), force);
+    }
+    if block(pos(3, 72, -7), block_state("minecraft:oak_wall_sign")) {
+        set_block(pos(536, 67, 1), block_state("minecraft:air"));
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(535, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(537, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(535, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(537, 66, 1), force);
+    }
+}
+
+export fn tick_rooms() {
+    audit_room1();
+    audit_room2();
+    audit_room3();
+    audit_room4();
+    audit_room5();
+    audit_room6();
+    audit_room7();
+    audit_room8();
+    audit_room9();
+    audit_room10();
+    audit_room11();
+    audit_room12();
+    audit_room13();
+    audit_room14();
+    audit_room15();
+    audit_room16();
+    audit_room17();
+    audit_room18();
+    audit_room19();
+    audit_room20();
+    audit_room21();
+    audit_room22();
+    audit_room23();
+    audit_room24();
+    audit_room25();
+    audit_room26();
+    audit_room27();
+    audit_room28();
+    audit_room29();
+    audit_room30();
+    audit_room31();
+    audit_room32();
+}
+
+fn audit_room1() {
+    if count(room1_players) > 1 {
+        each(room1_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room1_players) {
+            if scoreboard.get(self, session) == 1 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room2() {
+    if count(room2_players) > 1 {
+        each(room2_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room2_players) {
+            if scoreboard.get(self, session) == 2 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room3() {
+    if count(room3_players) > 1 {
+        each(room3_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room3_players) {
+            if scoreboard.get(self, session) == 3 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room4() {
+    if count(room4_players) > 1 {
+        each(room4_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room4_players) {
+            if scoreboard.get(self, session) == 4 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room5() {
+    if count(room5_players) > 1 {
+        each(room5_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room5_players) {
+            if scoreboard.get(self, session) == 5 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room6() {
+    if count(room6_players) > 1 {
+        each(room6_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room6_players) {
+            if scoreboard.get(self, session) == 6 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room7() {
+    if count(room7_players) > 1 {
+        each(room7_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room7_players) {
+            if scoreboard.get(self, session) == 7 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room8() {
+    if count(room8_players) > 1 {
+        each(room8_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room8_players) {
+            if scoreboard.get(self, session) == 8 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room9() {
+    if count(room9_players) > 1 {
+        each(room9_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room9_players) {
+            if scoreboard.get(self, session) == 9 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room10() {
+    if count(room10_players) > 1 {
+        each(room10_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room10_players) {
+            if scoreboard.get(self, session) == 10 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room11() {
+    if count(room11_players) > 1 {
+        each(room11_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room11_players) {
+            if scoreboard.get(self, session) == 11 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room12() {
+    if count(room12_players) > 1 {
+        each(room12_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room12_players) {
+            if scoreboard.get(self, session) == 12 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room13() {
+    if count(room13_players) > 1 {
+        each(room13_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room13_players) {
+            if scoreboard.get(self, session) == 13 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room14() {
+    if count(room14_players) > 1 {
+        each(room14_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room14_players) {
+            if scoreboard.get(self, session) == 14 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room15() {
+    if count(room15_players) > 1 {
+        each(room15_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room15_players) {
+            if scoreboard.get(self, session) == 15 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room16() {
+    if count(room16_players) > 1 {
+        each(room16_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room16_players) {
+            if scoreboard.get(self, session) == 16 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room17() {
+    if count(room17_players) > 1 {
+        each(room17_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room17_players) {
+            if scoreboard.get(self, session) == 17 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room18() {
+    if count(room18_players) > 1 {
+        each(room18_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room18_players) {
+            if scoreboard.get(self, session) == 18 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room19() {
+    if count(room19_players) > 1 {
+        each(room19_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room19_players) {
+            if scoreboard.get(self, session) == 19 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room20() {
+    if count(room20_players) > 1 {
+        each(room20_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room20_players) {
+            if scoreboard.get(self, session) == 20 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room21() {
+    if count(room21_players) > 1 {
+        each(room21_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room21_players) {
+            if scoreboard.get(self, session) == 21 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room22() {
+    if count(room22_players) > 1 {
+        each(room22_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room22_players) {
+            if scoreboard.get(self, session) == 22 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room23() {
+    if count(room23_players) > 1 {
+        each(room23_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room23_players) {
+            if scoreboard.get(self, session) == 23 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room24() {
+    if count(room24_players) > 1 {
+        each(room24_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room24_players) {
+            if scoreboard.get(self, session) == 24 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room25() {
+    if count(room25_players) > 1 {
+        each(room25_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room25_players) {
+            if scoreboard.get(self, session) == 25 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room26() {
+    if count(room26_players) > 1 {
+        each(room26_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room26_players) {
+            if scoreboard.get(self, session) == 26 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room27() {
+    if count(room27_players) > 1 {
+        each(room27_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room27_players) {
+            if scoreboard.get(self, session) == 27 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room28() {
+    if count(room28_players) > 1 {
+        each(room28_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room28_players) {
+            if scoreboard.get(self, session) == 28 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room29() {
+    if count(room29_players) > 1 {
+        each(room29_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room29_players) {
+            if scoreboard.get(self, session) == 29 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room30() {
+    if count(room30_players) > 1 {
+        each(room30_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room30_players) {
+            if scoreboard.get(self, session) == 30 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room31() {
+    if count(room31_players) > 1 {
+        each(room31_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room31_players) {
+            if scoreboard.get(self, session) == 31 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn audit_room32() {
+    if count(room32_players) > 1 {
+        each(room32_players) {
+            title.actionbar(self, "仓库出现第二名玩家，强制退出");
+            force_logout();
+        }
+    } else {
+        each(room32_players) {
+            if scoreboard.get(self, session) == 32 { scoreboard.set(self, in_room, 1); }
+            else { force_logout(); }
+        }
+    }
+}
+
+fn marker_exists(slot) -> score {
+    let found = 0;
+    each(account_markers) {
+        if scoreboard.get(self, account_slot) == slot { found = 1; }
+    }
+    return found;
+}
+
+export fn create_account_marker(slot) {
+    if marker_exists(slot) == 0 {
+        spawn("minecraft:marker", pos(0, 65, -5)) {
+            self.add_tag("sb_account");
+            scoreboard.set(self, account_slot, slot);
+            scoreboard.set(self, account_balance, 0);
+            scoreboard.set(self, account_size, 3);
+        }
+    }
+}
+
+export @player fn activate_new_account(slot) {
+    if slot == 1 {
+        fill(pos(101, 64, 1), pos(103, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(1);
+    }
+    if slot == 2 {
+        fill(pos(115, 64, 1), pos(117, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(2);
+    }
+    if slot == 3 {
+        fill(pos(129, 64, 1), pos(131, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(3);
+    }
+    if slot == 4 {
+        fill(pos(143, 64, 1), pos(145, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(4);
+    }
+    if slot == 5 {
+        fill(pos(157, 64, 1), pos(159, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(5);
+    }
+    if slot == 6 {
+        fill(pos(171, 64, 1), pos(173, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(6);
+    }
+    if slot == 7 {
+        fill(pos(185, 64, 1), pos(187, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(7);
+    }
+    if slot == 8 {
+        fill(pos(199, 64, 1), pos(201, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(8);
+    }
+    if slot == 9 {
+        fill(pos(213, 64, 1), pos(215, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(9);
+    }
+    if slot == 10 {
+        fill(pos(227, 64, 1), pos(229, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(10);
+    }
+    if slot == 11 {
+        fill(pos(241, 64, 1), pos(243, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(11);
+    }
+    if slot == 12 {
+        fill(pos(255, 64, 1), pos(257, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(12);
+    }
+    if slot == 13 {
+        fill(pos(269, 64, 1), pos(271, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(13);
+    }
+    if slot == 14 {
+        fill(pos(283, 64, 1), pos(285, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(14);
+    }
+    if slot == 15 {
+        fill(pos(297, 64, 1), pos(299, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(15);
+    }
+    if slot == 16 {
+        fill(pos(311, 64, 1), pos(313, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(16);
+    }
+    if slot == 17 {
+        fill(pos(325, 64, 1), pos(327, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(17);
+    }
+    if slot == 18 {
+        fill(pos(339, 64, 1), pos(341, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(18);
+    }
+    if slot == 19 {
+        fill(pos(353, 64, 1), pos(355, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(19);
+    }
+    if slot == 20 {
+        fill(pos(367, 64, 1), pos(369, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(20);
+    }
+    if slot == 21 {
+        fill(pos(381, 64, 1), pos(383, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(21);
+    }
+    if slot == 22 {
+        fill(pos(395, 64, 1), pos(397, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(22);
+    }
+    if slot == 23 {
+        fill(pos(409, 64, 1), pos(411, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(23);
+    }
+    if slot == 24 {
+        fill(pos(423, 64, 1), pos(425, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(24);
+    }
+    if slot == 25 {
+        fill(pos(437, 64, 1), pos(439, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(25);
+    }
+    if slot == 26 {
+        fill(pos(451, 64, 1), pos(453, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(26);
+    }
+    if slot == 27 {
+        fill(pos(465, 64, 1), pos(467, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(27);
+    }
+    if slot == 28 {
+        fill(pos(479, 64, 1), pos(481, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(28);
+    }
+    if slot == 29 {
+        fill(pos(493, 64, 1), pos(495, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(29);
+    }
+    if slot == 30 {
+        fill(pos(507, 64, 1), pos(509, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(30);
+    }
+    if slot == 31 {
+        fill(pos(521, 64, 1), pos(523, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(31);
+    }
+    if slot == 32 {
+        fill(pos(535, 64, 1), pos(537, 69, 5), block_state("minecraft:air"));
+        install_room_buttons(32);
+    }
+    enter_account(slot);
+}
+
+fn install_room_buttons(slot) {
+    if slot == 1 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(101, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(103, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(101, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(103, 66, 1), force);
+    }
+    if slot == 2 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(115, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(117, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(115, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(117, 66, 1), force);
+    }
+    if slot == 3 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(129, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(131, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(129, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(131, 66, 1), force);
+    }
+    if slot == 4 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(143, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(145, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(143, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(145, 66, 1), force);
+    }
+    if slot == 5 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(157, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(159, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(157, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(159, 66, 1), force);
+    }
+    if slot == 6 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(171, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(173, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(171, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(173, 66, 1), force);
+    }
+    if slot == 7 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(185, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(187, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(185, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(187, 66, 1), force);
+    }
+    if slot == 8 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(199, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(201, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(199, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(201, 66, 1), force);
+    }
+    if slot == 9 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(213, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(215, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(213, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(215, 66, 1), force);
+    }
+    if slot == 10 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(227, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(229, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(227, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(229, 66, 1), force);
+    }
+    if slot == 11 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(241, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(243, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(241, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(243, 66, 1), force);
+    }
+    if slot == 12 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(255, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(257, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(255, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(257, 66, 1), force);
+    }
+    if slot == 13 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(269, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(271, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(269, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(271, 66, 1), force);
+    }
+    if slot == 14 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(283, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(285, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(283, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(285, 66, 1), force);
+    }
+    if slot == 15 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(297, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(299, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(297, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(299, 66, 1), force);
+    }
+    if slot == 16 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(311, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(313, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(311, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(313, 66, 1), force);
+    }
+    if slot == 17 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(325, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(327, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(325, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(327, 66, 1), force);
+    }
+    if slot == 18 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(339, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(341, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(339, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(341, 66, 1), force);
+    }
+    if slot == 19 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(353, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(355, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(353, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(355, 66, 1), force);
+    }
+    if slot == 20 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(367, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(369, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(367, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(369, 66, 1), force);
+    }
+    if slot == 21 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(381, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(383, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(381, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(383, 66, 1), force);
+    }
+    if slot == 22 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(395, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(397, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(395, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(397, 66, 1), force);
+    }
+    if slot == 23 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(409, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(411, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(409, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(411, 66, 1), force);
+    }
+    if slot == 24 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(423, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(425, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(423, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(425, 66, 1), force);
+    }
+    if slot == 25 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(437, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(439, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(437, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(439, 66, 1), force);
+    }
+    if slot == 26 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(451, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(453, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(451, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(453, 66, 1), force);
+    }
+    if slot == 27 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(465, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(467, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(465, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(467, 66, 1), force);
+    }
+    if slot == 28 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(479, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(481, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(479, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(481, 66, 1), force);
+    }
+    if slot == 29 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(493, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(495, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(493, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(495, 66, 1), force);
+    }
+    if slot == 30 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(507, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(509, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(507, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(509, 66, 1), force);
+    }
+    if slot == 31 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(521, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(523, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(521, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(523, 66, 1), force);
+    }
+    if slot == 32 {
+        clone(pos(5, 72, -7), pos(5, 72, -7), pos(535, 67, 1), force);
+        clone(pos(6, 72, -7), pos(6, 72, -7), pos(537, 67, 1), force);
+        clone(pos(7, 72, -7), pos(7, 72, -7), pos(535, 66, 1), force);
+        clone(pos(8, 72, -7), pos(8, 72, -7), pos(537, 66, 1), force);
+    }
+}
+
+export @player fn enter_account(slot) {
+    scoreboard.set(self, auth_mode, 0);
+    scoreboard.set(self, pending_slot, 0);
+    scoreboard.set(self, session, slot);
+    scoreboard.set(self, in_room, 1);
+    if slot == 1 { teleport(self, vec3(102.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 2 { teleport(self, vec3(116.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 3 { teleport(self, vec3(130.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 4 { teleport(self, vec3(144.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 5 { teleport(self, vec3(158.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 6 { teleport(self, vec3(172.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 7 { teleport(self, vec3(186.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 8 { teleport(self, vec3(200.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 9 { teleport(self, vec3(214.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 10 { teleport(self, vec3(228.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 11 { teleport(self, vec3(242.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 12 { teleport(self, vec3(256.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 13 { teleport(self, vec3(270.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 14 { teleport(self, vec3(284.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 15 { teleport(self, vec3(298.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 16 { teleport(self, vec3(312.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 17 { teleport(self, vec3(326.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 18 { teleport(self, vec3(340.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 19 { teleport(self, vec3(354.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 20 { teleport(self, vec3(368.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 21 { teleport(self, vec3(382.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 22 { teleport(self, vec3(396.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 23 { teleport(self, vec3(410.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 24 { teleport(self, vec3(424.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 25 { teleport(self, vec3(438.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 26 { teleport(self, vec3(452.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 27 { teleport(self, vec3(466.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 28 { teleport(self, vec3(480.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 29 { teleport(self, vec3(494.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 30 { teleport(self, vec3(508.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 31 { teleport(self, vec3(522.5, 64.0, 2.5), rotation(180, 0)); }
+    if slot == 32 { teleport(self, vec3(536.5, 64.0, 2.5), rotation(180, 0)); }
+    show_status();
+}
+
+fn room_private(slot) -> score {
+    let safe = 0;
+    if slot == 1 && count(room1_players) == 1 { safe = 1; }
+    if slot == 2 && count(room2_players) == 1 { safe = 1; }
+    if slot == 3 && count(room3_players) == 1 { safe = 1; }
+    if slot == 4 && count(room4_players) == 1 { safe = 1; }
+    if slot == 5 && count(room5_players) == 1 { safe = 1; }
+    if slot == 6 && count(room6_players) == 1 { safe = 1; }
+    if slot == 7 && count(room7_players) == 1 { safe = 1; }
+    if slot == 8 && count(room8_players) == 1 { safe = 1; }
+    if slot == 9 && count(room9_players) == 1 { safe = 1; }
+    if slot == 10 && count(room10_players) == 1 { safe = 1; }
+    if slot == 11 && count(room11_players) == 1 { safe = 1; }
+    if slot == 12 && count(room12_players) == 1 { safe = 1; }
+    if slot == 13 && count(room13_players) == 1 { safe = 1; }
+    if slot == 14 && count(room14_players) == 1 { safe = 1; }
+    if slot == 15 && count(room15_players) == 1 { safe = 1; }
+    if slot == 16 && count(room16_players) == 1 { safe = 1; }
+    if slot == 17 && count(room17_players) == 1 { safe = 1; }
+    if slot == 18 && count(room18_players) == 1 { safe = 1; }
+    if slot == 19 && count(room19_players) == 1 { safe = 1; }
+    if slot == 20 && count(room20_players) == 1 { safe = 1; }
+    if slot == 21 && count(room21_players) == 1 { safe = 1; }
+    if slot == 22 && count(room22_players) == 1 { safe = 1; }
+    if slot == 23 && count(room23_players) == 1 { safe = 1; }
+    if slot == 24 && count(room24_players) == 1 { safe = 1; }
+    if slot == 25 && count(room25_players) == 1 { safe = 1; }
+    if slot == 26 && count(room26_players) == 1 { safe = 1; }
+    if slot == 27 && count(room27_players) == 1 { safe = 1; }
+    if slot == 28 && count(room28_players) == 1 { safe = 1; }
+    if slot == 29 && count(room29_players) == 1 { safe = 1; }
+    if slot == 30 && count(room30_players) == 1 { safe = 1; }
+    if slot == 31 && count(room31_players) == 1 { safe = 1; }
+    if slot == 32 && count(room32_players) == 1 { safe = 1; }
+    return safe;
+}
+
+@player fn valid_room_session() -> score {
+    let valid = 0;
+    let slot = scoreboard.get(self, session);
+    if slot != 0 && scoreboard.get(self, in_room) == 1 && room_private(slot) == 1 { valid = 1; }
+    return valid;
+}
+
+export @player fn deposit() {
+    if valid_room_session() == 1 {
+        title.actionbar(self, "正在存入绿宝石……");
+        sound.self("minecraft:block.note_block.hat", master);
+        do_deposit();
+    } else { title.actionbar(self, "没有有效的独占仓库会话"); }
+}
+
+export @player fn withdraw() {
+    if valid_room_session() == 1 {
+        title.actionbar(self, "正在取出绿宝石……");
+        sound.self("minecraft:block.note_block.hat", master);
+        do_withdraw();
+    } else { title.actionbar(self, "没有有效的独占仓库会话"); }
+}
+
+export @player fn upgrade() {
+    if valid_room_session() == 1 {
+        title.actionbar(self, "正在检查升级条件……");
+        sound.self("minecraft:block.note_block.hat", master);
+        do_upgrade();
+    } else { title.actionbar(self, "没有有效的独占仓库会话"); }
+}
+
+export @player fn logout() {
+    if scoreboard.get(self, session) != 0 {
+        sound.self("minecraft:block.note_block.hat", master);
+        force_logout();
+    }
+}
+
+@player fn read_account_state() {
+    let slot = scoreboard.get(self, session);
+    let balance = 0;
+    let size = 0;
+    each(account_markers) {
+        if scoreboard.get(self, account_slot) == slot {
+            balance = scoreboard.get(self, account_balance);
+            size = scoreboard.get(self, account_size);
+        }
+    }
+    scoreboard.set(self, view_balance, balance);
+    scoreboard.set(self, view_size, size);
+}
+
+@player fn show_status() {
+    read_account_state();
+    message.self(translate("chat.type.announcement", [text("银行余额"), score(self, view_balance)]) { color = "gold"; });
+    message.self(translate("chat.type.announcement", [text("仓库边长"), score(self, view_size)]) { color = "aqua"; });
+}
+
+@player fn do_deposit() {
+    scoreboard.set(self, transfer, 0);
+    execute store.result(self, transfer) { clear(self, "minecraft:emerald"); }
+    let amount = scoreboard.get(self, transfer);
+    let slot = scoreboard.get(self, session);
+    if amount > 0 {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot {
+                scoreboard.set(self, account_balance, scoreboard.get(self, account_balance) + amount);
+            }
+        }
+        title.actionbar(self, "绿宝石已存入");
+        sound.self("minecraft:entity.experience_orb.pickup", master);
+    } else { title.actionbar(self, "背包里没有绿宝石"); }
+    show_status();
+}
+
+@player fn do_withdraw() {
+    read_account_state();
+    let slot = scoreboard.get(self, session);
+    if scoreboard.get(self, view_balance) > 0 {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot {
+                scoreboard.set(self, account_balance, scoreboard.get(self, account_balance) - 1);
+            }
+        }
+        self.give_item(one_emerald);
+        title.actionbar(self, "已取出 1 枚绿宝石");
+    } else { title.actionbar(self, "账户余额为 0"); }
+    show_status();
+}
+
+@player fn do_upgrade() {
+    read_account_state();
+    let slot = scoreboard.get(self, session);
+    let size = scoreboard.get(self, view_size);
+    let balance = scoreboard.get(self, view_balance);
+    let next = size + 1;
+    if size >= 10 { title.actionbar(self, "仓库已经达到 10×10"); }
+    if size < 10 && balance < next { title.actionbar(self, "余额不足：费用等于新边长"); }
+    if size < 10 && balance >= next {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot {
+                scoreboard.set(self, account_balance, balance - next);
+                scoreboard.set(self, account_size, next);
+            }
+        }
+        expand_room(slot, next);
+        title.actionbar(self, "仓库升级完成");
+        sound.self("minecraft:block.anvil.use", master);
+        show_status();
+    }
+}
+
+fn expand_room(slot, size) {
+    if slot == 1 && size == 4 {
+        fill(pos(104, 64, 3), pos(104, 69, 6), block_state("minecraft:air"));
+        fill(pos(101, 64, 6), pos(103, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 1 && size == 5 {
+        fill(pos(105, 64, 3), pos(105, 69, 7), block_state("minecraft:air"));
+        fill(pos(101, 64, 7), pos(104, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 1 && size == 6 {
+        fill(pos(106, 64, 3), pos(106, 69, 8), block_state("minecraft:air"));
+        fill(pos(101, 64, 8), pos(105, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 1 && size == 7 {
+        fill(pos(107, 64, 3), pos(107, 69, 9), block_state("minecraft:air"));
+        fill(pos(101, 64, 9), pos(106, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 1 && size == 8 {
+        fill(pos(108, 64, 3), pos(108, 69, 10), block_state("minecraft:air"));
+        fill(pos(101, 64, 10), pos(107, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 1 && size == 9 {
+        fill(pos(109, 64, 3), pos(109, 69, 11), block_state("minecraft:air"));
+        fill(pos(101, 64, 11), pos(108, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 1 && size == 10 {
+        fill(pos(110, 64, 3), pos(110, 69, 12), block_state("minecraft:air"));
+        fill(pos(101, 64, 12), pos(109, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 2 && size == 4 {
+        fill(pos(118, 64, 3), pos(118, 69, 6), block_state("minecraft:air"));
+        fill(pos(115, 64, 6), pos(117, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 2 && size == 5 {
+        fill(pos(119, 64, 3), pos(119, 69, 7), block_state("minecraft:air"));
+        fill(pos(115, 64, 7), pos(118, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 2 && size == 6 {
+        fill(pos(120, 64, 3), pos(120, 69, 8), block_state("minecraft:air"));
+        fill(pos(115, 64, 8), pos(119, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 2 && size == 7 {
+        fill(pos(121, 64, 3), pos(121, 69, 9), block_state("minecraft:air"));
+        fill(pos(115, 64, 9), pos(120, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 2 && size == 8 {
+        fill(pos(122, 64, 3), pos(122, 69, 10), block_state("minecraft:air"));
+        fill(pos(115, 64, 10), pos(121, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 2 && size == 9 {
+        fill(pos(123, 64, 3), pos(123, 69, 11), block_state("minecraft:air"));
+        fill(pos(115, 64, 11), pos(122, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 2 && size == 10 {
+        fill(pos(124, 64, 3), pos(124, 69, 12), block_state("minecraft:air"));
+        fill(pos(115, 64, 12), pos(123, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 3 && size == 4 {
+        fill(pos(132, 64, 3), pos(132, 69, 6), block_state("minecraft:air"));
+        fill(pos(129, 64, 6), pos(131, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 3 && size == 5 {
+        fill(pos(133, 64, 3), pos(133, 69, 7), block_state("minecraft:air"));
+        fill(pos(129, 64, 7), pos(132, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 3 && size == 6 {
+        fill(pos(134, 64, 3), pos(134, 69, 8), block_state("minecraft:air"));
+        fill(pos(129, 64, 8), pos(133, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 3 && size == 7 {
+        fill(pos(135, 64, 3), pos(135, 69, 9), block_state("minecraft:air"));
+        fill(pos(129, 64, 9), pos(134, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 3 && size == 8 {
+        fill(pos(136, 64, 3), pos(136, 69, 10), block_state("minecraft:air"));
+        fill(pos(129, 64, 10), pos(135, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 3 && size == 9 {
+        fill(pos(137, 64, 3), pos(137, 69, 11), block_state("minecraft:air"));
+        fill(pos(129, 64, 11), pos(136, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 3 && size == 10 {
+        fill(pos(138, 64, 3), pos(138, 69, 12), block_state("minecraft:air"));
+        fill(pos(129, 64, 12), pos(137, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 4 && size == 4 {
+        fill(pos(146, 64, 3), pos(146, 69, 6), block_state("minecraft:air"));
+        fill(pos(143, 64, 6), pos(145, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 4 && size == 5 {
+        fill(pos(147, 64, 3), pos(147, 69, 7), block_state("minecraft:air"));
+        fill(pos(143, 64, 7), pos(146, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 4 && size == 6 {
+        fill(pos(148, 64, 3), pos(148, 69, 8), block_state("minecraft:air"));
+        fill(pos(143, 64, 8), pos(147, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 4 && size == 7 {
+        fill(pos(149, 64, 3), pos(149, 69, 9), block_state("minecraft:air"));
+        fill(pos(143, 64, 9), pos(148, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 4 && size == 8 {
+        fill(pos(150, 64, 3), pos(150, 69, 10), block_state("minecraft:air"));
+        fill(pos(143, 64, 10), pos(149, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 4 && size == 9 {
+        fill(pos(151, 64, 3), pos(151, 69, 11), block_state("minecraft:air"));
+        fill(pos(143, 64, 11), pos(150, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 4 && size == 10 {
+        fill(pos(152, 64, 3), pos(152, 69, 12), block_state("minecraft:air"));
+        fill(pos(143, 64, 12), pos(151, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 5 && size == 4 {
+        fill(pos(160, 64, 3), pos(160, 69, 6), block_state("minecraft:air"));
+        fill(pos(157, 64, 6), pos(159, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 5 && size == 5 {
+        fill(pos(161, 64, 3), pos(161, 69, 7), block_state("minecraft:air"));
+        fill(pos(157, 64, 7), pos(160, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 5 && size == 6 {
+        fill(pos(162, 64, 3), pos(162, 69, 8), block_state("minecraft:air"));
+        fill(pos(157, 64, 8), pos(161, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 5 && size == 7 {
+        fill(pos(163, 64, 3), pos(163, 69, 9), block_state("minecraft:air"));
+        fill(pos(157, 64, 9), pos(162, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 5 && size == 8 {
+        fill(pos(164, 64, 3), pos(164, 69, 10), block_state("minecraft:air"));
+        fill(pos(157, 64, 10), pos(163, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 5 && size == 9 {
+        fill(pos(165, 64, 3), pos(165, 69, 11), block_state("minecraft:air"));
+        fill(pos(157, 64, 11), pos(164, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 5 && size == 10 {
+        fill(pos(166, 64, 3), pos(166, 69, 12), block_state("minecraft:air"));
+        fill(pos(157, 64, 12), pos(165, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 6 && size == 4 {
+        fill(pos(174, 64, 3), pos(174, 69, 6), block_state("minecraft:air"));
+        fill(pos(171, 64, 6), pos(173, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 6 && size == 5 {
+        fill(pos(175, 64, 3), pos(175, 69, 7), block_state("minecraft:air"));
+        fill(pos(171, 64, 7), pos(174, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 6 && size == 6 {
+        fill(pos(176, 64, 3), pos(176, 69, 8), block_state("minecraft:air"));
+        fill(pos(171, 64, 8), pos(175, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 6 && size == 7 {
+        fill(pos(177, 64, 3), pos(177, 69, 9), block_state("minecraft:air"));
+        fill(pos(171, 64, 9), pos(176, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 6 && size == 8 {
+        fill(pos(178, 64, 3), pos(178, 69, 10), block_state("minecraft:air"));
+        fill(pos(171, 64, 10), pos(177, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 6 && size == 9 {
+        fill(pos(179, 64, 3), pos(179, 69, 11), block_state("minecraft:air"));
+        fill(pos(171, 64, 11), pos(178, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 6 && size == 10 {
+        fill(pos(180, 64, 3), pos(180, 69, 12), block_state("minecraft:air"));
+        fill(pos(171, 64, 12), pos(179, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 7 && size == 4 {
+        fill(pos(188, 64, 3), pos(188, 69, 6), block_state("minecraft:air"));
+        fill(pos(185, 64, 6), pos(187, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 7 && size == 5 {
+        fill(pos(189, 64, 3), pos(189, 69, 7), block_state("minecraft:air"));
+        fill(pos(185, 64, 7), pos(188, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 7 && size == 6 {
+        fill(pos(190, 64, 3), pos(190, 69, 8), block_state("minecraft:air"));
+        fill(pos(185, 64, 8), pos(189, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 7 && size == 7 {
+        fill(pos(191, 64, 3), pos(191, 69, 9), block_state("minecraft:air"));
+        fill(pos(185, 64, 9), pos(190, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 7 && size == 8 {
+        fill(pos(192, 64, 3), pos(192, 69, 10), block_state("minecraft:air"));
+        fill(pos(185, 64, 10), pos(191, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 7 && size == 9 {
+        fill(pos(193, 64, 3), pos(193, 69, 11), block_state("minecraft:air"));
+        fill(pos(185, 64, 11), pos(192, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 7 && size == 10 {
+        fill(pos(194, 64, 3), pos(194, 69, 12), block_state("minecraft:air"));
+        fill(pos(185, 64, 12), pos(193, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 8 && size == 4 {
+        fill(pos(202, 64, 3), pos(202, 69, 6), block_state("minecraft:air"));
+        fill(pos(199, 64, 6), pos(201, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 8 && size == 5 {
+        fill(pos(203, 64, 3), pos(203, 69, 7), block_state("minecraft:air"));
+        fill(pos(199, 64, 7), pos(202, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 8 && size == 6 {
+        fill(pos(204, 64, 3), pos(204, 69, 8), block_state("minecraft:air"));
+        fill(pos(199, 64, 8), pos(203, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 8 && size == 7 {
+        fill(pos(205, 64, 3), pos(205, 69, 9), block_state("minecraft:air"));
+        fill(pos(199, 64, 9), pos(204, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 8 && size == 8 {
+        fill(pos(206, 64, 3), pos(206, 69, 10), block_state("minecraft:air"));
+        fill(pos(199, 64, 10), pos(205, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 8 && size == 9 {
+        fill(pos(207, 64, 3), pos(207, 69, 11), block_state("minecraft:air"));
+        fill(pos(199, 64, 11), pos(206, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 8 && size == 10 {
+        fill(pos(208, 64, 3), pos(208, 69, 12), block_state("minecraft:air"));
+        fill(pos(199, 64, 12), pos(207, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 9 && size == 4 {
+        fill(pos(216, 64, 3), pos(216, 69, 6), block_state("minecraft:air"));
+        fill(pos(213, 64, 6), pos(215, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 9 && size == 5 {
+        fill(pos(217, 64, 3), pos(217, 69, 7), block_state("minecraft:air"));
+        fill(pos(213, 64, 7), pos(216, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 9 && size == 6 {
+        fill(pos(218, 64, 3), pos(218, 69, 8), block_state("minecraft:air"));
+        fill(pos(213, 64, 8), pos(217, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 9 && size == 7 {
+        fill(pos(219, 64, 3), pos(219, 69, 9), block_state("minecraft:air"));
+        fill(pos(213, 64, 9), pos(218, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 9 && size == 8 {
+        fill(pos(220, 64, 3), pos(220, 69, 10), block_state("minecraft:air"));
+        fill(pos(213, 64, 10), pos(219, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 9 && size == 9 {
+        fill(pos(221, 64, 3), pos(221, 69, 11), block_state("minecraft:air"));
+        fill(pos(213, 64, 11), pos(220, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 9 && size == 10 {
+        fill(pos(222, 64, 3), pos(222, 69, 12), block_state("minecraft:air"));
+        fill(pos(213, 64, 12), pos(221, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 10 && size == 4 {
+        fill(pos(230, 64, 3), pos(230, 69, 6), block_state("minecraft:air"));
+        fill(pos(227, 64, 6), pos(229, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 10 && size == 5 {
+        fill(pos(231, 64, 3), pos(231, 69, 7), block_state("minecraft:air"));
+        fill(pos(227, 64, 7), pos(230, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 10 && size == 6 {
+        fill(pos(232, 64, 3), pos(232, 69, 8), block_state("minecraft:air"));
+        fill(pos(227, 64, 8), pos(231, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 10 && size == 7 {
+        fill(pos(233, 64, 3), pos(233, 69, 9), block_state("minecraft:air"));
+        fill(pos(227, 64, 9), pos(232, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 10 && size == 8 {
+        fill(pos(234, 64, 3), pos(234, 69, 10), block_state("minecraft:air"));
+        fill(pos(227, 64, 10), pos(233, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 10 && size == 9 {
+        fill(pos(235, 64, 3), pos(235, 69, 11), block_state("minecraft:air"));
+        fill(pos(227, 64, 11), pos(234, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 10 && size == 10 {
+        fill(pos(236, 64, 3), pos(236, 69, 12), block_state("minecraft:air"));
+        fill(pos(227, 64, 12), pos(235, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 11 && size == 4 {
+        fill(pos(244, 64, 3), pos(244, 69, 6), block_state("minecraft:air"));
+        fill(pos(241, 64, 6), pos(243, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 11 && size == 5 {
+        fill(pos(245, 64, 3), pos(245, 69, 7), block_state("minecraft:air"));
+        fill(pos(241, 64, 7), pos(244, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 11 && size == 6 {
+        fill(pos(246, 64, 3), pos(246, 69, 8), block_state("minecraft:air"));
+        fill(pos(241, 64, 8), pos(245, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 11 && size == 7 {
+        fill(pos(247, 64, 3), pos(247, 69, 9), block_state("minecraft:air"));
+        fill(pos(241, 64, 9), pos(246, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 11 && size == 8 {
+        fill(pos(248, 64, 3), pos(248, 69, 10), block_state("minecraft:air"));
+        fill(pos(241, 64, 10), pos(247, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 11 && size == 9 {
+        fill(pos(249, 64, 3), pos(249, 69, 11), block_state("minecraft:air"));
+        fill(pos(241, 64, 11), pos(248, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 11 && size == 10 {
+        fill(pos(250, 64, 3), pos(250, 69, 12), block_state("minecraft:air"));
+        fill(pos(241, 64, 12), pos(249, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 12 && size == 4 {
+        fill(pos(258, 64, 3), pos(258, 69, 6), block_state("minecraft:air"));
+        fill(pos(255, 64, 6), pos(257, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 12 && size == 5 {
+        fill(pos(259, 64, 3), pos(259, 69, 7), block_state("minecraft:air"));
+        fill(pos(255, 64, 7), pos(258, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 12 && size == 6 {
+        fill(pos(260, 64, 3), pos(260, 69, 8), block_state("minecraft:air"));
+        fill(pos(255, 64, 8), pos(259, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 12 && size == 7 {
+        fill(pos(261, 64, 3), pos(261, 69, 9), block_state("minecraft:air"));
+        fill(pos(255, 64, 9), pos(260, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 12 && size == 8 {
+        fill(pos(262, 64, 3), pos(262, 69, 10), block_state("minecraft:air"));
+        fill(pos(255, 64, 10), pos(261, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 12 && size == 9 {
+        fill(pos(263, 64, 3), pos(263, 69, 11), block_state("minecraft:air"));
+        fill(pos(255, 64, 11), pos(262, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 12 && size == 10 {
+        fill(pos(264, 64, 3), pos(264, 69, 12), block_state("minecraft:air"));
+        fill(pos(255, 64, 12), pos(263, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 13 && size == 4 {
+        fill(pos(272, 64, 3), pos(272, 69, 6), block_state("minecraft:air"));
+        fill(pos(269, 64, 6), pos(271, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 13 && size == 5 {
+        fill(pos(273, 64, 3), pos(273, 69, 7), block_state("minecraft:air"));
+        fill(pos(269, 64, 7), pos(272, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 13 && size == 6 {
+        fill(pos(274, 64, 3), pos(274, 69, 8), block_state("minecraft:air"));
+        fill(pos(269, 64, 8), pos(273, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 13 && size == 7 {
+        fill(pos(275, 64, 3), pos(275, 69, 9), block_state("minecraft:air"));
+        fill(pos(269, 64, 9), pos(274, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 13 && size == 8 {
+        fill(pos(276, 64, 3), pos(276, 69, 10), block_state("minecraft:air"));
+        fill(pos(269, 64, 10), pos(275, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 13 && size == 9 {
+        fill(pos(277, 64, 3), pos(277, 69, 11), block_state("minecraft:air"));
+        fill(pos(269, 64, 11), pos(276, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 13 && size == 10 {
+        fill(pos(278, 64, 3), pos(278, 69, 12), block_state("minecraft:air"));
+        fill(pos(269, 64, 12), pos(277, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 14 && size == 4 {
+        fill(pos(286, 64, 3), pos(286, 69, 6), block_state("minecraft:air"));
+        fill(pos(283, 64, 6), pos(285, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 14 && size == 5 {
+        fill(pos(287, 64, 3), pos(287, 69, 7), block_state("minecraft:air"));
+        fill(pos(283, 64, 7), pos(286, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 14 && size == 6 {
+        fill(pos(288, 64, 3), pos(288, 69, 8), block_state("minecraft:air"));
+        fill(pos(283, 64, 8), pos(287, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 14 && size == 7 {
+        fill(pos(289, 64, 3), pos(289, 69, 9), block_state("minecraft:air"));
+        fill(pos(283, 64, 9), pos(288, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 14 && size == 8 {
+        fill(pos(290, 64, 3), pos(290, 69, 10), block_state("minecraft:air"));
+        fill(pos(283, 64, 10), pos(289, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 14 && size == 9 {
+        fill(pos(291, 64, 3), pos(291, 69, 11), block_state("minecraft:air"));
+        fill(pos(283, 64, 11), pos(290, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 14 && size == 10 {
+        fill(pos(292, 64, 3), pos(292, 69, 12), block_state("minecraft:air"));
+        fill(pos(283, 64, 12), pos(291, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 15 && size == 4 {
+        fill(pos(300, 64, 3), pos(300, 69, 6), block_state("minecraft:air"));
+        fill(pos(297, 64, 6), pos(299, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 15 && size == 5 {
+        fill(pos(301, 64, 3), pos(301, 69, 7), block_state("minecraft:air"));
+        fill(pos(297, 64, 7), pos(300, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 15 && size == 6 {
+        fill(pos(302, 64, 3), pos(302, 69, 8), block_state("minecraft:air"));
+        fill(pos(297, 64, 8), pos(301, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 15 && size == 7 {
+        fill(pos(303, 64, 3), pos(303, 69, 9), block_state("minecraft:air"));
+        fill(pos(297, 64, 9), pos(302, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 15 && size == 8 {
+        fill(pos(304, 64, 3), pos(304, 69, 10), block_state("minecraft:air"));
+        fill(pos(297, 64, 10), pos(303, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 15 && size == 9 {
+        fill(pos(305, 64, 3), pos(305, 69, 11), block_state("minecraft:air"));
+        fill(pos(297, 64, 11), pos(304, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 15 && size == 10 {
+        fill(pos(306, 64, 3), pos(306, 69, 12), block_state("minecraft:air"));
+        fill(pos(297, 64, 12), pos(305, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 16 && size == 4 {
+        fill(pos(314, 64, 3), pos(314, 69, 6), block_state("minecraft:air"));
+        fill(pos(311, 64, 6), pos(313, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 16 && size == 5 {
+        fill(pos(315, 64, 3), pos(315, 69, 7), block_state("minecraft:air"));
+        fill(pos(311, 64, 7), pos(314, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 16 && size == 6 {
+        fill(pos(316, 64, 3), pos(316, 69, 8), block_state("minecraft:air"));
+        fill(pos(311, 64, 8), pos(315, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 16 && size == 7 {
+        fill(pos(317, 64, 3), pos(317, 69, 9), block_state("minecraft:air"));
+        fill(pos(311, 64, 9), pos(316, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 16 && size == 8 {
+        fill(pos(318, 64, 3), pos(318, 69, 10), block_state("minecraft:air"));
+        fill(pos(311, 64, 10), pos(317, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 16 && size == 9 {
+        fill(pos(319, 64, 3), pos(319, 69, 11), block_state("minecraft:air"));
+        fill(pos(311, 64, 11), pos(318, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 16 && size == 10 {
+        fill(pos(320, 64, 3), pos(320, 69, 12), block_state("minecraft:air"));
+        fill(pos(311, 64, 12), pos(319, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 17 && size == 4 {
+        fill(pos(328, 64, 3), pos(328, 69, 6), block_state("minecraft:air"));
+        fill(pos(325, 64, 6), pos(327, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 17 && size == 5 {
+        fill(pos(329, 64, 3), pos(329, 69, 7), block_state("minecraft:air"));
+        fill(pos(325, 64, 7), pos(328, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 17 && size == 6 {
+        fill(pos(330, 64, 3), pos(330, 69, 8), block_state("minecraft:air"));
+        fill(pos(325, 64, 8), pos(329, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 17 && size == 7 {
+        fill(pos(331, 64, 3), pos(331, 69, 9), block_state("minecraft:air"));
+        fill(pos(325, 64, 9), pos(330, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 17 && size == 8 {
+        fill(pos(332, 64, 3), pos(332, 69, 10), block_state("minecraft:air"));
+        fill(pos(325, 64, 10), pos(331, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 17 && size == 9 {
+        fill(pos(333, 64, 3), pos(333, 69, 11), block_state("minecraft:air"));
+        fill(pos(325, 64, 11), pos(332, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 17 && size == 10 {
+        fill(pos(334, 64, 3), pos(334, 69, 12), block_state("minecraft:air"));
+        fill(pos(325, 64, 12), pos(333, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 18 && size == 4 {
+        fill(pos(342, 64, 3), pos(342, 69, 6), block_state("minecraft:air"));
+        fill(pos(339, 64, 6), pos(341, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 18 && size == 5 {
+        fill(pos(343, 64, 3), pos(343, 69, 7), block_state("minecraft:air"));
+        fill(pos(339, 64, 7), pos(342, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 18 && size == 6 {
+        fill(pos(344, 64, 3), pos(344, 69, 8), block_state("minecraft:air"));
+        fill(pos(339, 64, 8), pos(343, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 18 && size == 7 {
+        fill(pos(345, 64, 3), pos(345, 69, 9), block_state("minecraft:air"));
+        fill(pos(339, 64, 9), pos(344, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 18 && size == 8 {
+        fill(pos(346, 64, 3), pos(346, 69, 10), block_state("minecraft:air"));
+        fill(pos(339, 64, 10), pos(345, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 18 && size == 9 {
+        fill(pos(347, 64, 3), pos(347, 69, 11), block_state("minecraft:air"));
+        fill(pos(339, 64, 11), pos(346, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 18 && size == 10 {
+        fill(pos(348, 64, 3), pos(348, 69, 12), block_state("minecraft:air"));
+        fill(pos(339, 64, 12), pos(347, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 19 && size == 4 {
+        fill(pos(356, 64, 3), pos(356, 69, 6), block_state("minecraft:air"));
+        fill(pos(353, 64, 6), pos(355, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 19 && size == 5 {
+        fill(pos(357, 64, 3), pos(357, 69, 7), block_state("minecraft:air"));
+        fill(pos(353, 64, 7), pos(356, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 19 && size == 6 {
+        fill(pos(358, 64, 3), pos(358, 69, 8), block_state("minecraft:air"));
+        fill(pos(353, 64, 8), pos(357, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 19 && size == 7 {
+        fill(pos(359, 64, 3), pos(359, 69, 9), block_state("minecraft:air"));
+        fill(pos(353, 64, 9), pos(358, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 19 && size == 8 {
+        fill(pos(360, 64, 3), pos(360, 69, 10), block_state("minecraft:air"));
+        fill(pos(353, 64, 10), pos(359, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 19 && size == 9 {
+        fill(pos(361, 64, 3), pos(361, 69, 11), block_state("minecraft:air"));
+        fill(pos(353, 64, 11), pos(360, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 19 && size == 10 {
+        fill(pos(362, 64, 3), pos(362, 69, 12), block_state("minecraft:air"));
+        fill(pos(353, 64, 12), pos(361, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 20 && size == 4 {
+        fill(pos(370, 64, 3), pos(370, 69, 6), block_state("minecraft:air"));
+        fill(pos(367, 64, 6), pos(369, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 20 && size == 5 {
+        fill(pos(371, 64, 3), pos(371, 69, 7), block_state("minecraft:air"));
+        fill(pos(367, 64, 7), pos(370, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 20 && size == 6 {
+        fill(pos(372, 64, 3), pos(372, 69, 8), block_state("minecraft:air"));
+        fill(pos(367, 64, 8), pos(371, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 20 && size == 7 {
+        fill(pos(373, 64, 3), pos(373, 69, 9), block_state("minecraft:air"));
+        fill(pos(367, 64, 9), pos(372, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 20 && size == 8 {
+        fill(pos(374, 64, 3), pos(374, 69, 10), block_state("minecraft:air"));
+        fill(pos(367, 64, 10), pos(373, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 20 && size == 9 {
+        fill(pos(375, 64, 3), pos(375, 69, 11), block_state("minecraft:air"));
+        fill(pos(367, 64, 11), pos(374, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 20 && size == 10 {
+        fill(pos(376, 64, 3), pos(376, 69, 12), block_state("minecraft:air"));
+        fill(pos(367, 64, 12), pos(375, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 21 && size == 4 {
+        fill(pos(384, 64, 3), pos(384, 69, 6), block_state("minecraft:air"));
+        fill(pos(381, 64, 6), pos(383, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 21 && size == 5 {
+        fill(pos(385, 64, 3), pos(385, 69, 7), block_state("minecraft:air"));
+        fill(pos(381, 64, 7), pos(384, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 21 && size == 6 {
+        fill(pos(386, 64, 3), pos(386, 69, 8), block_state("minecraft:air"));
+        fill(pos(381, 64, 8), pos(385, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 21 && size == 7 {
+        fill(pos(387, 64, 3), pos(387, 69, 9), block_state("minecraft:air"));
+        fill(pos(381, 64, 9), pos(386, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 21 && size == 8 {
+        fill(pos(388, 64, 3), pos(388, 69, 10), block_state("minecraft:air"));
+        fill(pos(381, 64, 10), pos(387, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 21 && size == 9 {
+        fill(pos(389, 64, 3), pos(389, 69, 11), block_state("minecraft:air"));
+        fill(pos(381, 64, 11), pos(388, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 21 && size == 10 {
+        fill(pos(390, 64, 3), pos(390, 69, 12), block_state("minecraft:air"));
+        fill(pos(381, 64, 12), pos(389, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 22 && size == 4 {
+        fill(pos(398, 64, 3), pos(398, 69, 6), block_state("minecraft:air"));
+        fill(pos(395, 64, 6), pos(397, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 22 && size == 5 {
+        fill(pos(399, 64, 3), pos(399, 69, 7), block_state("minecraft:air"));
+        fill(pos(395, 64, 7), pos(398, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 22 && size == 6 {
+        fill(pos(400, 64, 3), pos(400, 69, 8), block_state("minecraft:air"));
+        fill(pos(395, 64, 8), pos(399, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 22 && size == 7 {
+        fill(pos(401, 64, 3), pos(401, 69, 9), block_state("minecraft:air"));
+        fill(pos(395, 64, 9), pos(400, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 22 && size == 8 {
+        fill(pos(402, 64, 3), pos(402, 69, 10), block_state("minecraft:air"));
+        fill(pos(395, 64, 10), pos(401, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 22 && size == 9 {
+        fill(pos(403, 64, 3), pos(403, 69, 11), block_state("minecraft:air"));
+        fill(pos(395, 64, 11), pos(402, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 22 && size == 10 {
+        fill(pos(404, 64, 3), pos(404, 69, 12), block_state("minecraft:air"));
+        fill(pos(395, 64, 12), pos(403, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 23 && size == 4 {
+        fill(pos(412, 64, 3), pos(412, 69, 6), block_state("minecraft:air"));
+        fill(pos(409, 64, 6), pos(411, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 23 && size == 5 {
+        fill(pos(413, 64, 3), pos(413, 69, 7), block_state("minecraft:air"));
+        fill(pos(409, 64, 7), pos(412, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 23 && size == 6 {
+        fill(pos(414, 64, 3), pos(414, 69, 8), block_state("minecraft:air"));
+        fill(pos(409, 64, 8), pos(413, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 23 && size == 7 {
+        fill(pos(415, 64, 3), pos(415, 69, 9), block_state("minecraft:air"));
+        fill(pos(409, 64, 9), pos(414, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 23 && size == 8 {
+        fill(pos(416, 64, 3), pos(416, 69, 10), block_state("minecraft:air"));
+        fill(pos(409, 64, 10), pos(415, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 23 && size == 9 {
+        fill(pos(417, 64, 3), pos(417, 69, 11), block_state("minecraft:air"));
+        fill(pos(409, 64, 11), pos(416, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 23 && size == 10 {
+        fill(pos(418, 64, 3), pos(418, 69, 12), block_state("minecraft:air"));
+        fill(pos(409, 64, 12), pos(417, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 24 && size == 4 {
+        fill(pos(426, 64, 3), pos(426, 69, 6), block_state("minecraft:air"));
+        fill(pos(423, 64, 6), pos(425, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 24 && size == 5 {
+        fill(pos(427, 64, 3), pos(427, 69, 7), block_state("minecraft:air"));
+        fill(pos(423, 64, 7), pos(426, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 24 && size == 6 {
+        fill(pos(428, 64, 3), pos(428, 69, 8), block_state("minecraft:air"));
+        fill(pos(423, 64, 8), pos(427, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 24 && size == 7 {
+        fill(pos(429, 64, 3), pos(429, 69, 9), block_state("minecraft:air"));
+        fill(pos(423, 64, 9), pos(428, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 24 && size == 8 {
+        fill(pos(430, 64, 3), pos(430, 69, 10), block_state("minecraft:air"));
+        fill(pos(423, 64, 10), pos(429, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 24 && size == 9 {
+        fill(pos(431, 64, 3), pos(431, 69, 11), block_state("minecraft:air"));
+        fill(pos(423, 64, 11), pos(430, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 24 && size == 10 {
+        fill(pos(432, 64, 3), pos(432, 69, 12), block_state("minecraft:air"));
+        fill(pos(423, 64, 12), pos(431, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 25 && size == 4 {
+        fill(pos(440, 64, 3), pos(440, 69, 6), block_state("minecraft:air"));
+        fill(pos(437, 64, 6), pos(439, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 25 && size == 5 {
+        fill(pos(441, 64, 3), pos(441, 69, 7), block_state("minecraft:air"));
+        fill(pos(437, 64, 7), pos(440, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 25 && size == 6 {
+        fill(pos(442, 64, 3), pos(442, 69, 8), block_state("minecraft:air"));
+        fill(pos(437, 64, 8), pos(441, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 25 && size == 7 {
+        fill(pos(443, 64, 3), pos(443, 69, 9), block_state("minecraft:air"));
+        fill(pos(437, 64, 9), pos(442, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 25 && size == 8 {
+        fill(pos(444, 64, 3), pos(444, 69, 10), block_state("minecraft:air"));
+        fill(pos(437, 64, 10), pos(443, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 25 && size == 9 {
+        fill(pos(445, 64, 3), pos(445, 69, 11), block_state("minecraft:air"));
+        fill(pos(437, 64, 11), pos(444, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 25 && size == 10 {
+        fill(pos(446, 64, 3), pos(446, 69, 12), block_state("minecraft:air"));
+        fill(pos(437, 64, 12), pos(445, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 26 && size == 4 {
+        fill(pos(454, 64, 3), pos(454, 69, 6), block_state("minecraft:air"));
+        fill(pos(451, 64, 6), pos(453, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 26 && size == 5 {
+        fill(pos(455, 64, 3), pos(455, 69, 7), block_state("minecraft:air"));
+        fill(pos(451, 64, 7), pos(454, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 26 && size == 6 {
+        fill(pos(456, 64, 3), pos(456, 69, 8), block_state("minecraft:air"));
+        fill(pos(451, 64, 8), pos(455, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 26 && size == 7 {
+        fill(pos(457, 64, 3), pos(457, 69, 9), block_state("minecraft:air"));
+        fill(pos(451, 64, 9), pos(456, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 26 && size == 8 {
+        fill(pos(458, 64, 3), pos(458, 69, 10), block_state("minecraft:air"));
+        fill(pos(451, 64, 10), pos(457, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 26 && size == 9 {
+        fill(pos(459, 64, 3), pos(459, 69, 11), block_state("minecraft:air"));
+        fill(pos(451, 64, 11), pos(458, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 26 && size == 10 {
+        fill(pos(460, 64, 3), pos(460, 69, 12), block_state("minecraft:air"));
+        fill(pos(451, 64, 12), pos(459, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 27 && size == 4 {
+        fill(pos(468, 64, 3), pos(468, 69, 6), block_state("minecraft:air"));
+        fill(pos(465, 64, 6), pos(467, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 27 && size == 5 {
+        fill(pos(469, 64, 3), pos(469, 69, 7), block_state("minecraft:air"));
+        fill(pos(465, 64, 7), pos(468, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 27 && size == 6 {
+        fill(pos(470, 64, 3), pos(470, 69, 8), block_state("minecraft:air"));
+        fill(pos(465, 64, 8), pos(469, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 27 && size == 7 {
+        fill(pos(471, 64, 3), pos(471, 69, 9), block_state("minecraft:air"));
+        fill(pos(465, 64, 9), pos(470, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 27 && size == 8 {
+        fill(pos(472, 64, 3), pos(472, 69, 10), block_state("minecraft:air"));
+        fill(pos(465, 64, 10), pos(471, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 27 && size == 9 {
+        fill(pos(473, 64, 3), pos(473, 69, 11), block_state("minecraft:air"));
+        fill(pos(465, 64, 11), pos(472, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 27 && size == 10 {
+        fill(pos(474, 64, 3), pos(474, 69, 12), block_state("minecraft:air"));
+        fill(pos(465, 64, 12), pos(473, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 28 && size == 4 {
+        fill(pos(482, 64, 3), pos(482, 69, 6), block_state("minecraft:air"));
+        fill(pos(479, 64, 6), pos(481, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 28 && size == 5 {
+        fill(pos(483, 64, 3), pos(483, 69, 7), block_state("minecraft:air"));
+        fill(pos(479, 64, 7), pos(482, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 28 && size == 6 {
+        fill(pos(484, 64, 3), pos(484, 69, 8), block_state("minecraft:air"));
+        fill(pos(479, 64, 8), pos(483, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 28 && size == 7 {
+        fill(pos(485, 64, 3), pos(485, 69, 9), block_state("minecraft:air"));
+        fill(pos(479, 64, 9), pos(484, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 28 && size == 8 {
+        fill(pos(486, 64, 3), pos(486, 69, 10), block_state("minecraft:air"));
+        fill(pos(479, 64, 10), pos(485, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 28 && size == 9 {
+        fill(pos(487, 64, 3), pos(487, 69, 11), block_state("minecraft:air"));
+        fill(pos(479, 64, 11), pos(486, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 28 && size == 10 {
+        fill(pos(488, 64, 3), pos(488, 69, 12), block_state("minecraft:air"));
+        fill(pos(479, 64, 12), pos(487, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 29 && size == 4 {
+        fill(pos(496, 64, 3), pos(496, 69, 6), block_state("minecraft:air"));
+        fill(pos(493, 64, 6), pos(495, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 29 && size == 5 {
+        fill(pos(497, 64, 3), pos(497, 69, 7), block_state("minecraft:air"));
+        fill(pos(493, 64, 7), pos(496, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 29 && size == 6 {
+        fill(pos(498, 64, 3), pos(498, 69, 8), block_state("minecraft:air"));
+        fill(pos(493, 64, 8), pos(497, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 29 && size == 7 {
+        fill(pos(499, 64, 3), pos(499, 69, 9), block_state("minecraft:air"));
+        fill(pos(493, 64, 9), pos(498, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 29 && size == 8 {
+        fill(pos(500, 64, 3), pos(500, 69, 10), block_state("minecraft:air"));
+        fill(pos(493, 64, 10), pos(499, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 29 && size == 9 {
+        fill(pos(501, 64, 3), pos(501, 69, 11), block_state("minecraft:air"));
+        fill(pos(493, 64, 11), pos(500, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 29 && size == 10 {
+        fill(pos(502, 64, 3), pos(502, 69, 12), block_state("minecraft:air"));
+        fill(pos(493, 64, 12), pos(501, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 30 && size == 4 {
+        fill(pos(510, 64, 3), pos(510, 69, 6), block_state("minecraft:air"));
+        fill(pos(507, 64, 6), pos(509, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 30 && size == 5 {
+        fill(pos(511, 64, 3), pos(511, 69, 7), block_state("minecraft:air"));
+        fill(pos(507, 64, 7), pos(510, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 30 && size == 6 {
+        fill(pos(512, 64, 3), pos(512, 69, 8), block_state("minecraft:air"));
+        fill(pos(507, 64, 8), pos(511, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 30 && size == 7 {
+        fill(pos(513, 64, 3), pos(513, 69, 9), block_state("minecraft:air"));
+        fill(pos(507, 64, 9), pos(512, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 30 && size == 8 {
+        fill(pos(514, 64, 3), pos(514, 69, 10), block_state("minecraft:air"));
+        fill(pos(507, 64, 10), pos(513, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 30 && size == 9 {
+        fill(pos(515, 64, 3), pos(515, 69, 11), block_state("minecraft:air"));
+        fill(pos(507, 64, 11), pos(514, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 30 && size == 10 {
+        fill(pos(516, 64, 3), pos(516, 69, 12), block_state("minecraft:air"));
+        fill(pos(507, 64, 12), pos(515, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 31 && size == 4 {
+        fill(pos(524, 64, 3), pos(524, 69, 6), block_state("minecraft:air"));
+        fill(pos(521, 64, 6), pos(523, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 31 && size == 5 {
+        fill(pos(525, 64, 3), pos(525, 69, 7), block_state("minecraft:air"));
+        fill(pos(521, 64, 7), pos(524, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 31 && size == 6 {
+        fill(pos(526, 64, 3), pos(526, 69, 8), block_state("minecraft:air"));
+        fill(pos(521, 64, 8), pos(525, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 31 && size == 7 {
+        fill(pos(527, 64, 3), pos(527, 69, 9), block_state("minecraft:air"));
+        fill(pos(521, 64, 9), pos(526, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 31 && size == 8 {
+        fill(pos(528, 64, 3), pos(528, 69, 10), block_state("minecraft:air"));
+        fill(pos(521, 64, 10), pos(527, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 31 && size == 9 {
+        fill(pos(529, 64, 3), pos(529, 69, 11), block_state("minecraft:air"));
+        fill(pos(521, 64, 11), pos(528, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 31 && size == 10 {
+        fill(pos(530, 64, 3), pos(530, 69, 12), block_state("minecraft:air"));
+        fill(pos(521, 64, 12), pos(529, 69, 12), block_state("minecraft:air"));
+    }
+    if slot == 32 && size == 4 {
+        fill(pos(538, 64, 3), pos(538, 69, 6), block_state("minecraft:air"));
+        fill(pos(535, 64, 6), pos(537, 69, 6), block_state("minecraft:air"));
+    }
+    if slot == 32 && size == 5 {
+        fill(pos(539, 64, 3), pos(539, 69, 7), block_state("minecraft:air"));
+        fill(pos(535, 64, 7), pos(538, 69, 7), block_state("minecraft:air"));
+    }
+    if slot == 32 && size == 6 {
+        fill(pos(540, 64, 3), pos(540, 69, 8), block_state("minecraft:air"));
+        fill(pos(535, 64, 8), pos(539, 69, 8), block_state("minecraft:air"));
+    }
+    if slot == 32 && size == 7 {
+        fill(pos(541, 64, 3), pos(541, 69, 9), block_state("minecraft:air"));
+        fill(pos(535, 64, 9), pos(540, 69, 9), block_state("minecraft:air"));
+    }
+    if slot == 32 && size == 8 {
+        fill(pos(542, 64, 3), pos(542, 69, 10), block_state("minecraft:air"));
+        fill(pos(535, 64, 10), pos(541, 69, 10), block_state("minecraft:air"));
+    }
+    if slot == 32 && size == 9 {
+        fill(pos(543, 64, 3), pos(543, 69, 11), block_state("minecraft:air"));
+        fill(pos(535, 64, 11), pos(542, 69, 11), block_state("minecraft:air"));
+    }
+    if slot == 32 && size == 10 {
+        fill(pos(544, 64, 3), pos(544, 69, 12), block_state("minecraft:air"));
+        fill(pos(535, 64, 12), pos(543, 69, 12), block_state("minecraft:air"));
+    }
+}
+
