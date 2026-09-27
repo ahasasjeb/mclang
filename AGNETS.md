@@ -15,6 +15,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3 的数据包编程语言及�
 - 命令行：
   - `mclang build <源文件.mcl|项目目录> [-o <输出路径>] [--zip] [--description <文本>] [--deny-raw]`
   - `mclang check <源文件.mcl|项目目录> [--deny-raw]`
+  - `mclang translate <源文件.mcl|项目目录> --to <en|zh>`（就地互译关键词，只改写语言词汇）
   - `mclang lsp`（标准输入输出上的语言服务器，供编辑器插件调用）
   - `mclang help` / `mclang version`
 - 默认输出到 `build/<项目名>`，`--zip` 默认输出 `build/<项目名>.zip`；`.mclang-manifest` 记录目录构建的上次产物，重建只清理自己上次生成的文件，并回收 `data/` 下不再包含文件的空目录
@@ -40,6 +41,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3 的数据包编程语言及�
 | `src/ast.rs` | AST 与源范围定义（声明带 `name_span`，供编辑器跳转） |
 | `src/analysis.rs` | 工具侧分析入口：内存源文件 → 结构化诊断与符号表 |
 | `src/lsp/` | 语言服务器：`rpc`（分帧）、`convert`（位置换算）、`server`（会话与分派）、`features`（补全/悬停/跳转） |
+| `src/translate/` | 中英关键词互译：词表从解析器函数探测，按出现位置改写并保护用户声明的标识符 |
 | `src/parser/` | 递归下降解析：`mod.rs`（游标导航与顶层分派）、`declarations`、`items`、`statements`、`conditions`、`expressions`、`keywords` |
 | `src/compiler/mod.rs` | `compile()` 入口与 `CompiledPack` |
 | `src/compiler/types.rs` | 校验与生成共享的内部类型 |
@@ -113,6 +115,9 @@ cargo run -- build examples/give_reward.mcl -o build/give_reward --description "
 # 编译测试语料
 cargo run -- build tests/valid/language -o build/tests/language --deny-raw
 cargo run -- check tests/invalid/items.mcl
+
+# 就地互译关键词（会改写文件本身）
+cargo run --bin mclang -- translate tests/dual/en --to zh
 ```
 
 ## 文档索引

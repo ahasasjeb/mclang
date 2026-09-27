@@ -153,6 +153,7 @@
 | --- | --- |
 | 项目配置 | 从配置文件读取 namespace、description、output、strict policy、libraries、pack metadata；CLI 可覆盖。 |
 | `mclang fmt` | 稳定格式化、保留注释、中英文关键词不互改、支持 `--check`。 |
+| `mclang translate` | 已实现：就地互译关键词，词表从 `src/parser/keywords/` 的规范化函数探测；只改写语言词汇，用户声明的标识符不翻译，翻译后产物与原项目逐字节一致（`tests/translate.rs`）。 |
 | JSON diagnostics | 输出 code、severity、message、file、range、related、fixes。 |
 | `mclang build --zip` | 已实现；生成可直接分发且可复现的数据包 ZIP。 |
 | warning policy | 支持 warning 类别与 allow/deny。 |

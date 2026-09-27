@@ -10,6 +10,7 @@ mod modules;
 mod name_walk;
 mod parser;
 mod stdlib;
+mod translate;
 pub mod version;
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
@@ -24,6 +25,7 @@ pub use analysis::{
     FileDiagnostic, ProjectAnalysis, SourceFile, Span, Symbol, SymbolKind, analyze,
 };
 pub use lsp::serve;
+pub use translate::{KeywordLanguage, translate};
 
 pub struct BuildOptions {
     pub description: String,
@@ -85,6 +87,81 @@ pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
         function_tags: program.function_tags.len(),
         raw_statements: raw_statement_count(&program.functions),
     })
+}
+
+/// 就地把单个 `.mcl` 文件改写成目标语言；内容未变时不重写，返回是否发生改写。
+pub fn translate_file(source: &Path, language: KeywordLanguage) -> Result<bool, String> {
+    let text = fs::read_to_string(source)
+        .map_err(|error| format!("无法读取 {}：{error}", source.display()))?;
+    let translated = translate(&text, language)?;
+    if translated == text {
+        return Ok(false);
+    }
+    write_if_changed(source, translated.as_bytes())?;
+    Ok(true)
+}
+
+/// 就地翻译项目目录下的全部 `.mcl` 文件，返回发生改写的文件数。
+///
+/// 先读完所有模块并收集声明的标识符（跨模块引用同样受保护），全部翻译成功后才
+/// 写回；中途失败不会留下半翻译的项目。内容未变的文件不重写。
+pub fn translate_project(source: &Path, language: KeywordLanguage) -> Result<usize, String> {
+    if !source.is_dir() {
+        return Err(format!("{} 不是项目目录", source.display()));
+    }
+    let mut files = Vec::new();
+    collect_translatable_files(source, &mut files)?;
+
+    let mut declared = std::collections::HashSet::new();
+    let mut texts = Vec::new();
+    for path in files {
+        let text = fs::read_to_string(&path)
+            .map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
+        declared.extend(translate::declared_names(&text));
+        texts.push((path, text));
+    }
+
+    let mut pending = Vec::new();
+    for (path, text) in texts {
+        let translated = translate::translate_declared(&text, language, &declared)?;
+        if translated != text {
+            pending.push((path, translated));
+        }
+    }
+    let changed = pending.len();
+    for (path, text) in pending {
+        write_if_changed(&path, text.as_bytes())?;
+    }
+    Ok(changed)
+}
+
+/// 递归收集目录下的全部 `.mcl` 源文件；符号链接、`.` 开头的目录与构建产物目录跳过。
+fn collect_translatable_files(directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    let mut entries: Vec<_> = fs::read_dir(directory)
+        .map_err(|error| format!("无法读取目录 {}：{error}", directory.display()))?
+        .map(|entry| entry.map_err(|error| format!("无法读取目录项：{error}")))
+        .collect::<Result<_, _>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("无法读取 {} 的类型：{error}", path.display()))?;
+        if file_type.is_dir() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with('.') || matches!(name.as_ref(), "target" | "build" | "node_modules")
+            {
+                continue;
+            }
+            collect_translatable_files(&path, files)?;
+        } else if file_type.is_file()
+            && path.extension().and_then(|extension| extension.to_str()) == Some("mcl")
+        {
+            files.push(path);
+        }
+    }
+    Ok(())
 }
 
 pub fn build_file(

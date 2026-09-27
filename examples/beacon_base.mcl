@@ -9,34 +9,34 @@
 //
 // 编译：
 //   cargo run --bin mclang -- build examples/beacon_base.mcl -o build/beacon_base --deny-raw
-namespace beacon_base;
+命名空间 beacon_base;
 
 进度 放置泥土 {
     准则 放下泥土 {
-        trigger = placed_block;
-        conditions = """{"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}""";
+        触发器 = placed_block;
+        条件 = """{"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}""";
     }
     奖励 { 函数 = 检查基座; }
 }
 
 // 逐格检查泥土下面那一层；用局部变量避免一条九个 && 的长条件。
-fn 基座层合格() -> score {
+函数 基座层合格() -> 计分 {
     令 合格 = 1;
-    如果 !block(坐标(~-1, ~-2, ~-1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~, ~-2, ~-1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~1, ~-2, ~-1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~-1, ~-2, ~), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~, ~-2, ~), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~1, ~-2, ~), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~-1, ~-2, ~1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~, ~-2, ~1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
-    如果 !block(坐标(~1, ~-2, ~1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~-1, ~-2, ~-1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~, ~-2, ~-1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~1, ~-2, ~-1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~-1, ~-2, ~), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~, ~-2, ~), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~1, ~-2, ~), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~-1, ~-2, ~1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~, ~-2, ~1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
+    如果 !方块(坐标(~1, ~-2, ~1), 方块状态("#minecraft:beacon_base_blocks")) { 合格 = 0; }
     返回 合格;
 }
 
-@player
-fn 检查基座() {
-    如果 block(坐标(~, ~-1, ~), 方块状态("minecraft:dirt")) && 基座层合格() == 1 {
+@玩家
+函数 检查基座() {
+    如果 方块(坐标(~, ~-1, ~), 方块状态("minecraft:dirt")) && 基座层合格() == 1 {
         设置方块(坐标(~, ~-1, ~), 方块状态("minecraft:beacon"));
         消息.自身("信标基座成立，泥土已变成信标。", 金色);
         声音.自身("minecraft:block.beacon.activate", 方块);
@@ -46,6 +46,6 @@ fn 检查基座() {
 }
 
 @加载
-fn 初始化() {
+函数 初始化() {
     消息.全部("信标基座检测器已加载：对着自己脚下的方块放泥土试试。", 绿色);
 }

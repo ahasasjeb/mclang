@@ -89,6 +89,7 @@ fn tick() {
 ```text
 mclang build <源文件.mcl|项目目录> [-o <输出路径>] [--zip] [--description <文本>] [--deny-raw]
 mclang check <源文件.mcl|项目目录> [--deny-raw]
+mclang translate <源文件.mcl|项目目录> --to <en|zh>
 mclang lsp
 mclang help
 mclang version
@@ -96,6 +97,7 @@ mclang version
 
 - 输入可以是单个 `.mcl` 文件，也可以是递归包含 `.mcl` 的项目目录；项目内所有文件必须声明相同命名空间，声明与引用在整个项目内可见。
 - `check` 只做检查并打印统计；`build` 通过全部检查后才写出文件。
+- `translate` 把关键词就地改写成另一种写法，便于在中文与英文风格之间切换：只翻译语言词汇（关键词、函数属性、方法与枚举值），字符串、注释、NBT 键与用户声明的标识符保持原样，内容没有变化的文件不会被重写。
 - 默认输出目录是 `build/<源文件名>`。
 - `--zip` 直接生成 ZIP，默认路径是 `build/<源文件名>.zip`；指定 `-o` 时该路径就是 ZIP 文件名。
 - 目录项目可放置 `assets/pack.png`。如需自定义格式范围、`overlays`、`filter` 或 `features`，提供完整的 `assets/pack.mcmeta`；`--description` 会覆盖其中的描述。Overlay 文件放在 `assets/overlays/<directory>/`。
@@ -165,6 +167,7 @@ code --install-extension mclang-0.5.0.vsix
 | `src/ast.rs` | 语法树与源范围 |
 | `src/analysis.rs` | 工具侧分析入口：结构化诊断与符号表 |
 | `src/lsp/` | 语言服务器：JSON-RPC、位置换算、补全、悬停、跳转 |
+| `src/translate/` | 中英关键词互译：词表探测、位置规则与源码改写 |
 | `src/compiler/validate/` | 整程序语义检查（名称、资源、上下文、递归、JSON） |
 | `src/compiler/codegen/` | 函数、辅助函数、资源与函数标签的代码生成 |
 | `src/lib.rs` / `src/main.rs` | 项目编排、数据包写入与命令行入口 |

@@ -15,7 +15,9 @@
 //   或 `属性 = 值`（`rarity = rare`）。否则 `player`、`master` 这类词表里的单词
 //   会和普通标识符冲突；
 // - `t`/`s`/`d` 在数字旁边是时间单位。其中 `s` 与 `d` 紧贴数字时是 NBT 后缀
-//   （`1s`、`1.5d`），与词法器一致并入数字 token；时间单位要写成 `1 s`、`5 d`。
+//   （`1s`、`1.5d`），与词法器一致并入数字 token；时间单位要写成 `1 s`、`5 d`；
+// - `nbt { ... }` 与 `block_state("…") { ... }` 内部是数据：前者是用户 NBT
+//   （只翻译布尔字面量），后者是原版方块状态属性名与取值，整块保持原样。
 //
 // 文档构建会用真实编译器同时编译两种写法并比较产物，任何翻译错误都会在
 // 构建阶段以“无法编译”或“产物不一致”的形式暴露出来。
@@ -416,6 +418,49 @@ export function buildTranslator(data) {
     return opaque;
   };
 
+  /** `block_state` 关键词的两种写法。 */
+  const isBlockStateKeyword = (word) =>
+    keywords.some((pair) => pair.en === "block_state" && (pair.en === word || pair.zh === word));
+
+  /**
+   * `block_state("minecraft:light") { level = "15"; }` 的属性名与取值是原版数据，
+   * 与 `nbt` 字面量一样整块保持原样；只有 `block_state` 关键词本身参与翻译。
+   */
+  const blockStateBodyTokens = (tokens) => {
+    const opaque = new Set();
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      if (token.type !== "ident" || !isBlockStateKeyword(token.text)) continue;
+      const open = nextSignificant(tokens, index);
+      if (!open || open.text !== "(") continue;
+      let depth = 0;
+      let close = null;
+      for (let cursor = open.index + 1; cursor < tokens.length; cursor += 1) {
+        if (tokens[cursor].text === "(") depth += 1;
+        else if (tokens[cursor].text === ")") {
+          if (depth === 0) {
+            close = tokens[cursor];
+            break;
+          }
+          depth -= 1;
+        }
+      }
+      if (!close) continue;
+      const brace = nextSignificant(tokens, close.index);
+      if (!brace || brace.text !== "{") continue;
+      let braces = 0;
+      for (let cursor = brace.index; cursor < tokens.length; cursor += 1) {
+        opaque.add(cursor);
+        if (tokens[cursor].text === "{") braces += 1;
+        else if (tokens[cursor].text === "}") {
+          braces -= 1;
+          if (braces === 0) break;
+        }
+      }
+    }
+    return opaque;
+  };
+
   // Import paths and exported names are identifiers, even when they spell a
   // keyword such as `time` or `random`. Only `import` and alias `as` are syntax.
   const importNameTokens = (tokens) => {
@@ -443,6 +488,7 @@ export function buildTranslator(data) {
     const tokens = tokenize(code);
     const frames = computeFrames(tokens);
     const nbtOpaque = nbtBodyTokens(tokens);
+    const blockStateOpaque = blockStateBodyTokens(tokens);
     const importOpaque = importNameTokens(tokens);
     const relaxed = options.relaxed === true;
     return tokens
@@ -453,6 +499,8 @@ export function buildTranslator(data) {
         if (nbtOpaque.has(index)) {
           return rewrite(token.text, "boolean_word", target) ?? token.text;
         }
+        // 方块状态的属性名与取值是原版数据，整块保持原样。
+        if (blockStateOpaque.has(index)) return token.text;
         return translateWord(tokens, frames, index, target, relaxed) ?? token.text;
       })
       .join("");

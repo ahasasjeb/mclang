@@ -1,7 +1,10 @@
 use std::env;
 use std::path::PathBuf;
 
-use mclang::{BuildOptions, build_file, build_zip_file, check_file, serve};
+use mclang::{
+    BuildOptions, KeywordLanguage, build_file, build_zip_file, check_file, serve, translate_file,
+    translate_project,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -109,6 +112,38 @@ fn run() -> Result<(), String> {
             );
             Ok(())
         }
+        "translate" => {
+            let source = args
+                .next()
+                .ok_or_else(|| "缺少源文件或项目目录\n\n运行 `mclang help` 查看用法".to_owned())?;
+            let mut language = None;
+
+            while let Some(arg) = args.next() {
+                match arg.as_str() {
+                    "--to" | "-t" => {
+                        let value = args.next().ok_or_else(|| format!("{arg} 缺少语言参数"))?;
+                        language = Some(KeywordLanguage::parse(&value).ok_or_else(|| {
+                            format!("`{value}` 不是有效的目标语言：需要 en 或 zh")
+                        })?);
+                    }
+                    _ => return Err(format!("未知参数 `{arg}`\n\n运行 `mclang help` 查看用法")),
+                }
+            }
+
+            let language = language.ok_or_else(|| "缺少 --to <en|zh>".to_owned())?;
+            let source = PathBuf::from(source);
+            let changed = if source.is_dir() {
+                translate_project(&source, language)?
+            } else {
+                usize::from(translate_file(&source, language)?)
+            };
+            if changed == 0 {
+                println!("内容已是目标写法，未改写文件：{}", source.display());
+            } else {
+                println!("已翻译 {changed} 个文件：{}", source.display());
+            }
+            Ok(())
+        }
         "lsp" => {
             if args.next().is_some() {
                 return Err("`mclang lsp` 不接受参数：它通过标准输入输出与编辑器通信".to_owned());
@@ -135,9 +170,12 @@ fn print_help() {
          用法:\n  \
             mclang build <源文件.mcl|项目目录> [-o <输出路径>] [--zip] [--description <文本>] [--deny-raw]\n  \
             mclang check <源文件.mcl|项目目录> [--deny-raw]\n  \
+            mclang translate <源文件.mcl|项目目录> --to <en|zh>\n  \
             mclang lsp\n  \
             mclang help\n\n\
          默认输出目录为 build/<源文件名>；--zip 改为 build/<源文件名>.zip。\n\
+         translate 就地改写语言词汇并写回原文件，字符串、注释、标识符与格式保持原样；\n\
+         用户声明的名字不会翻译，内容未变的文件不重写。\n\
          项目可提供 assets/pack.png 与 assets/pack.mcmeta；后者可声明 formats、overlays、filter、features。\n\
          文件输入是单模块项目；目录输入以 <目录>/main.mcl 为入口模块，其他 .mcl 文件由 `import` 引入，\n\
          只有入口可达的模块会被编译。跨模块引用要求对方声明 `export`。\n\
