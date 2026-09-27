@@ -43,6 +43,12 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
         active_macro_parameters: std::collections::HashMap::new(),
         active_macro_uses: Vec::new(),
         active_macro_coordinates: Vec::new(),
+        constant_bindings: Vec::new(),
+        constant_variables: Vec::new(),
+        runtime_loop_depth: 0,
+        runtime_loop_variables: Vec::new(),
+        function_parameters: Vec::new(),
+        unroll_budget: statements::EXPANSION_BUDGET,
     }
     .program()
     .map_err(|error| vec![error])
@@ -74,9 +80,47 @@ struct Parser {
     active_macro_parameters: std::collections::HashMap<String, MacroType>,
     active_macro_uses: Vec<(String, Span)>,
     active_macro_coordinates: Vec<(String, MacroCoordinateKind)>,
+    /// 编译期循环变量的当前取值（最内层在末尾）；表达式解析时替换为整数字面量。
+    constant_bindings: Vec<(String, i32)>,
+    /// 正在展开的编译期循环变量名，用于 break/continue、赋值与重声明的诊断。
+    constant_variables: Vec<String>,
+    /// 当前嵌套的运行期 for/while 层数，用来判断 break/continue 的目标。
+    runtime_loop_depth: usize,
+    /// 当前嵌套的运行期 for 变量名，用于坐标诊断提示。
+    runtime_loop_variables: Vec<String>,
+    /// 当前函数的参数名；编译期循环变量与参数同名时给出诊断。
+    function_parameters: Vec<String>,
+    /// 本文件剩余的编译期展开预算；嵌套循环按层重复计入，属于保守上限。
+    unroll_budget: usize,
 }
 
 impl Parser {
+    /// 编译期循环变量的当前取值。
+    fn constant_binding(&self, name: &str) -> Option<i32> {
+        self.constant_bindings
+            .iter()
+            .rev()
+            .find(|(bound, _)| bound == name)
+            .map(|(_, value)| *value)
+    }
+
+    /// 名字是否已被某个正在展开的编译期循环占用。
+    fn constant_variable(&self, name: &str) -> bool {
+        self.constant_variables.iter().any(|bound| bound == name)
+    }
+
+    /// 当前是否处于编译期循环体内、且中间没有运行期循环。
+    fn inside_compile_time_loop(&self) -> bool {
+        !self.constant_variables.is_empty() && self.runtime_loop_depth == 0
+    }
+
+    /// 名字是否是某个正在解析的运行期循环变量。
+    fn runtime_loop_variable(&self, name: &str) -> bool {
+        self.runtime_loop_variables
+            .iter()
+            .any(|variable| variable == name)
+    }
+
     fn program(&mut self) -> Result<Program, Diagnostic> {
         // 命名空间只在入口模块必需；其他模块可以省略，写了则必须与入口一致。
         let mut namespace = String::new();

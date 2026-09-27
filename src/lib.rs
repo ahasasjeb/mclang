@@ -2,6 +2,7 @@ mod analysis;
 mod archive;
 mod ast;
 mod compiler;
+mod constant;
 mod diagnostic;
 mod lexer;
 mod lsp;

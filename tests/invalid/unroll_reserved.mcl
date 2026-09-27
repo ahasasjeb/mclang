@@ -1,0 +1,8 @@
+// expect: 含有保留字，不能用作编译期循环变量名
+namespace bad;
+
+fn f() {
+    unroll for column in 0..3 {
+        set_block(pos(column, 64, 0), block_state("minecraft:air"));
+    }
+}

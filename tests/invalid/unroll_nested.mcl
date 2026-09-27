@@ -1,0 +1,10 @@
+// expect: 编译期循环变量 `index` 不能与外层编译期循环变量同名
+namespace bad;
+
+fn f() {
+    unroll for index in 0..3 {
+        unroll for index in 0..2 {
+            set_block(pos(index, 64, 0), block_state("minecraft:air"));
+        }
+    }
+}

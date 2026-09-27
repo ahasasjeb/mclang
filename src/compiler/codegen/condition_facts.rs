@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{Comparison, Condition, ExprKind};
-use crate::compiler::constant::constant_value;
+use crate::constant::constant_value;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum Truth {

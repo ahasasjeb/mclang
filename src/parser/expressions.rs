@@ -141,6 +141,12 @@ impl Parser {
                     })
                 } else if self.check(&TokenKind::Dot) {
                     self.named_expression(name, token.span)
+                } else if let Some(value) = self.constant_binding(&name) {
+                    // 编译期循环变量在循环体内直接以常量参与表达式。
+                    Ok(Expr {
+                        kind: ExprKind::Integer(value),
+                        span: token.span,
+                    })
                 } else {
                     Ok(Expr {
                         kind: ExprKind::Score(name),

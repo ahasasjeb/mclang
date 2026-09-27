@@ -271,4 +271,43 @@ fn native_command_shapes_and_macro_forwarding() {
         fs::read_to_string(world_output.join("data/world_test/function/journey.mcfunction"))
             .unwrap();
     assert!(world_journey.contains("tp @s 2.0 64.0 4.0"));
+    let unroll_output = root.join("target/command-outputs/loops");
+    build_file(&root.join("tests/valid/loops"), &unroll_output, &options).unwrap();
+    let grid =
+        fs::read_to_string(unroll_output.join("data/loops/function/compile_time_grid.mcfunction"))
+            .unwrap();
+    for expected in [
+        "setblock -4 64 0 minecraft:air",
+        "setblock -1 64 0 minecraft:air",
+        "setblock -4 66 0 minecraft:air",
+        "setblock -1 66 0 minecraft:air",
+        "setblock 0 70 0 minecraft:stone",
+    ] {
+        assert!(
+            grid.contains(expected),
+            "编译期循环应生成静态坐标：{expected}\n{grid}"
+        );
+    }
+    assert!(
+        !grid.contains("execute if") && !grid.contains("scoreboard") && !grid.contains("#l_"),
+        "编译期循环展开后不应残留循环状态、假玩家或守卫分支：{grid}"
+    );
+    let nested = fs::read_to_string(
+        unroll_output.join("data/loops/function/compile_time_nested.mcfunction"),
+    )
+    .unwrap();
+    assert_eq!(
+        nested
+            .lines()
+            .filter(|line| line.contains("scoreboard players add #v_sum"))
+            .count(),
+        6,
+        "内层边界应随外层编译期变量展开：{nested}"
+    );
+    let constant_coordinates = fs::read_to_string(
+        unroll_output.join("data/loops/function/constant_coordinates.mcfunction"),
+    )
+    .unwrap();
+    assert!(constant_coordinates.contains("setblock 3 64 -6 minecraft:air"));
+    assert!(constant_coordinates.contains("fill 2 64 0 6 64 1 minecraft:air"));
 }

@@ -134,7 +134,7 @@
           <a class="button button-secondary" href="#examples-core">浏览完整示例 <span aria-hidden="true">→</span></a>
         </div>
         <div class="hero-meta">
-          <span><strong>15</strong> 个手册示例经编译器验证</span>
+          <span><strong>16</strong> 个手册示例经编译器验证</span>
           <span class="hero-meta-divider" aria-hidden="true"></span>
           <span>中文与 English 关键词</span>
         </div>
@@ -933,6 +933,10 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 
 <span class="tok-kw">for</span> &lt;<span class="tok-ident">变量</span>&gt; <span class="tok-kw">in</span> &lt;<span class="tok-ident">起点</span>&gt;..&lt;<span class="tok-ident">终点</span>&gt; {
     ...
+}
+
+<span class="tok-kw">unroll</span> <span class="tok-kw">for</span> &lt;<span class="tok-ident">变量</span>&gt; <span class="tok-kw">in</span> &lt;<span class="tok-ident">起点</span>&gt;..&lt;<span class="tok-ident">终点</span>&gt; {
+    ...
 }</code><code class="kw-zh"><span class="tok-kw">如果</span> &lt;<span class="tok-lit">条件</span>&gt; {
     ...
 } <span class="tok-kw">否则</span> {
@@ -945,12 +949,53 @@ cargo run -- build examples/portable_chest --deny-raw</code></pre></figure>
 
 <span class="tok-kw">对于</span> &lt;<span class="tok-ident">变量</span>&gt; <span class="tok-kw">在</span> &lt;<span class="tok-ident">起点</span>&gt;..&lt;<span class="tok-ident">终点</span>&gt; {
     ...
+}
+
+<span class="tok-kw">展开</span> <span class="tok-kw">对于</span> &lt;<span class="tok-ident">变量</span>&gt; <span class="tok-kw">在</span> &lt;<span class="tok-ident">起点</span>&gt;..&lt;<span class="tok-ident">终点</span>&gt; {
+    ...
 }</code></pre></figure>
 <p><code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code> 与 <code class="kw"><span class="kw-en">while</span><span class="kw-zh">当</span></code> 保持当前执行上下文，不引入新实体。简单条件可以直接生成原版 <code class="kw"><span class="kw-en">execute if/unless</span><span class="kw-zh">执行 如果/除非</span></code>；需要保存求值结果时，条件会生成 0/1 的临时计分项，再用 <code class="kw"><span class="kw-en">matches 1</span><span class="kw-zh">匹配 1</span></code> 或 <code class="kw"><span class="kw-en">matches 0</span><span class="kw-zh">匹配 0</span></code> 选择分支。带 <code class="kw"><span class="kw-en">else</span><span class="kw-zh">否则</span></code> 的条件只求值一次，执行真分支后不会重新判断条件。</p>
 <p><strong>编译期能确定的条件会被折叠</strong>：<code class="kw"><span class="kw-en">if 1 == 1</span><span class="kw-zh">如果 1 == 1</span></code> 直接把真分支展开进当前函数（不生成标志，也不分配辅助函数），<code class="kw"><span class="kw-en">if 2 &lt; 1</span><span class="kw-zh">如果 2 &lt; 1</span></code> 整段省略（<code class="kw"><span class="kw-en">else</span><span class="kw-zh">否则</span></code> 分支同理）；<code class="kw"><span class="kw-en">while 0 == 1</span><span class="kw-zh">当 0 == 1</span></code> 不生成任何循环命令。</p>
 <p>连续嵌套的 <code class="kw"><span class="kw-en">if</span><span class="kw-zh">如果</span></code> 会合并成同一条原版条件链，而不是嵌套 <code class="kw"><span class="kw-en">execute</span><span class="kw-zh">执行</span></code>：<code>if a &gt; 0 { if b &gt; 0 { ... } }</code> 生成 <code>execute if score a … if score b … run …</code>。同一条链里编译期已经成立的条件不会再判断一次，例如 <code>if a &amp;&amp; a</code>、<code>if x &gt; 10 { if x &gt; 5 { … } }</code> 里的第二个条件直接省略；<code>if x &gt; 10 { if x &lt; 5 { … } }</code> 这种矛盾组合整段不生成命令。前提是条件本身没有副作用：<code class="kw"><span class="kw-en">function(...)</span><span class="kw-zh">函数(...)</span></code>、<code class="kw"><span class="kw-en">predicate(...)</span><span class="kw-zh">谓词(...)</span></code> 这类可能重复产生效果的判断保留原来的求值路径。</p>
 <p><code>&amp;&amp;</code>、<code>||</code> 从左到右短路。右侧即使是恒假或恒真条件，也不会删除必须执行的左侧调用，例如 <code>side_effect() == 1 &amp;&amp; 0 == 1</code> 仍然执行一次 <code>side_effect()</code>，<code>side_effect() == 1 || 1 == 1</code> 同样先执行一次 <code>side_effect()</code>。<code>&amp;&amp;</code> 右侧是比较时不会为它单独分配标志计分项：<code>x == 1 &amp;&amp; charge(price()) == 1</code> 只在左侧成立时求值右侧，并把右侧的否定直接并进合并命令。</p>
 <p><code class="kw"><span class="kw-en">for</span><span class="kw-zh">对于</span></code> 是半开区间循环，起止都可以是表达式：常量终点直接生成 <code>matches ..&lt;终点-1&gt;</code> 比较，动态终点只求值一次并存入循环上限计分项；常量空区间（起点 ≥ 终点）不生成命令。循环变量是循环体内的局部计分项，兄弟循环可以复用同一个名字，但不能与参数、<code class="kw"><span class="kw-en">let</span><span class="kw-zh">令</span></code> 或全局计分变量重名。</p>
+<p><code class="kw"><span class="kw-en">unroll for</span><span class="kw-zh">展开 对于</span></code> 是<strong>编译期循环</strong>：起点与终点必须是编译期常量（可以引用外层 <code class="kw"><span class="kw-en">unroll for</span><span class="kw-zh">展开 对于</span></code> 的变量），循环体按迭代逐份展开进当前代码块，不生成循环假玩家、循环上限或辅助函数。循环变量在循环体内是编译期常量，能参与表达式和条件判断，所以 <code>if 槽位 == 3 { ... }</code> 会在展开时选定分支；它不能再被赋值，循环体里也不能用 <code class="kw"><span class="kw-en">let</span><span class="kw-zh">令</span></code>/<code class="kw"><span class="kw-en">for</span><span class="kw-zh">对于</span></code> 重新声明同名变量，也不能使用 <code class="kw"><span class="kw-en">break</span><span class="kw-zh">跳出</span></code>/<code class="kw"><span class="kw-en">continue</span><span class="kw-zh">跳过</span></code>。单个循环最多展开 4096 次，一个文件最多展开 65536 条语句。</p>
+<p>循环体应当<strong>用循环变量直接算出坐标</strong>（<code>pos(-4 + 槽位, 64, 0)</code>）：展开后每个迭代只剩自己的那几条命令，规模是 O(n)。不要在同一个 <code class="kw"><span class="kw-en">unroll for</span><span class="kw-zh">展开 对于</span></code> 里再写一遍同一索引的逐项守卫（例如 32 个 <code>if 槽位 == N</code>），那会让源码变成 O(n²)，而产物并不会更优；只有当索引来自运行期值（函数参数、计分项）时，才需要 <code>if 索引 == 值</code> 这样的运行期守卫，它的规模仍然是 O(n)。</p>
+<figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">编译期循环生成静态坐标</span><span class="code-actions"><span class="badge ok">编译器验证通过</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">compile_time_demo</span>;
+
+<span class="tok-kw">score</span> <span class="tok-ident">rows</span> = 0;
+
+<span class="tok-kw">fn</span> <span class="tok-fn">build</span>() {
+    <span class="tok-kw">unroll</span> <span class="tok-kw">for</span> <span class="tok-ident">slot</span> <span class="tok-kw">in</span> 1..9 {
+        <span class="tok-com">// 坐标分量由循环变量算出，展开后就是字面量。</span>
+        <span class="tok-kw">set_block</span>(<span class="tok-kw">pos</span>(-4 + (<span class="tok-ident">slot</span> - 1) % 4, 64 + 2 * ((<span class="tok-ident">slot</span> - 1) / 4), 0), <span class="tok-kw">block_state</span>(<span class="tok-str">&quot;minecraft:air&quot;</span>));
+        <span class="tok-kw">if</span> <span class="tok-ident">slot</span> % 4 == 1 {
+            <span class="tok-ident">rows</span> += 1;
+        }
+    }
+}
+
+<span class="tok-attr">@</span><span class="tok-attr">load</span>
+<span class="tok-kw">fn</span> <span class="tok-fn">load</span>() {
+    <span class="tok-fn">build</span>();
+}</code><code class="kw-zh"><span class="tok-kw">命名空间</span> <span class="tok-ident">compile_time_demo</span>;
+
+<span class="tok-kw">计分</span> <span class="tok-ident">rows</span> = 0;
+
+<span class="tok-kw">函数</span> <span class="tok-fn">build</span>() {
+    <span class="tok-kw">展开</span> <span class="tok-kw">对于</span> <span class="tok-ident">slot</span> <span class="tok-kw">在</span> 1..9 {
+        <span class="tok-com">// 坐标分量由循环变量算出，展开后就是字面量。</span>
+        <span class="tok-kw">设置方块</span>(<span class="tok-kw">坐标</span>(-4 + (<span class="tok-ident">slot</span> - 1) % 4, 64 + 2 * ((<span class="tok-ident">slot</span> - 1) / 4), 0), <span class="tok-kw">方块状态</span>(<span class="tok-str">&quot;minecraft:air&quot;</span>));
+        <span class="tok-kw">如果</span> <span class="tok-ident">slot</span> % 4 == 1 {
+            <span class="tok-ident">rows</span> += 1;
+        }
+    }
+}
+
+<span class="tok-attr">@</span><span class="tok-attr">加载</span>
+<span class="tok-kw">函数</span> <span class="tok-fn">load</span>() {
+    <span class="tok-fn">build</span>();
+}</code></pre></figure>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">&quot;for</span><span class="code-actions"><span class="badge ok">编译器验证通过</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">namespace</span> <span class="tok-ident">loops_demo</span>;
 
 <span class="tok-kw">score</span> <span class="tok-ident">total</span> = 0;
@@ -1752,7 +1797,7 @@ execute store success score @e[type=minecraft:player] execute_demo_cleared run e
 <figure class="code" data-lang="text"><figcaption><span class="code-title">&quot;--deny-raw</span><span class="code-actions"><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code>$ cargo run -- check raw_escape.mcl --deny-raw
 严格模式检查失败：项目包含 4 条底层语句或不安全宏（run/execute/return run/运行期 with/nbt 宏片段）</code></pre></figure>
 <h3 id="statements-world">世界与方块</h3>
-<p>世界命令的参数也由编译器检查：坐标范围、方块资源位置、方块属性字符、枚举值、时间单位与数值范围都在编译期验证。位置统一写成 <code class="kw"><span class="kw-en">pos(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span><span class="kw-zh">坐标(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span></code>（中文 <code class="kw"><span class="kw-en">pos(...)</span><span class="kw-zh">坐标(...)</span></code>，别名 <code class="kw"><span class="kw-en">block_pos(...)</span><span class="kw-zh">方块坐标(...)</span></code>）：分量可以是整数绝对坐标、<code>~[±偏移]</code> 相对坐标或 <code>^[±偏移]</code> 局部坐标；<code>^</code> 三个分量必须同时使用，不能与另外两种混用。绝对坐标的水平范围是 -30000000 到 29999999，垂直范围是 -2032 到 2031。</p>
+<p>世界命令的参数也由编译器检查：坐标范围、方块资源位置、方块属性字符、枚举值、时间单位与数值范围都在编译期验证。位置统一写成 <code class="kw"><span class="kw-en">pos(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span><span class="kw-zh">坐标(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span></code>（中文 <code class="kw"><span class="kw-en">pos(...)</span><span class="kw-zh">坐标(...)</span></code>，别名 <code class="kw"><span class="kw-en">block_pos(...)</span><span class="kw-zh">方块坐标(...)</span></code>）：分量可以是整数绝对坐标、<code>~[±偏移]</code> 相对坐标或 <code>^[±偏移]</code> 局部坐标；<code>^</code> 三个分量必须同时使用，不能与另外两种混用。绝对坐标的水平范围是 -30000000 到 29999999，垂直范围是 -2032 到 2031。绝对整数分量还可以写编译期常量表达式（例如 <code>pos(-4 + 槽位, 64, 0)</code>）：它在编译期折叠成整数文本，正好用来配合 <code class="kw"><span class="kw-en">unroll for</span><span class="kw-zh">展开 对于</span></code> 生成静态坐标表；<code>~</code>/<code>^</code> 与小数分量仍只接受字面量。</p>
 <p>需要小数坐标时写 <code class="kw"><span class="kw-en">vec3(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span><span class="kw-zh">精确坐标(&lt;x&gt;, &lt;y&gt;, &lt;z&gt;)</span></code>（精确坐标，如传送落点），水平两分量用 <code class="kw"><span class="kw-en">vec2(&lt;x&gt;, &lt;z&gt;)</span><span class="kw-zh">平面坐标(&lt;x&gt;, &lt;z&gt;)</span></code>（如 <code>worldborder.center</code> 的另一种写法）；两者的绝对分量允许小数，范围与方块坐标一致。<code class="kw"><span class="kw-en">vec2</span><span class="kw-zh">平面坐标</span></code> 不支持 <code>^</code>。</p>
 <p>方块写成 <code class="kw"><span class="kw-en">block_state(&quot;&lt;命名空间:方块&gt;&quot;) { &lt;属性&gt; = &quot;&lt;值&gt;&quot;; }</span><span class="kw-zh">方块状态(&quot;&lt;命名空间:方块&gt;&quot;) { &lt;属性&gt; = &quot;&lt;值&gt;&quot;; }</span></code>（中文 <code class="kw"><span class="kw-en">block_state(...)</span><span class="kw-zh">方块状态(...)</span></code>），属性块可省略；属性名只能是小写字母、数字与下划线，属性值只能是小写字母、数字与 <code>_ . + -</code>。对 26.3 内建方块，编译器依据随附的方块模型状态快照检查能从模型提取的属性和值；模型不含属性表的方块暂不做逐字段检查，模型中不可见的 <code>waterlogged</code> 暂按布尔值保守检查。自定义方块没有随附状态表，只做字符检查。<code class="kw"><span class="kw-en">block_state(&quot;#标签&quot;)</span><span class="kw-zh">方块状态(&quot;#标签&quot;)</span></code> 是方块谓词，只能用在 <code class="kw"><span class="kw-en">fill</span><span class="kw-zh">填充</span></code> 的替换过滤器与 <code class="kw"><span class="kw-en">clone</span><span class="kw-zh">复制</span></code> 的 <code class="kw"><span class="kw-en">filtered</span><span class="kw-zh">过滤</span></code> 选项里，也不能带属性。</p>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-title">语法</span><span class="code-actions"><span class="badge">片段</span><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">set_block</span>(&lt;<span class="tok-ident">位置</span>&gt;, &lt;<span class="tok-kw">block_state</span>&gt;[, <span class="tok-lit">destroy</span> | <span class="tok-lit">keep</span> | <span class="tok-kw">replace</span> | <span class="tok-lit">strict</span>][, <span class="tok-kw">nbt</span> { ... }]);
@@ -2023,7 +2068,7 @@ scoreboard players set #v_phase mcl_ade30ff2a2f0 1</code></pre></figure>
 <tr><td><code>time.query_gametime()</code></td><td>世界的游戏时间</td></tr>
 <tr><td><code class="kw"><span class="kw-en">gamerule.query(&quot;&lt;规则&gt;&quot;)</span><span class="kw-zh">游戏规则.查询(&quot;&lt;规则&gt;&quot;)</span></code></td><td>规则当前值</td></tr>
 <tr><td><code class="kw"><span class="kw-en">worldborder.get()</span><span class="kw-zh">世界边界.获取()</span></code></td><td>世界边界边长</td></tr>
-<tr><td><code class="kw"><span class="kw-en">count(&lt;query&gt;)</span><span class="kw-zh">数量(&lt;查询&gt;)</span></code></td><td>查询命中的实体数量（无命中为 0）</td></tr>
+<tr><td><code class="kw"><span class="kw-en">count(&lt;query&gt;)</span><span class="kw-zh">计数(&lt;查询&gt;)</span></code></td><td>查询命中的实体数量（无命中为 0）</td></tr>
 <tr><td><code class="kw"><span class="kw-en">random(&lt;最小值&gt;, &lt;最大值&gt;)</span><span class="kw-zh">随机(&lt;最小值&gt;, &lt;最大值&gt;)</span></code></td><td>闭区间随机整数，如 <code class="kw"><span class="kw-en">random(1, 6)</span><span class="kw-zh">随机(1, 6)</span></code></td></tr>
 <tr><td><code class="kw"><span class="kw-en">data.get(entity, &lt;持有者&gt;, &quot;&lt;路径&gt;&quot;[, &lt;缩放&gt;])</span><span class="kw-zh">数据操作.get(实体, &lt;持有者&gt;, &quot;&lt;路径&gt;&quot;[, &lt;缩放&gt;])</span></code> 等</td><td>读取 NBT 数值，可选双精度缩放；实体查询要求 <code class="kw"><span class="kw-en">limit(1)</span><span class="kw-zh">上限(1)</span></code>，另有 <code class="kw"><span class="kw-en">block</span><span class="kw-zh">方块</span></code>、<code class="kw"><span class="kw-en">storage</span><span class="kw-zh">存储</span></code> 来源</td></tr>
 <tr><td><code>compute(&lt;来源&gt;, float, &quot;&lt;provider&gt;&quot;[, &lt;缩放&gt;])</code></td><td>按上下文浮点 provider 计算数值，可选单精度缩放（包括 0）</td></tr>
@@ -2788,7 +2833,7 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <h2 id="appendix-keywords">附录 A：语言关键词总表</h2>
 <p>关键词、函数属性与方法/枚举的中英写法完全等价；构造器关键词（<code class="kw"><span class="kw-en">pos</span><span class="kw-zh">坐标</span></code>、<code class="kw"><span class="kw-en">block_state</span><span class="kw-zh">方块状态</span></code>、<code class="kw"><span class="kw-en">entity</span><span class="kw-zh">实体</span></code> 等）与声明名保持 ASCII。</p>
 <div class="filter-bar" data-filter-root="keywords"><input type="search" class="table-filter" placeholder="过滤关键词：输入英文、中文或用途" aria-label="过滤关键词：输入英文、中文或用途"><span class="filter-count"></span></div>
-<h4>语言关键词 <small>KEYWORDS · 133 项</small></h4>
+<h4>语言关键词 <small>KEYWORDS · 134 项</small></h4>
 <div class="table-wrap"><table class="alias-table"><thead><tr><th>English</th><th>中文</th><th>说明</th></tr></thead><tbody><tr><td><code>with</code></td><td><code>用</code></td><td></td></tr>
 <tr><td><code>macro</code></td><td><code>宏</code></td><td></td></tr>
 <tr><td><code>item_predicate</code></td><td><code>物品谓词</code></td><td></td></tr>
@@ -2849,6 +2894,7 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <tr><td><code>bossbar</code></td><td><code>Boss栏</code></td><td>Boss 栏操作：<code>bossbar.add/set.*/remove/list</code>；<code>bossbar.get(&quot;id&quot;, value|max|visible|players)</code> 返回整数。</td></tr>
 <tr><td><code>else</code></td><td><code>否则</code></td><td>条件分支的否定分支。</td></tr>
 <tr><td><code>while</code></td><td><code>当</code></td><td>条件循环。</td></tr>
+<tr><td><code>unroll</code></td><td><code>展开</code></td><td><code>unroll for 变量 in 起点..终点 { ... }</code>：编译期循环。边界必须是常量，循环体按迭代逐份展开，变量在循环体内是编译期常量，可用于坐标与条件。</td></tr>
 <tr><td><code>for</code></td><td><code>对于</code></td><td><code>for 变量 in 起点..终点 { ... }</code>：半开区间循环，变量是循环体内的局部计分项。</td></tr>
 <tr><td><code>in</code></td><td><code>在</code></td><td>for 区间的连接词：<code>for index in 0..10</code>。</td></tr>
 <tr><td><code>break</code></td><td><code>跳出</code></td><td>跳出最近一层 for/while 循环。</td></tr>
@@ -3609,9 +3655,9 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <footer>
   <div class="wrap">
     <p>本手册由 <code>docs/tools/build.mjs</code> 依据编译器源码与真实编译结果生成：
-    关键词与别名表取自 <code>src/parser/keywords.rs</code>，共 133 个语言关键词、
+    关键词与别名表取自 <code>src/parser/keywords.rs</code>，共 134 个语言关键词、
     5 个函数属性、64 组别名表。</p>
-    <p>全部 15 个标注“编译器验证通过”的完整示例（<code>hello</code>、<code>mixed_language</code>、<code>chinese_identifiers</code>、<code>nbt_tags</code>、<code>advancement_demo</code>、<code>loops</code>、<code>execute_structured</code>、<code>scoreboard_state</code>、<code>entity_nbt_demo</code>、<code>raw_escape</code>、<code>tour_world</code>、<code>tour_core</code>、<code>tour_entities</code>、<code>item_predicates</code>、<code>function_macros</code>）都分别用英文与中文关键词
+    <p>全部 16 个标注“编译器验证通过”的完整示例（<code>hello</code>、<code>mixed_language</code>、<code>chinese_identifiers</code>、<code>nbt_tags</code>、<code>advancement_demo</code>、<code>compile_time_loops</code>、<code>loops</code>、<code>execute_structured</code>、<code>scoreboard_state</code>、<code>entity_nbt_demo</code>、<code>raw_escape</code>、<code>tour_world</code>、<code>tour_core</code>、<code>tour_entities</code>、<code>item_predicates</code>、<code>function_macros</code>）都分别用英文与中文关键词
     编译过，两种写法的数据包逐字节一致；仓库 <code>examples/</code> 示例的往返验证可用
     <code>bun docs/tools/build.mjs --self-test</code> 复现。</p>
     <p>目标版本：Minecraft Java Edition 26.3，数据包格式 121.0。手册随 <code>mclang 0.5.0</code> 生成。</p>

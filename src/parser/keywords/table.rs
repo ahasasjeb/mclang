@@ -247,6 +247,10 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
         chinese: "当",
     },
     Keyword {
+        english: "unroll",
+        chinese: "展开",
+    },
+    Keyword {
         english: "for",
         chinese: "对于",
     },

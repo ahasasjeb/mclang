@@ -95,7 +95,16 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
         &declarations.reachable_tag_functions,
         &mut diagnostics,
     );
+    deduplicate(diagnostics)
+}
+
+/// 编译期循环会把同一处源码展开多次，同一位置、同一消息的诊断只保留一次。
+fn deduplicate(diagnostics: Vec<Diagnostic>) -> Vec<Diagnostic> {
+    let mut seen = HashSet::new();
     diagnostics
+        .into_iter()
+        .filter(|diagnostic| seen.insert((diagnostic.span, diagnostic.message.clone())))
+        .collect()
 }
 
 /// 顶层声明收集出的符号表，供函数体校验共享。

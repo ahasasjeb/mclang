@@ -9,8 +9,8 @@ use crate::ast::{
     BinaryOp, CallTarget, ComputeKind, ComputeSource, Condition, DataSource, Expr, ExprKind,
     Holder, ItemConditionSource, Span,
 };
-use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, Signature};
+use crate::constant::constant_value;
 use crate::diagnostic::Diagnostic;
 
 use super::statements::ValidationContext;

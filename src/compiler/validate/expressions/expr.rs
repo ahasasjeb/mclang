@@ -205,7 +205,7 @@ pub(in crate::compiler::validate) fn validate_expr(
                 diagnostics.push(Diagnostic::new("不能除以零", right.span));
             } else if let (Some(left), Some(right)) = (constant_value(left), constant_value(right))
             {
-                let result = crate::compiler::constant::constant_binary(left, *operation, right);
+                let result = crate::constant::constant_binary(left, *operation, right);
                 if result.is_none() {
                     diagnostics.push(Diagnostic::new(
                         "常量整数运算结果超出 i32 范围",

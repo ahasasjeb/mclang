@@ -7,3 +7,6 @@ mod scoreboard;
 mod scoreboard_commands;
 mod self_actions;
 mod ui;
+mod unroll;
+
+pub(in crate::parser) use unroll::EXPANSION_BUDGET;

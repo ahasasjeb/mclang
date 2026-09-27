@@ -5,11 +5,11 @@
 //! 1. [`validate`] 只读地检查整程序，要么返回全部诊断，要么返回空列表；
 //! 2. [`codegen`] 只处理已经通过检查的程序，不重复报告错误。
 //!
-//! 两个阶段共享本模块下的 [`types`] 和 [`constant`]，其余实现细节分别封装在
-//! `validate` 与 `codegen` 子模块中。
+//! 两个阶段共享本模块下的 [`types`]，常量折叠则来自 crate 级的
+//! [`crate::constant`]，其余实现细节分别封装在 `validate` 与 `codegen`
+//! 子模块中。
 
 mod codegen;
-mod constant;
 mod rename;
 mod types;
 mod validate;

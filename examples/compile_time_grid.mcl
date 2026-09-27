@@ -1,0 +1,38 @@
+// 编译期循环示例：`unroll for` 按索引展开，坐标由编译期常量算出。
+//
+// 验证：
+//   cargo run --bin mclang -- build examples/compile_time_grid.mcl --deny-raw
+// 重点检查：
+//   build/compile_time_grid/data/compile_time_grid/function/build_platform.mcfunction
+//   32 条 setblock 都是字面量坐标，没有循环假玩家、循环上限或辅助函数；
+//   build_columns.mcfunction 里 `if` 守卫已在展开时选定分支。
+namespace compile_time_grid;
+
+score rows = 0;
+
+@load
+fn load() {
+    build_platform();
+    build_columns();
+    rows = 4;
+}
+
+// 32 个槽位排成 8×4：索引在循环体内是编译期常量，坐标直接算出。
+fn build_platform() {
+    unroll for slot in 1..33 {
+        set_block(pos(-4 + (slot - 1) % 8, 64 + 2 * ((slot - 1) / 8), 0), block_state("minecraft:smooth_stone"));
+    }
+    fill(pos(0 - 4, 63, -1), pos(1 + 3, 63, 1), block_state("minecraft:stone_bricks"));
+}
+
+// 嵌套编译期循环：内层边界引用外层变量，常量守卫在展开时选定分支。
+fn build_columns() {
+    unroll for row in 0..3 {
+        unroll for height in 0..(row + 1) {
+            set_block(pos(row, 65 + height, 2), block_state("minecraft:oak_log"));
+            if height == row {
+                set_block(pos(row, 66 + height, 2), block_state("minecraft:torch"));
+            }
+        }
+    }
+}

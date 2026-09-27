@@ -1,0 +1,8 @@
+// expect: 编译期循环不能使用 break
+namespace bad;
+
+fn f() {
+    unroll for index in 0..3 {
+        break;
+    }
+}

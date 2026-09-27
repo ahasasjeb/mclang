@@ -1,7 +1,7 @@
 use crate::ast::*;
 
 use crate::compiler::codegen::Compiler;
-use crate::compiler::constant::constant_value;
+use crate::constant::constant_value;
 
 impl Compiler<'_> {
     /// Keep a helper boundary for multi-command blocks and commands whose

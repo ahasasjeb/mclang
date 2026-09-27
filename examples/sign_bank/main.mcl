@@ -259,38 +259,12 @@ fn copy_account_input() {
 
 fn prepare_credential(slot) {
     reset_stages();
-    if slot == 1 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 74, -7), "front_text.messages[0]")); }
-    if slot == 2 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 74, -7), "front_text.messages[0]")); }
-    if slot == 3 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 74, -7), "front_text.messages[0]")); }
-    if slot == 4 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 74, -7), "front_text.messages[0]")); }
-    if slot == 5 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 74, -7), "front_text.messages[0]")); }
-    if slot == 6 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 74, -7), "front_text.messages[0]")); }
-    if slot == 7 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 74, -7), "front_text.messages[0]")); }
-    if slot == 8 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 74, -7), "front_text.messages[0]")); }
-    if slot == 9 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 76, -7), "front_text.messages[0]")); }
-    if slot == 10 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 76, -7), "front_text.messages[0]")); }
-    if slot == 11 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 76, -7), "front_text.messages[0]")); }
-    if slot == 12 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 76, -7), "front_text.messages[0]")); }
-    if slot == 13 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 76, -7), "front_text.messages[0]")); }
-    if slot == 14 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 76, -7), "front_text.messages[0]")); }
-    if slot == 15 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 76, -7), "front_text.messages[0]")); }
-    if slot == 16 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 76, -7), "front_text.messages[0]")); }
-    if slot == 17 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 78, -7), "front_text.messages[0]")); }
-    if slot == 18 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 78, -7), "front_text.messages[0]")); }
-    if slot == 19 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 78, -7), "front_text.messages[0]")); }
-    if slot == 20 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 78, -7), "front_text.messages[0]")); }
-    if slot == 21 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 78, -7), "front_text.messages[0]")); }
-    if slot == 22 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 78, -7), "front_text.messages[0]")); }
-    if slot == 23 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 78, -7), "front_text.messages[0]")); }
-    if slot == 24 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 78, -7), "front_text.messages[0]")); }
-    if slot == 25 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4, 80, -7), "front_text.messages[0]")); }
-    if slot == 26 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-3, 80, -7), "front_text.messages[0]")); }
-    if slot == 27 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-2, 80, -7), "front_text.messages[0]")); }
-    if slot == 28 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-1, 80, -7), "front_text.messages[0]")); }
-    if slot == 29 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 80, -7), "front_text.messages[0]")); }
-    if slot == 30 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(1, 80, -7), "front_text.messages[0]")); }
-    if slot == 31 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(2, 80, -7), "front_text.messages[0]")); }
-    if slot == 32 { data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(3, 80, -7), "front_text.messages[0]")); }
+    // 编译期循环：源坐标由索引算出，只保留一条运行期守卫。
+    unroll for index in 1..33 {
+        if index == slot {
+            data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), "front_text.messages[0]"));
+        }
+    }
     data.modify(block, pos(5, 66, -7), "front_text.messages[1]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
     data.modify(block, pos(7, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
 }
@@ -474,418 +448,74 @@ export @player fn register_password() {
 
 fn find_account() -> score {
     let found = 0;
-    if found == 0 && block(pos(-4, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 74, -7)) { found = 1; }
-    if found == 0 && block(pos(-3, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 74, -7)) { found = 2; }
-    if found == 0 && block(pos(-2, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 74, -7)) { found = 3; }
-    if found == 0 && block(pos(-1, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 74, -7)) { found = 4; }
-    if found == 0 && block(pos(0, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 74, -7)) { found = 5; }
-    if found == 0 && block(pos(1, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 74, -7)) { found = 6; }
-    if found == 0 && block(pos(2, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 74, -7)) { found = 7; }
-    if found == 0 && block(pos(3, 66, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 74, -7)) { found = 8; }
-    if found == 0 && block(pos(-4, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 76, -7)) { found = 9; }
-    if found == 0 && block(pos(-3, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 76, -7)) { found = 10; }
-    if found == 0 && block(pos(-2, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 76, -7)) { found = 11; }
-    if found == 0 && block(pos(-1, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 76, -7)) { found = 12; }
-    if found == 0 && block(pos(0, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 76, -7)) { found = 13; }
-    if found == 0 && block(pos(1, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 76, -7)) { found = 14; }
-    if found == 0 && block(pos(2, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 76, -7)) { found = 15; }
-    if found == 0 && block(pos(3, 68, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 76, -7)) { found = 16; }
-    if found == 0 && block(pos(-4, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 78, -7)) { found = 17; }
-    if found == 0 && block(pos(-3, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 78, -7)) { found = 18; }
-    if found == 0 && block(pos(-2, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 78, -7)) { found = 19; }
-    if found == 0 && block(pos(-1, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 78, -7)) { found = 20; }
-    if found == 0 && block(pos(0, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 78, -7)) { found = 21; }
-    if found == 0 && block(pos(1, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 78, -7)) { found = 22; }
-    if found == 0 && block(pos(2, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 78, -7)) { found = 23; }
-    if found == 0 && block(pos(3, 70, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 78, -7)) { found = 24; }
-    if found == 0 && block(pos(-4, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 80, -7)) { found = 25; }
-    if found == 0 && block(pos(-3, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 80, -7)) { found = 26; }
-    if found == 0 && block(pos(-2, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 80, -7)) { found = 27; }
-    if found == 0 && block(pos(-1, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 80, -7)) { found = 28; }
-    if found == 0 && block(pos(0, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 80, -7)) { found = 29; }
-    if found == 0 && block(pos(1, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 80, -7)) { found = 30; }
-    if found == 0 && block(pos(2, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 80, -7)) { found = 31; }
-    if found == 0 && block(pos(3, 72, -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 80, -7)) { found = 32; }
+    unroll for index in 1..33 {
+        if found == 0 && block(pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7)) {
+            found = index;
+        }
+    }
     return found;
 }
 
 fn credential_matches(slot) -> score {
     let matched = 0;
-    if slot == 1 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 66, -7)) { matched = 1; }
-    if slot == 2 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 66, -7)) { matched = 1; }
-    if slot == 3 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 66, -7)) { matched = 1; }
-    if slot == 4 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 66, -7)) { matched = 1; }
-    if slot == 5 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 66, -7)) { matched = 1; }
-    if slot == 6 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 66, -7)) { matched = 1; }
-    if slot == 7 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 66, -7)) { matched = 1; }
-    if slot == 8 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 66, -7)) { matched = 1; }
-    if slot == 9 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 68, -7)) { matched = 1; }
-    if slot == 10 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 68, -7)) { matched = 1; }
-    if slot == 11 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 68, -7)) { matched = 1; }
-    if slot == 12 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 68, -7)) { matched = 1; }
-    if slot == 13 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 68, -7)) { matched = 1; }
-    if slot == 14 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 68, -7)) { matched = 1; }
-    if slot == 15 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 68, -7)) { matched = 1; }
-    if slot == 16 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 68, -7)) { matched = 1; }
-    if slot == 17 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 70, -7)) { matched = 1; }
-    if slot == 18 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 70, -7)) { matched = 1; }
-    if slot == 19 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 70, -7)) { matched = 1; }
-    if slot == 20 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 70, -7)) { matched = 1; }
-    if slot == 21 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 70, -7)) { matched = 1; }
-    if slot == 22 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 70, -7)) { matched = 1; }
-    if slot == 23 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 70, -7)) { matched = 1; }
-    if slot == 24 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 70, -7)) { matched = 1; }
-    if slot == 25 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 72, -7)) { matched = 1; }
-    if slot == 26 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 72, -7)) { matched = 1; }
-    if slot == 27 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 72, -7)) { matched = 1; }
-    if slot == 28 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 72, -7)) { matched = 1; }
-    if slot == 29 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(0, 72, -7)) { matched = 1; }
-    if slot == 30 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(1, 72, -7)) { matched = 1; }
-    if slot == 31 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(2, 72, -7)) { matched = 1; }
-    if slot == 32 && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(3, 72, -7)) { matched = 1; }
+    unroll for index in 1..33 {
+        if index == slot && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7)) {
+            matched = 1;
+        }
+    }
     return matched;
 }
 
 fn account_exists() -> score {
     let found = 0;
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 74, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 76, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 78, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 80, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 80, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 80, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 80, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(0, 80, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(1, 80, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(2, 80, -7)) { found = 1; }
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(3, 80, -7)) { found = 1; }
+    unroll for index in 1..33 {
+        if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7)) {
+            found = 1;
+        }
+    }
     return found;
 }
 
 fn first_free_slot() -> score {
     let slot = 0;
-    if slot == 0 && !block(pos(-4, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 1; }
-    if slot == 0 && !block(pos(-3, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 2; }
-    if slot == 0 && !block(pos(-2, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 3; }
-    if slot == 0 && !block(pos(-1, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 4; }
-    if slot == 0 && !block(pos(0, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 5; }
-    if slot == 0 && !block(pos(1, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 6; }
-    if slot == 0 && !block(pos(2, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 7; }
-    if slot == 0 && !block(pos(3, 74, -7), block_state("minecraft:oak_wall_sign")) { slot = 8; }
-    if slot == 0 && !block(pos(-4, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 9; }
-    if slot == 0 && !block(pos(-3, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 10; }
-    if slot == 0 && !block(pos(-2, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 11; }
-    if slot == 0 && !block(pos(-1, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 12; }
-    if slot == 0 && !block(pos(0, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 13; }
-    if slot == 0 && !block(pos(1, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 14; }
-    if slot == 0 && !block(pos(2, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 15; }
-    if slot == 0 && !block(pos(3, 76, -7), block_state("minecraft:oak_wall_sign")) { slot = 16; }
-    if slot == 0 && !block(pos(-4, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 17; }
-    if slot == 0 && !block(pos(-3, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 18; }
-    if slot == 0 && !block(pos(-2, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 19; }
-    if slot == 0 && !block(pos(-1, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 20; }
-    if slot == 0 && !block(pos(0, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 21; }
-    if slot == 0 && !block(pos(1, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 22; }
-    if slot == 0 && !block(pos(2, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 23; }
-    if slot == 0 && !block(pos(3, 78, -7), block_state("minecraft:oak_wall_sign")) { slot = 24; }
-    if slot == 0 && !block(pos(-4, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 25; }
-    if slot == 0 && !block(pos(-3, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 26; }
-    if slot == 0 && !block(pos(-2, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 27; }
-    if slot == 0 && !block(pos(-1, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 28; }
-    if slot == 0 && !block(pos(0, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 29; }
-    if slot == 0 && !block(pos(1, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 30; }
-    if slot == 0 && !block(pos(2, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 31; }
-    if slot == 0 && !block(pos(3, 80, -7), block_state("minecraft:oak_wall_sign")) { slot = 32; }
+    unroll for index in 1..33 {
+        if slot == 0 && !block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
+            slot = index;
+        }
+    }
     return slot;
 }
 
 fn reserve_account(slot) {
-    if slot == 1 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 74, -7), force); }
-    if slot == 2 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 74, -7), force); }
-    if slot == 3 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 74, -7), force); }
-    if slot == 4 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 74, -7), force); }
-    if slot == 5 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 74, -7), force); }
-    if slot == 6 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 74, -7), force); }
-    if slot == 7 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 74, -7), force); }
-    if slot == 8 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 74, -7), force); }
-    if slot == 9 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 76, -7), force); }
-    if slot == 10 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 76, -7), force); }
-    if slot == 11 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 76, -7), force); }
-    if slot == 12 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 76, -7), force); }
-    if slot == 13 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 76, -7), force); }
-    if slot == 14 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 76, -7), force); }
-    if slot == 15 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 76, -7), force); }
-    if slot == 16 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 76, -7), force); }
-    if slot == 17 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 78, -7), force); }
-    if slot == 18 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 78, -7), force); }
-    if slot == 19 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 78, -7), force); }
-    if slot == 20 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 78, -7), force); }
-    if slot == 21 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 78, -7), force); }
-    if slot == 22 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 78, -7), force); }
-    if slot == 23 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 78, -7), force); }
-    if slot == 24 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 78, -7), force); }
-    if slot == 25 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4, 80, -7), force); }
-    if slot == 26 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-3, 80, -7), force); }
-    if slot == 27 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-2, 80, -7), force); }
-    if slot == 28 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(-1, 80, -7), force); }
-    if slot == 29 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(0, 80, -7), force); }
-    if slot == 30 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(1, 80, -7), force); }
-    if slot == 31 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(2, 80, -7), force); }
-    if slot == 32 { clone(pos(6, 66, -7), pos(6, 66, -7), pos(3, 80, -7), force); }
+    unroll for index in 1..33 {
+        if index == slot {
+            clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), force);
+        }
+    }
 }
 
 fn store_credential(slot) {
-    if slot == 1 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 66, -7), force); }
-    if slot == 2 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 66, -7), force); }
-    if slot == 3 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 66, -7), force); }
-    if slot == 4 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 66, -7), force); }
-    if slot == 5 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 66, -7), force); }
-    if slot == 6 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 66, -7), force); }
-    if slot == 7 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 66, -7), force); }
-    if slot == 8 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 66, -7), force); }
-    if slot == 9 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 68, -7), force); }
-    if slot == 10 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 68, -7), force); }
-    if slot == 11 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 68, -7), force); }
-    if slot == 12 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 68, -7), force); }
-    if slot == 13 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 68, -7), force); }
-    if slot == 14 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 68, -7), force); }
-    if slot == 15 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 68, -7), force); }
-    if slot == 16 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 68, -7), force); }
-    if slot == 17 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 70, -7), force); }
-    if slot == 18 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 70, -7), force); }
-    if slot == 19 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 70, -7), force); }
-    if slot == 20 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 70, -7), force); }
-    if slot == 21 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 70, -7), force); }
-    if slot == 22 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 70, -7), force); }
-    if slot == 23 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 70, -7), force); }
-    if slot == 24 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 70, -7), force); }
-    if slot == 25 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4, 72, -7), force); }
-    if slot == 26 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-3, 72, -7), force); }
-    if slot == 27 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-2, 72, -7), force); }
-    if slot == 28 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(-1, 72, -7), force); }
-    if slot == 29 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(0, 72, -7), force); }
-    if slot == 30 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(1, 72, -7), force); }
-    if slot == 31 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(2, 72, -7), force); }
-    if slot == 32 { clone(pos(5, 66, -7), pos(5, 66, -7), pos(3, 72, -7), force); }
+    unroll for index in 1..33 {
+        if index == slot {
+            clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), force);
+        }
+    }
 }
 
 fn release_reservation(slot) {
-    if slot == 1 && !block(pos(-4, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-4, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 2 && !block(pos(-3, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-3, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 3 && !block(pos(-2, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-2, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 4 && !block(pos(-1, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-1, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 5 && !block(pos(0, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(0, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 6 && !block(pos(1, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(1, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 7 && !block(pos(2, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(2, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 8 && !block(pos(3, 66, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(3, 74, -7), block_state("minecraft:air"));
-    }
-    if slot == 9 && !block(pos(-4, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-4, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 10 && !block(pos(-3, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-3, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 11 && !block(pos(-2, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-2, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 12 && !block(pos(-1, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-1, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 13 && !block(pos(0, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(0, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 14 && !block(pos(1, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(1, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 15 && !block(pos(2, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(2, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 16 && !block(pos(3, 68, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(3, 76, -7), block_state("minecraft:air"));
-    }
-    if slot == 17 && !block(pos(-4, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-4, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 18 && !block(pos(-3, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-3, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 19 && !block(pos(-2, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-2, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 20 && !block(pos(-1, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-1, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 21 && !block(pos(0, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(0, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 22 && !block(pos(1, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(1, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 23 && !block(pos(2, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(2, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 24 && !block(pos(3, 70, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(3, 78, -7), block_state("minecraft:air"));
-    }
-    if slot == 25 && !block(pos(-4, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-4, 80, -7), block_state("minecraft:air"));
-    }
-    if slot == 26 && !block(pos(-3, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-3, 80, -7), block_state("minecraft:air"));
-    }
-    if slot == 27 && !block(pos(-2, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-2, 80, -7), block_state("minecraft:air"));
-    }
-    if slot == 28 && !block(pos(-1, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(-1, 80, -7), block_state("minecraft:air"));
-    }
-    if slot == 29 && !block(pos(0, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(0, 80, -7), block_state("minecraft:air"));
-    }
-    if slot == 30 && !block(pos(1, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(1, 80, -7), block_state("minecraft:air"));
-    }
-    if slot == 31 && !block(pos(2, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(2, 80, -7), block_state("minecraft:air"));
-    }
-    if slot == 32 && !block(pos(3, 72, -7), block_state("minecraft:oak_wall_sign")) {
-        set_block(pos(3, 80, -7), block_state("minecraft:air"));
+    unroll for index in 1..33 {
+        if index == slot && !block(pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
+            set_block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:air"));
+        }
     }
 }
 
 fn cleanup_orphan_reservations() {
     if count(pending_registrations) == 0 {
-        if block(pos(-4, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-4, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-3, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-3, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-2, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-2, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-1, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-1, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(0, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(0, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(1, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(1, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(2, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(2, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(3, 74, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 66, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(3, 74, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-4, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-4, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-3, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-3, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-2, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-2, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-1, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-1, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(0, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(0, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(1, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(1, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(2, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(2, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(3, 76, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 68, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(3, 76, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-4, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-4, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-3, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-3, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-2, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-2, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-1, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-1, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(0, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(0, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(1, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(1, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(2, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(2, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(3, 78, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 70, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(3, 78, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-4, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-4, 80, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-3, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-3, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-3, 80, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-2, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-2, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-2, 80, -7), block_state("minecraft:air"));
-        }
-        if block(pos(-1, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-1, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-1, 80, -7), block_state("minecraft:air"));
-        }
-        if block(pos(0, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(0, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(0, 80, -7), block_state("minecraft:air"));
-        }
-        if block(pos(1, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(1, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(1, 80, -7), block_state("minecraft:air"));
-        }
-        if block(pos(2, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(2, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(2, 80, -7), block_state("minecraft:air"));
-        }
-        if block(pos(3, 80, -7), block_state("minecraft:oak_wall_sign")) && !block(pos(3, 72, -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(3, 80, -7), block_state("minecraft:air"));
+        unroll for index in 1..33 {
+            if block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
+                set_block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:air"));
+            }
         }
     }
 }

@@ -9,7 +9,7 @@ use super::Compiler;
 use super::Value;
 use super::emit::{entity_query_clause, entity_query_selector};
 use super::names::user_objective_name;
-use crate::compiler::constant::constant_value;
+use crate::constant::constant_value;
 
 impl Compiler<'_> {
     /// Write a result into its final slot when the expression can be lowered

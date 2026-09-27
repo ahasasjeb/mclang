@@ -45,8 +45,19 @@ impl Parser {
         } else {
             false
         };
+        // 编译期循环变量不能与参数同名，这里登记当前函数的全部参数。
+        self.function_parameters = parameters
+            .iter()
+            .map(|parameter| parameter.name.clone())
+            .chain(
+                macro_parameters
+                    .iter()
+                    .map(|parameter| parameter.name.clone()),
+            )
+            .collect();
         let body_start = self.cursor;
         let (body, end) = self.block()?;
+        self.function_parameters.clear();
         let macro_signature = if is_macro {
             for token in &self.tokens[body_start..self.cursor] {
                 if let TokenKind::String(text) = &token.kind {

@@ -17,8 +17,8 @@ use crate::ast::{
     ScoreTarget, SelfAction, Span, Statement, StatementKind, TeleportDestination, TextComponent,
     XpOperation,
 };
-use crate::compiler::constant::constant_value;
 use crate::compiler::types::{ExecutionContext, ReturnRules, StatementSymbols};
+use crate::constant::constant_value;
 use crate::diagnostic::Diagnostic;
 
 use super::expressions::{

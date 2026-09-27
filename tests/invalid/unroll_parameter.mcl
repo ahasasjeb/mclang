@@ -1,0 +1,8 @@
+// expect: 编译期循环变量 `index` 与函数参数同名
+namespace bad;
+
+fn f(index) {
+    unroll for index in 0..3 {
+        set_block(pos(index, 64, 0), block_state("minecraft:air"));
+    }
+}

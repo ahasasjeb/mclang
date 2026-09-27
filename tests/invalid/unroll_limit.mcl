@@ -1,0 +1,8 @@
+// expect: 编译期循环展开次数过多
+namespace bad;
+
+fn f() {
+    unroll for index in 0..5000 {
+        set_block(pos(0, 64, 0), block_state("minecraft:air"));
+    }
+}

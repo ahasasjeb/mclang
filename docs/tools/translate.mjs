@@ -105,6 +105,10 @@ const CALL_FAMILIES = ["execute_clause"];
 const COMMAND_RECEIVERS = new Set(["tag", "attribute", "ride", "rotate", "team", "waypoint", "datapack", "recipe", "loot", "random", "title", "bossbar", "dialog", "posteffect"]);
 const COMMAND_CALLS = new Set(["kill", "enchant", "damage", "spreadplayers", "spectate", "swing", "trigger", "gamemode", "defaultgamemode", "difficulty", "spawnpoint", "setworldspawn", "list", "reload", "teleport", "has", "equals", "matches", "particle", "stopsound", "msg", "teammsg"]);
 
+/** 表达式内建函数 `count(查询)`、`compute(...)`：关键词表优先于同名的声明属性
+ * （`count` 在物品属性里是“数量”，在表达式里是“计数”）。 */
+const EXPRESSION_CALLS = new Set(["count", "compute"]);
+
 /** 调用实参里允许出现的枚举值表，键是规范化的“接收者.方法”或裸函数名。 */
 const CALL_VALUE_CONTEXTS = {
   sort: ["entity_sort"],
@@ -325,7 +329,7 @@ export function buildTranslator(data) {
     // 函数调用位置：声明属性与 execute 子句都写在这。
     if (next?.text === "(") {
       const canonical = canonicalWord(word);
-      if (COMMAND_CALLS.has(canonical) || COMMAND_RECEIVERS.has(canonical)) {
+      if (COMMAND_CALLS.has(canonical) || COMMAND_RECEIVERS.has(canonical) || EXPRESSION_CALLS.has(canonical)) {
         const rewritten = lookupKeywords(word, target) ?? rewrite(word, "command_value", target) ?? rewrite(word, "ui_value", target);
         if (rewritten) return rewritten;
       }

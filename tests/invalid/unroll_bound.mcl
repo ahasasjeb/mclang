@@ -1,0 +1,10 @@
+// expect: 编译期循环的终点必须是编译期常量
+namespace bad;
+
+score bound = 1;
+
+fn f() {
+    unroll for index in 0..bound {
+        set_block(pos(0, 64, 0), block_state("minecraft:air"));
+    }
+}

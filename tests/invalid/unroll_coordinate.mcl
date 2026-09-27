@@ -1,0 +1,10 @@
+// expect: 坐标分量必须是编译期常量
+namespace bad;
+
+fn f() {
+    unroll for row in 0..2 {
+        for column_index in 0..3 {
+            set_block(pos(row + column_index, 64, 0), block_state("minecraft:air"));
+        }
+    }
+}

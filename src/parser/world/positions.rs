@@ -1,4 +1,5 @@
 use crate::ast::*;
+use crate::constant::{ConstantBlocker, compile_time_constant};
 use crate::diagnostic::Diagnostic;
 use crate::lexer::{Token, TokenKind};
 
@@ -173,6 +174,9 @@ impl Parser {
             let offset = self.coordinate_offset(label, &token)?;
             return Ok(Coordinate::Local(format!("^{offset}")));
         }
+        if !self.literal_coordinate_ahead() {
+            return self.constant_coordinate(label);
+        }
         let negative = self.negative_sign();
         let token = self.advance().clone();
         let text = match token.kind {
@@ -241,7 +245,69 @@ impl Parser {
         Ok(Some(self.block_position("位置参数")?))
     }
 
-    /// 一个坐标分量：绝对整数、`~[±数]` 或 `^[±数]`。
+    /// 下一个分量是否写成字面量（可选符号 + 整数/小数）。
+    ///
+    /// 字面量后紧跟算术运算符时按表达式处理，让 `pos(1 + 2, ...)` 也走常量折叠；
+    /// 其余字面量保持既有文本输出，中英两种写法仍逐字节一致。
+    fn literal_coordinate_ahead(&self) -> bool {
+        let mut offset = 0;
+        if matches!(
+            self.peek_kind(offset).kind,
+            TokenKind::Plus | TokenKind::Minus
+        ) {
+            offset += 1;
+        }
+        if !matches!(
+            self.peek_kind(offset).kind,
+            TokenKind::Number(_) | TokenKind::Decimal(_)
+        ) {
+            return false;
+        }
+        !matches!(
+            self.peek_kind(offset + 1).kind,
+            TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::Star
+                | TokenKind::Slash
+                | TokenKind::Percent
+        )
+    }
+
+    /// 接下来的分量是否是带符号的小数字面量；用于表达式路径的诊断提示。
+    fn decimal_coordinate_ahead(&self) -> bool {
+        let mut offset = 0;
+        if matches!(
+            self.peek_kind(offset).kind,
+            TokenKind::Plus | TokenKind::Minus
+        ) {
+            offset += 1;
+        }
+        matches!(self.peek_kind(offset).kind, TokenKind::Decimal(_))
+    }
+
+    /// 编译期常量坐标分量：折叠成整数文本，交给既有的范围检查与命令输出。
+    fn constant_coordinate(&mut self, label: &str) -> Result<Coordinate, Diagnostic> {
+        if self.decimal_coordinate_ahead() {
+            return Err(Diagnostic::new(
+                format!("{label}的坐标表达式只支持整数；小数请直接写成字面量"),
+                self.current().span,
+            ));
+        }
+        let expression = self.expression()?;
+        let value = compile_time_constant(&expression).map_err(|blocker| {
+            let mut message = format!("{label}的坐标分量必须是编译期常量（{}）", blocker.reason());
+            if let ConstantBlocker::Name(name) = &blocker
+                && self.runtime_loop_variable(name)
+            {
+                message
+                    .push_str("；运行期循环变量请改用 `unroll for`，运行期坐标请改用 `macro fn`");
+            }
+            Diagnostic::new(message, expression.span)
+        })?;
+        Ok(Coordinate::Absolute(value.to_string()))
+    }
+
+    /// 一个坐标分量：绝对整数、`~[±数]`、`^[±数]`，或编译期常量表达式。
     fn coordinate(&mut self, label: &str) -> Result<Coordinate, Diagnostic> {
         if let Some(value) = self.macro_coordinate(true)? {
             return Ok(value);
@@ -253,6 +319,9 @@ impl Parser {
         if let Some(token) = self.take(&TokenKind::Caret) {
             let offset = self.coordinate_offset(label, &token)?;
             return Ok(Coordinate::Local(format!("^{offset}")));
+        }
+        if !self.literal_coordinate_ahead() {
+            return self.constant_coordinate(label);
         }
         let negative = self.negative_sign();
         let token = self.advance().clone();

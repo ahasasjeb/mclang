@@ -88,6 +88,15 @@
     total = boost(total);
 }
 
+函数 compile_time_showcase() {
+    展开 对于 slot 在 1..5 {
+        设置方块(坐标(-2 + slot, 64, (slot - 1) % 2), 方块状态("minecraft:air"));
+        如果 slot == 3 {
+            total += slot;
+        }
+    }
+}
+
 函数 later() {
     调度 later() 延后 1.5 秒 追加;
 }

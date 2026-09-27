@@ -1,0 +1,7 @@
+// expect: 坐标表达式只支持整数
+namespace bad;
+
+fn f() {
+    set_block(pos(0, 64, 0), block_state("minecraft:air"));
+    fill(pos(0.5 + 1, 64, 0), pos(2, 64, 1), block_state("minecraft:air"));
+}

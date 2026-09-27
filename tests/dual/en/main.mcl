@@ -91,6 +91,15 @@ fn loop_showcase() {
     total = boost(total);
 }
 
+fn compile_time_showcase() {
+    unroll for slot in 1..5 {
+        set_block(pos(-2 + slot, 64, (slot - 1) % 2), block_state("minecraft:air"));
+        if slot == 3 {
+            total += slot;
+        }
+    }
+}
+
 fn later() {
     schedule later() after 1.5 s append;
 }

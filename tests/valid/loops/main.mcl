@@ -1,4 +1,4 @@
-// 编译测试：for 循环、break/continue 与控制流优化。
+// 编译测试：for/while 循环、编译期循环（unroll for）、break/continue 与控制流优化。
 // 覆盖半开区间、常量与表达式边界、嵌套循环、while 里的 break/continue、
 // 常量条件折叠（if 与 while）以及循环变量的局部作用域。
 //
@@ -8,6 +8,7 @@
 //   data/loops/function/counted_sum.mcfunction 的常量上限比较（matches ..N）
 //   data/loops/function/always.mcfunction 里折叠掉的 if 与 while 0 == 1
 //   data/loops/function/nested.mcfunction 的辅助函数
+//   data/loops/function/compile_time_grid.mcfunction 的静态坐标（展开后没有循环假玩家）
 namespace loops;
 
 score total = 0;
@@ -163,3 +164,66 @@ fn negative_range() {
         total += index;
     }
 }
+
+// 编译期循环：边界是常量，循环体按迭代展开，变量在循环体内是编译期常量。
+// 坐标分量由变量算出，展开后是静态字面量，不生成循环假玩家。
+fn compile_time_grid() {
+    unroll for slot in 1..9 {
+        set_block(pos(-4 + (slot - 1) % 4, 64 + 2 * ((slot - 1) / 4), 0), block_state("minecraft:air"));
+        if slot == 3 {
+            set_block(pos(0, 70, 0), block_state("minecraft:stone"));
+        }
+    }
+}
+
+// 嵌套编译期循环：内层边界可以引用外层变量。
+fn compile_time_nested() {
+    unroll for row in 0..3 {
+        unroll for column_index in 0..(2 * row) {
+            sum += column_index;
+        }
+    }
+}
+
+// 空区间不产出语句，但循环体仍要通过语法检查。
+fn compile_time_empty() {
+    unroll for index in 4..4 {
+        total += index;
+    }
+}
+
+// 编译期循环里可以嵌套运行期循环：外层常量先代入内层边界。
+fn compile_time_with_runtime_loop() {
+    unroll for row in 0..2 {
+        for column_index in 0..row {
+            total += row + column_index;
+        }
+    }
+}
+
+// 编译期循环可以放在 if、execute 与 while 里；循环体也能包含这些结构。
+fn compile_time_nested_blocks() {
+    if total < 100 {
+        unroll for index in 0..2 {
+            sum += index;
+        }
+    }
+    let step = 0;
+    while step < 2 {
+        unroll for index in 0..2 {
+            execute if total < 100 {
+                sum += index;
+            }
+        }
+        step += 1;
+    }
+}
+
+// 坐标的绝对整数分量可以用编译期常量表达式。
+@player
+fn constant_coordinates() {
+    set_block(pos(1 + 2, 64, -3 * 2), block_state("minecraft:air"));
+    fill(pos(4 / 2, 64, 0), pos(2 * 3, 64, 1), block_state("minecraft:air"));
+    teleport(self, vec3(8 / 2, 65, 0));
+}
+

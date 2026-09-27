@@ -4,7 +4,7 @@ use crate::compiler::codegen::Compiler;
 use crate::compiler::codegen::emit::nbt_text;
 use crate::compiler::codegen::names::user_objective_name;
 use crate::compiler::codegen::world;
-use crate::compiler::constant::constant_value;
+use crate::constant::constant_value;
 
 use super::helpers::contains_current_loop_jump;
 

@@ -4,7 +4,7 @@ use super::emit::entity_query_selector;
 use super::statements::helpers::constant_condition;
 use super::{Compiler, Value};
 use crate::ast::*;
-use crate::compiler::constant::constant_value;
+use crate::constant::constant_value;
 
 impl Compiler<'_> {
     /// A condition that can participate directly in a native execute chain.

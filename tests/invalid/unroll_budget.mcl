@@ -1,0 +1,12 @@
+// expect: 编译期循环展开的语句过多
+namespace bad;
+
+score total = 0;
+
+fn f() {
+    unroll for outer in 0..17 {
+        unroll for inner in 0..4096 {
+            total += 1;
+        }
+    }
+}

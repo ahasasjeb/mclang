@@ -255,11 +255,7 @@ declarations (namespace/score/resource/storage/data_slot/...) require `;`.
   requirements=all emits one single-name group per criterion (AND);
   requirements=any emits one group with all names (OR).
   conditions keeps the vanilla JSON; known trigger condition fields are checked
-  against the 26.3 snapshot. An inline condition `type` must be a registered
-  26.3 loot condition (the `minecraft:` prefix is optional, near misses get a
-  suggestion); `all_of`/`any_of` `terms` and `inverted` `term` are checked
-  recursively, and `listOf()` fields (`victims`, `items`, `ingredients`) only
-  accept arrays. 26.3 inline loot conditions use `type` as the
+  against the 26.3 snapshot. 26.3 inline loot conditions use `type` as the
   discriminator, e.g. block match:
     {"location":{"type":"minecraft:match_block","blocks":"minecraft:dirt"}}
   and entity predicates are nested:
@@ -315,26 +311,29 @@ Every statement ends with `;` unless it ends with a `}` block.
     if <condition> { ... } else { ... }
     while <condition> { ... }
     for <name> in <start>..<end> { ... }
+    unroll for <name> in <start>..<end> { ... }
     break;      continue;
   - Conditions that are constant at compile time are folded: `if 1 == 1`
     inlines the then-branch, `if 2 < 1` disappears, `while 0 == 1` emits nothing.
-  - Consecutive nested `if` statements merge into ONE vanilla condition chain
-    (`execute if ... if ...`), and a condition already implied by the chain is
-    not tested twice (`if a && a`, `if x > 10 { if x > 5 { ... } }`); a
-    contradictory chain (`if x > 10 { if x < 5 { ... } }`) emits nothing.
-    Conditions with side effects (function/predicate) keep the original path.
   - `&&` and `||` short-circuit left to right; the left side is always
-    evaluated exactly as written, and a provably true right side never removes
-    the left call. When the right side of `&&` is a comparison it gets no
-    separate flag score.
-  - Comparison ranges render exactly like vanilla: `x < c` is `matches ..c-1`,
-    `x > c` is `matches c+1..`, `x == c` is `matches c`, `x != c` is
-    `unless ... matches c`; literals always stay inside i32, so impossible
-    comparisons (`x < -2147483648`, `x > 2147483647`) emit no test at all.
+    evaluated exactly as written.
   - `for` is half-open [start, end); the end expression is evaluated once
     (dynamic ends are stored in a temp slot). An empty constant range emits
     nothing. break/continue only work inside the innermost for/while; they are
     rejected in each/spawn.
+  - `unroll for` is a COMPILE-TIME loop: both bounds must fold to constants (an
+    enclosing unroll variable is allowed). The body is emitted once per
+    iteration with the variable replaced by a constant, so no loop score, no
+    limit slot and no helper function are generated, and constant guards such as
+    `if slot == 3` pick their branch during expansion. The variable cannot be
+    assigned or redeclared and the body cannot use break/continue; one loop
+    expands at most 4096 times and one file at most 65536 statements. Compute
+    coordinates from the loop variable (`pos(-4 + slot, 64, 0)`); do not spell
+    out a full `if slot == N` ladder over the same index inside the loop, that
+    makes the source O(n^2) without improving the output.
+  - Absolute integer coordinate components accept compile-time constant
+    expressions; they fold to literal text and are rejected when they cannot be
+    folded. `~`/`^` components and decimal components stay literal-only.
   - `return` may appear ONLY directly in the outermost function body. Blocks
     (if/while/for/each/spawn/execute/in_dimension) lower to helper functions,
     so a return inside them would only end the helper. Assign a local and
@@ -740,10 +739,6 @@ Every statement ends with `;` unless it ends with a `}` block.
   current execution context. Failures of entity/block/item/data lookups make
   the atom false (index misses read 0 for expressions), and negation preserves
   that boundary: `!data(entity, q, "Health")` is true when q matches nothing.
-  A score compared with a constant renders a vanilla `matches` range (closed
-  bounds): `x < c` is `..c-1`, `x > c` is `c+1..`, `x == c` is `c`, `x != c` is
-  `unless ... matches c`; literals always stay inside i32 and an impossible
-  comparison emits no test.
 
 ===============================================================================
 7 EXECUTION CONTEXT
@@ -947,9 +942,13 @@ Repeat these until they are automatic; each one is enforced by the compiler.
     `namespace` or repeat the same value.
 12. Constant folding never removes side effects: `side_effect() == 1 && 0 == 1`
     still calls side_effect() once, and if/else evaluates its condition once.
-13. `for` is half-open and evaluates the end once. `while` re-evaluates the
-    condition every iteration and can exhaust Minecraft's command-chain limit;
-    make sure the body changes the condition or contains `break`.
+13. `for` is half-open and evaluates the end once. `unroll for` expands at
+    compile time instead: both bounds must be constant, the variable is a
+    compile-time constant inside the body (usable in coordinates and guards),
+    and break/continue, assignment to the variable and shadowing declarations
+    are rejected. `while` re-evaluates the condition every iteration and can
+    exhaust Minecraft's command-chain limit; make sure the body changes the
+    condition or contains `break`.
 14. break/continue escape only the innermost for/while. They are rejected in
     each/spawn blocks (each entity runs its own helper function).
 15. /reload never resets scoreboard, storage or stopwatch data. Guard one-time
@@ -996,18 +995,18 @@ Repeat these until they are automatic; each one is enforced by the compiler.
    item_data=物品数据 entity_data=实体数据 item=物品 item_stack=物品堆 item_list=物品列表
    storage=存储 resource=资源 advancement=进度 predicate=谓词 fn=函数 fn_tag=函数标签 let=令
    return=返回 fail=失败 if=如果 unless=除非 store=存值 bossbar=Boss栏 else=否则 while=当
-   for=对于 in=在 break=跳出 continue=跳过 import=导入 export=公开 as=作为 each=遍历 call=调用
-   schedule=调度 after=延后 append=追加 replace=替换 give=给予 origin=投掷者
-   in_dimension=在维度 spawn=召唤 self=自身 message=消息 sound=声音 title=屏幕标题
-   dialog=对话框 particle=粒子 stopsound=停止声音 posteffect=后处理效果 msg=私聊 teammsg=队伍消息
-   effect=效果 xp=经验 clear=清除 stopwatch=秒表 run=原生命令 execute=执行 contents=内容
-   set_block=设置方块 fill=填充 fill_biome=填充生物群系 clone=复制 place=放置 forceload=强制加载
-   time=时间 weather=天气 gamerule=游戏规则 worldborder=世界边界 locate=定位 teleport=传送
-   pos=坐标 block_pos=方块坐标 vec3=精确坐标 vec2=平面坐标 rotation=朝向 column=列坐标
-   block_state=方块状态 nbt=数据 text=文本 translate=翻译 keybind=按键 object=对象内容
-   show_item=展示物品 show_entity=展示实体 selector=选择器 count=计数 random=随机 compute=计算
-   data=数据操作 block=方块 blocks=区域方块 biome=生物群系 loaded=已加载 dimension=维度
-   items=物品条件 slots=槽位条件 function=函数条件
+   unroll=展开 for=对于 in=在 break=跳出 continue=跳过 import=导入 export=公开 as=作为
+   each=遍历 call=调用 schedule=调度 after=延后 append=追加 replace=替换 give=给予
+   origin=投掷者 in_dimension=在维度 spawn=召唤 self=自身 message=消息 sound=声音
+   title=屏幕标题 dialog=对话框 particle=粒子 stopsound=停止声音 posteffect=后处理效果 msg=私聊
+   teammsg=队伍消息 effect=效果 xp=经验 clear=清除 stopwatch=秒表 run=原生命令 execute=执行
+   contents=内容 set_block=设置方块 fill=填充 fill_biome=填充生物群系 clone=复制 place=放置
+   forceload=强制加载 time=时间 weather=天气 gamerule=游戏规则 worldborder=世界边界 locate=定位
+   teleport=传送 pos=坐标 block_pos=方块坐标 vec3=精确坐标 vec2=平面坐标 rotation=朝向
+   column=列坐标 block_state=方块状态 nbt=数据 text=文本 translate=翻译 keybind=按键
+   object=对象内容 show_item=展示物品 show_entity=展示实体 selector=选择器 count=计数
+   random=随机 compute=计算 data=数据操作 block=方块 blocks=区域方块 biome=生物群系 loaded=已加载
+   dimension=维度 items=物品条件 slots=槽位条件 function=函数条件
 
   function attributes:
    @load=@加载 @tick=@每刻 @entity=@实体 @player=@玩家 @non_player=@非玩家
@@ -1293,6 +1292,16 @@ fn compute_sum(bound) -> score {
         result += 1;
     }
     return result;
+}
+
+fn build_row() {
+    // Compile-time loop: the coordinates come from the loop variable.
+    unroll for slot in 1..5 {
+        set_block(pos(-2 + slot, 64, (slot - 1) % 2), block_state("minecraft:air"));
+        if slot % 2 == 1 {
+            total += slot;
+        }
+    }
 }
 
 fn reset() {

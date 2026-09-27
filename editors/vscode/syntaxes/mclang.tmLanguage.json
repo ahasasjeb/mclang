@@ -143,7 +143,7 @@
           "name": "storage.type.mclang"
         },
         {
-          "match": "\\b(if|如果|unless|除非|else|否则|while|当|for|对于|in|在|break|跳出|continue|跳过|each|遍历|call|调用|schedule|调度|after|延后|append|追加|replace|替换|return|返回|fail|失败|run|原生命令|set_block|设置方块|fill|填充|fill_biome|填充生物群系|clone|复制|place|放置)\\b",
+          "match": "\\b(if|如果|unless|除非|else|否则|while|当|unroll|展开|for|对于|in|在|break|跳出|continue|跳过|each|遍历|call|调用|schedule|调度|after|延后|append|追加|replace|替换|return|返回|fail|失败|run|原生命令|set_block|设置方块|fill|填充|fill_biome|填充生物群系|clone|复制|place|放置)\\b",
           "name": "keyword.control.mclang"
         },
         {

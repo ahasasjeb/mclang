@@ -43,7 +43,7 @@ mclang 是一门面向 Minecraft Java Edition 26.3 的数据包编程语言及�
 | `src/parser/` | 递归下降解析：`mod.rs`（游标导航与顶层分派）、`declarations`、`items`、`statements`、`conditions`、`expressions`、`keywords` |
 | `src/compiler/mod.rs` | `compile()` 入口与 `CompiledPack` |
 | `src/compiler/types.rs` | 校验与生成共享的内部类型 |
-| `src/compiler/constant.rs` | 编译期常量折叠 |
+| `src/constant.rs` | 编译期常量折叠（解析、校验与生成三方共用） |
 | `src/compiler/validate/` | 只读语义检查：`rules`（名称/路径/标签等规则）、`items`、`statements`、`expressions`、`recursion` |
 | `src/compiler/codegen/` | 代码生成：`statements`（控制流与辅助函数）、`actions`（give 与 self 操作）、`expressions`、`names`（假玩家/objective）、`emit`（命令与 JSON 格式化） |
 | `docs/` | 语言与编译器文档 |
@@ -125,3 +125,4 @@ cargo run -- check tests/invalid/items.mcl
 
 给GPT系列：当用户要求收尾时，最好先更新同步DEVELOPMENT_PLAN.md，并立即开始减少工具调用，因为此时额度告急无法支撑太多操作，收尾时无需执行验证
 不到万不得已，就避免使用unsafe
+尽量避免$O(n^2)$

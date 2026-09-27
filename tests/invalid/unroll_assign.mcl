@@ -1,0 +1,11 @@
+// expect: 不能给编译期循环变量 `index` 赋值
+namespace bad;
+
+score total = 0;
+
+fn f() {
+    unroll for index in 0..3 {
+        index = 5;
+        total += index;
+    }
+}

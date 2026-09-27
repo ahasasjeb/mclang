@@ -12,10 +12,30 @@ impl Parser {
             if self.check(&TokenKind::Eof) {
                 return Err(Diagnostic::new("代码块缺少 `}`", self.current().span));
             }
+            if self.check_word("unroll") {
+                statements.extend(self.compile_time_unroll()?);
+                continue;
+            }
             statements.push(self.statement()?);
         }
         let end = self.advance().span;
         Ok((statements, end))
+    }
+
+    /// 编译期循环变量的名字不能在循环体内复用。
+    fn reject_constant_variable(
+        &self,
+        name: &str,
+        span: Span,
+        description: &str,
+    ) -> Result<(), Diagnostic> {
+        if self.constant_variable(name) {
+            return Err(Diagnostic::new(
+                format!("{description} `{name}` 不能与编译期循环变量同名"),
+                span,
+            ));
+        }
+        Ok(())
     }
 
     pub(super) fn statement(&mut self) -> Result<Statement, Diagnostic> {
@@ -93,15 +113,22 @@ impl Parser {
             }
         } else if self.take_word("while").is_some() {
             let condition = self.condition()?;
+            self.runtime_loop_depth += 1;
             let (body, _) = self.block()?;
+            self.runtime_loop_depth -= 1;
             StatementKind::While { condition, body }
         } else if self.take_word("for").is_some() {
             let (variable, variable_span) = self.ident("循环变量名称")?;
+            self.reject_constant_variable(&variable, variable_span, "运行期循环变量")?;
             self.expect_word("in")?;
             let start = self.expression()?;
             self.expect(TokenKind::DotDot, "for 区间需要 `..`")?;
             let end = self.expression()?;
+            self.runtime_loop_depth += 1;
+            self.runtime_loop_variables.push(variable.clone());
             let (body, _) = self.block()?;
+            self.runtime_loop_variables.pop();
+            self.runtime_loop_depth -= 1;
             StatementKind::For {
                 variable,
                 variable_span,
@@ -110,9 +137,21 @@ impl Parser {
                 body,
             }
         } else if self.take_word("break").is_some() {
+            if self.inside_compile_time_loop() {
+                return Err(Diagnostic::new(
+                    "编译期循环不能使用 break；需要提前结束时请改用运行期 `for`/`while`",
+                    start,
+                ));
+            }
             self.expect(TokenKind::Semicolon, "break 后需要 `;`")?;
             StatementKind::Break
         } else if self.take_word("continue").is_some() {
+            if self.inside_compile_time_loop() {
+                return Err(Diagnostic::new(
+                    "编译期循环不能使用 continue；需要跳过迭代时请改用运行期 `for`/`while`",
+                    start,
+                ));
+            }
             self.expect(TokenKind::Semicolon, "continue 后需要 `;`")?;
             StatementKind::Continue
         } else if self.take_word("execute").is_some() {
@@ -192,6 +231,7 @@ impl Parser {
             StatementKind::Return(kind)
         } else if self.take_word("let").is_some() {
             let (name, name_span) = self.ident("局部变量名称")?;
+            self.reject_constant_variable(&name, name_span, "局部变量")?;
             self.expect(TokenKind::Equal, "局部变量需要初始值")?;
             let value = self.expression()?;
             self.expect(TokenKind::Semicolon, "局部变量声明后需要 `;`")?;
@@ -248,7 +288,7 @@ impl Parser {
             self.take(&TokenKind::Semicolon);
             StatementKind::NbtMerge { nbt }
         } else {
-            let (name, _) = self.ident("语句")?;
+            let (name, name_span) = self.ident("语句")?;
             if self.check(&TokenKind::LeftParen) {
                 let arguments = self.call_arguments()?;
                 self.expect(TokenKind::Semicolon, "函数调用后需要 `;`")?;
@@ -257,6 +297,12 @@ impl Parser {
                     arguments,
                 }
             } else {
+                if self.constant_variable(&name) {
+                    return Err(Diagnostic::new(
+                        format!("不能给编译期循环变量 `{name}` 赋值"),
+                        name_span,
+                    ));
+                }
                 let operation = self.assignment_operator()?;
                 let value = self.expression()?;
                 self.expect(TokenKind::Semicolon, "赋值后需要 `;`")?;
