@@ -1,0 +1,7 @@
+[17:29:26] [main/INFO]: [STDOUT]: PROBE 123 => {back_text:{color:"black",has_glowing_text:0b,messages:["","","",""]},components:{},front_text:{color:"black",has_glowing_text:0b,messages:["123","","",""]},id:"minecraft:sign",is_waxed:1b,x:0,y:0,z:0}
+[17:29:26] [main/INFO]: [STDOUT]: PROBE 00123 => {back_text:{color:"black",has_glowing_text:0b,messages:["","","",""]},components:{},front_text:{color:"black",has_glowing_text:0b,messages:["00123","","",""]},id:"minecraft:sign",is_waxed:1b,x:0,y:0,z:0}
+[17:29:26] [main/INFO]: [STDOUT]: PROBE lzy => {back_text:{color:"black",has_glowing_text:0b,messages:["","","",""]},components:{},front_text:{color:"black",has_glowing_text:0b,messages:["lzy","","",""]},id:"minecraft:sign",is_waxed:1b,x:0,y:0,z:0}
+[17:29:26] [main/INFO]: [STDOUT]: PROBE 中文账户 => {back_text:{color:"black",has_glowing_text:0b,messages:["","","",""]},components:{},front_text:{color:"black",has_glowing_text:0b,messages:["中文账户","","",""]},id:"minecraft:sign",is_waxed:1b,x:0,y:0,z:0}
+[17:29:26] [main/INFO]: [STDOUT]: PROBE a"b\c => {back_text:{color:"black",has_glowing_text:0b,messages:["","","",""]},components:{},front_text:{color:"black",has_glowing_text:0b,messages:['a"b\\c',"","",""]},id:"minecraft:sign",is_waxed:1b,x:0,y:0,z:0}
+[17:29:26] [main/INFO]: [STDOUT]: PROBE  => {back_text:{color:"black",has_glowing_text:0b,messages:["","","",""]},components:{},front_text:{color:"black",has_glowing_text:0b,messages:["","","",""]},id:"minecraft:sign",is_waxed:1b,x:0,y:0,z:0}
+[17:29:26] [main/INFO]: [STDOUT]: SIGN ROUNDTRIP PASSED

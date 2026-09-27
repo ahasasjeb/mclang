@@ -1,0 +1,128 @@
+// Sign colors are DyeColor values; component colors use ChatFormatting.
+namespace sign_bank;
+import main;
+
+export fn maintain_public_signs() {
+    let users = count(terminal_players);
+    if users != 1 {
+        show_home_menu();
+    }
+    if users == 1 {
+        let page = scoreboard.get(terminal_player, auth_mode);
+        if page == 0 { show_home_menu(); }
+        if page == 1 { show_login_account(); }
+        if page == 2 { show_login_password(); }
+        if page == 3 { show_register_account(); }
+        if page == 4 { show_register_password(); }
+        if page < 0 || page > 4 { show_home_menu(); }
+    }
+}
+
+export fn show_home_menu() {
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["告示牌账户银行", "账户系统首屏", "32个账户槽位", "下方选择登录或注册"]; color = "yellow"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["欢迎使用", "注册费 1 绿宝石", "仓库 3×3 至 10×10", "选择后开放输入牌"]; color = "cyan"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【登录账户】"; color = "cyan"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/button_login"; }; }, "进入账号登录", "━━━━━━"]; color = "cyan"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_block(pos(1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【注册账户】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/button_register"; }; }, "创建新账户", "━━━━━━"]; color = "green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+}
+
+export fn show_login_account() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["登录 / 第1步", "编辑中间输入牌", "第1行只写账号", "确认后才询问密码"]; color = "yellow"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交登录账号】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/login_account"; }; }, "检查账户是否存在", "━━━━━━"]; color = "green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+export fn show_login_password() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["登录 / 第2步", "账号已经确认", "第1行只写密码", "错误后返回账号页"]; color = "yellow"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交登录密码】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/login_password"; }; }, "核对账户凭据", "━━━━━━"]; color = "green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+export fn show_register_account() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["注册 / 第1步", "编辑中间输入牌", "第1行只写新账号", "需要 1 枚绿宝石"]; color = "green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交注册账号】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/register_account"; }; }, "检查账号并预留", "━━━━━━"]; color = "green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+export fn show_register_password() {
+    ensure_input_sign();
+    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["注册 / 第2步", "账号已经临时保留", "第1行设置密码", "提交后扣 1 绿宝石"]; color = "yellow"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = true;
+    });
+    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["━━━━━━", { text = "【提交注册密码】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/register_password"; }; }, "扣费并创建账户", "━━━━━━"]; color = "green"; has_glowing_text = true; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true; is_waxed = true;
+    });
+    set_back_sign();
+}
+
+export fn ensure_input_sign() {
+    if !block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }) {
+        set_input_sign();
+    }
+}
+
+export fn set_input_sign() {
+    set_block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        is_waxed = false;
+    });
+}
+
+export fn set_back_sign() {
+    set_block(pos(1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
+        front_text = {
+            messages = ["━━━━━━", { text = "【返回首屏】"; color = "red"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:auth/button_home"; }; }, "取消本次操作", "━━━━━━"];
+            color = "red"; has_glowing_text = true;
+        };
+        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
+        allow_op_features = true;
+        is_waxed = true;
+    });
+}

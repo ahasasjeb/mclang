@@ -1,0 +1,61 @@
+namespace sign_bank;
+import main;
+import accounts;
+
+query bank_displays = entity("minecraft:text_display") { tag("sb_display"); }
+
+export fn clear_displays() {
+    kill(bank_displays);
+}
+
+export fn remove_display(slot) {
+    each(bank_displays) {
+        if scoreboard.get(self, account_slot) == slot { kill(self); }
+    }
+}
+
+export fn cleanup_displays() {
+    each(bank_displays) {
+        let slot = scoreboard.get(self, account_slot);
+        if account_online(slot) != 1 || record_ready(slot) != 1 { kill(self); }
+    }
+}
+
+export fn refresh_display(slot) {
+    remove_display(slot);
+    if record_ready(slot) == 1 {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot {
+                let balance = scoreboard.get(self, account_balance);
+                let size = scoreboard.get(self, account_size);
+                spawn("minecraft:text_display", vec3(~-3.5, ~0.5, ~-5.8)) {
+                    self.add_tag("sb_display");
+                    scoreboard.set(self, account_slot, slot);
+                    scoreboard.set(self, account_balance, balance);
+                    scoreboard.set(self, account_size, size);
+                    scoreboard.set(self, transfer, size + 1);
+                    nbt {
+                        billboard = "fixed"; Rotation = [0.0f, 0.0f];
+                        brightness = { block = 15; sky = 15; };
+                        line_width = 220; background = 1073741824;
+                        shadow = true; see_through = false; view_range = 0.5f;
+                        text = { text = "账户 #"; color = "gold"; extra = [
+                            { score = { name = "@s"; objective = "sign_bank_account_slot"; }; },
+                            { text = "\n余额："; }, { score = { name = "@s"; objective = "sign_bank_account_balance"; }; },
+                            { text = " 绿宝石\n仓库："; }, { score = { name = "@s"; objective = "sign_bank_account_size"; }; },
+                            { text = "×"; }, { score = { name = "@s"; objective = "sign_bank_account_size"; }; },
+                            { text = "（最大 10×10）\n升级费用："; }, { score = { name = "@s"; objective = "sign_bank_transfer"; }; }
+                        ]; };
+                    };
+                    if size == 10 { data.modify(entity, self, "text", set, value(nbt {
+                        text = "账户 #"; color = "gold"; extra = [
+                            { score = { name = "@s"; objective = "sign_bank_account_slot"; }; },
+                            { text = "\n余额："; }, { score = { name = "@s"; objective = "sign_bank_account_balance"; }; },
+                            { text = " 绿宝石\n仓库：10×10\n已达到最大尺寸"; }
+                        ];
+                    })); }
+                }
+            }
+        }
+    }
+}

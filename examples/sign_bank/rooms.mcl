@@ -1,788 +1,134 @@
 namespace sign_bank;
-
 import main;
+import accounts;
+import displays;
+import bank;
 
-export objective account_slot;
-export objective account_balance;
-export objective account_size;
+query nearby_players = entity("minecraft:player") { distance("..10.5"); }
 
-export query account_markers = entity("minecraft:marker") { tag("sb_account"); }
-
-query room1_players = entity("minecraft:player") { box(100, 63, 0, 11, 7, 13); }
-query room2_players = entity("minecraft:player") { box(114, 63, 0, 11, 7, 13); }
-query room3_players = entity("minecraft:player") { box(128, 63, 0, 11, 7, 13); }
-query room4_players = entity("minecraft:player") { box(142, 63, 0, 11, 7, 13); }
-query room5_players = entity("minecraft:player") { box(156, 63, 0, 11, 7, 13); }
-query room6_players = entity("minecraft:player") { box(170, 63, 0, 11, 7, 13); }
-query room7_players = entity("minecraft:player") { box(184, 63, 0, 11, 7, 13); }
-query room8_players = entity("minecraft:player") { box(198, 63, 0, 11, 7, 13); }
-query room9_players = entity("minecraft:player") { box(212, 63, 0, 11, 7, 13); }
-query room10_players = entity("minecraft:player") { box(226, 63, 0, 11, 7, 13); }
-query room11_players = entity("minecraft:player") { box(240, 63, 0, 11, 7, 13); }
-query room12_players = entity("minecraft:player") { box(254, 63, 0, 11, 7, 13); }
-query room13_players = entity("minecraft:player") { box(268, 63, 0, 11, 7, 13); }
-query room14_players = entity("minecraft:player") { box(282, 63, 0, 11, 7, 13); }
-query room15_players = entity("minecraft:player") { box(296, 63, 0, 11, 7, 13); }
-query room16_players = entity("minecraft:player") { box(310, 63, 0, 11, 7, 13); }
-query room17_players = entity("minecraft:player") { box(324, 63, 0, 11, 7, 13); }
-query room18_players = entity("minecraft:player") { box(338, 63, 0, 11, 7, 13); }
-query room19_players = entity("minecraft:player") { box(352, 63, 0, 11, 7, 13); }
-query room20_players = entity("minecraft:player") { box(366, 63, 0, 11, 7, 13); }
-query room21_players = entity("minecraft:player") { box(380, 63, 0, 11, 7, 13); }
-query room22_players = entity("minecraft:player") { box(394, 63, 0, 11, 7, 13); }
-query room23_players = entity("minecraft:player") { box(408, 63, 0, 11, 7, 13); }
-query room24_players = entity("minecraft:player") { box(422, 63, 0, 11, 7, 13); }
-query room25_players = entity("minecraft:player") { box(436, 63, 0, 11, 7, 13); }
-query room26_players = entity("minecraft:player") { box(450, 63, 0, 11, 7, 13); }
-query room27_players = entity("minecraft:player") { box(464, 63, 0, 11, 7, 13); }
-query room28_players = entity("minecraft:player") { box(478, 63, 0, 11, 7, 13); }
-query room29_players = entity("minecraft:player") { box(492, 63, 0, 11, 7, 13); }
-query room30_players = entity("minecraft:player") { box(506, 63, 0, 11, 7, 13); }
-query room31_players = entity("minecraft:player") { box(520, 63, 0, 11, 7, 13); }
-query room32_players = entity("minecraft:player") { box(534, 63, 0, 11, 7, 13); }
-
-// 32 间仓库的并集（x 100..545）：空仓库时整轮审计只花一次查询。
-query room_area_players = entity("minecraft:player") { box(100, 63, 0, 445, 7, 13); }
-
-item one_emerald = item_stack("minecraft:emerald") {}
-
-export fn build_room_shells() {
-    // 编译期循环：仓库左下角是 100 + 14 * (索引 - 1)，外壳固定 12×8×14。
+export fn build_rooms() {
     unroll for index in 1..33 {
-        fill(pos(100 + 14 * (index - 1), 63, 0), pos(111 + 14 * (index - 1), 70, 13), block_state("minecraft:barrier"));
-    }
-}
-
-export fn maintain_room_signs() {
-    set_block(pos(5, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【存入全部】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/deposit"; }; }, "背包绿宝石入账", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
-    });
-    set_block(pos(6, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【取出1枚】"; color = "aqua"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/withdraw"; }; }, "从余额取绿宝石", "━━━━━━"]; color = "dark_aqua"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
-    });
-    set_block(pos(7, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【升级仓库】"; color = "gold"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/upgrade"; }; }, "扩建下一圈空间", "━━━━━━"]; color = "yellow"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
-    });
-    set_block(pos(8, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【安全退出】"; color = "red"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:rooms/logout"; }; }, "注销并返回大厅", "━━━━━━"]; color = "dark_red"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; }; allow_op_features = true; is_waxed = true;
-    });
-    // 编译期循环：守卫是槽位是否已注册（运行期方块检查），目标坐标由索引算出。
-    unroll for index in 1..33 {
-        if block(pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(100 + 14 * (index - 1) + 2, 67, 1), block_state("minecraft:air"));
-            clone(pos(5, 72, -7), pos(5, 72, -7), pos(100 + 14 * (index - 1) + 1, 67, 1), force);
-            clone(pos(6, 72, -7), pos(6, 72, -7), pos(100 + 14 * (index - 1) + 3, 67, 1), force);
-            clone(pos(7, 72, -7), pos(7, 72, -7), pos(100 + 14 * (index - 1) + 1, 66, 1), force);
-            clone(pos(8, 72, -7), pos(8, 72, -7), pos(100 + 14 * (index - 1) + 3, 66, 1), force);
-        }
-    }
-}
-
-export fn tick_rooms() {
-    if count(room_area_players) > 0 {
-        audit_room1();
-        audit_room2();
-        audit_room3();
-        audit_room4();
-        audit_room5();
-        audit_room6();
-        audit_room7();
-        audit_room8();
-        audit_room9();
-        audit_room10();
-        audit_room11();
-        audit_room12();
-        audit_room13();
-        audit_room14();
-        audit_room15();
-        audit_room16();
-        audit_room17();
-        audit_room18();
-        audit_room19();
-        audit_room20();
-        audit_room21();
-        audit_room22();
-        audit_room23();
-        audit_room24();
-        audit_room25();
-        audit_room26();
-        audit_room27();
-        audit_room28();
-        audit_room29();
-        audit_room30();
-        audit_room31();
-        audit_room32();
-    }
-}
-
-fn audit_room1() {
-    if count(room1_players) > 1 {
-        each(room1_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room1_players) {
-            if scoreboard.get(self, session) == 1 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room2() {
-    if count(room2_players) > 1 {
-        each(room2_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room2_players) {
-            if scoreboard.get(self, session) == 2 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room3() {
-    if count(room3_players) > 1 {
-        each(room3_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room3_players) {
-            if scoreboard.get(self, session) == 3 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room4() {
-    if count(room4_players) > 1 {
-        each(room4_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room4_players) {
-            if scoreboard.get(self, session) == 4 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room5() {
-    if count(room5_players) > 1 {
-        each(room5_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room5_players) {
-            if scoreboard.get(self, session) == 5 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room6() {
-    if count(room6_players) > 1 {
-        each(room6_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room6_players) {
-            if scoreboard.get(self, session) == 6 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room7() {
-    if count(room7_players) > 1 {
-        each(room7_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room7_players) {
-            if scoreboard.get(self, session) == 7 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room8() {
-    if count(room8_players) > 1 {
-        each(room8_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room8_players) {
-            if scoreboard.get(self, session) == 8 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room9() {
-    if count(room9_players) > 1 {
-        each(room9_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room9_players) {
-            if scoreboard.get(self, session) == 9 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room10() {
-    if count(room10_players) > 1 {
-        each(room10_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room10_players) {
-            if scoreboard.get(self, session) == 10 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room11() {
-    if count(room11_players) > 1 {
-        each(room11_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room11_players) {
-            if scoreboard.get(self, session) == 11 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room12() {
-    if count(room12_players) > 1 {
-        each(room12_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room12_players) {
-            if scoreboard.get(self, session) == 12 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room13() {
-    if count(room13_players) > 1 {
-        each(room13_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room13_players) {
-            if scoreboard.get(self, session) == 13 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room14() {
-    if count(room14_players) > 1 {
-        each(room14_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room14_players) {
-            if scoreboard.get(self, session) == 14 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room15() {
-    if count(room15_players) > 1 {
-        each(room15_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room15_players) {
-            if scoreboard.get(self, session) == 15 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room16() {
-    if count(room16_players) > 1 {
-        each(room16_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room16_players) {
-            if scoreboard.get(self, session) == 16 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room17() {
-    if count(room17_players) > 1 {
-        each(room17_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room17_players) {
-            if scoreboard.get(self, session) == 17 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room18() {
-    if count(room18_players) > 1 {
-        each(room18_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room18_players) {
-            if scoreboard.get(self, session) == 18 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room19() {
-    if count(room19_players) > 1 {
-        each(room19_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room19_players) {
-            if scoreboard.get(self, session) == 19 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room20() {
-    if count(room20_players) > 1 {
-        each(room20_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room20_players) {
-            if scoreboard.get(self, session) == 20 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room21() {
-    if count(room21_players) > 1 {
-        each(room21_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room21_players) {
-            if scoreboard.get(self, session) == 21 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room22() {
-    if count(room22_players) > 1 {
-        each(room22_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room22_players) {
-            if scoreboard.get(self, session) == 22 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room23() {
-    if count(room23_players) > 1 {
-        each(room23_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room23_players) {
-            if scoreboard.get(self, session) == 23 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room24() {
-    if count(room24_players) > 1 {
-        each(room24_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room24_players) {
-            if scoreboard.get(self, session) == 24 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room25() {
-    if count(room25_players) > 1 {
-        each(room25_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room25_players) {
-            if scoreboard.get(self, session) == 25 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room26() {
-    if count(room26_players) > 1 {
-        each(room26_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room26_players) {
-            if scoreboard.get(self, session) == 26 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room27() {
-    if count(room27_players) > 1 {
-        each(room27_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room27_players) {
-            if scoreboard.get(self, session) == 27 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room28() {
-    if count(room28_players) > 1 {
-        each(room28_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room28_players) {
-            if scoreboard.get(self, session) == 28 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room29() {
-    if count(room29_players) > 1 {
-        each(room29_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room29_players) {
-            if scoreboard.get(self, session) == 29 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room30() {
-    if count(room30_players) > 1 {
-        each(room30_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room30_players) {
-            if scoreboard.get(self, session) == 30 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room31() {
-    if count(room31_players) > 1 {
-        each(room31_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room31_players) {
-            if scoreboard.get(self, session) == 31 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn audit_room32() {
-    if count(room32_players) > 1 {
-        each(room32_players) {
-            title.actionbar(self, "仓库出现第二名玩家，强制退出");
-            force_logout();
-        }
-    } else {
-        each(room32_players) {
-            if scoreboard.get(self, session) == 32 { scoreboard.set(self, in_room, 1); }
-            else { force_logout(); }
-        }
-    }
-}
-
-fn marker_exists(slot) -> score {
-    let found = 0;
-    each(account_markers) {
-        if scoreboard.get(self, account_slot) == slot { found = 1; }
-    }
-    return found;
-}
-
-export fn create_account_marker(slot) {
-    if marker_exists(slot) == 0 {
-        spawn("minecraft:marker", pos(0, 65, -5)) {
+        fill(pos(100 + 16 * (index - 1), 63, 0), pos(111 + 16 * (index - 1), 70, 13), block_state("minecraft:bedrock"));
+        spawn("minecraft:marker", pos(106 + 16 * (index - 1), 67, 7)) {
             self.add_tag("sb_account");
-            scoreboard.set(self, account_slot, slot);
+            scoreboard.set(self, account_slot, index);
             scoreboard.set(self, account_balance, 0);
             scoreboard.set(self, account_size, 3);
+            scoreboard.set(self, account_ready, 0);
         }
     }
 }
 
-export @player fn activate_new_account(slot) {
-    unroll for index in 1..33 {
-        if index == slot {
-            fill(pos(100 + 14 * (index - 1) + 1, 64, 1), pos(100 + 14 * (index - 1) + 3, 69, 5), block_state("minecraft:air"));
-            install_room_buttons(index);
-        }
-    }
-    enter_account(slot);
+export fn make_button_templates() {
+    set_block(pos(5, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; }, nbt {
+        front_text = { messages = ["存入全部绿宝石", {text = "【存入】"; color = "green"; click_event = {action = "run_command"; command = "/function sign_bank:bank/deposit";};}, "", "余额显示在上方"]; color = "green"; };
+        is_waxed = true; allow_op_features = true;
+    });
+    set_block(pos(6, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; }, nbt {
+        front_text = { messages = ["取出一枚绿宝石", {text = "【取款】"; color = "aqua"; click_event = {action = "run_command"; command = "/function sign_bank:bank/withdraw";};}, "", "每次 1 枚"]; color = "cyan"; };
+        is_waxed = true; allow_op_features = true;
+    });
+    set_block(pos(7, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; }, nbt {
+        front_text = { messages = ["扩建一圈仓库", {text = "【升级】"; color = "gold"; click_event = {action = "run_command"; command = "/function sign_bank:bank/upgrade";};}, "费用 = 新边长", "上限 10×10"]; color = "yellow"; };
+        is_waxed = true; allow_op_features = true;
+    });
+    set_block(pos(8, 72, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; }, nbt {
+        front_text = { messages = ["退出并返回大厅", {text = "【退出】"; color = "red"; click_event = {action = "run_command"; command = "/function sign_bank:bank/logout";};}, "", "房间和物品保留"]; color = "red"; };
+        is_waxed = true; allow_op_features = true;
+    });
 }
 
-fn install_room_buttons(slot) {
-    unroll for index in 1..33 {
-        if index == slot {
-            clone(pos(5, 72, -7), pos(5, 72, -7), pos(100 + 14 * (index - 1) + 1, 67, 1), force);
-            clone(pos(6, 72, -7), pos(6, 72, -7), pos(100 + 14 * (index - 1) + 3, 67, 1), force);
-            clone(pos(7, 72, -7), pos(7, 72, -7), pos(100 + 14 * (index - 1) + 1, 66, 1), force);
-            clone(pos(8, 72, -7), pos(8, 72, -7), pos(100 + 14 * (index - 1) + 3, 66, 1), force);
+// Every relative coordinate below is based on the slot's fixed marker.
+export fn open_new_room(slot) {
+    each(account_markers) {
+        if scoreboard.get(self, account_slot) == slot {
+            fill(pos(~-5, ~-3, ~-6), pos(~-3, ~2, ~-2), block_state("minecraft:air"));
+            fill(pos(~-5, ~-4, ~-6), pos(~-3, ~-4, ~-5), block_state("minecraft:smooth_stone"));
+            fill(pos(~-5, ~-4, ~-4), pos(~-3, ~-4, ~-2), block_state("minecraft:chiseled_stone_bricks"));
+            fill(pos(~-5, ~2, ~-6), pos(~-3, ~2, ~-2), block_state("minecraft:light") { level = "15"; });
+            install_buttons();
         }
     }
+}
+
+@non_player fn install_buttons() {
+    clone(pos(5, 72, -7), pos(5, 72, -7), pos(~-5, ~-1, ~-6), force);
+    clone(pos(6, 72, -7), pos(6, 72, -7), pos(~-3, ~-1, ~-6), force);
+    clone(pos(7, 72, -7), pos(7, 72, -7), pos(~-5, ~-2, ~-6), force);
+    clone(pos(8, 72, -7), pos(8, 72, -7), pos(~-3, ~-2, ~-6), force);
+}
+
+export fn room_available(slot) -> score {
+    let available = 0;
+    if unique_record(slot) == 1 {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot && count(nearby_players) == 0 { available = 1; }
+        }
+    }
+    return available;
 }
 
 export @player fn enter_account(slot) {
     scoreboard.set(self, auth_mode, 0);
     scoreboard.set(self, pending_slot, 0);
     scoreboard.set(self, session, slot);
-    scoreboard.set(self, in_room, 1);
-    // 落点是房间中心：整数格再补 0.5 偏移，不必为每个槽位写一条小数坐标。
     unroll for index in 1..33 {
         if index == slot {
-            execute positioned(pos(100 + 14 * (index - 1) + 2, 64, 2)) {
+            execute positioned(pos(102 + 16 * (index - 1), 64, 2)) {
                 teleport(self, vec3(~0.5, ~0.0, ~0.5), rotation(180, 0));
             }
         }
     }
-    show_status();
+    refresh_display(slot);
 }
 
-fn room_private(slot) -> score {
-    let safe = 0;
-    if slot == 1 && count(room1_players) == 1 { safe = 1; }
-    if slot == 2 && count(room2_players) == 1 { safe = 1; }
-    if slot == 3 && count(room3_players) == 1 { safe = 1; }
-    if slot == 4 && count(room4_players) == 1 { safe = 1; }
-    if slot == 5 && count(room5_players) == 1 { safe = 1; }
-    if slot == 6 && count(room6_players) == 1 { safe = 1; }
-    if slot == 7 && count(room7_players) == 1 { safe = 1; }
-    if slot == 8 && count(room8_players) == 1 { safe = 1; }
-    if slot == 9 && count(room9_players) == 1 { safe = 1; }
-    if slot == 10 && count(room10_players) == 1 { safe = 1; }
-    if slot == 11 && count(room11_players) == 1 { safe = 1; }
-    if slot == 12 && count(room12_players) == 1 { safe = 1; }
-    if slot == 13 && count(room13_players) == 1 { safe = 1; }
-    if slot == 14 && count(room14_players) == 1 { safe = 1; }
-    if slot == 15 && count(room15_players) == 1 { safe = 1; }
-    if slot == 16 && count(room16_players) == 1 { safe = 1; }
-    if slot == 17 && count(room17_players) == 1 { safe = 1; }
-    if slot == 18 && count(room18_players) == 1 { safe = 1; }
-    if slot == 19 && count(room19_players) == 1 { safe = 1; }
-    if slot == 20 && count(room20_players) == 1 { safe = 1; }
-    if slot == 21 && count(room21_players) == 1 { safe = 1; }
-    if slot == 22 && count(room22_players) == 1 { safe = 1; }
-    if slot == 23 && count(room23_players) == 1 { safe = 1; }
-    if slot == 24 && count(room24_players) == 1 { safe = 1; }
-    if slot == 25 && count(room25_players) == 1 { safe = 1; }
-    if slot == 26 && count(room26_players) == 1 { safe = 1; }
-    if slot == 27 && count(room27_players) == 1 { safe = 1; }
-    if slot == 28 && count(room28_players) == 1 { safe = 1; }
-    if slot == 29 && count(room29_players) == 1 { safe = 1; }
-    if slot == 30 && count(room30_players) == 1 { safe = 1; }
-    if slot == 31 && count(room31_players) == 1 { safe = 1; }
-    if slot == 32 && count(room32_players) == 1 { safe = 1; }
-    return safe;
+export @player fn in_warehouse_area() -> score {
+    let inside = 0;
+    if dimension("minecraft:overworld") {
+        let x = data.get(entity, self, "Pos[0]");
+        let y = data.get(entity, self, "Pos[1]");
+        let z = data.get(entity, self, "Pos[2]");
+        if x >= 100 && x <= 607 && y >= 63 && y <= 70 && z >= 0 && z <= 13 { inside = 1; }
+    }
+    return inside;
 }
 
-@player fn valid_room_session() -> score {
+export @player fn valid_room_session() -> score {
     let valid = 0;
     let slot = scoreboard.get(self, session);
-    if slot != 0 && scoreboard.get(self, in_room) == 1 && room_private(slot) == 1 { valid = 1; }
+    if dimension("minecraft:overworld") && record_ready(slot) == 1 && account_online(slot) == 1 {
+        let occupants = 0;
+        let size = 0;
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot {
+                occupants = count(nearby_players);
+                size = scoreboard.get(self, account_size);
+            }
+        }
+        let x = data.get(entity, self, "Pos[0]") - 100 - 16 * (slot - 1);
+        let y = data.get(entity, self, "Pos[1]");
+        let z = data.get(entity, self, "Pos[2]");
+        if occupants == 1 && size >= 3 && size <= 10 && y >= 64 && y <= 69 {
+            if x >= 1 && x <= 3 && z >= 1 && z <= 2 { valid = 1; }
+            if x >= 1 && x <= size && z >= 3 && z <= size + 2 { valid = 1; }
+        }
+    }
     return valid;
 }
 
-export @player fn deposit() {
-    if valid_room_session() == 1 {
-        title.actionbar(self, "正在存入绿宝石……");
-        sound.self("minecraft:block.note_block.hat", master);
-        do_deposit();
-    } else { title.actionbar(self, "没有有效的独占仓库会话"); }
-}
-
-export @player fn withdraw() {
-    if valid_room_session() == 1 {
-        title.actionbar(self, "正在取出绿宝石……");
-        sound.self("minecraft:block.note_block.hat", master);
-        do_withdraw();
-    } else { title.actionbar(self, "没有有效的独占仓库会话"); }
-}
-
-export @player fn upgrade() {
-    if valid_room_session() == 1 {
-        title.actionbar(self, "正在检查升级条件……");
-        sound.self("minecraft:block.note_block.hat", master);
-        do_upgrade();
-    } else { title.actionbar(self, "没有有效的独占仓库会话"); }
-}
-
-export @player fn logout() {
-    if scoreboard.get(self, session) != 0 {
-        sound.self("minecraft:block.note_block.hat", master);
-        force_logout();
-    }
-}
-
-@player fn read_account_state() {
-    let slot = scoreboard.get(self, session);
-    let balance = 0;
-    let size = 0;
-    each(account_markers) {
-        if scoreboard.get(self, account_slot) == slot {
-            balance = scoreboard.get(self, account_balance);
-            size = scoreboard.get(self, account_size);
-        }
-    }
-    scoreboard.set(self, view_balance, balance);
-    scoreboard.set(self, view_size, size);
-}
-
-@player fn show_status() {
-    read_account_state();
-    message.self(translate("chat.type.announcement", [text("银行余额"), score(self, view_balance)]) { color = "gold"; });
-    message.self(translate("chat.type.announcement", [text("仓库边长"), score(self, view_size)]) { color = "aqua"; });
-}
-
-@player fn do_deposit() {
-    scoreboard.set(self, transfer, 0);
-    execute store.result(self, transfer) { clear(self, "minecraft:emerald"); }
-    let amount = scoreboard.get(self, transfer);
-    let slot = scoreboard.get(self, session);
-    if amount > 0 {
-        each(account_markers) {
-            if scoreboard.get(self, account_slot) == slot {
-                scoreboard.set(self, account_balance, scoreboard.get(self, account_balance) + amount);
-            }
-        }
-        title.actionbar(self, "绿宝石已存入");
-        sound.self("minecraft:entity.experience_orb.pickup", master);
-    } else { title.actionbar(self, "背包里没有绿宝石"); }
-    show_status();
-}
-
-@player fn do_withdraw() {
-    read_account_state();
-    let slot = scoreboard.get(self, session);
-    if scoreboard.get(self, view_balance) > 0 {
-        each(account_markers) {
-            if scoreboard.get(self, account_slot) == slot {
-                scoreboard.set(self, account_balance, scoreboard.get(self, account_balance) - 1);
-            }
-        }
-        self.give_item(one_emerald);
-        title.actionbar(self, "已取出 1 枚绿宝石");
-    } else { title.actionbar(self, "账户余额为 0"); }
-    show_status();
-}
-
-@player fn do_upgrade() {
-    read_account_state();
-    let slot = scoreboard.get(self, session);
-    let size = scoreboard.get(self, view_size);
-    let balance = scoreboard.get(self, view_balance);
-    let next = size + 1;
-    if size >= 10 { title.actionbar(self, "仓库已经达到 10×10"); }
-    if size < 10 && balance < next { title.actionbar(self, "余额不足：费用等于新边长"); }
-    if size < 10 && balance >= next {
-        each(account_markers) {
-            if scoreboard.get(self, account_slot) == slot {
-                scoreboard.set(self, account_balance, balance - next);
-                scoreboard.set(self, account_size, next);
-            }
-        }
-        expand_room(slot, next);
-        title.actionbar(self, "仓库升级完成");
-        sound.self("minecraft:block.anvil.use", master);
-        show_status();
-    }
-}
-
-fn expand_room(slot, size) {
-    // 每间仓库只打开下一圈：索引与目标边长都是编译期常量，两层守卫仍是 O(槽位 + 边长)。
+export fn expand_room(slot, size) {
+    // Runtime score values cannot be block coordinates; unroll resolves these constants.
     unroll for index in 1..33 {
         if index == slot {
             unroll for width in 4..11 {
                 if width == size {
-                    fill(pos(100 + 14 * (index - 1) + width, 64, 3), pos(100 + 14 * (index - 1) + width, 69, 3 + width - 1), block_state("minecraft:air"));
-                    fill(pos(100 + 14 * (index - 1) + 1, 64, 3 + width - 1), pos(100 + 14 * (index - 1) + width - 1, 69, 3 + width - 1), block_state("minecraft:air"));
+                    fill(pos(100 + 16 * (index - 1) + width, 64, 3), pos(100 + 16 * (index - 1) + width, 69, width + 2), block_state("minecraft:air"), replace, block_state("minecraft:bedrock"));
+                    fill(pos(101 + 16 * (index - 1), 64, width + 2), pos(99 + 16 * (index - 1) + width, 69, width + 2), block_state("minecraft:air"), replace, block_state("minecraft:bedrock"));
+                    fill(pos(100 + 16 * (index - 1) + width, 63, 3), pos(100 + 16 * (index - 1) + width, 63, width + 2), block_state("minecraft:chiseled_stone_bricks"));
+                    fill(pos(101 + 16 * (index - 1), 63, width + 2), pos(99 + 16 * (index - 1) + width, 63, width + 2), block_state("minecraft:chiseled_stone_bricks"));
+                    fill(pos(101 + 16 * (index - 1), 69, 3), pos(100 + 16 * (index - 1) + width, 69, width + 2), block_state("minecraft:light") { level = "15"; }, replace, block_state("minecraft:air"));
                 }
             }
         }
     }
 }
-

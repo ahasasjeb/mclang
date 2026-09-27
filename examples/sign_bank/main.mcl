@@ -1,551 +1,174 @@
-// 告示牌银行 v2：首屏菜单 -> 独立账号页 -> 独立密码页。
-// 账户是否占用直接由机房记录牌表示；余额与尺寸保存在账户 marker 上。
+// Credentials use separate signs. Slot IDs never depend on account text.
 namespace sign_bank;
-
+import ui;
+import auth;
+import accounts;
 import rooms;
+import displays;
 
 score installed = 0;
+score revision = 0;
 score maintenance_ticks = 0;
-
+score reset_pending = 0;
 export objective session;
+export objective pending_slot;
+export objective auth_mode;
 export objective transfer;
 export objective view_balance;
 export objective view_size;
 export objective leave_count { criteria = "minecraft.custom:minecraft.leave_game"; }
 export objective leave_seen;
-export objective in_room;
-export objective in_terminal;
-// 0=首屏, 1=登录账号, 2=登录密码, 3=注册账号, 4=注册密码。
-export objective auth_mode;
-export objective pending_slot;
+export objective account_slot;
+export objective account_balance;
+export objective account_size;
+export objective account_ready;
+export objective room_valid;
 
 export query all_players = entity("minecraft:player") {}
-query terminal_players = entity("minecraft:player") { box(-8, 64, 1, 16, 6, 10); }
-query terminal_player = entity("minecraft:player") { box(-8, 64, 1, 16, 6, 10); limit(1); }
+export query terminal_players = entity("minecraft:player") { box(-7, 64, 1, 14, 6, 9); }
+export query terminal_player = entity("minecraft:player") { box(-7, 64, 1, 14, 6, 9); limit(1); }
+export query account_markers = entity("minecraft:marker") { tag("sb_account"); }
 query pending_registrations = entity("minecraft:player") { scores("auth_mode", "4"); }
 
 @load fn load() {
-    forceload.add(column(-16, -16), column(559, 15));
-    if installed == 0 {
-        install_world();
-        installed = 1;
+    in_dimension("minecraft:overworld") {
+        forceload.add(column(-16, -16), column(15, 15));
+        forceload.add(column(96, 0), column(607, 15));
+        if installed == 0 { reset_pending = 1; schedule finish_reset() after 1 t replace; }
+        clear_displays();
+        each(all_players) {
+            cancel_auth();
+            if scoreboard.get(self, session) != 0 { force_logout(); }
+        }
+        if revision == 3 {
+            cleanup_reservations();
+            maintain_public_signs();
+        } else { if installed != 0 {
+            message.all("银行格式已更新：备份后执行 /function sign_bank:reset 重建测试区域。", yellow);
+        } }
     }
-    maintain_public_signs();
-    maintain_room_signs();
-    message.all("告示牌银行 v2 已加载：请从大厅首屏选择登录或注册。", green);
 }
 
 @tick fn tick() {
-    maintenance_ticks += 1;
-    if maintenance_ticks >= 20 {
-        maintenance_ticks = 0;
-        maintain_public_signs();
-        maintain_room_signs();
-        // 预留清理是兜底路径：跟随每秒维护执行，不必每刻扫描 32 个槽位。
-        cleanup_orphan_reservations();
-    }
-
-    each(all_players) {
-        scoreboard.set(self, in_room, 0);
-        scoreboard.set(self, in_terminal, 0);
-        let leaves = scoreboard.get(self, leave_count);
-        if leaves != scoreboard.get(self, leave_seen) {
-            scoreboard.set(self, leave_seen, leaves);
-            if scoreboard.get(self, auth_mode) != 0 { cancel_auth(); }
-            if scoreboard.get(self, session) != 0 { force_logout(); }
-        }
-    }
-
-    tick_rooms();
-    each(all_players) {
-        if scoreboard.get(self, session) != 0 && scoreboard.get(self, in_room) == 0 {
-            title.actionbar(self, "已离开安全仓库，会话注销");
-            force_logout();
-        }
-    }
-
-    let users = count(terminal_players);
-    each(terminal_players) {
-        scoreboard.set(self, in_terminal, 1);
-    }
-    each(all_players) {
-        if scoreboard.get(self, auth_mode) != 0 && scoreboard.get(self, in_terminal) == 0 {
-            title.actionbar(self, "离开登录区，认证取消");
-            cancel_auth();
-        }
-    }
-
-    if users > 1 {
-        each(terminal_players) {
-            if scoreboard.get(self, auth_mode) != 0 {
-                title.actionbar(self, "登录区出现第二名玩家，认证取消");
-                cancel_auth();
+    if revision == 3 {
+        in_dimension("minecraft:overworld") {
+            each(all_players) {
+                let leaves = scoreboard.get(self, leave_count);
+                if leaves != scoreboard.get(self, leave_seen) {
+                    scoreboard.set(self, leave_seen, leaves);
+                    cancel_auth();
+                    if scoreboard.get(self, session) != 0 { force_logout(); }
+                }
+                scoreboard.set(self, room_valid, 0);
+                if scoreboard.get(self, session) != 0 { scoreboard.set(self, room_valid, valid_room_session()); }
+                if scoreboard.get(self, auth_mode) != 0 {
+                    if terminal_ready() == 0 { cancel_auth(); }
+                }
+            }
+            // Snapshot all sessions before teleporting anybody, so both occupants are evicted.
+            each(all_players) {
+                if scoreboard.get(self, room_valid) == 0 && (scoreboard.get(self, session) != 0 || in_warehouse_area() == 1) { force_logout(); }
+            }
+            maintenance_ticks += 1;
+            if maintenance_ticks >= 20 {
+                maintenance_ticks = 0;
+                maintain_public_signs();
+                cleanup_reservations();
+                cleanup_displays();
             }
         }
-        show_home_menu();
     }
 }
 
-fn install_world() {
-    // 清除早期测试版的高位和远端告示牌；这些位置当前布局不再写入，装一次就够。
-    set_block(pos(-3, 66, 1), block_state("minecraft:air"));
-    set_block(pos(3, 66, 1), block_state("minecraft:air"));
-    set_block(pos(0, 68, 1), block_state("minecraft:air"));
+// This explicit command resets test data; /reload never rebuilds rooms.
+export fn reset() {
+    in_dimension("minecraft:overworld") {
+        each(all_players) {
+            cancel_auth();
+            if scoreboard.get(self, session) != 0 { force_logout(); }
+        }
+        revision = 0;
+        reset_pending = 1;
+        forceload.add(column(-16, -16), column(15, 15));
+        forceload.add(column(96, 0), column(607, 15));
+        schedule finish_reset() after 1 t replace;
+    }
+}
 
+fn finish_reset() {
+    in_dimension("minecraft:overworld") {
+        let ready = 1;
+        if !loaded(pos(-10, 64, -10)) || !loaded(pos(10, 64, 10)) { ready = 0; }
+        unroll for index in 1..33 {
+            if !loaded(pos(100 + 16 * (index - 1), 64, 0)) { ready = 0; }
+        }
+        if reset_pending == 1 {
+            if ready == 1 {
+                install();
+                reset_pending = 0;
+                message.all("银行 v3 已重建，测试账号和仓库已清空。", yellow);
+            } else { schedule finish_reset() after 10 t replace; }
+        }
+    }
+}
+
+fn install() {
+    forceload.add(column(-16, -16), column(15, 15));
+    forceload.add(column(96, 0), column(607, 15));
+    clear_displays();
+    kill(account_markers);
     fill(pos(-10, 63, -12), pos(10, 63, 12), block_state("minecraft:smooth_stone"));
     fill(pos(-8, 64, 0), pos(8, 70, 0), block_state("minecraft:polished_deepslate"));
-    fill(pos(-8, 64, 11), pos(8, 66, 11), block_state("minecraft:polished_deepslate"));
-    fill(pos(-8, 64, 1), pos(-8, 66, 10), block_state("minecraft:polished_deepslate"));
-    fill(pos(8, 64, 1), pos(8, 66, 10), block_state("minecraft:polished_deepslate"));
-
     fill(pos(-10, 63, -10), pos(10, 82, -2), block_state("minecraft:barrier"));
     fill(pos(-9, 64, -9), pos(9, 81, -3), block_state("minecraft:air"));
     fill(pos(-9, 64, -8), pos(9, 81, -8), block_state("minecraft:barrier"));
-
+    build_rooms();
+    make_button_templates();
+    reset_scratch();
+    installed = 1;
+    revision = 3;
     show_home_menu();
-    build_room_shells();
 }
 
-fn terminal_ready() -> score {
+export @player fn terminal_ready() -> score {
     let ready = 0;
-    if count(terminal_players) == 1 { ready = 1; }
+    if revision == 3 && dimension("minecraft:overworld") && count(terminal_players) == 1 {
+        let x = data.get(entity, self, "Pos[0]");
+        let y = data.get(entity, self, "Pos[1]");
+        let z = data.get(entity, self, "Pos[2]");
+        if x >= -7 && x <= 7 && y >= 64 && y <= 70 && z >= 1 && z <= 10 && scoreboard.get(self, session) == 0 {
+            ready = 1;
+        }
+    }
     return ready;
 }
 
-@player fn deny_terminal() {
-    title.actionbar(self, "登录区必须只有你一名玩家");
-    sound.self("minecraft:block.note_block.bass", master);
-    cancel_auth();
-}
-
-fn maintain_public_signs() {
-    let users = count(terminal_players);
-    if users != 1 {
-        show_home_menu();
-    }
-    if users == 1 {
-        let page = scoreboard.get(terminal_player, auth_mode);
-        if page == 0 { show_home_menu(); }
-        if page == 1 { show_login_account(); }
-        if page == 2 { show_login_password(); }
-        if page == 3 { show_register_account(); }
-        if page == 4 { show_register_password(); }
-        if page < 0 || page > 4 { show_home_menu(); }
-    }
-}
-
-fn show_home_menu() {
-    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["告示牌账户银行", "账户系统首屏", "32个账户槽位", "下方选择登录或注册"]; color = "gold"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = true;
-    });
-    set_block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["欢迎使用", "注册费 1 绿宝石", "仓库 3×3 至 10×10", "选择后开放输入牌"]; color = "aqua"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = true;
-    });
-    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【登录账户】"; color = "aqua"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:button_login"; }; }, "进入账号登录", "━━━━━━"]; color = "dark_aqua"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        allow_op_features = true; is_waxed = true;
-    });
-    set_block(pos(1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【注册账户】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:button_register"; }; }, "创建新账户", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        allow_op_features = true; is_waxed = true;
-    });
-}
-
-fn show_login_account() {
-    ensure_input_sign();
-    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["登录 / 第1步", "编辑中间输入牌", "第1行只写账号", "确认后才询问密码"]; color = "yellow"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = true;
-    });
-    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【提交登录账号】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:login_account"; }; }, "检查账户是否存在", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        allow_op_features = true; is_waxed = true;
-    });
-    set_back_sign();
-}
-
-fn show_login_password() {
-    ensure_input_sign();
-    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["登录 / 第2步", "账号已经确认", "第1行只写密码", "错误后返回账号页"]; color = "gold"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = true;
-    });
-    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【提交登录密码】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:login_password"; }; }, "核对账户凭据", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        allow_op_features = true; is_waxed = true;
-    });
-    set_back_sign();
-}
-
-fn show_register_account() {
-    ensure_input_sign();
-    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["注册 / 第1步", "编辑中间输入牌", "第1行只写新账号", "需要 1 枚绿宝石"]; color = "green"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = true;
-    });
-    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【提交注册账号】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:register_account"; }; }, "检查账号并预留", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        allow_op_features = true; is_waxed = true;
-    });
-    set_back_sign();
-}
-
-fn show_register_password() {
-    ensure_input_sign();
-    set_block(pos(0, 67, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["注册 / 第2步", "账号已经临时保留", "第1行设置密码", "提交后扣 1 绿宝石"]; color = "gold"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = true;
-    });
-    set_block(pos(-1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["━━━━━━", { text = "【提交注册密码】"; color = "green"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:register_password"; }; }, "扣费并创建账户", "━━━━━━"]; color = "dark_green"; has_glowing_text = true; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        allow_op_features = true; is_waxed = true;
-    });
-    set_back_sign();
-}
-
-fn ensure_input_sign() {
-    if !block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }) {
-        set_input_sign();
-    }
-}
-
-fn set_input_sign() {
-    set_block(pos(0, 66, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = false;
-    });
-}
-
-fn set_back_sign() {
-    set_block(pos(1, 65, 1), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = {
-            messages = ["━━━━━━", { text = "【返回首屏】"; color = "red"; bold = true; click_event = { action = "run_command"; command = "/function sign_bank:button_home"; }; }, "取消本次操作", "━━━━━━"];
-            color = "dark_red"; has_glowing_text = true;
-        };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        allow_op_features = true;
-        is_waxed = true;
-    });
-}
-
-fn reset_stages() {
-    set_block(pos(5, 66, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
-        front_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        back_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
-        is_waxed = true;
-    });
-    clone(pos(5, 66, -7), pos(5, 66, -7), pos(6, 66, -7), force);
-    clone(pos(5, 66, -7), pos(5, 66, -7), pos(7, 66, -7), force);
-    clone(pos(5, 66, -7), pos(5, 66, -7), pos(8, 66, -7), force);
-}
-
-fn copy_account_input() {
-    data.modify(block, pos(6, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
-}
-
-fn prepare_credential(slot) {
-    reset_stages();
-    // 编译期循环：源坐标由索引算出，只保留一条运行期守卫。
-    unroll for index in 1..33 {
-        if index == slot {
-            data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), "front_text.messages[0]"));
-        }
-    }
-    data.modify(block, pos(5, 66, -7), "front_text.messages[1]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
-    data.modify(block, pos(7, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
-}
-
-export @player fn button_login() {
-    if terminal_ready() == 1 {
-        scoreboard.set(self, auth_mode, 1);
-        scoreboard.set(self, pending_slot, 0);
-        set_input_sign();
-        maintain_public_signs();
-        title.actionbar(self, "登录第1步：请输入账号");
-        sound.self("minecraft:block.note_block.hat", master);
-    } else { deny_terminal(); }
-}
-
-export @player fn button_register() {
-    if terminal_ready() == 1 {
-        scoreboard.set(self, auth_mode, 3);
-        scoreboard.set(self, pending_slot, 0);
-        set_input_sign();
-        maintain_public_signs();
-        title.actionbar(self, "注册第1步：请输入新账号");
-        sound.self("minecraft:block.note_block.hat", master);
-    } else { deny_terminal(); }
-}
-
-export @player fn button_home() {
-    cancel_auth();
-    show_home_menu();
-    title.actionbar(self, "已返回首屏");
-    sound.self("minecraft:block.note_block.hat", master);
-}
-
-export @player fn login_account() {
-    if terminal_ready() == 1 {
-        title.actionbar(self, "正在检查登录账号……");
-        sound.self("minecraft:block.note_block.hat", master);
-        process_login_account();
-    } else { deny_terminal(); }
-}
-
-@player fn process_login_account() {
-    reset_stages();
-    copy_account_input();
-    let slot = 0;
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(8, 66, -7)) {
-        title.actionbar(self, "账号不能为空");
-        sound.self("minecraft:block.note_block.bass", master);
-    } else {
-        slot = find_account();
-        if slot == 0 {
-            title.actionbar(self, "账号不存在");
-            sound.self("minecraft:block.note_block.bass", master);
-        } else {
-            if account_online(slot) == 1 {
-                title.actionbar(self, "这个账户已经在线");
-                sound.self("minecraft:block.note_block.bass", master);
-            } else {
-                scoreboard.set(self, pending_slot, slot);
-                scoreboard.set(self, auth_mode, 2);
-                // 只有真正进入下一页才擦除输入牌；失败时保留账号，方便重试。
-                set_input_sign();
-                title.actionbar(self, "账号存在：请输入密码");
-                sound.self("minecraft:block.note_block.pling", master);
-            }
-        }
-    }
-    maintain_public_signs();
-}
-
-export @player fn register_account() {
-    if terminal_ready() == 1 {
-        title.actionbar(self, "正在检查注册账号……");
-        sound.self("minecraft:block.note_block.hat", master);
-        process_register_account();
-    } else { deny_terminal(); }
-}
-
-@player fn process_register_account() {
-    reset_stages();
-    copy_account_input();
-    let valid = 1;
-    if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(8, 66, -7)) {
-        valid = 0;
-        title.actionbar(self, "账号不能为空");
-    }
-    if account_exists() == 1 {
-        valid = 0;
-        title.actionbar(self, "这个账号已经存在");
-    }
-    let slot = first_free_slot();
-    if slot == 0 {
-        valid = 0;
-        title.actionbar(self, "32 个账户槽位已经用完");
-    }
-    scoreboard.set(self, transfer, 0);
-    execute store.result(self, transfer) { clear(self, "minecraft:emerald", 0); }
-    if scoreboard.get(self, transfer) < 1 {
-        valid = 0;
-        title.actionbar(self, "注册需要 1 枚绿宝石");
-    }
-    if valid == 1 {
-        reserve_account(slot);
-        scoreboard.set(self, pending_slot, slot);
-        scoreboard.set(self, auth_mode, 4);
-        // 只有真正进入下一页才擦除输入牌；失败时保留账号，方便重试。
-        set_input_sign();
-        title.actionbar(self, "账号可用：请设置密码");
-        sound.self("minecraft:block.note_block.pling", master);
-    } else {
-        sound.self("minecraft:block.note_block.bass", master);
-    }
-    maintain_public_signs();
-}
-
-export @player fn login_password() {
-    if terminal_ready() == 1 {
-        title.actionbar(self, "正在核对登录密码……");
-        sound.self("minecraft:block.note_block.hat", master);
-        process_login_password();
-    } else { deny_terminal(); }
-}
-
-@player fn process_login_password() {
-    let slot = scoreboard.get(self, pending_slot);
-    prepare_credential(slot);
-    if blocks(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7)) {
-        title.actionbar(self, "密码不能为空");
-        sound.self("minecraft:block.note_block.bass", master);
-    } else {
-        if credential_matches(slot) == 1 && account_online(slot) == 0 {
-            create_account_marker(slot);
-            scoreboard.set(self, auth_mode, 0);
-            scoreboard.set(self, pending_slot, 0);
-            title.actionbar(self, "登录成功");
-            enter_account(slot);
-        } else {
-            scoreboard.set(self, auth_mode, 1);
-            scoreboard.set(self, pending_slot, 0);
-            title.actionbar(self, "密码错误：请重新输入账号");
-            sound.self("minecraft:block.note_block.bass", master);
-        }
-    }
-    set_input_sign();
-    maintain_public_signs();
-}
-
-export @player fn register_password() {
-    if terminal_ready() == 1 {
-        title.actionbar(self, "正在创建账户……");
-        sound.self("minecraft:block.note_block.hat", master);
-        process_register_password();
-    } else { deny_terminal(); }
-}
-
-@player fn process_register_password() {
-    let slot = scoreboard.get(self, pending_slot);
-    prepare_credential(slot);
-    if blocks(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7)) {
-        title.actionbar(self, "密码不能为空");
-        sound.self("minecraft:block.note_block.bass", master);
-    } else {
-        scoreboard.set(self, transfer, 0);
-        execute store.result(self, transfer) { clear(self, "minecraft:emerald", 0); }
-        if scoreboard.get(self, transfer) < 1 {
-            title.actionbar(self, "缺少注册所需的绿宝石");
-            sound.self("minecraft:block.note_block.bass", master);
-            cancel_auth();
-        } else {
-            clear(self, "minecraft:emerald", 1);
-            store_credential(slot);
-            create_account_marker(slot);
-            scoreboard.set(self, auth_mode, 0);
-            scoreboard.set(self, pending_slot, 0);
-            activate_new_account(slot);
-            title.actionbar(self, "注册成功");
-            sound.self("minecraft:block.enchantment_table.use", master);
-        }
-    }
-    set_input_sign();
-    maintain_public_signs();
-}
-
-fn find_account() -> score {
-    let found = 0;
-    unroll for index in 1..33 {
-        if found == 0 && block(pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) && blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7)) {
-            found = index;
-        }
-    }
-    return found;
-}
-
-fn credential_matches(slot) -> score {
-    let matched = 0;
-    unroll for index in 1..33 {
-        if index == slot && blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7)) {
-            matched = 1;
-        }
-    }
-    return matched;
-}
-
-fn account_exists() -> score {
-    let found = 0;
-    unroll for index in 1..33 {
-        if blocks(pos(6, 66, -7), pos(6, 66, -7), pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7)) {
-            found = 1;
-        }
-    }
-    return found;
-}
-
-fn first_free_slot() -> score {
-    let slot = 0;
-    unroll for index in 1..33 {
-        if slot == 0 && !block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
-            slot = index;
-        }
-    }
-    return slot;
-}
-
-fn reserve_account(slot) {
-    unroll for index in 1..33 {
-        if index == slot {
-            clone(pos(6, 66, -7), pos(6, 66, -7), pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), force);
-        }
-    }
-}
-
-fn store_credential(slot) {
-    unroll for index in 1..33 {
-        if index == slot {
-            clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), force);
-        }
-    }
-}
-
-fn release_reservation(slot) {
-    unroll for index in 1..33 {
-        if index == slot && !block(pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
-            set_block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:air"));
-        }
-    }
-}
-
-fn cleanup_orphan_reservations() {
-    if count(pending_registrations) == 0 {
-        unroll for index in 1..33 {
-            if block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4 + (index - 1) % 8, 66 + 2 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
-                set_block(pos(-4 + (index - 1) % 8, 74 + 2 * ((index - 1) / 8), -7), block_state("minecraft:air"));
-            }
-        }
-    }
-}
-
-fn account_online(slot) -> score {
+export fn account_online(slot) -> score {
     let online = 0;
     each(all_players) {
-        if scoreboard.get(self, session) == slot { online = 1; }
+        if scoreboard.get(self, session) == slot { online += 1; }
     }
     return online;
 }
 
-@player fn cancel_auth() {
-    let page = scoreboard.get(self, auth_mode);
+fn cleanup_reservations() {
+    if count(pending_registrations) == 0 { clear_uncommitted(); }
+}
+
+export @player fn cancel_auth() {
     let slot = scoreboard.get(self, pending_slot);
-    if page == 4 { release_reservation(slot); }
-    scoreboard.set(self, auth_mode, 0);
+    if scoreboard.get(self, auth_mode) == 4 { release_slot(slot); }
     scoreboard.set(self, pending_slot, 0);
-    set_input_sign();
-    maintain_public_signs();
+    scoreboard.set(self, auth_mode, 0);
 }
 
 export @player fn force_logout() {
+    let slot = scoreboard.get(self, session);
+    remove_display(slot);
     cancel_auth();
     scoreboard.set(self, session, 0);
-    scoreboard.set(self, in_room, 0);
-    teleport(self, vec3(0.5, 64.0, 5.5), rotation(180, 0));
-    title.actionbar(self, "银行会话已结束");
+    scoreboard.set(self, view_balance, 0);
+    scoreboard.set(self, view_size, 0);
+    in_dimension("minecraft:overworld") { teleport(self, vec3(0.5, 64, 5.5), rotation(180, 0)); }
+    title.actionbar(self, "会话已注销，返回银行大厅");
 }
-

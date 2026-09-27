@@ -1,0 +1,87 @@
+namespace sign_bank;
+import main;
+import accounts;
+import rooms;
+import displays;
+
+item one_emerald = item_stack("minecraft:emerald") {}
+
+@player fn read_state() {
+    let slot = scoreboard.get(self, session);
+    let balance = 0;
+    let size = 0;
+    each(account_markers) {
+        if scoreboard.get(self, account_slot) == slot {
+            balance = scoreboard.get(self, account_balance);
+            size = scoreboard.get(self, account_size);
+        }
+    }
+    scoreboard.set(self, view_balance, balance);
+    scoreboard.set(self, view_size, size);
+}
+
+export fn credit(slot, amount) {
+    if unique_record(slot) == 1 {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot {
+                scoreboard.set(self, account_balance, scoreboard.get(self, account_balance) + amount);
+            }
+        }
+    }
+}
+
+export @player fn deposit() {
+    if valid_room_session() == 1 {
+        read_state();
+        scoreboard.set(self, transfer, 0);
+        execute store.result(self, transfer) { clear(self, "minecraft:emerald", 0); }
+        let amount = scoreboard.get(self, transfer);
+        let remaining = 2147483647 - scoreboard.get(self, view_balance);
+        if amount > 0 && amount <= remaining {
+            execute store.result(self, transfer) { clear(self, "minecraft:emerald"); }
+            credit(scoreboard.get(self, session), scoreboard.get(self, transfer));
+            refresh_display(scoreboard.get(self, session));
+            title.actionbar(self, "绿宝石已存入");
+        } else { title.actionbar(self, "没有绿宝石，或余额达到上限"); }
+    } else { title.actionbar(self, "会话或仓库独占检查失败"); }
+}
+
+export @player fn withdraw() {
+    if valid_room_session() == 1 {
+        read_state();
+        if scoreboard.get(self, view_balance) > 0 {
+            scoreboard.set(self, transfer, 0);
+            execute store.success(self, transfer) { give(self, one_emerald); }
+            if scoreboard.get(self, transfer) == 1 {
+                credit(scoreboard.get(self, session), -1);
+                refresh_display(scoreboard.get(self, session));
+                title.actionbar(self, "已取出 1 枚绿宝石");
+            }
+        } else { title.actionbar(self, "账户余额为 0"); }
+    } else { title.actionbar(self, "会话或仓库独占检查失败"); }
+}
+
+export @player fn upgrade() {
+    if valid_room_session() == 1 {
+        read_state();
+        let slot = scoreboard.get(self, session);
+        let size = scoreboard.get(self, view_size);
+        let balance = scoreboard.get(self, view_balance);
+        let next = size + 1;
+        if size >= 10 { title.actionbar(self, "仓库已达到 10×10"); }
+        if size < 10 && balance < next { title.actionbar(self, "余额不足，升级费用等于新边长"); }
+        if size < 10 && balance >= next {
+            expand_room(slot, next);
+            credit(slot, -next);
+            each(account_markers) {
+                if scoreboard.get(self, account_slot) == slot { scoreboard.set(self, account_size, next); }
+            }
+            refresh_display(slot);
+            title.actionbar(self, "仓库已扩建，原有物品保持不变");
+        }
+    } else { title.actionbar(self, "会话或仓库独占检查失败"); }
+}
+
+export @player fn logout() {
+    if scoreboard.get(self, session) > 0 { force_logout(); }
+}
