@@ -1,4 +1,5 @@
 use std::env;
+use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 
 use mclang::{
@@ -8,8 +9,30 @@ use mclang::{
 
 fn main() {
     if let Err(error) = run() {
-        eprintln!("{error}");
+        print_diagnostic(&error);
         std::process::exit(1);
+    }
+}
+
+fn print_diagnostic(message: &str) {
+    if !io::stderr().is_terminal() || env::var_os("NO_COLOR").is_some() {
+        eprintln!("{message}");
+        return;
+    }
+
+    for (index, line) in message.lines().enumerate() {
+        let color = if line.starts_with("警告：") {
+            Some("\x1b[33m")
+        } else if line.starts_with("错误：") || index == 0 {
+            Some("\x1b[31m")
+        } else {
+            None
+        };
+        if let Some(color) = color {
+            eprintln!("{color}{line}\x1b[0m");
+        } else {
+            eprintln!("{line}");
+        }
     }
 }
 
@@ -71,6 +94,9 @@ fn run() -> Result<(), String> {
             } else {
                 build_file(&source, &output, &options)?
             };
+            for warning in &result.warnings {
+                print_diagnostic(warning);
+            }
             println!(
                 "已生成 {} 个文件：{}",
                 result.file_count,
@@ -90,6 +116,9 @@ fn run() -> Result<(), String> {
                 }
             }
             let summary = check_file(&PathBuf::from(source))?;
+            for warning in &summary.warnings {
+                print_diagnostic(warning);
+            }
             if deny_raw && summary.raw_statements > 0 {
                 return Err(format!(
                     "严格模式检查失败：项目包含 {} 条底层语句或不安全宏（run/execute/return run/运行期 with/nbt 宏片段）",

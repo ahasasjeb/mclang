@@ -2,7 +2,7 @@
 //!
 //! 编译分成两个互不重叠的阶段：
 //!
-//! 1. [`validate`] 只读地检查整程序，要么返回全部诊断，要么返回空列表；
+//! 1. [`validate`] 只读地检查整程序，收集错误与非阻断警告；
 //! 2. [`codegen`] 只处理已经通过检查的程序，不重复报告错误。
 //!
 //! 两个阶段共享本模块下的 [`types`]，常量折叠则来自 crate 级的
@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::ast::Program;
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, DiagnosticSeverity};
 
 /// FNV-1a：跨平台稳定的 64 位哈希，用于可复现的生成名称。
 pub(crate) fn stable_hash(value: &str) -> u64 {
@@ -37,6 +37,12 @@ pub(crate) fn stable_hash(value: &str) -> u64 {
 pub struct CompiledPack {
     pub files: BTreeMap<PathBuf, String>,
     pub binary_files: BTreeMap<PathBuf, Vec<u8>>,
+}
+
+/// 成功编译的数据包与仍需向用户展示的警告。
+pub struct Compilation {
+    pub pack: CompiledPack,
+    pub warnings: Vec<Diagnostic>,
 }
 
 /// 数据包函数的权限上限：26.3 的 `function-permission-level` 默认
@@ -57,7 +63,7 @@ pub struct CompileOptions {
 pub fn compile(
     program: &mut Program,
     options: &CompileOptions,
-) -> Result<CompiledPack, Vec<Diagnostic>> {
+) -> Result<Compilation, Vec<Diagnostic>> {
     crate::stack::run(|| compile_inner(program, options)).unwrap_or_else(|error| {
         Err(vec![Diagnostic::new(
             format!("无法创建编译工作线程：{error}"),
@@ -69,9 +75,12 @@ pub fn compile(
 fn compile_inner(
     program: &mut Program,
     options: &CompileOptions,
-) -> Result<CompiledPack, Vec<Diagnostic>> {
+) -> Result<Compilation, Vec<Diagnostic>> {
     let diagnostics = validate::validate(program);
-    if !diagnostics.is_empty() {
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+    {
         return Err(diagnostics);
     }
 
@@ -79,5 +88,15 @@ fn compile_inner(
 
     let mut compiler = codegen::Compiler::new(program);
     compiler.compile_functions();
-    compiler.finish(&options.description)
+    let pack = match compiler.finish(&options.description) {
+        Ok(pack) => pack,
+        Err(mut errors) => {
+            errors.extend(diagnostics);
+            return Err(errors);
+        }
+    };
+    Ok(Compilation {
+        pack,
+        warnings: diagnostics,
+    })
 }

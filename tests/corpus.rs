@@ -11,7 +11,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use mclang::{BuildOptions, build_file, build_zip_file, check_file};
+use mclang::{
+    BuildOptions, DiagnosticSeverity, SourceFile, analyze, build_file, build_zip_file, check_file,
+};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -76,6 +78,39 @@ fn valid_corpus_compiles() {
             )
         });
     }
+}
+
+#[test]
+fn sign_command_warnings_do_not_block_compilation() {
+    let source = repo_root().join("tests/valid/sign_command_warnings.mcl");
+    let summary = check_file(&source).expect("命令木牌配置警告不能阻止检查");
+    assert_eq!(summary.warnings.len(), 3);
+    assert!(
+        summary
+            .warnings
+            .iter()
+            .all(|warning| warning.contains("allow_op_features"))
+    );
+
+    let output = output_directory("sign_command_warnings");
+    let result = build_file(&source, &output, &BuildOptions::default())
+        .expect("命令木牌配置警告不能阻止构建");
+    assert_eq!(result.warnings.len(), 3);
+    assert!(
+        output
+            .join("data/sign_command_warnings/function/show_signs.mcfunction")
+            .is_file()
+    );
+
+    let text = fs::read_to_string(&source).expect("缺少命令木牌语料");
+    let analysis = analyze(&[SourceFile { path: source, text }]);
+    assert_eq!(analysis.diagnostics.len(), 3);
+    assert!(
+        analysis
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.severity == DiagnosticSeverity::Warning)
+    );
 }
 
 #[test]

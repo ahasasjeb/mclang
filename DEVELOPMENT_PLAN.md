@@ -95,7 +95,7 @@
 | 控制流 | 较高 | 保留短路与表达式求值顺序；简单条件和安全单命令块直接内联，无跳转循环省略状态。多实体执行、store 赋值结果和失败条件取反均保留语义边界；后续可增加 `match/switch`。已有编译期循环 `unroll for`：边界取常量，循环体按迭代展开，展开后不生成循环假玩家与辅助函数。 |
 | 函数调用 | 较高 | 整理参数、返回值、macro 调用规则和诊断。 |
 | raw 入口 | 已有 | 保留兼容入口；增加严格模式统计哪些代码仍依赖 raw。 |
-| 诊断 | 较高 | 增加诊断码、warning 等级、JSON 输出、related span、fix-it。 |
+| 诊断 | 较高 | 已支持非阻断 warning 等级，并能在 CLI 与 LSP 显示；继续增加诊断码、JSON 输出、related span、fix-it。 |
 | 项目配置 | 待实现 | 增加项目配置文件，保存 namespace、description、output、strict policy、libraries、pack metadata 等。 |
 | source map | 待实现 | 记录生成 `.mcfunction` 行与源文件 span/symbol 的对应关系。 |
 | 本地库 | 待实现 | 支持只读 library roots、稳定解析顺序和冲突诊断。 |

@@ -10,6 +10,7 @@ mod border;
 mod features;
 mod gamerules;
 mod positions;
+mod signs;
 
 use crate::ast::{CloneFilter, LocateKind, Span, Statement, StatementKind, TimeOperation};
 use crate::diagnostic::Diagnostic;
@@ -25,6 +26,7 @@ use blocks::validate_forceload;
 use border::validate_world_border;
 use features::validate_place_feature;
 use gamerules::validate_game_rule;
+use signs::warn_disabled_sign_commands;
 
 /// 水平坐标范围，对应 `Level.isInWorldBoundsHorizontal` 的半开区间。
 pub(super) const HORIZONTAL_MIN: i32 = -30_000_000;
@@ -39,20 +41,25 @@ const BORDER_MAX_CENTER: f64 = 29_999_984.0;
 /// 世界语句的校验入口；调用方已按 [`StatementKind`] 分派。
 pub(super) fn validate_world_statement(statement: &Statement, diagnostics: &mut Vec<Diagnostic>) {
     match &statement.kind {
-        StatementKind::SetBlock { pos, block, .. } => {
+        StatementKind::SetBlock {
+            pos, block, nbt, ..
+        } => {
             validate_block_position(pos, diagnostics);
             validate_block_state(block, false, diagnostics);
+            warn_disabled_sign_commands(block, nbt.as_ref(), diagnostics);
         }
         StatementKind::Fill {
             from,
             to,
             block,
             filter,
+            nbt,
             ..
         } => {
             validate_block_position(from, diagnostics);
             validate_block_position(to, diagnostics);
             validate_block_state(block, false, diagnostics);
+            warn_disabled_sign_commands(block, nbt.as_ref(), diagnostics);
             if let Some(filter) = filter {
                 validate_block_state(filter, true, diagnostics);
             }

@@ -2,10 +2,17 @@ use std::path::Path;
 
 use crate::ast::Span;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DiagnosticSeverity {
+    Error,
+    Warning,
+}
+
 #[derive(Debug)]
 pub struct Diagnostic {
     pub message: String,
     pub span: Span,
+    pub severity: DiagnosticSeverity,
 }
 
 impl Diagnostic {
@@ -13,6 +20,15 @@ impl Diagnostic {
         Self {
             message: message.into(),
             span,
+            severity: DiagnosticSeverity::Error,
+        }
+    }
+
+    pub fn warning(message: impl Into<String>, span: Span) -> Self {
+        Self {
+            message: message.into(),
+            span,
+            severity: DiagnosticSeverity::Warning,
         }
     }
 
@@ -33,8 +49,12 @@ impl Diagnostic {
             .chars()
             .count()
             .max(1);
+        let label = match self.severity {
+            DiagnosticSeverity::Error => "错误",
+            DiagnosticSeverity::Warning => "警告",
+        };
         format!(
-            "错误：{}\n --> {}:{}:{}\n  |\n{:>3} | {}\n  | {}{}",
+            "{label}：{}\n --> {}:{}:{}\n  |\n{:>3} | {}\n  | {}{}",
             self.message,
             path.display(),
             line,

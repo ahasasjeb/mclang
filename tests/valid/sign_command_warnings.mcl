@@ -1,0 +1,26 @@
+namespace sign_command_warnings;
+
+fn show_signs() {
+    set_block(pos(0, 64, 0), block_state("minecraft:oak_wall_sign"), nbt {
+        front_text = { messages = [{ text = "运行"; click_event = { action = "run_command"; command = "/say missing"; }; }, "", "", ""]; };
+        is_waxed = true;
+    });
+
+    set_block(pos(1, 64, 0), block_state("minecraft:oak_wall_sign"), nbt {
+        back_text = { messages = [{ text = "运行"; click_event = { action = "run_command"; command = "/say disabled"; }; }, "", "", ""]; };
+        allow_op_features = false;
+    });
+
+    fill(pos(2, 64, 0), pos(3, 64, 0), block_state("minecraft:oak_wall_sign"), nbt {
+        front_text = { messages = [{ text = "运行"; click_event = { action = "run_command"; command = "/say fill"; }; }, "", "", ""]; };
+    });
+
+    set_block(pos(4, 64, 0), block_state("minecraft:oak_wall_sign"), nbt {
+        front_text = { messages = [{ text = "运行"; click_event = { action = "run_command"; command = "/say enabled"; }; }, "", "", ""]; };
+        allow_op_features = true;
+    });
+
+    set_block(pos(5, 64, 0), block_state("minecraft:oak_wall_sign"), nbt {
+        front_text = { messages = ["普通木牌", "", "", ""]; };
+    });
+}

@@ -160,7 +160,10 @@ fn diagnostic_json(text: &str, diagnostic: &FileDiagnostic) -> Value {
             "start": {"line": start_line, "character": start_character},
             "end": {"line": end_line, "character": end_character},
         },
-        "severity": 1,
+        "severity": match diagnostic.severity {
+            crate::diagnostic::DiagnosticSeverity::Error => 1,
+            crate::diagnostic::DiagnosticSeverity::Warning => 2,
+        },
         "source": "mclang",
         "message": diagnostic.message,
     })
