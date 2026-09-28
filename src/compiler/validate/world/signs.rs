@@ -1,7 +1,7 @@
 use crate::ast::{BlockStateValue, NbtEntry, NbtValue, NbtValueKind, Span};
 use crate::diagnostic::Diagnostic;
 
-/// 26.3 的 `SignBlockEntity` 默认关闭点击命令；只检查能在右键时执行的行级事件。
+///  `SignBlockEntity` 默认关闭点击命令；只检查能在右键时执行的行级事件。
 pub(super) fn warn_disabled_sign_commands(
     block: &BlockStateValue,
     nbt: Option<&NbtValue>,
@@ -28,7 +28,7 @@ pub(super) fn warn_disabled_sign_commands(
     }
     diagnostics.push(Diagnostic::warning(
         format!(
-            "命令木牌 `{}` 含 `run_command` 点击事件，但 NBT `allow_op_features` 未设为 true；26.3 默认关闭，玩家右键不会执行命令",
+            "命令木牌 `{}` 含 `run_command` 点击事件，但 NBT `allow_op_features` 未设为 true；默认关闭，玩家右键不会执行命令",
             block.id
         ),
         enabled.map_or(click_span, |value| value.span),
