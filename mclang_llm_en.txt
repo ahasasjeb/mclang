@@ -514,7 +514,7 @@ Every statement ends with `;` unless it ends with a `}` block.
     scoreboard.enable(<holder>, <declared objective>);         // criteria=trigger
     scoreboard.operation(<dest holder>, <dest objective>, <op>, <src holder>, <src objective>);
         op: set add subtract multiply divide modulo min max swap
-    let <name> = scoreboard.get(<limit(1) holder or self>, <declared objective>);
+    let <name> = scoreboard.get(self|origin|<limit(1) query>, <declared objective>);
     scoreboard.display("<slot>"[, <declared objective>]);      // no objective clears
     scoreboard.objectives.list(); | .remove(<objective>);
     scoreboard.objectives.modify.displayname(<objective>, <component|string>);
@@ -680,10 +680,12 @@ Every statement ends with `;` unless it ends with a `}` block.
     waypoint.modify.color.reset(<holder>); waypoint.modify.style.set(<holder>, "<style>");
     waypoint.modify.style.reset(<holder>);
   Integer-returning commands can be used in expressions; failures yield 0.
-  Single-entity parameters require limit(1); player parameters require a
-  minecraft:player query. Trigger needs player context and a criteria=trigger
-  objective. datapack.create and kick need permissions a datapack function
-  does not have and are rejected.
+  When a command needs one entity from a query, that query requires limit(1);
+  Query arguments for player-only commands must be minecraft:player queries;
+  `self` targets need player context. Some commands accept `origin` with entity
+  context; others reject it. Trigger needs player context and a criteria=trigger
+  objective. `datapack.create` and `kick` require
+  permissions unavailable in datapack functions, so the compiler rejects them.
 
 ===============================================================================
 6 EXPRESSIONS AND CONDITIONS
@@ -913,7 +915,8 @@ Behavior:
 ===============================================================================
 11 HARD RULES AND PITFALLS
 ===============================================================================
-Repeat these until they are automatic; each one is enforced by the compiler.
+Use these as a checklist. Static restrictions are checked by the compiler;
+runtime and generated-pack behavior are described where each rule applies.
  1. `return` is only legal directly in the outermost body of a function.
     It cannot appear inside if/while/for/each/spawn/in_dimension/execute.
     For conditional results assign a local and return at the end.
@@ -924,8 +927,8 @@ Repeat these until they are automatic; each one is enforced by the compiler.
  3. `schedule` targets must be parameter-free and context-free; tags are
     allowed as targets, and every member must satisfy the same rule.
     schedule.clear takes a function only.
- 4. Every single-entity parameter requires a query with `limit(1)`; the
-    compiler never picks "the first" entity silently.
+ 4. When a command takes a query where it requires one entity, that query must
+    declare `limit(1)`; the compiler never silently picks the first match.
  5. data/NBT writes require a definite non-player context. Player NBT is
     read-only.
  6. message.self, self.give_item, xp.*, clear()/give(self,...), trigger need a

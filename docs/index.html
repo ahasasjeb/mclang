@@ -2063,7 +2063,7 @@ scoreboard players set #v_phase mcl_ade30ff2a2f0 1</code></pre></figure>
 <tr><td><code class="kw"><span class="kw-en">&lt;integer&gt;</span><span class="kw-zh">&lt;整数&gt;</span></code></td><td>32 位整数常量，纯常量表达式在编译期折叠</td></tr>
 <tr><td><code>&lt;计分变量&gt;</code></td><td>全局计分变量、函数参数或局部变量</td></tr>
 <tr><td><code class="kw"><span class="kw-en">&lt;fn&gt;(&lt;实参&gt;...)</span><span class="kw-zh">&lt;函数&gt;(&lt;实参&gt;...)</span></code></td><td>返回 score 的函数调用，结果写入临时计分项</td></tr>
-<tr><td><code class="kw"><span class="kw-en">scoreboard.get(&lt;持有者&gt;, &lt;objective&gt;)</span><span class="kw-zh">计分板.取(&lt;持有者&gt;, &lt;目标&gt;)</span></code></td><td>读取用户计分板，失败时为 0，要求 <code class="kw"><span class="kw-en">limit(1)</span><span class="kw-zh">上限(1)</span></code> 查询</td></tr>
+<tr><td><code class="kw"><span class="kw-en">scoreboard.get(&lt;持有者&gt;, &lt;objective&gt;)</span><span class="kw-zh">计分板.取(&lt;持有者&gt;, &lt;目标&gt;)</span></code></td><td>读取用户计分板，失败时为 0；目标可用 <code class="kw"><span class="kw-en">self</span><span class="kw-zh">自身</span></code>、<code class="kw"><span class="kw-en">origin</span><span class="kw-zh">投掷者</span></code> 或带 <code class="kw"><span class="kw-en">limit(1)</span><span class="kw-zh">上限(1)</span></code> 的查询</td></tr>
 <tr><td><code>xp.query(&lt;查询&gt;, points 或 levels)</code></td><td>读取经验值，要求 <code class="kw"><span class="kw-en">limit(1)</span><span class="kw-zh">上限(1)</span></code></td></tr>
 <tr><td><code class="kw"><span class="kw-en">stopwatch.query(&quot;&lt;id&gt;&quot;[, &lt;缩放&gt;])</span><span class="kw-zh">秒表.查询(&quot;&lt;id&gt;&quot;[, &lt;缩放&gt;])</span></code></td><td>读取秒表，失败时为 0</td></tr>
 <tr><td><code class="kw"><span class="kw-en">time.query([&quot;&lt;时钟&gt;&quot;])</span><span class="kw-zh">时间.查询([&quot;&lt;时钟&gt;&quot;])</span></code></td><td>世界时钟的总游戏刻</td></tr>
@@ -2671,7 +2671,7 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 </tbody></table></div>
 <h2 id="command-completion">核心与实体命令补全</h2>
 <p>本节对应开发计划 §2.1、§2.2，命令形状以随附的 26.3 源码为准。新增命令都可以直接写成语句，也可把原版整数结果用于表达式，例如 <code>let total = tag.list(players);</code>、<code>let health = attribute.get(one, &quot;minecraft:max_health&quot;, 100);</code>。查询失败时结果为 0。函数宏使用下文单独的调用形式。</p>
-<p>实体参数使用已声明查询或 <code class="kw"><span class="kw-en">self</span><span class="kw-zh">自身</span></code>。<code class="kw"><span class="kw-en">damage</span><span class="kw-zh">伤害</span></code>、<code class="kw"><span class="kw-en">attribute</span><span class="kw-zh">实体属性</span></code>、<code class="kw"><span class="kw-en">ride</span><span class="kw-zh">乘骑</span></code>、<code class="kw"><span class="kw-en">rotate</span><span class="kw-zh">旋转</span></code>、<code class="kw"><span class="kw-en">spectate</span><span class="kw-zh">旁观</span></code> 的被观察目标、路径点以及 <code class="kw"><span class="kw-en">loot.kill</span><span class="kw-zh">战利品.杀死</span></code> 都要求单实体，查询必须声明 <code class="kw"><span class="kw-en">limit(1)</span><span class="kw-zh">上限(1)</span></code>；玩家参数还要求查询匹配 <code>minecraft:player</code>。省略目标的 <code class="kw"><span class="kw-en">kill</span><span class="kw-zh">杀死</span></code>、<code class="kw"><span class="kw-en">swing</span><span class="kw-zh">挥动</span></code> 需要实体上下文，<code class="kw"><span class="kw-en">spectate</span><span class="kw-zh">旁观</span></code>、<code class="kw"><span class="kw-en">gamemode</span><span class="kw-zh">游戏模式</span></code>、<code class="kw"><span class="kw-en">spawnpoint</span><span class="kw-zh">设置出生点</span></code>、<code class="kw"><span class="kw-en">clear</span><span class="kw-zh">清除</span></code> 需要玩家上下文。<code class="kw"><span class="kw-en">trigger</span><span class="kw-zh">触发</span></code> 只能在玩家上下文执行，目标准则必须是 <code class="kw"><span class="kw-en">trigger</span><span class="kw-zh">触发</span></code>。</p>
+<p>实体参数通常使用已声明查询；支持当前实体或来源实体的位置还可写 <code class="kw"><span class="kw-en">self</span><span class="kw-zh">自身</span></code>/<code class="kw"><span class="kw-en">origin</span><span class="kw-zh">投掷者</span></code>，具体目标形式由命令决定。<code class="kw"><span class="kw-en">damage</span><span class="kw-zh">伤害</span></code>、<code class="kw"><span class="kw-en">attribute</span><span class="kw-zh">实体属性</span></code>、<code class="kw"><span class="kw-en">ride</span><span class="kw-zh">乘骑</span></code>、<code class="kw"><span class="kw-en">rotate</span><span class="kw-zh">旋转</span></code>、<code class="kw"><span class="kw-en">spectate</span><span class="kw-zh">旁观</span></code> 的被观察目标、路径点以及 <code class="kw"><span class="kw-en">loot.kill</span><span class="kw-zh">战利品.杀死</span></code> 都要求单实体，查询必须声明 <code class="kw"><span class="kw-en">limit(1)</span><span class="kw-zh">上限(1)</span></code>；玩家专用命令的查询目标必须匹配 <code>minecraft:player</code>，<code class="kw"><span class="kw-en">self</span><span class="kw-zh">自身</span></code> 目标需要玩家上下文。<code class="kw"><span class="kw-en">origin</span><span class="kw-zh">投掷者</span></code> 仅在部分命令中可用，使用时需要实体上下文；其他命令会在编译期拒绝。省略目标的 <code class="kw"><span class="kw-en">kill</span><span class="kw-zh">杀死</span></code>、<code class="kw"><span class="kw-en">swing</span><span class="kw-zh">挥动</span></code> 需要实体上下文，<code class="kw"><span class="kw-en">spectate</span><span class="kw-zh">旁观</span></code>、<code class="kw"><span class="kw-en">gamemode</span><span class="kw-zh">游戏模式</span></code>、<code class="kw"><span class="kw-en">spawnpoint</span><span class="kw-zh">设置出生点</span></code>、<code class="kw"><span class="kw-en">clear</span><span class="kw-zh">清除</span></code> 需要玩家上下文。<code class="kw"><span class="kw-en">trigger</span><span class="kw-zh">触发</span></code> 只能在玩家上下文执行，目标准则必须是 <code class="kw"><span class="kw-en">trigger</span><span class="kw-zh">触发</span></code>。</p>
 <p>带物品过滤条件的查询仍可作为新增命令的目标。编译器先用内部计分目标记录匹配实体，再执行一次原生命令，并在清理后保留命令的结果与成功状态。这样 <code class="kw"><span class="kw-en">tag.list</span><span class="kw-zh">标签.列出</span></code> 仍查询整个实体集合，<code class="kw"><span class="kw-en">loot</span><span class="kw-zh">战利品</span></code> 也不会因为逐实体展开而重复抽取战利品。</p>
 <h3 id="sec-战利品-配方-随机与数据包">战利品、配方、随机与数据包</h3>
 <figure class="code" data-lang="mcl" data-dual="true"><figcaption><span class="code-actions"><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code class="kw-en"><span class="tok-kw">loot</span>.<span class="tok-method">give</span>(<span class="tok-lit">players</span>, <span class="tok-kw">loot</span>.<span class="tok-method">table</span>(<span class="tok-ident">treasure</span>));
@@ -3331,7 +3331,7 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <h2 id="appendix-registry">附录 C：游戏规则与 JSON 资源类型</h2>
 <p>规则名与取值类型来自 26.3 的 <code>GameRules</code> 注册表；<code class="kw"><span class="kw-en">resource</span><span class="kw-zh">资源</span></code> 声明的类型来自资源目录。两者都由编译器在编译期校验。</p>
 <div class="filter-bar" data-filter-root="game-rules"><input type="search" class="table-filter" placeholder="过滤规则：输入规则名" aria-label="过滤规则：输入规则名"><span class="filter-count"></span></div>
-<h4>游戏规则 <small>GAME_RULES · 53 条（26.3 注册表）</small></h4>
+<h4>游戏规则 <small>GAME_RULES · 59 条（26.3 注册表）</small></h4>
 <p class="table-note"><code>gamerule.set(&quot;规则&quot;, 值)</code> 的值类型与范围在编译期检查；<code>gamerule.query(&quot;规则&quot;)</code> 可作为表达式读取结果。<code>max_minecart_speed</code> 需要 <code>minecart_improvements</code> 特性，默认特性集下该规则的命令不可用。</p><div class="table-wrap"><table class="alias-table"><thead><tr><th>规则</th><th>类型</th><th>取值范围</th></tr></thead><tbody><tr><td><code>advance_time</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>advance_weather</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>allow_entering_nether_using_portals</code></td><td>布尔</td><td>true / false</td></tr>
@@ -3345,6 +3345,7 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <tr><td><code>entity_drops</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>fall_damage</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>fire_damage</code></td><td>布尔</td><td>true / false</td></tr>
+<tr><td><code>fire_spread_radius_around_player</code></td><td>整数</td><td>-1 到 2147483647</td></tr>
 <tr><td><code>forgive_dead_players</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>freeze_damage</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>global_sound_events</code></td><td>布尔</td><td>true / false</td></tr>
@@ -3354,7 +3355,9 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <tr><td><code>limited_crafting</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>locator_bar</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>log_admin_commands</code></td><td>布尔</td><td>true / false</td></tr>
+<tr><td><code>max_block_modifications</code></td><td>整数</td><td>1 到 2147483647</td></tr>
 <tr><td><code>max_command_forks</code></td><td>整数</td><td>0 到 2147483647</td></tr>
+<tr><td><code>max_command_sequence_length</code></td><td>整数</td><td>0 到 2147483647</td></tr>
 <tr><td><code>max_entity_cramming</code></td><td>整数</td><td>0 到 2147483647</td></tr>
 <tr><td><code>max_minecart_speed</code></td><td>整数</td><td>1 到 1000</td></tr>
 <tr><td><code>max_snow_accumulation_height</code></td><td>整数</td><td>0 到 8</td></tr>
@@ -3363,6 +3366,9 @@ cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
 <tr><td><code>mob_griefing</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>natural_health_regeneration</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>player_movement_check</code></td><td>布尔</td><td>true / false</td></tr>
+<tr><td><code>players_nether_portal_creative_delay</code></td><td>整数</td><td>0 到 2147483647</td></tr>
+<tr><td><code>players_nether_portal_default_delay</code></td><td>整数</td><td>0 到 2147483647</td></tr>
+<tr><td><code>players_sleeping_percentage</code></td><td>整数</td><td>0 到 2147483647</td></tr>
 <tr><td><code>projectiles_can_break_blocks</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>pvp</code></td><td>布尔</td><td>true / false</td></tr>
 <tr><td><code>raids</code></td><td>布尔</td><td>true / false</td></tr>

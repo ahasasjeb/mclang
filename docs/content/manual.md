@@ -1643,7 +1643,7 @@ fn release() {
 | `<整数>` | 32 位整数常量，纯常量表达式在编译期折叠 |
 | `<计分变量>` | 全局计分变量、函数参数或局部变量 |
 | `<函数>(<实参>...)` | 返回 score 的函数调用，结果写入临时计分项 |
-| `scoreboard.get(<持有者>, <目标>)` | 读取用户计分板，失败时为 0，要求 `limit(1)` 查询 |
+| `scoreboard.get(<持有者>, <目标>)` | 读取用户计分板，失败时为 0；目标可用 `self`、`origin` 或带 `limit(1)` 的查询 |
 | `xp.query(<查询>, points 或 levels)` | 读取经验值，要求 `limit(1)` |
 | `stopwatch.query("<id>"[, <缩放>])` | 读取秒表，失败时为 0 |
 | `time.query(["<时钟>"])` | 世界时钟的总游戏刻 |
@@ -2036,7 +2036,7 @@ cargo run -- check examples/multi_counter --deny-raw
 
 本节对应开发计划 §2.1、§2.2，命令形状以随附的 26.3 源码为准。新增命令都可以直接写成语句，也可把原版整数结果用于表达式，例如 `let total = tag.list(players);`、`let health = attribute.get(one, "minecraft:max_health", 100);`。查询失败时结果为 0。函数宏使用下文单独的调用形式。
 
-实体参数使用已声明查询或 `self`。`damage`、`attribute`、`ride`、`rotate`、`spectate` 的被观察目标、路径点以及 `loot.kill` 都要求单实体，查询必须声明 `limit(1)`；玩家参数还要求查询匹配 `minecraft:player`。省略目标的 `kill`、`swing` 需要实体上下文，`spectate`、`gamemode`、`spawnpoint`、`clear` 需要玩家上下文。`trigger` 只能在玩家上下文执行，目标准则必须是 `trigger`。
+实体参数通常使用已声明查询；支持当前实体或来源实体的位置还可写 `self`/`origin`，具体目标形式由命令决定。`damage`、`attribute`、`ride`、`rotate`、`spectate` 的被观察目标、路径点以及 `loot.kill` 都要求单实体，查询必须声明 `limit(1)`；玩家专用命令的查询目标必须匹配 `minecraft:player`，`self` 目标需要玩家上下文。`origin` 仅在部分命令中可用，使用时需要实体上下文；其他命令会在编译期拒绝。省略目标的 `kill`、`swing` 需要实体上下文，`spectate`、`gamemode`、`spawnpoint`、`clear` 需要玩家上下文。`trigger` 只能在玩家上下文执行，目标准则必须是 `trigger`。
 
 带物品过滤条件的查询仍可作为新增命令的目标。编译器先用内部计分目标记录匹配实体，再执行一次原生命令，并在清理后保留命令的结果与成功状态。这样 `tag.list` 仍查询整个实体集合，`loot` 也不会因为逐实体展开而重复抽取战利品。
 

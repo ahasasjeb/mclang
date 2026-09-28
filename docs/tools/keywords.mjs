@@ -135,13 +135,25 @@ function parseGameRules(source) {
 
   const rules = [];
   const pattern =
-    /\(\s*"([a-z0-9_]+)",\s*GameRuleKind::(Bool|Integer\((-?\d+),\s*(i32::MAX|-?\d+)\))\s*\)/g;
+    /\(\s*"([a-z0-9_]+)",\s*GameRuleKind::(Bool|Integer\(\s*(-?\d+),\s*(i32::MAX|-?\d+)\s*\))\s*,?\s*\)/g;
   for (const match of source.slice(start, end).matchAll(pattern)) {
     const range =
       match[2] === "Bool" ? null : [Number(match[3]), match[4] === "i32::MAX" ? 2147483647 : Number(match[4])];
     rules.push({ name: match[1], type: match[2] === "Bool" ? "bool" : "int", range });
   }
   if (rules.length === 0) throw new Error("GAME_RULES 没有解析出任何规则");
+  const multilineRules = [
+    "fire_spread_radius_around_player",
+    "max_block_modifications",
+    "max_command_sequence_length",
+    "players_nether_portal_creative_delay",
+    "players_nether_portal_default_delay",
+    "players_sleeping_percentage",
+  ];
+  const missing = multilineRules.filter((name) => !rules.some((rule) => rule.name === name));
+  if (missing.length > 0) {
+    throw new Error(`GAME_RULES 漏掉多行规则：${missing.join(", ")}`);
+  }
   return rules;
 }
 
