@@ -2645,30 +2645,48 @@ execute as @e[type=minecraft:item,tag=!picked] at @s if items entity @s contents
   }
 }</code></pre></figure>
 <h3 id="sec-仓库里的端到端示例">仓库里的端到端示例</h3>
-<p><code>examples/</code> 下还有多个可直接运行的项目，都可以用下面的方式检查与构建：</p>
+<p><code>examples/</code> 下有 23 个可直接运行的项目（15 个单文件 + 8 个多文件目录），都可以用下面的方式检查与构建：</p>
 <figure class="code" data-lang="powershell"><figcaption><span class="code-title">逐个检查仓库示例</span><span class="code-actions"><button class="copy" type="button" title="复制当前显示的代码">复制</button></span></figcaption><pre><code>cargo run -- check examples/counter.mcl --deny-raw
-cargo run -- check examples/chinese_counter.mcl --deny-raw
-cargo run -- check examples/give_reward.mcl --deny-raw
-cargo run -- check examples/potion_lab.mcl --deny-raw
-cargo run -- check examples/world_ops.mcl --deny-raw
-cargo run -- check examples/portal.mcl --deny-raw
+cargo run -- check examples/beacon_base.mcl --deny-raw
+cargo run -- check examples/compile_time_grid.mcl --deny-raw
+cargo run -- check examples/core_commands.mcl --deny-raw
+cargo run -- check examples/entity_commands.mcl --deny-raw
+cargo run -- check examples/item_components.mcl --deny-raw
+cargo run -- check examples/remaining_commands.mcl --deny-raw
+cargo run -- check examples/shared_arguments.mcl --deny-raw
+cargo run -- check examples/optimization_lab.mcl --deny-raw
+cargo run -- check examples/stdlib_demo --deny-raw
 cargo run -- check examples/portable_chest --deny-raw
-cargo run -- check examples/multi_counter --deny-raw</code></pre></figure>
+cargo run -- check examples/monster_market --deny-raw
+cargo run -- check examples/sign_bank --deny-raw</code></pre></figure>
 <div class="table-wrap"><table>
 <thead><tr><th>示例</th><th>演示内容</th></tr></thead>
 <tbody>
 <tr><td><code>counter.mcl</code></td><td>计分变量、<code class="kw"><span class="kw-en">@tick</span><span class="kw-zh">@每刻</span></code>、<code class="kw"><span class="kw-en">each</span><span class="kw-zh">遍历</span></code>、消息与声音</td></tr>
 <tr><td><code>chinese_counter.mcl</code></td><td>全中文关键词写法的同一程序</td></tr>
+<tr><td><code>beacon_base.mcl</code></td><td>全中文关键词写成的玩法示例：<code>placed_block</code> 进度检测、九格 <code class="kw"><span class="kw-en">block</span><span class="kw-zh">方块</span></code> 条件检查与把泥土换成信标</td></tr>
 <tr><td><code>give_reward.mcl</code></td><td>查询标签排除、类型化 <code class="kw"><span class="kw-en">give</span><span class="kw-zh">给予</span></code> 与物品组件</td></tr>
 <tr><td><code>potion_lab.mcl</code></td><td>效果、经验、清空、秒表、函数标签与小数调度</td></tr>
 <tr><td><code>world_ops.mcl</code></td><td>方块、生物群系、复制、放置、区块加载、时间、天气、规则与边界</td></tr>
 <tr><td><code>ui_commands.mcl</code></td><td>Boss 栏、标题、粒子、停止声音、后处理与私聊</td></tr>
+<tr><td><code>item_components.mcl</code></td><td><code class="kw"><span class="kw-en">components = nbt { ... }</span><span class="kw-zh">组件 = 数据 { ... }</span></code> 任意组件、查询里的 <code class="kw"><span class="kw-en">item(...)</span><span class="kw-zh">物品(...)</span></code> 子块与 <code class="kw"><span class="kw-en">item_predicate</span><span class="kw-zh">物品谓词</span></code> 的 <code class="kw"><span class="kw-en">has</span><span class="kw-zh">存在</span></code> / <code class="kw"><span class="kw-en">equals</span><span class="kw-zh">等于</span></code> / <code class="kw"><span class="kw-en">matches</span><span class="kw-zh">匹配</span></code></td></tr>
+<tr><td><code>core_commands.mcl</code></td><td>战利品、配方、随机与数据包命令族，含 <code class="kw"><span class="kw-en">loot.*</span><span class="kw-zh">战利品.*</span></code> 的四种来源与 <code class="kw"><span class="kw-en">random.roll</span><span class="kw-zh">随机.掷出</span></code> 的序列</td></tr>
+<tr><td><code>entity_commands.mcl</code></td><td>实体、属性与队伍命令族：<code class="kw"><span class="kw-en">attribute.*</span><span class="kw-zh">实体属性.*</span></code>、<code class="kw"><span class="kw-en">ride</span><span class="kw-zh">乘骑</span></code>、<code class="kw"><span class="kw-en">rotate</span><span class="kw-zh">旋转</span></code>、<code class="kw"><span class="kw-en">team.*</span><span class="kw-zh">队伍.*</span></code>、<code class="kw"><span class="kw-en">waypoint.*</span><span class="kw-zh">路径点.*</span></code>、路径点十六进制颜色</td></tr>
+<tr><td><code>shared_arguments.mcl</code></td><td><code class="kw"><span class="kw-en">object(player)</span><span class="kw-zh">对象内容(玩家)</span></code> / <code>object(atlas)</code>、<code>hover</code> / <code>click</code> 全部动作、复杂 NBT 路径与更多物品组件</td></tr>
+<tr><td><code>remaining_commands.mcl</code></td><td><code class="kw"><span class="kw-en">objective</span><span class="kw-zh">目标</span></code> 运行期设置、<code class="kw"><span class="kw-en">version</span><span class="kw-zh">版本</span></code> / <code class="kw"><span class="kw-en">seed</span><span class="kw-zh">世界种子</span></code> / <code class="kw"><span class="kw-en">say</span><span class="kw-zh">广播</span></code>、计分板玩家子命令与 <code class="kw"><span class="kw-en">test.run</span><span class="kw-zh">测试命令.原生命令</span></code></td></tr>
 <tr><td><code>portal.mcl</code></td><td>进度声明、<code>placed_block</code> / <code>enter_block</code> 触发器与可重复触发的 <code>advancement.revoke</code></td></tr>
+<tr><td><code>compile_time_grid.mcl</code></td><td><code class="kw"><span class="kw-en">unroll for</span><span class="kw-zh">展开 对于</span></code> 编译期展开：32 个槽位折叠成字面量坐标，嵌套展开与常量守卫在展开时定型</td></tr>
+<tr><td><code>optimization_lab.mcl</code></td><td>循环与条件的优化语料：嵌套守卫折叠、矛盾区间消除、<code class="kw"><span class="kw-en">break</span><span class="kw-zh">跳出</span></code> / <code class="kw"><span class="kw-en">continue</span><span class="kw-zh">跳过</span></code> 指向最近循环</td></tr>
+<tr><td><code>module_demo/</code></td><td>最小模块项目：<code>import lib::math::{sum, product}</code> 与 <code class="kw"><span class="kw-en">export</span><span class="kw-zh">公开</span></code> 的产物路径</td></tr>
+<tr><td><code>stdlib_demo/</code></td><td>显式导入 <code>std::math</code> / <code>state</code> / <code class="kw"><span class="kw-en">time</span><span class="kw-zh">时间</span></code> / <code class="kw"><span class="kw-en">random</span><span class="kw-zh">随机</span></code> 组合出的定时状态机</td></tr>
+<tr><td><code>macro_demo/</code></td><td><code class="kw"><span class="kw-en">macro fn</span><span class="kw-zh">宏 函数</span></code> 的字面量与标签宏调用、<code>$(占位符)</code>、<code class="kw"><span class="kw-en">macro(pos)</span><span class="kw-zh">宏(坐标)</span></code> 与外部函数调度</td></tr>
 <tr><td><code>portable_chest/</code></td><td>多文件模块、用户计分板、<code class="kw"><span class="kw-en">teleport</span><span class="kw-zh">传送</span></code> 仓库、屏障盒与按玩家绑定的箱子</td></tr>
 <tr><td><code>multi_counter/</code></td><td>多文件模块、带返回值函数、资源 predicate 与调度心跳</td></tr>
-<tr><td><code>module_demo/</code></td><td>最小模块项目：<code>import lib::math::{sum, product}</code> 与 <code class="kw"><span class="kw-en">export</span><span class="kw-zh">公开</span></code> 的产物路径</td></tr>
+<tr><td><code>monster_market/</code></td><td>多人动态市场：<code class="kw"><span class="kw-en">dialog</span><span class="kw-zh">对话框</span></code> 资源、侧边栏、玩家私有计分项、跨模块事件与连杀赏金</td></tr>
+<tr><td><code>sign_bank/</code></td><td>纯告示牌 UI 的多文件银行：双牌账号密码、<code class="kw"><span class="kw-en">unroll for</span><span class="kw-zh">展开 对于</span></code> 槽位、<code class="kw"><span class="kw-en">clone</span><span class="kw-zh">复制</span></code> 回读校验与方块扩建仓库</td></tr>
 <tr><td><code>bounty_hunter/</code></td><td>进度事件、触发器条件、连杀结算与里程碑播报的大型示例</td></tr>
 </tbody></table></div>
+<p>表中的全部项目都可以用 <code>mclang check examples/&lt;名字&gt; --deny-raw</code> 检查、用 <code>mclang build examples/&lt;名字&gt; --deny-raw</code> 构建，且都不含底层语句，严格模式可以直接通过。</p>
 <h2 id="command-completion">核心与实体命令补全</h2>
 <p>本节对应开发计划 §2.1、§2.2，命令形状以随附的 26.3 源码为准。新增命令都可以直接写成语句，也可把原版整数结果用于表达式，例如 <code>let total = tag.list(players);</code>、<code>let health = attribute.get(one, &quot;minecraft:max_health&quot;, 100);</code>。查询失败时结果为 0。函数宏使用下文单独的调用形式。</p>
 <p>实体参数通常使用已声明查询；支持当前实体或来源实体的位置还可写 <code class="kw"><span class="kw-en">self</span><span class="kw-zh">自身</span></code>/<code class="kw"><span class="kw-en">origin</span><span class="kw-zh">投掷者</span></code>，具体目标形式由命令决定。<code class="kw"><span class="kw-en">damage</span><span class="kw-zh">伤害</span></code>、<code class="kw"><span class="kw-en">attribute</span><span class="kw-zh">实体属性</span></code>、<code class="kw"><span class="kw-en">ride</span><span class="kw-zh">乘骑</span></code>、<code class="kw"><span class="kw-en">rotate</span><span class="kw-zh">旋转</span></code>、<code class="kw"><span class="kw-en">spectate</span><span class="kw-zh">旁观</span></code> 的被观察目标、路径点以及 <code class="kw"><span class="kw-en">loot.kill</span><span class="kw-zh">战利品.杀死</span></code> 都要求单实体，查询必须声明 <code class="kw"><span class="kw-en">limit(1)</span><span class="kw-zh">上限(1)</span></code>；玩家专用命令的查询目标必须匹配 <code>minecraft:player</code>，<code class="kw"><span class="kw-en">self</span><span class="kw-zh">自身</span></code> 目标需要玩家上下文。<code class="kw"><span class="kw-en">origin</span><span class="kw-zh">投掷者</span></code> 仅在部分命令中可用，使用时需要实体上下文；其他命令会在编译期拒绝。省略目标的 <code class="kw"><span class="kw-en">kill</span><span class="kw-zh">杀死</span></code>、<code class="kw"><span class="kw-en">swing</span><span class="kw-zh">挥动</span></code> 需要实体上下文，<code class="kw"><span class="kw-en">spectate</span><span class="kw-zh">旁观</span></code>、<code class="kw"><span class="kw-en">gamemode</span><span class="kw-zh">游戏模式</span></code>、<code class="kw"><span class="kw-en">spawnpoint</span><span class="kw-zh">设置出生点</span></code>、<code class="kw"><span class="kw-en">clear</span><span class="kw-zh">清除</span></code> 需要玩家上下文。<code class="kw"><span class="kw-en">trigger</span><span class="kw-zh">触发</span></code> 只能在玩家上下文执行，目标准则必须是 <code class="kw"><span class="kw-en">trigger</span><span class="kw-zh">触发</span></code>。</p>

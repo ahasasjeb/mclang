@@ -2005,32 +2005,51 @@ fn tick() {
 
 ### 仓库里的端到端示例
 
-`examples/` 下还有多个可直接运行的项目，都可以用下面的方式检查与构建：
+`examples/` 下有 23 个可直接运行的项目（15 个单文件 + 8 个多文件目录），都可以用下面的方式检查与构建：
 
 ```powershell title="逐个检查仓库示例"
 cargo run -- check examples/counter.mcl --deny-raw
-cargo run -- check examples/chinese_counter.mcl --deny-raw
-cargo run -- check examples/give_reward.mcl --deny-raw
-cargo run -- check examples/potion_lab.mcl --deny-raw
-cargo run -- check examples/world_ops.mcl --deny-raw
-cargo run -- check examples/portal.mcl --deny-raw
+cargo run -- check examples/beacon_base.mcl --deny-raw
+cargo run -- check examples/compile_time_grid.mcl --deny-raw
+cargo run -- check examples/core_commands.mcl --deny-raw
+cargo run -- check examples/entity_commands.mcl --deny-raw
+cargo run -- check examples/item_components.mcl --deny-raw
+cargo run -- check examples/remaining_commands.mcl --deny-raw
+cargo run -- check examples/shared_arguments.mcl --deny-raw
+cargo run -- check examples/optimization_lab.mcl --deny-raw
+cargo run -- check examples/stdlib_demo --deny-raw
 cargo run -- check examples/portable_chest --deny-raw
-cargo run -- check examples/multi_counter --deny-raw
+cargo run -- check examples/monster_market --deny-raw
+cargo run -- check examples/sign_bank --deny-raw
 ```
 
 | 示例 | 演示内容 |
 | --- | --- |
 | `counter.mcl` | 计分变量、`@tick`、`each`、消息与声音 |
 | `chinese_counter.mcl` | 全中文关键词写法的同一程序 |
+| `beacon_base.mcl` | 全中文关键词写成的玩法示例：`placed_block` 进度检测、九格 `block` 条件检查与把泥土换成信标 |
 | `give_reward.mcl` | 查询标签排除、类型化 `give` 与物品组件 |
 | `potion_lab.mcl` | 效果、经验、清空、秒表、函数标签与小数调度 |
 | `world_ops.mcl` | 方块、生物群系、复制、放置、区块加载、时间、天气、规则与边界 |
 | `ui_commands.mcl` | Boss 栏、标题、粒子、停止声音、后处理与私聊 |
+| `item_components.mcl` | `components = nbt { ... }` 任意组件、查询里的 `item(...)` 子块与 `item_predicate` 的 `has` / `equals` / `matches` |
+| `core_commands.mcl` | 战利品、配方、随机与数据包命令族，含 `loot.*` 的四种来源与 `random.roll` 的序列 |
+| `entity_commands.mcl` | 实体、属性与队伍命令族：`attribute.*`、`ride`、`rotate`、`team.*`、`waypoint.*`、路径点十六进制颜色 |
+| `shared_arguments.mcl` | `object(player)` / `object(atlas)`、`hover` / `click` 全部动作、复杂 NBT 路径与更多物品组件 |
+| `remaining_commands.mcl` | `objective` 运行期设置、`version` / `seed` / `say`、计分板玩家子命令与 `test.run` |
 | `portal.mcl` | 进度声明、`placed_block` / `enter_block` 触发器与可重复触发的 `advancement.revoke` |
+| `compile_time_grid.mcl` | `unroll for` 编译期展开：32 个槽位折叠成字面量坐标，嵌套展开与常量守卫在展开时定型 |
+| `optimization_lab.mcl` | 循环与条件的优化语料：嵌套守卫折叠、矛盾区间消除、`break` / `continue` 指向最近循环 |
+| `module_demo/` | 最小模块项目：`import lib::math::{sum, product}` 与 `export` 的产物路径 |
+| `stdlib_demo/` | 显式导入 `std::math` / `state` / `time` / `random` 组合出的定时状态机 |
+| `macro_demo/` | `macro fn` 的字面量与标签宏调用、`$(占位符)`、`macro(坐标)` 与外部函数调度 |
 | `portable_chest/` | 多文件模块、用户计分板、`teleport` 仓库、屏障盒与按玩家绑定的箱子 |
 | `multi_counter/` | 多文件模块、带返回值函数、资源 predicate 与调度心跳 |
-| `module_demo/` | 最小模块项目：`import lib::math::{sum, product}` 与 `export` 的产物路径 |
+| `monster_market/` | 多人动态市场：`dialog` 资源、侧边栏、玩家私有计分项、跨模块事件与连杀赏金 |
+| `sign_bank/` | 纯告示牌 UI 的多文件银行：双牌账号密码、`unroll for` 槽位、`clone` 回读校验与方块扩建仓库 |
 | `bounty_hunter/` | 进度事件、触发器条件、连杀结算与里程碑播报的大型示例 |
+
+表中的全部项目都可以用 `mclang check examples/<名字> --deny-raw` 检查、用 `mclang build examples/<名字> --deny-raw` 构建，且都不含底层语句，严格模式可以直接通过。
 
 ## 核心与实体命令补全 {#command-completion}
 
