@@ -988,7 +988,7 @@ Edition 26.3，数据包 pack format 121.0。本版本正文与示例统一使�
    坐标盒=box 距离=distance 等级=level 游戏模式=gamemode 队伍=team 排除队伍=without_team
    旋转=rotate 谓词=predicate 进度过滤=advancements 物品=item
 --- gamemode (gamemode_value)
-   生存=survival 创造=creative 冒险=adventure 旁观=spectator
+   生存=survival 创造=creative 冒险=adventure 旁观者=spectator
 --- query item { } (item_property)
    类型=id 数量=count 自定义名称=custom_name
 --- fn_tag { } (function_tag_property)

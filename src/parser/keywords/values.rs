@@ -73,7 +73,7 @@ pub(crate) fn gamemode_value(value: &str) -> Option<&'static str> {
         "survival" | "生存" => Some("survival"),
         "creative" | "创造" => Some("creative"),
         "adventure" | "冒险" => Some("adventure"),
-        "spectator" | "旁观" => Some("spectator"),
+        "spectator" | "旁观者" => Some("spectator"),
         _ => None,
     }
 }

@@ -1079,7 +1079,7 @@ Repeat these until they are automatic; each one is enforced by the compiler.
    box=坐标盒 distance=距离 level=等级 gamemode=游戏模式 team=队伍 without_team=排除队伍
    rotate=旋转 predicate=谓词 advancements=进度过滤 item=物品
 --- gamemode (gamemode_value)
-   survival=生存 creative=创造 adventure=冒险 spectator=旁观
+   survival=生存 creative=创造 adventure=冒险 spectator=旁观者
 --- query item { } (item_property)
    id=类型 count=数量 custom_name=自定义名称
 --- fn_tag { } (function_tag_property)
