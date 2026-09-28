@@ -17,15 +17,30 @@ pub(crate) fn attribute_word(value: &str) -> Option<Attribute> {
     }
 }
 
+/// 英文词 → 中文别名的一次性哈希索引。
+///
+/// `KEYWORDS` 是固定表，用 `OnceLock` 建表后按 key 借用查询，避免解析器
+/// `check_word` 在每个语法分支上线性扫描全部词条。
+fn alias_index() -> &'static std::collections::HashMap<&'static str, &'static str> {
+    static INDEX: std::sync::OnceLock<std::collections::HashMap<&'static str, &'static str>> =
+        std::sync::OnceLock::new();
+    INDEX.get_or_init(|| {
+        KEYWORDS
+            .iter()
+            .map(|keyword| (keyword.english, keyword.chinese))
+            .collect()
+    })
+}
+
 pub(crate) fn keyword_alias(english: &str) -> Option<&'static str> {
-    KEYWORDS
-        .iter()
-        .find(|keyword| keyword.english == english)
-        .map(|keyword| keyword.chinese)
+    alias_index().get(english).copied()
 }
 
 pub(crate) fn word_matches(value: &str, english: &str) -> bool {
-    value == english || keyword_alias(english).is_some_and(|alias| alias == value)
+    value == english
+        || alias_index()
+            .get(english)
+            .is_some_and(|alias| *alias == value)
 }
 
 /// 不能用作标识符的保留字：全部关键词（中英文）和布尔字面量。

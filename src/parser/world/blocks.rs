@@ -329,7 +329,7 @@ impl Parser {
 
     /// 旋转值是原版 `Rotation` 枚举名；`180` 以数字记号出现。
     fn template_rotation_value(&mut self) -> Result<TemplateRotation, Diagnostic> {
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let text = match token.kind {
             TokenKind::Ident(value) => value,
             TokenKind::Number(value) => value.to_string(),

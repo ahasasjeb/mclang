@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::ast::Span;
+use crate::lines::LineIndex;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DiagnosticSeverity {
@@ -32,18 +33,16 @@ impl Diagnostic {
         }
     }
 
-    pub fn render(&self, path: &Path, source: &str) -> String {
+    /// 用预先建好的行首索引渲染；同批诊断共用一个索引即可。
+    pub fn render_with(&self, path: &Path, source: &str, index: &LineIndex) -> String {
         let start = self.span.start.min(source.len());
-        let line_start = source[..start].rfind('\n').map_or(0, |index| index + 1);
-        let line_end = source[start..]
+        let (line_index, column_index) = index.character_position(source, start);
+        let line_start = index.line_start(line_index);
+        let line_end = source[line_start..]
             .find('\n')
-            .map_or(source.len(), |index| start + index);
-        let line = source[..start]
-            .bytes()
-            .filter(|byte| *byte == b'\n')
-            .count()
-            + 1;
-        let column = source[line_start..start].chars().count() + 1;
+            .map_or(source.len(), |position| line_start + position);
+        let line = line_index + 1;
+        let column = column_index + 1;
         let excerpt = &source[line_start..line_end];
         let width = source[start..self.span.end.min(line_end)]
             .chars()

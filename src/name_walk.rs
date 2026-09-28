@@ -16,24 +16,48 @@ use crate::ast::*;
 
 /// 名字所属的符号类别。
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[repr(usize)]
 pub enum NameRole {
-    Function,
+    Function = 0,
     /// 函数标签（`#标签`）。
-    Tag,
-    Score,
-    Objective,
-    Query,
-    Item,
-    Storage,
-    DataSlot,
+    Tag = 1,
+    Score = 2,
+    Objective = 3,
+    Query = 4,
+    Item = 5,
+    Storage = 6,
+    DataSlot = 7,
     /// JSON 资源（谓词、战利品表、配方、进度资源等）。
-    Resource,
+    Resource = 8,
     /// 结构化进度声明。
-    Advancement,
+    Advancement = 9,
     /// 进度内的准则名；只在所属进度内可见。
-    Criterion,
-    Parameter,
-    Local,
+    Criterion = 10,
+    Parameter = 11,
+    Local = 12,
+}
+
+impl NameRole {
+    /// 全部类别，按 `#[repr(usize)]` 的顺序排列；作用域按它分组成定长数组。
+    pub const ALL: [NameRole; 13] = [
+        NameRole::Function,
+        NameRole::Tag,
+        NameRole::Score,
+        NameRole::Objective,
+        NameRole::Query,
+        NameRole::Item,
+        NameRole::Storage,
+        NameRole::DataSlot,
+        NameRole::Resource,
+        NameRole::Advancement,
+        NameRole::Criterion,
+        NameRole::Parameter,
+        NameRole::Local,
+    ];
+
+    pub(crate) const fn index(self) -> usize {
+        self as usize
+    }
 }
 
 /// 名字出现在声明处还是引用处。

@@ -165,4 +165,20 @@ pub struct NbtEntry {
 pub struct Statement {
     pub kind: StatementKind,
     pub span: Span,
+    /// 该语句（含嵌套块）是否含 `break`/`continue`，且不含内层 `for`/`while`。
+    ///
+    /// 循环体编译与 `compile_block` 的状态检查都要问这个问题；嵌套 `if` 较深时
+    /// 两处会重复扫描同一部分子树，解析后一次算好即可。`None` 表示尚未汇总。
+    pub(crate) contains_loop_jump: std::cell::Cell<Option<bool>>,
+}
+
+impl Statement {
+    /// 解析期调用：建立字段初值。
+    pub(crate) fn new(kind: StatementKind, span: Span) -> Self {
+        Self {
+            kind,
+            span,
+            contains_loop_jump: std::cell::Cell::new(None),
+        }
+    }
 }

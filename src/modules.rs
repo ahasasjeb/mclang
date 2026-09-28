@@ -19,7 +19,12 @@ mod declarations;
 mod paths;
 mod resolve;
 
+use std::path::Path;
+
 use declarations::*;
 use paths::*;
 
 pub(crate) use resolve::resolve;
+
+/// 模块解析只需要每个源文件的路径，调用方按这个形状提供即可。
+pub(crate) type SourcePath<'a> = &'a Path;

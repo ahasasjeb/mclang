@@ -3,6 +3,9 @@
 //! 与 `docs/tools/translate.mjs` 的 `tokenize` 保持一致：三引号字符串、双引号
 //! 字符串、`//` 注释、空白、带 NBT 后缀的数字、Unicode 标识符和单字符标点。
 //! 翻译只改写标识符 token，其余 token 原样保留。
+//!
+//! token 直接借用原始 UTF-8 源码的字节范围，不为每个 token 单独分配字符串；
+//! 只有真正被改写的词才在输出里产生新字符串。
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum TokenKind {
@@ -14,111 +17,87 @@ pub(super) enum TokenKind {
     Punct,
 }
 
-pub(super) struct Token {
+pub(super) struct Token<'a> {
     pub(super) kind: TokenKind,
-    pub(super) text: String,
+    pub(super) text: &'a str,
 }
 
-pub(super) fn tokenize(source: &str) -> Vec<Token> {
-    let chars: Vec<char> = source.chars().collect();
+pub(super) fn tokenize(source: &str) -> Vec<Token<'_>> {
     let mut tokens = Vec::new();
-    let mut index = 0;
-    while index < chars.len() {
-        if chars.get(index) == Some(&'"')
-            && chars.get(index + 1) == Some(&'"')
-            && chars.get(index + 2) == Some(&'"')
-        {
-            let mut stop = index + 3;
-            let mut closed = false;
-            while stop + 3 <= chars.len() {
-                if chars[stop] == '"' && chars[stop + 1] == '"' && chars[stop + 2] == '"' {
-                    closed = true;
-                    break;
-                }
-                stop += 1;
-            }
-            let end = if closed { stop + 3 } else { chars.len() };
-            tokens.push(Token {
-                kind: TokenKind::Text,
-                text: collect(&chars, index, end),
-            });
-            index = end;
-            continue;
-        }
-        if chars[index] == '"' {
-            let mut stop = index + 1;
-            while stop < chars.len() && chars[stop] != '"' && chars[stop] != '\n' {
-                if chars[stop] == '\\' {
-                    stop += 1;
-                }
-                stop += 1;
-            }
-            if stop < chars.len() && chars[stop] == '"' {
-                stop += 1;
-            }
-            tokens.push(Token {
-                kind: TokenKind::Text,
-                text: collect(&chars, index, stop),
-            });
-            index = stop;
-            continue;
-        }
-        if chars[index] == '/' && chars.get(index + 1) == Some(&'/') {
-            let mut stop = index;
-            while stop < chars.len() && chars[stop] != '\n' {
-                stop += 1;
-            }
-            tokens.push(Token {
-                kind: TokenKind::Comment,
-                text: collect(&chars, index, stop),
-            });
-            index = stop;
-            continue;
-        }
-        if chars[index].is_whitespace() {
-            let mut stop = index;
-            while stop < chars.len() && chars[stop].is_whitespace() {
-                stop += 1;
-            }
-            tokens.push(Token {
-                kind: TokenKind::Whitespace,
-                text: collect(&chars, index, stop),
-            });
-            index = stop;
-            continue;
-        }
-        if chars[index].is_ascii_digit() {
-            let stop = number_end(&chars, index);
-            tokens.push(Token {
-                kind: TokenKind::Number,
-                text: collect(&chars, index, stop),
-            });
-            index = stop;
-            continue;
-        }
-        if is_ident_start(chars[index]) {
-            let mut stop = index + 1;
-            while stop < chars.len() && is_ident_continue(chars[stop]) {
-                stop += 1;
-            }
-            tokens.push(Token {
-                kind: TokenKind::Ident,
-                text: collect(&chars, index, stop),
-            });
-            index = stop;
-            continue;
-        }
+    let mut index = 0usize;
+    while index < source.len() {
+        let rest = &source[index..];
+        let current = rest.chars().next().unwrap_or_default();
+        let length = if rest.starts_with("\"\"\"") {
+            raw_string_length(rest)
+        } else if current == '"' {
+            string_length(rest)
+        } else if rest.starts_with("//") {
+            rest.find('\n').unwrap_or(rest.len())
+        } else if current.is_whitespace() {
+            whitespace_length(rest)
+        } else if current.is_ascii_digit() {
+            number_length(rest)
+        } else if is_ident_start(current) {
+            ident_length(rest)
+        } else {
+            current.len_utf8()
+        };
+        let kind = if rest.starts_with("//") {
+            TokenKind::Comment
+        } else if rest.starts_with("\"") {
+            TokenKind::Text
+        } else if current.is_whitespace() {
+            TokenKind::Whitespace
+        } else if current.is_ascii_digit() {
+            TokenKind::Number
+        } else if is_ident_start(current) {
+            TokenKind::Ident
+        } else {
+            TokenKind::Punct
+        };
         tokens.push(Token {
-            kind: TokenKind::Punct,
-            text: chars[index].to_string(),
+            kind,
+            text: &rest[..length],
         });
-        index += 1;
+        index += length;
     }
     tokens
 }
 
-fn collect(chars: &[char], start: usize, end: usize) -> String {
-    chars[start..end].iter().collect()
+/// 三引号原始字符串；没有结束标记时取到文件末尾。
+fn raw_string_length(rest: &str) -> usize {
+    match rest[3..].find("\"\"\"") {
+        Some(offset) => 3 + offset + 3,
+        None => rest.len(),
+    }
+}
+
+/// 双引号字符串；`\` 跳过紧随其后的字符，结束引号或换行收尾。
+fn string_length(rest: &str) -> usize {
+    let mut characters = rest[1..].char_indices();
+    while let Some((index, character)) = characters.next() {
+        if character == '"' || character == '\n' {
+            return 1 + index + character.len_utf8();
+        }
+        if character == '\\' {
+            // 转义字符本身不参与闭合判断；再消费一个字符。
+            characters.next();
+        }
+    }
+    rest.len()
+}
+
+fn whitespace_length(rest: &str) -> usize {
+    rest.char_indices()
+        .find(|(_, character)| !character.is_whitespace())
+        .map_or(rest.len(), |(index, _)| index)
+}
+
+fn ident_length(rest: &str) -> usize {
+    rest.char_indices()
+        .find(|(_, character)| !is_ident_continue(*character))
+        .map_or(rest.len(), |(index, _)| index)
 }
 
 fn is_ident_start(character: char) -> bool {
@@ -131,31 +110,34 @@ fn is_ident_continue(character: char) -> bool {
 
 /// 数字与 NBT 后缀一起扫描：`1b`、`2s`、`3i`、`4L`、`5.5f`、`6d`。后缀之后
 /// 紧跟标识符字符时按普通数字处理（`1bytes` = `1` + `bytes`）。
-fn number_end(chars: &[char], start: usize) -> usize {
-    let mut index = start;
-    while index < chars.len() && chars[index].is_ascii_digit() {
-        index += 1;
+fn number_length(rest: &str) -> usize {
+    let mut offset = 0usize;
+    let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+    offset += digits;
+    let tail = &rest[offset..];
+    if tail.starts_with('.') && tail[1..].starts_with(|c: char| c.is_ascii_digit()) {
+        offset += 1
+            + (tail[1..].len()
+                - tail[1..]
+                    .trim_start_matches(|c: char| c.is_ascii_digit())
+                    .len());
     }
-    if chars.get(index) == Some(&'.') && chars.get(index + 1).is_some_and(char::is_ascii_digit) {
-        index += 1;
-        while index < chars.len() && chars[index].is_ascii_digit() {
-            index += 1;
-        }
-    }
-    if let Some(&suffix) = chars.get(index)
+    let tail = &rest[offset..];
+    if let Some(suffix) = tail.chars().next()
         && matches!(
             suffix,
             'b' | 'B' | 's' | 'S' | 'i' | 'I' | 'l' | 'L' | 'f' | 'F' | 'd' | 'D'
         )
     {
-        let blocked = chars
-            .get(index + 1)
-            .is_some_and(|character| is_ident_continue(*character));
+        let blocked = tail[suffix.len_utf8()..]
+            .chars()
+            .next()
+            .is_some_and(is_ident_continue);
         if !blocked {
-            index += 1;
+            offset += suffix.len_utf8();
         }
     }
-    index
+    offset
 }
 
 /// 每个 token 前后最近的非空白 token 索引。注释也算有效邻居，与文档工具的
@@ -166,7 +148,7 @@ pub(super) struct Neighbors {
 }
 
 impl Neighbors {
-    pub(super) fn new(tokens: &[Token]) -> Self {
+    pub(super) fn new(tokens: &[Token<'_>]) -> Self {
         let mut previous = vec![None; tokens.len()];
         let mut last = None;
         for (index, token) in tokens.iter().enumerate() {

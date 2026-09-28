@@ -116,7 +116,7 @@ impl Parser {
                 span: start.merge(self.previous().span),
             });
         }
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         match token.kind {
             TokenKind::Number(number) => {
                 let value = i32::try_from(number)

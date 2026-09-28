@@ -178,7 +178,7 @@ impl Parser {
             return self.constant_coordinate(label);
         }
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
             TokenKind::Decimal(value) => decimal_text(value),
@@ -324,7 +324,7 @@ impl Parser {
             return self.constant_coordinate(label);
         }
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let TokenKind::Number(value) = token.kind else {
             return Err(Diagnostic::new(
                 format!("{label}的绝对坐标需要整数，或用 `~`/`^` 写相对坐标"),
@@ -344,7 +344,7 @@ impl Parser {
             return Ok(String::new());
         }
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
             TokenKind::Decimal(value) => decimal_text(value),
@@ -365,7 +365,7 @@ impl Parser {
             return Ok(format!("~{offset}"));
         }
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
             TokenKind::Decimal(value) => decimal_text(value),

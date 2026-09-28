@@ -9,11 +9,10 @@ impl Session {
             // 客户端对服务器请求的响应；本服务器不发起请求，直接忽略。
             return (None, Vec::new());
         };
-        let method = method.to_owned();
-        let params = message.get("params").cloned().unwrap_or(Value::Null);
+        let params = message.get("params").unwrap_or(&Value::Null);
         match message.get("id") {
-            Some(id) => (Some(self.request(&method, id, &params)), Vec::new()),
-            None => (None, self.notification(&method, &params)),
+            Some(id) => (Some(self.request(method, id, params)), Vec::new()),
+            None => (None, self.notification(method, params)),
         }
     }
 
@@ -86,20 +85,40 @@ impl Session {
                 self.refresh()
             }
             "textDocument/didChange" => {
-                if let Some((path, text)) = changed_document(params) {
-                    // 命名空间声明可能被改过，失效缓存后重新推断项目边界。
-                    self.namespaces.remove(&path);
-                    self.open.insert(path, text);
+                if self.apply_document_change(params) {
+                    self.refresh()
+                } else {
+                    Vec::new()
                 }
-                self.refresh()
             }
             "textDocument/didClose" => {
                 if let Some(path) = closed_document(params) {
                     self.open.remove(&path);
+                    self.invalidate_disk_text(&path);
                 }
                 self.refresh()
             }
-            "textDocument/didSave" => self.refresh(),
+            "textDocument/didSave" => {
+                if let Some(path) = closed_document(params) {
+                    self.invalidate_disk_text(&path);
+                }
+                self.refresh()
+            }
+            "workspace/didChangeWatchedFiles" => {
+                if let Some(changes) = params.get("changes").and_then(Value::as_array) {
+                    for change in changes {
+                        if let Some(path) = change
+                            .get("uri")
+                            .and_then(Value::as_str)
+                            .and_then(uri_to_path)
+                        {
+                            self.invalidate_disk_text(&absolute(&path));
+                        }
+                    }
+                }
+                self.discovery_dirty = true;
+                self.refresh()
+            }
             "workspace/didChangeWorkspaceFolders" => {
                 self.change_workspace_folders(params);
                 self.refresh()
@@ -111,5 +130,17 @@ impl Session {
             }
             _ => Vec::new(),
         }
+    }
+
+    pub(super) fn apply_document_change(&mut self, params: &Value) -> bool {
+        let Some((path, text)) = changed_document(params) else {
+            return false;
+        };
+        if self.open.get(&path) == Some(&text) {
+            return false;
+        }
+        self.namespaces.remove(&path);
+        self.open.insert(path, text);
+        true
     }
 }

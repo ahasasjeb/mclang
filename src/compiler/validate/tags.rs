@@ -40,10 +40,49 @@ fn tags_in_declaration_order<'a>(
     declarations
 }
 
+/// 标签的包含关系图与环节点集合。
+///
+/// 校验需要报环，可达函数展开也要用同一张图判环；两者合并成一次构建与一次
+/// O(V + E) 遍历。
+pub(super) struct TagGraph<'a> {
+    /// 标签 → 它直接包含的标签。
+    edges: HashMap<&'a str, HashSet<&'a str>>,
+    /// 属于环的标签。
+    cyclic: HashSet<&'a str>,
+}
+
+impl<'a> TagGraph<'a> {
+    pub(super) fn build(tags: &HashMap<&'a str, &'a FunctionTagDecl>) -> Self {
+        let edges = tags
+            .iter()
+            .map(|(&name, declaration)| {
+                let children = declaration
+                    .values
+                    .iter()
+                    .filter_map(|entry| {
+                        let FunctionTagEntry::Tag(child, _) = entry else {
+                            return None;
+                        };
+                        tags.get_key_value(child.as_str()).map(|(key, _)| *key)
+                    })
+                    .collect();
+                (name, children)
+            })
+            .collect();
+        let cyclic = cyclic_nodes(tags.keys().copied(), &edges);
+        Self { edges, cyclic }
+    }
+
+    fn is_cyclic(&self, name: &str) -> bool {
+        self.cyclic.contains(name)
+    }
+}
+
 /// 检查标签条目的引用与循环；必须在签名表建立之后调用。
-pub(super) fn validate_function_tags(
-    tags: &HashMap<&str, &FunctionTagDecl>,
+pub(super) fn validate_function_tags<'a>(
+    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
     signatures: &HashMap<&str, Signature>,
+    graph: &TagGraph<'a>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for tag in tags_in_declaration_order(tags) {
@@ -77,7 +116,15 @@ pub(super) fn validate_function_tags(
             }
         }
     }
-    detect_cycles(tags, diagnostics);
+    for declaration in tags_in_declaration_order(tags) {
+        let name = declaration.name.as_str();
+        if graph.is_cyclic(name) {
+            diagnostics.push(Diagnostic::new(
+                format!("函数标签 `{name}` 形成循环引用"),
+                declaration.span,
+            ));
+        }
+    }
 }
 
 fn collect_functions<'a>(
@@ -113,9 +160,10 @@ fn collect_functions<'a>(
 /// 为每个标签预先展开可达函数，使函数体内的每个标签调用只需查表。
 pub(super) fn reachable_functions_by_tag<'a>(
     tags: &HashMap<&'a str, &'a FunctionTagDecl>,
+    graph: &TagGraph<'a>,
 ) -> HashMap<&'a str, Vec<&'a str>> {
-    let graph = tag_graph(tags);
-    let cyclic = cyclic_nodes(tags.keys().copied(), &graph);
+    let cyclic = &graph.cyclic;
+    let edges = &graph.edges;
 
     // 沿反向边标记所有能到达环的标签。合法的剩余子图是 DAG，可从叶节点开始
     // 动态展开；有环的无效输入沿用逐根 DFS，保留原有的去重和声明顺序语义。
@@ -123,7 +171,7 @@ pub(super) fn reachable_functions_by_tag<'a>(
         .keys()
         .map(|&name| (name, Vec::new()))
         .collect::<HashMap<_, _>>();
-    for (&name, children) in &graph {
+    for (&name, children) in edges {
         for &child in children {
             reverse.entry(child).or_default().push(name);
         }
@@ -149,7 +197,7 @@ pub(super) fn reachable_functions_by_tag<'a>(
     for &name in remaining_children.keys() {
         parents.entry(name).or_default();
     }
-    for (&name, children) in &graph {
+    for (&name, children) in edges {
         if reaches_cycle.contains(name) {
             continue;
         }
@@ -221,38 +269,4 @@ pub(super) fn reachable_functions_by_tag<'a>(
         reachable.insert(name, functions);
     }
     reachable
-}
-
-fn tag_graph<'a>(
-    tags: &HashMap<&'a str, &'a FunctionTagDecl>,
-) -> HashMap<&'a str, HashSet<&'a str>> {
-    let mut graph = HashMap::with_capacity(tags.len());
-    for (&name, declaration) in tags {
-        let children = declaration
-            .values
-            .iter()
-            .filter_map(|entry| {
-                let FunctionTagEntry::Tag(child, _) = entry else {
-                    return None;
-                };
-                tags.get_key_value(child.as_str()).map(|(key, _)| *key)
-            })
-            .collect();
-        graph.insert(name, children);
-    }
-    graph
-}
-
-fn detect_cycles(tags: &HashMap<&str, &FunctionTagDecl>, diagnostics: &mut Vec<Diagnostic>) {
-    let graph = tag_graph(tags);
-    let cyclic = cyclic_nodes(tags.keys().copied(), &graph);
-    for declaration in tags_in_declaration_order(tags) {
-        let name = declaration.name.as_str();
-        if cyclic.contains(name) {
-            diagnostics.push(Diagnostic::new(
-                format!("函数标签 `{name}` 形成循环引用"),
-                declaration.span,
-            ));
-        }
-    }
 }

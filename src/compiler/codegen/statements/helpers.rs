@@ -93,8 +93,14 @@ pub(in crate::compiler::codegen) fn constant_condition(condition: &Condition) ->
 
 /// Whether a jump can target the current loop. Inner loops consume their own
 /// jumps and must not force a state check in the outer loop.
+///
+/// 结果写回语句节点：循环体编译与 `compile_block` 的状态检查问的是同一个问题，
+/// 嵌套 `if` 较深时后者会重复扫描祖先已扫过的子树。
 pub(super) fn contains_current_loop_jump(statement: &Statement) -> bool {
-    match &statement.kind {
+    if let Some(cached) = statement.contains_loop_jump.get() {
+        return cached;
+    }
+    let found = match &statement.kind {
         StatementKind::Break | StatementKind::Continue => true,
         StatementKind::If {
             then_body,
@@ -109,7 +115,9 @@ pub(super) fn contains_current_loop_jump(statement: &Statement) -> bool {
         | StatementKind::InDimension { body, .. }
         | StatementKind::Spawn { body, .. } => body.iter().any(contains_current_loop_jump),
         _ => false,
-    }
+    };
+    statement.contains_loop_jump.set(Some(found));
+    found
 }
 
 /// Whether a source statement can assign an MCL score variable with this

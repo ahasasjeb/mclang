@@ -56,7 +56,11 @@ impl Parser {
             )
             .collect();
         let body_start = self.cursor;
-        let (body, end) = self.block()?;
+        let (body, end) = if is_macro {
+            self.with_retained_tokens(Self::block)?
+        } else {
+            self.block()?
+        };
         self.function_parameters.clear();
         let macro_signature = if is_macro {
             for token in &self.tokens[body_start..self.cursor] {
@@ -102,7 +106,7 @@ impl Parser {
     /// 读取可带负号的整数；供 `xp add` 这类允许减少的命令使用。
     pub(in crate::parser) fn signed(&mut self, name: &str) -> Result<i32, Diagnostic> {
         let minus = self.take(&TokenKind::Minus);
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let TokenKind::Number(value) = token.kind else {
             return Err(Diagnostic::new(format!("{name} 需要整数"), token.span));
         };
@@ -125,7 +129,7 @@ impl Parser {
         name: &str,
     ) -> Result<String, Diagnostic> {
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
             TokenKind::Decimal(value) => format!("{value}"),
@@ -147,7 +151,7 @@ impl Parser {
         &mut self,
         name: &str,
     ) -> Result<(u32, Span), Diagnostic> {
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let TokenKind::Number(value) = token.kind else {
             return Err(Diagnostic::new(format!("{name} 需要非负整数"), token.span));
         };

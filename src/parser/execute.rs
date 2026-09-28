@@ -336,7 +336,7 @@ impl Parser {
             return Ok(None);
         }
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let text = match token.kind {
             TokenKind::Number(value) => value.to_string(),
             TokenKind::Decimal(value) => format!("{value}"),

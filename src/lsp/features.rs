@@ -8,9 +8,10 @@ use std::path::Path;
 use serde_json::{Value, json};
 
 use crate::analysis::{SourceFile, Symbol, SymbolKind};
+use crate::lines::LineIndex;
 use crate::parser::keywords::{ATTRIBUTES, KEYWORDS};
 
-use super::convert::{offset_to_position, path_to_uri, word_at};
+use super::convert::{path_to_uri, word_at};
 
 /// 每个关键词的一句话说明，悬停与补全文档使用；与 `KEYWORDS` 逐项对应。
 const KEYWORD_DOCS: &[(&str, &str)] = &[
@@ -294,7 +295,8 @@ pub fn hover(
         symbol.detail
     );
     if let Some(source) = sources.iter().find(|source| source.path == symbol.path) {
-        let (line, _) = offset_to_position(&source.text, symbol.name_span.start);
+        let (line, _) =
+            LineIndex::new(&source.text).utf16_position(&source.text, symbol.name_span.start);
         value.push_str(&format!(
             "\n\n定义：`{}:{}`",
             symbol.path.display(),
@@ -500,8 +502,9 @@ fn prefix_at(text: &str, offset: usize) -> (&str, usize) {
 }
 
 fn range_json(text: &str, start: usize, end: usize) -> Value {
-    let (start_line, start_character) = offset_to_position(text, start);
-    let (end_line, end_character) = offset_to_position(text, end);
+    let index = LineIndex::new(text);
+    let (start_line, start_character) = index.utf16_position(text, start);
+    let (end_line, end_character) = index.utf16_position(text, end);
     json!({
         "start": {"line": start_line, "character": start_character},
         "end": {"line": end_line, "character": end_character},

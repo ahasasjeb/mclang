@@ -20,7 +20,7 @@ impl Parser {
         } else {
             1
         };
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let TokenKind::Number(number) = token.kind else {
             return Err(Diagnostic::new("初始值必须是整数常量", token.span));
         };

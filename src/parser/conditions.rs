@@ -232,7 +232,7 @@ impl Parser {
     /// `data.get(...)` 这类属于表达式，交给比较条件。
     fn take_word_call(&mut self, word: &str) -> Option<crate::lexer::Token> {
         if self.check_word(word) && matches!(self.peek_kind(1).kind, TokenKind::LeftParen) {
-            Some(self.advance().clone())
+            Some(self.advance_owned())
         } else {
             None
         }
@@ -274,7 +274,7 @@ impl Parser {
 
     fn comparison_condition(&mut self) -> Result<Condition, Diagnostic> {
         let left = self.expression()?;
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let comparison = match token.kind {
             TokenKind::EqualEqual => Comparison::Equal,
             TokenKind::BangEqual => Comparison::NotEqual,

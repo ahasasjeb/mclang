@@ -46,11 +46,20 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
     })
 }
 
+/// 在调用方线程上解析，不另建工作线程。
+///
+/// 调用方已经身处大栈线程时（项目解析、分析入口）走这里：逐文件再建一个
+/// 16 MiB 线程的成本与模块数成正比，而深递归的保护由外层线程提供。
+pub(crate) fn parse_in_place(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
+    parse_inner(tokens)
+}
+
 fn parse_inner(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
     let paren_matches = matching_parens(&tokens);
     let mut parser = Parser {
         tokens,
         cursor: 0,
+        retain_token_text: 0,
         paren_matches,
         active_macro_parameters: std::collections::HashMap::new(),
         active_macro_uses: Vec::new(),
@@ -99,6 +108,8 @@ fn matching_parens(tokens: &[Token]) -> Vec<Option<usize>> {
 struct Parser {
     tokens: Vec<Token>,
     cursor: usize,
+    // Macro templates and unrolled blocks inspect consumed tokens again.
+    retain_token_text: usize,
     /// 每个圆括号记号对应的配对位置；解析条件分组时可 O(1) 判断后继记号。
     paren_matches: Vec<Option<usize>>,
     active_macro_parameters: std::collections::HashMap<String, MacroType>,
@@ -305,7 +316,7 @@ impl Parser {
     }
 
     fn ident(&mut self, expected: &str) -> Result<(String, Span), Diagnostic> {
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         match token.kind {
             TokenKind::Ident(value) => Ok((value, token.span)),
             _ => Err(Diagnostic::new(format!("这里需要{expected}"), token.span)),
@@ -313,7 +324,7 @@ impl Parser {
     }
 
     fn string(&mut self, message: &str) -> Result<(String, Span), Diagnostic> {
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         match token.kind {
             TokenKind::String(value) => Ok((value, token.span)),
             _ => Err(Diagnostic::new(message, token.span)),
@@ -327,7 +338,7 @@ impl Parser {
 
     fn expect_word(&mut self, word: &str) -> Result<Token, Diagnostic> {
         if self.check_word(word) {
-            Ok(self.advance().clone())
+            Ok(self.advance_owned())
         } else {
             let expected = keyword_alias(word)
                 .map(|alias| format!("`{word}` 或 `{alias}`"))
@@ -341,7 +352,7 @@ impl Parser {
 
     fn take_word(&mut self, word: &str) -> Option<Token> {
         if self.check_word(word) {
-            Some(self.advance().clone())
+            Some(self.advance_owned())
         } else {
             None
         }
@@ -353,7 +364,7 @@ impl Parser {
 
     fn expect(&mut self, kind: TokenKind, message: &str) -> Result<Token, Diagnostic> {
         if self.check(&kind) {
-            Ok(self.advance().clone())
+            Ok(self.advance_owned())
         } else {
             Err(Diagnostic::new(message, self.current().span))
         }
@@ -361,7 +372,7 @@ impl Parser {
 
     fn take(&mut self, kind: &TokenKind) -> Option<Token> {
         if self.check(kind) {
-            Some(self.advance().clone())
+            Some(self.advance_owned())
         } else {
             None
         }
@@ -392,5 +403,32 @@ impl Parser {
             self.cursor += 1;
         }
         &self.tokens[index]
+    }
+
+    /// Move text into the AST, retaining token kinds and spans for recovery.
+    fn advance_owned(&mut self) -> Token {
+        let index = self.cursor;
+        self.advance();
+        let token = &mut self.tokens[index];
+        let kind = match &mut token.kind {
+            TokenKind::Ident(text) if self.retain_token_text == 0 => {
+                TokenKind::Ident(std::mem::take(text))
+            }
+            TokenKind::String(text) if self.retain_token_text == 0 => {
+                TokenKind::String(std::mem::take(text))
+            }
+            kind => kind.clone(),
+        };
+        Token {
+            kind,
+            span: token.span,
+        }
+    }
+
+    fn with_retained_tokens<T>(&mut self, parse: impl FnOnce(&mut Self) -> T) -> T {
+        self.retain_token_text += 1;
+        let result = parse(self);
+        self.retain_token_text -= 1;
+        result
     }
 }

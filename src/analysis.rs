@@ -15,12 +15,12 @@ use crate::ast;
 use crate::compiler::compile;
 use crate::diagnostic::{Diagnostic, DiagnosticSeverity};
 use crate::lexer::lex;
-use crate::parser::parse;
+use crate::parser::parse_in_place;
 
 pub use crate::ast::Span;
 
 /// 一份待分析的源文件。`path` 只用于标识来源，不要求文件真实存在。
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct SourceFile {
     pub path: PathBuf,
     pub text: String,
@@ -94,13 +94,9 @@ pub struct ProjectAnalysis {
 
 /// 对一组源文件做词法、语法、模块解析与语义检查，返回全部诊断与已声明的符号。
 pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
-    let mut expanded = sources
-        .iter()
-        .map(|source| SourceFile {
-            path: source.path.clone(),
-            text: source.text.clone(),
-        })
-        .collect::<Vec<_>>();
+    // 工作区文件按引用持有，只有内置标准库模块是新增的：分析期间不再复制整份项目
+    // 文本，语言服务器每次按键都重跑本函数，省下的是每个文件的完整副本。
+    let mut expanded: Vec<ModuleSource<'_>> = sources.iter().map(ModuleSource::Borrowed).collect();
     let mut groups = project_groups(sources);
     let (mut programs, mut diagnostics) = parse_all(&expanded);
     let parsed_source_count = expanded.len();
@@ -129,9 +125,10 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
                     .push((index, program));
             }
         }
+        let paths: Vec<&std::path::Path> = expanded.iter().map(ModuleSource::path).collect();
         for (root, _) in groups {
             let group = programs_by_root.remove(&root).unwrap_or_default();
-            match crate::modules::resolve(group, &expanded, root) {
+            match crate::modules::resolve(group, &paths, root) {
                 Ok(mut program) => {
                     match compile(
                         &mut program,
@@ -153,7 +150,7 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
         .filter_map(|diagnostic| {
             let source = expanded.get(diagnostic.span.source)?;
             Some(FileDiagnostic {
-                path: source.path.clone(),
+                path: source.path().to_path_buf(),
                 message: diagnostic.message,
                 span: diagnostic.span,
                 severity: diagnostic.severity,
@@ -166,9 +163,31 @@ pub fn analyze(sources: &[SourceFile]) -> ProjectAnalysis {
     }
 }
 
+/// 分析期间持有的源文件：工作区文件借用调用方，内置标准库模块自有内容。
+enum ModuleSource<'a> {
+    Borrowed(&'a SourceFile),
+    Owned(SourceFile),
+}
+
+impl ModuleSource<'_> {
+    fn path(&self) -> &std::path::Path {
+        match self {
+            Self::Borrowed(source) => &source.path,
+            Self::Owned(source) => &source.path,
+        }
+    }
+
+    fn text(&self) -> &str {
+        match self {
+            Self::Borrowed(source) => &source.text,
+            Self::Owned(source) => &source.text,
+        }
+    }
+}
+
 /// Mirror the CLI's embedded-module loading for unsaved editor buffers.
 fn add_standard_modules(
-    sources: &mut Vec<SourceFile>,
+    sources: &mut Vec<ModuleSource<'_>>,
     groups: &mut [(usize, HashSet<usize>)],
     programs: &[(usize, ast::Program)],
 ) {
@@ -177,7 +196,11 @@ fn add_standard_modules(
         .map(|(index, program)| (*index, program))
         .collect();
     for (root, members) in groups {
-        let Some(directory) = sources[*root].path.parent().map(|path| path.to_path_buf()) else {
+        let Some(directory) = sources[*root]
+            .path()
+            .parent()
+            .map(|path| path.to_path_buf())
+        else {
             continue;
         };
         let mut imported = std::collections::BTreeSet::new();
@@ -193,10 +216,10 @@ fn add_standard_modules(
         }
         for (module, text) in imported {
             let index = sources.len();
-            sources.push(SourceFile {
+            sources.push(ModuleSource::Owned(SourceFile {
                 path: crate::stdlib::virtual_path(&directory, &module),
                 text: text.to_owned(),
-            });
+            }));
             members.insert(index);
         }
     }
@@ -235,46 +258,63 @@ fn is_main_module(path: &std::path::Path) -> bool {
 }
 
 /// 按源文件顺序解析所有文件，返回解析成功的程序与全部词法/语法诊断。
-pub(crate) fn parse_all(sources: &[SourceFile]) -> (Vec<(usize, ast::Program)>, Vec<Diagnostic>) {
+fn parse_all(sources: &[ModuleSource<'_>]) -> (Vec<(usize, ast::Program)>, Vec<Diagnostic>) {
     parse_from(sources, 0)
 }
 
-/// Parse one source using the same lexer/parser path as [`parse_all`].
+/// Parse one source using the same lexer/parser path as the analysis entry.
 ///
 /// The disk project loader uses the parsed imports to discover reachable modules,
 /// then hands this result to the frontend so it does not need to parse the file again.
-pub(crate) fn parse_source(
-    source: &SourceFile,
-    source_id: usize,
-) -> Result<ast::Program, Vec<Diagnostic>> {
-    match lex(&source.text, source_id) {
-        Ok(tokens) => parse(tokens),
+///
+/// Callers must run this on a compiler worker with sufficient stack space.
+pub(crate) fn parse_source(text: &str, source_id: usize) -> Result<ast::Program, Vec<Diagnostic>> {
+    match lex(text, source_id) {
+        Ok(tokens) => parse_in_place(tokens),
         Err(errors) => Err(errors),
     }
 }
 
 fn parse_from(
-    sources: &[SourceFile],
+    sources: &[ModuleSource<'_>],
     start: usize,
 ) -> (Vec<(usize, ast::Program)>, Vec<Diagnostic>) {
-    let mut programs = Vec::new();
-    let mut diagnostics = Vec::new();
-    for (source_id, source) in sources.iter().enumerate().skip(start) {
-        match parse_source(source, source_id) {
-            Ok(program) => programs.push((source_id, program)),
-            Err(mut errors) => diagnostics.append(&mut errors),
+    crate::stack::run(|| {
+        let mut programs = Vec::new();
+        let mut diagnostics = Vec::new();
+        for (index, source) in sources.iter().enumerate().skip(start) {
+            match parse_source(source.text(), index) {
+                Ok(program) => programs.push((index, program)),
+                Err(mut errors) => diagnostics.append(&mut errors),
+            }
         }
-    }
-    (programs, diagnostics)
+        (programs, diagnostics)
+    })
+    .unwrap_or_else(|error| {
+        (
+            Vec::new(),
+            vec![Diagnostic::new(
+                format!("无法创建解析工作线程：{error}"),
+                Span {
+                    source: start,
+                    start: 0,
+                    end: 0,
+                },
+            )],
+        )
+    })
 }
 
-fn collect_symbols(sources: &[SourceFile], programs: &[(usize, ast::Program)]) -> Vec<Symbol> {
+fn collect_symbols(
+    sources: &[ModuleSource<'_>],
+    programs: &[(usize, ast::Program)],
+) -> Vec<Symbol> {
     let mut symbols = Vec::new();
     for (source_id, program) in programs {
         let Some(source) = sources.get(*source_id) else {
             continue;
         };
-        let path = &source.path;
+        let path = &source.path().to_path_buf();
         for score in &program.scores {
             symbols.push(Symbol {
                 name: score.name.clone(),

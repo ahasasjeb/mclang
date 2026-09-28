@@ -208,7 +208,7 @@ impl Parser {
     fn nbt_number(&mut self) -> Result<NbtValue, Diagnostic> {
         let start = self.current().span;
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let span = start.merge(token.span);
         let kind = match token.kind {
             TokenKind::Byte(value) => NbtValueKind::Byte(signed_integer(
@@ -334,7 +334,7 @@ impl Parser {
     /// 数组元素：整数后缀必须被数组类型接受，并按后缀检查取值范围。
     fn nbt_array_element(&mut self, kind: ArrayKind) -> Result<i64, Diagnostic> {
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let (value, suffix) = match token.kind {
             TokenKind::Number(value) => (value, 'i'),
             TokenKind::Byte(value) => (value, 'b'),

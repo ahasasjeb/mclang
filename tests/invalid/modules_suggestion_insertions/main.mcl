@@ -1,0 +1,6 @@
+// Expected diagnostic: ab is missing; the closest exported name is abcd.
+namespace suggestion_insertions;
+
+import library::{ab};
+
+fn main() {}

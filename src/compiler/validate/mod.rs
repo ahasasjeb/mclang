@@ -33,7 +33,7 @@ use crate::diagnostic::Diagnostic;
 use super::types::Signature;
 use advancement::collect_advancements;
 use recursion::validate_synchronous_recursion;
-use tags::{collect_function_tags, validate_function_tags};
+use tags::{TagGraph, collect_function_tags, validate_function_tags};
 
 use collect::{
     collect_data_slots, collect_item_stacks, collect_objectives, collect_queries, collect_scores,
@@ -50,7 +50,14 @@ pub(super) struct ResourceSymbols<'a> {
     pub(super) advancements: HashSet<&'a str>,
 }
 
-pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
+/// 语义检查的全部结果：错误之外，还带上代码生成可以复用的中间数据。
+pub(super) struct Validated {
+    pub(super) diagnostics: Vec<Diagnostic>,
+    /// 与 `program.resources` 同序的已解析 JSON；解析失败的声明为 `None`。
+    pub(super) resource_json: Vec<Option<serde_json::Value>>,
+}
+
+pub(super) fn validate(program: &Program) -> Validated {
     let mut diagnostics = Vec::new();
 
     validate_namespace(program, &mut diagnostics);
@@ -58,9 +65,11 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
     let objectives = collect_objectives(program, &mut diagnostics);
     let function_tags = collect_function_tags(program, &mut diagnostics);
     let signatures = collect_signatures(program, &scores, &mut diagnostics);
-    validate_function_tags(&function_tags, &signatures, &mut diagnostics);
-    let reachable_tag_functions = tags::reachable_functions_by_tag(&function_tags);
-    let resources = validate_resources(program, &mut diagnostics);
+    // 标签图与环只构建一次：报环与展开可达函数共用同一份结果。
+    let tag_graph = TagGraph::build(&function_tags);
+    validate_function_tags(&function_tags, &signatures, &tag_graph, &mut diagnostics);
+    let reachable_tag_functions = tags::reachable_functions_by_tag(&function_tags, &tag_graph);
+    let (resources, resource_json) = validate_resources(program, &mut diagnostics);
     let item_stacks = collect_item_stacks(program, &mut diagnostics);
     let advancements = collect_advancements(
         program,
@@ -95,7 +104,10 @@ pub(super) fn validate(program: &Program) -> Vec<Diagnostic> {
         &declarations.reachable_tag_functions,
         &mut diagnostics,
     );
-    deduplicate(diagnostics)
+    Validated {
+        diagnostics: deduplicate(diagnostics),
+        resource_json,
+    }
 }
 
 /// 编译期循环会把同一处源码展开多次，同一位置、同一消息的诊断只保留一次。

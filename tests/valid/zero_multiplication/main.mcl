@@ -1,0 +1,41 @@
+namespace zero_multiplication;
+
+score calls = 0;
+score result = 9;
+
+fn bump() -> score {
+    calls += 1;
+    return calls;
+}
+
+fn pure_left(value) -> score {
+    return 0 * value;
+}
+
+fn pure_right(value) -> score {
+    return value * 0;
+}
+
+fn effect_left() -> score {
+    return bump() * 0;
+}
+
+fn effect_right() -> score {
+    return 0 * bump();
+}
+
+fn assign_effect() {
+    result = bump() * 0;
+}
+
+fn ordered_effects() -> score {
+    return (bump() * 0) + bump();
+}
+
+fn random_effect() -> score {
+    return 0 * random(1, 10);
+}
+
+fn command_effect() -> score {
+    return 0 * time.query();
+}

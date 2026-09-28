@@ -64,6 +64,14 @@ impl Compiler<'_> {
         literal: i32,
         commands: &mut Vec<String>,
     ) {
+        // 乘 0 恒为 0：目标槽已经由左侧求值填好，直接置零即可，不必再 `*=`。
+        if operation == BinaryOp::Multiply && literal == 0 {
+            commands.push(format!(
+                "scoreboard players set {target} {} 0",
+                self.objective
+            ));
+            return;
+        }
         if matches!(operation, BinaryOp::Add | BinaryOp::Subtract) {
             let signed = if operation == BinaryOp::Add {
                 i64::from(literal)
@@ -334,6 +342,14 @@ impl Compiler<'_> {
                 if *operation == BinaryOp::Add && constant_value(left) == Some(0) {
                     return self.compile_expr(right, owner, commands);
                 }
+                // 零乘折叠：乘 0 恒为 0。另一侧仍按原顺序求值（可能有副作用），
+                // 只是结果不再复制进临时槽再 `*=`。
+                if *operation == BinaryOp::Multiply
+                    && let Some(other) = zero_operand(left, right)
+                {
+                    self.compile_expr(other, owner, commands);
+                    return Value::Integer(0);
+                }
                 let left_value = self.compile_expr(left, owner, commands);
                 let left_value = self.freeze_before_effect(left_value, right, commands);
                 let right_value = self.compile_expr(right, owner, commands);
@@ -461,6 +477,17 @@ impl Compiler<'_> {
                 format!("entity {}", self.component_holder(holder))
             }
         }
+    }
+}
+
+/// Return the operand whose evaluation must be preserved when multiplying by zero.
+fn zero_operand<'a>(left: &'a Expr, right: &'a Expr) -> Option<&'a Expr> {
+    if constant_value(right) == Some(0) {
+        Some(left)
+    } else if constant_value(left) == Some(0) {
+        Some(right)
+    } else {
+        None
     }
 }
 

@@ -3,7 +3,6 @@ use super::*;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
-use crate::analysis::SourceFile;
 use crate::ast::*;
 use crate::compiler::{valid_user_name, windows_reserved_name};
 use crate::diagnostic::Diagnostic;
@@ -14,7 +13,7 @@ use crate::version::snapshot::closest;
 /// 模块解析结果：合并后的整程序。
 pub(crate) fn resolve(
     programs: Vec<(usize, Program)>,
-    sources: &[SourceFile],
+    sources: &[SourcePath<'_>],
     root: usize,
 ) -> Result<Program, Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
@@ -53,7 +52,7 @@ pub(crate) fn resolve(
     // 2. 模块路径表：文件路径 -> 模块路径。
     let root_directory = sources
         .get(root)
-        .and_then(|source| source.path.parent())
+        .and_then(|path| path.parent())
         .map(Path::to_path_buf);
     let mut module_paths: BTreeMap<usize, Vec<String>> = BTreeMap::new();
     for (index, program) in &by_source {
@@ -61,22 +60,21 @@ pub(crate) fn resolve(
             module_paths.insert(*index, Vec::new());
             continue;
         }
-        let (Some(directory), Some(source)) = (root_directory.as_deref(), sources.get(*index))
-        else {
+        let (Some(directory), Some(path)) = (root_directory.as_deref(), sources.get(*index)) else {
             continue;
         };
-        let Some(segments) = module_segments(&source.path, directory) else {
+        let Some(segments) = module_segments(path, directory) else {
             continue;
         };
         if segments.first().is_some_and(|segment| segment == "std")
-            && !crate::stdlib::is_virtual_path(&source.path, directory)
+            && !crate::stdlib::is_virtual_path(path, directory)
         {
             diagnostics.push(Diagnostic::new(
                 "项目不能定义 `std` 模块：这个路径保留给内置标准库",
                 first_span(program),
             ));
         }
-        let builtin = crate::stdlib::is_virtual_path(&source.path, directory);
+        let builtin = crate::stdlib::is_virtual_path(path, directory);
         for segment in segments.iter().filter(|_| !builtin) {
             let span = first_span(program);
             if segment.starts_with("__mcl") {
@@ -169,150 +167,81 @@ pub(crate) fn resolve(
     let reachable = reachable_modules(root, &edges);
 
     // 5. 每个模块的声明表与作用域。
-    let mut modules: BTreeMap<usize, ModuleState> = BTreeMap::new();
+    //
+    // 声明表按模块独立保存，作用域的键直接来自这些 `String`：改写阶段按 `&str`
+    // 借用查询，不再为每个引用分配元组键，也不用复制整张作用域。
+    let mut segments_by_module: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+    let mut declarations_by_module: BTreeMap<usize, Vec<Declaration>> = BTreeMap::new();
+    let mut exports: ModuleExports = BTreeMap::new();
+    let mut exports_by_name: ExportsByName = BTreeMap::new();
+    let mut scopes: BTreeMap<usize, Scope> = BTreeMap::new();
     for index in &reachable {
-        let program = &by_source[index];
         let segments = module_paths.get(index).cloned().unwrap_or_default();
-        let declarations = collect_declarations(program);
-        let declaration_names = declarations
-            .iter()
-            .map(|(_, name, _, _)| name.clone())
+        let declarations: Vec<Declaration> = collect_declarations(&by_source[index])
+            .into_iter()
+            .map(|(role, name, exported, _)| Declaration {
+                role,
+                name,
+                exported,
+            })
             .collect();
-        let mut exports = Vec::new();
-        let mut exports_by_name: HashMap<String, Vec<(NameRole, String)>> = HashMap::new();
-        let mut scope = HashMap::new();
-        for (role, name, exported, _) in &declarations {
-            let qualified = qualify(*role, &segments, name);
-            if *exported {
-                exports.push((*role, name.clone(), qualified.clone()));
-                exports_by_name
-                    .entry(name.clone())
+        let mut module_exports = Vec::new();
+        let mut module_exports_by_name: HashMap<String, Vec<(NameRole, String)>> = HashMap::new();
+        let mut scope = Scope::default();
+        for declaration in &declarations {
+            let qualified = qualify(declaration.role, &segments, &declaration.name);
+            if declaration.exported {
+                module_exports.push((
+                    declaration.role,
+                    declaration.name.clone(),
+                    qualified.clone(),
+                ));
+                module_exports_by_name
+                    .entry(declaration.name.clone())
                     .or_default()
-                    .push((*role, qualified.clone()));
+                    .push((declaration.role, qualified.clone()));
             }
-            scope.insert((*role, name.clone()), qualified);
+            scope.insert(declaration.role, declaration.name.clone(), qualified);
         }
-        modules.insert(
-            *index,
-            ModuleState {
-                segments,
-                declarations,
-                declaration_names,
-                exports,
-                exports_by_name,
-                scope,
-            },
-        );
+        declarations_by_module.insert(*index, declarations);
+        exports.insert(*index, module_exports);
+        exports_by_name.insert(*index, module_exports_by_name);
+        scopes.insert(*index, scope);
+        segments_by_module.insert(*index, segments);
     }
 
     // 6. 处理导入：把公开声明映射进导入方的作用域。
-    let local_names: HashMap<usize, HashSet<(NameRole, String)>> = modules
-        .iter()
-        .map(|(index, module)| {
-            (
-                *index,
-                module
-                    .declarations
-                    .iter()
-                    .map(|(role, name, _, _)| (*role, name.clone()))
-                    .collect(),
-            )
-        })
-        .collect();
-    for index in &reachable {
-        let program = &by_source[index];
-        let module = &modules[index];
-        let mut scope = module.scope.clone();
-        let locals = &local_names[index];
-        for import in &program.imports {
-            let Some(target) = by_module_path.get(&import.path.join("/")) else {
-                continue;
-            };
-            let target_module = &modules[target];
-            match &import.items {
-                None => {
-                    for (role, name, qualified) in &target_module.exports {
-                        bind_import(
-                            &mut scope,
-                            &mut diagnostics,
-                            locals,
-                            *role,
-                            name,
-                            qualified,
-                            ImportOrigin {
-                                path: &import.path,
-                                span: import.path_span,
-                            },
-                        );
-                    }
-                }
-                Some(items) => {
-                    for item in items {
-                        let effective = item.alias.as_deref().unwrap_or(&item.name);
-                        let Some(matches) = target_module.exports_by_name.get(&item.name) else {
-                            if target_module.declaration_names.contains(&item.name) {
-                                diagnostics.push(Diagnostic::new(
-                                    format!(
-                                        "`{}` 在模块 `{}` 中存在但没有 export，其他模块不能导入",
-                                        item.name,
-                                        import.path.join("/")
-                                    ),
-                                    item.name_span,
-                                ));
-                            } else {
-                                let suggestion = closest(
-                                    &item.name,
-                                    target_module
-                                        .declarations
-                                        .iter()
-                                        .map(|(_, name, _, _)| name.as_str()),
-                                )
-                                .map(|candidate| format!("；最接近的名字是 `{candidate}`"))
-                                .unwrap_or_default();
-                                diagnostics.push(Diagnostic::new(
-                                    format!(
-                                        "模块 `{}` 中没有 `{}`{suggestion}",
-                                        import.path.join("/"),
-                                        item.name
-                                    ),
-                                    item.name_span,
-                                ));
-                            }
-                            continue;
-                        };
-                        for (role, qualified) in matches {
-                            bind_import(
-                                &mut scope,
-                                &mut diagnostics,
-                                locals,
-                                *role,
-                                effective,
-                                qualified,
-                                ImportOrigin {
-                                    path: &import.path,
-                                    span: import.path_span,
-                                },
-                            );
-                        }
-                    }
-                }
-            }
-        }
-        modules.get_mut(index).unwrap().scope = scope;
-    }
+    //
+    // 放在独立函数里，`by_source` 的只读借用在返回时就结束，第 7 步才能取出模块
+    // 做可变改写。
+    let scopes = bind_imports(
+        &ImportContext {
+            by_source: &by_source,
+            reachable: &reachable,
+            by_module_path: &by_module_path,
+            declarations_by_module: &declarations_by_module,
+            exports: &exports,
+            exports_by_name: &exports_by_name,
+        },
+        scopes,
+        &mut diagnostics,
+    );
 
     // 7. 限定名重写：声明直接改写，引用查作用域，查不到时保持原样，
     //    由语义检查给出「未声明/未导入」的针对性诊断。
     if diagnostics.is_empty() {
         for index in &reachable {
-            let segments = modules[index].segments.clone();
-            let scope = modules[index].scope.clone();
+            let scope = scopes.get(index).expect("作用域已为所有可达模块建立");
+            let segments = segments_by_module
+                .get(index)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
             let program = by_source.get_mut(index).expect("模块一定来自已解析的程序");
             program.for_each_name_mut(&mut |context, site, role, name| {
                 if site == NameSite::Declaration {
                     match role {
                         NameRole::Local | NameRole::Parameter | NameRole::Criterion => {}
-                        _ => *name = qualify(role, &segments, name),
+                        _ => *name = qualify(role, segments, name),
                     }
                     return;
                 }
@@ -321,8 +250,9 @@ pub(crate) fn resolve(
                     NameRole::Score if context.is_local(name) => return,
                     _ => {}
                 }
-                if let Some(qualified) = scope.get(&(role, name.clone())) {
-                    *name = qualified.clone();
+                if let Some(qualified) = scope.get(role, name.as_str()) {
+                    name.clear();
+                    name.push_str(qualified);
                 }
             });
         }
@@ -351,17 +281,159 @@ pub(crate) fn resolve(
     Ok(merged)
 }
 
-/// 一个模块的声明、公开接口与已解析的作用域。
-struct ModuleState {
-    segments: Vec<String>,
-    declarations: Vec<(NameRole, String, bool, Span)>,
-    declaration_names: HashSet<String>,
-    /// 公开声明：`(类别, 原名, 限定名)`。
-    exports: Vec<(NameRole, String, String)>,
-    /// 选择性导入按原名查公开声明；同名可以对应多个 NameRole。
-    exports_by_name: HashMap<String, Vec<(NameRole, String)>>,
-    /// 可见名字：`(类别, 本地名) -> 限定名`。
-    scope: HashMap<(NameRole, String), String>,
+/// 选择性导入按原名查公开声明；同名可以对应多个 NameRole。
+type ExportsByName = BTreeMap<usize, HashMap<String, Vec<(NameRole, String)>>>;
+
+/// 一个模块的公开声明集合。
+type ModuleExports = BTreeMap<usize, Vec<(NameRole, String, String)>>;
+
+/// 导入处理所需的只读上下文。
+struct ImportContext<'a> {
+    by_source: &'a BTreeMap<usize, Program>,
+    reachable: &'a [usize],
+    by_module_path: &'a HashMap<String, usize>,
+    declarations_by_module: &'a BTreeMap<usize, Vec<Declaration>>,
+    exports: &'a ModuleExports,
+    exports_by_name: &'a ExportsByName,
+}
+
+/// 把每个可达模块的 `import` 绑定进它自己的作用域，返回更新后的作用域表。
+///
+/// 放在独立函数里，`by_source` 的只读借用在返回时就结束，第 7 步才能取出模块
+/// 做可变改写。
+fn bind_imports(
+    context: &ImportContext<'_>,
+    mut scopes: BTreeMap<usize, Scope>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> BTreeMap<usize, Scope> {
+    let ImportContext {
+        by_source,
+        reachable,
+        by_module_path,
+        declarations_by_module,
+        exports,
+        exports_by_name,
+    } = context;
+    let locals: HashMap<usize, HashSet<(NameRole, &str)>> = declarations_by_module
+        .iter()
+        .map(|(index, declarations)| {
+            (
+                *index,
+                declarations
+                    .iter()
+                    .map(|declaration| (declaration.role, declaration.name.as_str()))
+                    .collect(),
+            )
+        })
+        .collect();
+    for index in *reachable {
+        let scope = scopes.get_mut(index).expect("作用域已为所有可达模块建立");
+        let local = &locals[index];
+        for import in &by_source[index].imports {
+            let Some(target) = by_module_path.get(&import.path.join("/")) else {
+                continue;
+            };
+            match &import.items {
+                None => {
+                    for (role, name, qualified) in &exports[target] {
+                        bind_import(
+                            scope,
+                            diagnostics,
+                            local,
+                            *role,
+                            name,
+                            qualified,
+                            ImportOrigin {
+                                path: &import.path,
+                                span: import.path_span,
+                            },
+                        );
+                    }
+                }
+                Some(items) => {
+                    for item in items {
+                        let effective = item.alias.as_deref().unwrap_or(&item.name);
+                        let Some(matches) = exports_by_name[target].get(item.name.as_str()) else {
+                            let target_declarations = &declarations_by_module[target];
+                            let declared = target_declarations
+                                .iter()
+                                .any(|declaration| declaration.name == item.name);
+                            if declared {
+                                diagnostics.push(Diagnostic::new(
+                                    format!(
+                                        "`{}` 在模块 `{}` 中存在但没有 export，其他模块不能导入",
+                                        item.name,
+                                        import.path.join("/")
+                                    ),
+                                    item.name_span,
+                                ));
+                            } else {
+                                let suggestion = closest(
+                                    &item.name,
+                                    target_declarations
+                                        .iter()
+                                        .map(|declaration| declaration.name.as_str()),
+                                )
+                                .map(|candidate| format!("；最接近的名字是 `{candidate}`"))
+                                .unwrap_or_default();
+                                diagnostics.push(Diagnostic::new(
+                                    format!(
+                                        "模块 `{}` 中没有 `{}`{suggestion}",
+                                        import.path.join("/"),
+                                        item.name
+                                    ),
+                                    item.name_span,
+                                ));
+                            }
+                            continue;
+                        };
+                        for (role, qualified) in matches {
+                            bind_import(
+                                scope,
+                                diagnostics,
+                                local,
+                                *role,
+                                effective,
+                                qualified,
+                                ImportOrigin {
+                                    path: &import.path,
+                                    span: import.path_span,
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    scopes
+}
+
+/// 一个模块的顶层声明，作用域与导入检查共用。
+struct Declaration {
+    role: NameRole,
+    name: String,
+    exported: bool,
+}
+
+/// 可见名字：按 `NameRole` 分组，组内按本地名查询。
+///
+/// 原来是 `HashMap<(NameRole, String), String>`，每次引用都要为元组键临时分配一个
+/// `String`。按角色分组后每组是 `HashMap<String, String>`，`get` 直接借用 `&str`
+/// 查询（`String: Borrow<str>`），不必构造任何临时键。
+#[derive(Default)]
+struct Scope {
+    groups: [HashMap<String, String>; NameRole::ALL.len()],
+}
+
+impl Scope {
+    fn insert(&mut self, role: NameRole, name: String, qualified: String) {
+        self.groups[role.index()].insert(name, qualified);
+    }
+
+    fn get(&self, role: NameRole, name: &str) -> Option<&str> {
+        self.groups[role.index()].get(name).map(String::as_str)
+    }
 }
 
 /// 导入语句的来源信息，用于诊断。
@@ -373,20 +445,19 @@ struct ImportOrigin<'a> {
 
 /// 把导入的名字绑定进作用域：局部声明优先，导入之间冲突报错。
 fn bind_import(
-    scope: &mut HashMap<(NameRole, String), String>,
+    scope: &mut Scope,
     diagnostics: &mut Vec<Diagnostic>,
-    locals: &HashSet<(NameRole, String)>,
+    locals: &HashSet<(NameRole, &str)>,
     role: NameRole,
     name: &str,
     qualified: &str,
     origin: ImportOrigin<'_>,
 ) {
-    let key = (role, name.to_owned());
-    if locals.contains(&key) {
+    if locals.contains(&(role, name)) {
         // 本模块自己的声明优先，导入的名字被遮蔽。
         return;
     }
-    match scope.get(&key) {
+    match scope.get(role, name) {
         Some(existing) if existing != qualified => diagnostics.push(Diagnostic::new(
             format!(
                 "导入的名字 `{name}` 已经指向 `{existing}`，与模块 `{}` 的 `{qualified}` 冲突；\
@@ -396,8 +467,6 @@ fn bind_import(
             origin.span,
         )),
         Some(_) => {}
-        None => {
-            scope.insert(key, qualified.to_owned());
-        }
+        None => scope.insert(role, name.to_owned(), qualified.to_owned()),
     }
 }

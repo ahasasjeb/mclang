@@ -5,6 +5,7 @@ mod compiler;
 mod constant;
 mod diagnostic;
 mod lexer;
+mod lines;
 mod lsp;
 mod modules;
 mod name_walk;
@@ -16,6 +17,7 @@ pub mod version;
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fs;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 use analysis::parse_source;
@@ -355,24 +357,46 @@ fn read_project(path: &Path) -> Result<LoadedSources, String> {
         return Err(format!("输入 {} 不是普通文件或目录", path.display()));
     };
 
+    // Reuse one large stack for the entire project. Falling back to the caller
+    // on spawn failure would lose the stack guarantee on Windows.
+    let (sources, parsed, root) = crate::stack::run(|| discover_modules(&entry, &directory))
+        .map_err(|error| format!("无法创建解析工作线程：{error}"))??;
+
+    Ok(LoadedSources {
+        sources,
+        parsed,
+        root,
+        directory,
+    })
+}
+
+/// 沿 `import` 边发现模块的结果：源文件、逐个解析结果与入口下标。
+type Discovered = (
+    Vec<SourceFile>,
+    Vec<Option<Result<ast::Program, Vec<Diagnostic>>>>,
+    usize,
+);
+
+/// 沿 `import` 边按需发现模块，并逐个解析；返回的 `parsed` 与 `sources` 同序。
+fn discover_modules(entry: &Path, directory: &Path) -> Result<Discovered, String> {
     let mut sources: Vec<SourceFile> = Vec::new();
     let mut parsed = Vec::new();
     let mut indices: HashMap<PathBuf, usize> = HashMap::new();
     let mut queue: VecDeque<PathBuf> = VecDeque::new();
-    let root = push_source(&mut sources, &mut indices, &entry)?;
+    let root = push_source(&mut sources, &mut indices, entry)?;
     parsed.push(None);
-    queue.push_back(entry);
+    queue.push_back(entry.to_path_buf());
 
     while let Some(file) = queue.pop_front() {
         let index = indices[&file];
         // Preserve the complete parser result: the frontend will report these exact
         // diagnostics, while successful ASTs are reused for module resolution.
-        let result = parse_source(&sources[index], index);
+        let result = parse_source(&sources[index].text, index);
         if let Ok(program) = &result {
             for import in &program.imports {
                 if import.path.first().is_some_and(|segment| segment == "std") {
                     if let Some(text) = stdlib::source(&import.path) {
-                        let target = stdlib::virtual_path(&directory, &import.path[1]);
+                        let target = stdlib::virtual_path(directory, &import.path[1]);
                         if !indices.contains_key(&target) {
                             let target_index = sources.len();
                             indices.insert(target.clone(), target_index);
@@ -387,7 +411,7 @@ fn read_project(path: &Path) -> Result<LoadedSources, String> {
                     continue;
                 }
 
-                let Some(target) = module_file(&directory, &import.path) else {
+                let Some(target) = module_file(directory, &import.path) else {
                     continue;
                 };
                 if indices.contains_key(&target) {
@@ -401,13 +425,7 @@ fn read_project(path: &Path) -> Result<LoadedSources, String> {
         }
         parsed[index] = Some(result);
     }
-
-    Ok(LoadedSources {
-        sources,
-        parsed,
-        root,
-        directory,
-    })
+    Ok((sources, parsed, root))
 }
 
 fn push_source(
@@ -458,7 +476,12 @@ fn frontend(loaded: &mut LoadedSources) -> Result<ast::Program, String> {
     if !diagnostics.is_empty() {
         return Err(render(&loaded.sources, diagnostics));
     }
-    modules::resolve(programs, &loaded.sources, loaded.root)
+    let paths: Vec<&Path> = loaded
+        .sources
+        .iter()
+        .map(|source| source.path.as_path())
+        .collect();
+    modules::resolve(programs, &paths, loaded.root)
         .map_err(|diagnostics| render(&loaded.sources, diagnostics))
 }
 
@@ -494,13 +517,7 @@ fn render(sources: &[SourceFile], diagnostics: Vec<Diagnostic>) -> String {
 }
 
 fn render_each(sources: &[SourceFile], diagnostics: Vec<Diagnostic>) -> Vec<String> {
-    diagnostics
-        .into_iter()
-        .map(|diagnostic| {
-            let source = &sources[diagnostic.span.source];
-            diagnostic.render(&source.path, &source.text)
-        })
-        .collect()
+    lines::render_all(sources, diagnostics)
 }
 
 fn write_pack(output: &Path, pack: &CompiledPack) -> Result<(), String> {
@@ -534,23 +551,34 @@ fn write_pack(output: &Path, pack: &CompiledPack) -> Result<(), String> {
 }
 
 fn write_files(output: &Path, pack: &CompiledPack) -> Result<(), String> {
+    // 同一目录下有大量函数文件时，重复 `create_dir_all` 只是徒增目录检查；
+    // 记录本次构建已经创建过的父目录即可。
+    let mut created = std::collections::HashSet::new();
     for (relative, contents) in &pack.files {
         let path = output.join(relative);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
-        }
+        ensure_parent(&path, &mut created)?;
         write_if_changed(&path, contents.as_bytes())?;
     }
     for (relative, contents) in &pack.binary_files {
         let path = output.join(relative);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
-        }
+        ensure_parent(&path, &mut created)?;
         write_if_changed(&path, contents)?;
     }
     Ok(())
+}
+
+fn ensure_parent(
+    path: &Path,
+    created: &mut std::collections::HashSet<PathBuf>,
+) -> Result<(), String> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    if !created.insert(parent.to_path_buf()) {
+        return Ok(());
+    }
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))
 }
 
 /// Copy project assets/structure/**/*.nbt into the namespace's data directory.
@@ -995,10 +1023,36 @@ fn remove_stale_outputs(
     Ok(())
 }
 
+/// 现有输出是否与新内容一致。
+///
+/// 先比长度，再按固定大小缓冲分块比较，避免为已存在的文件再分配一份同体积的
+/// `Vec`。
+fn existing_matches(path: &Path, contents: &[u8]) -> std::io::Result<bool> {
+    const COMPARE_BUFFER: usize = 64 * 1024;
+    let mut file = fs::File::open(path)?;
+    if file.metadata()?.len() != contents.len() as u64 {
+        return Ok(false);
+    }
+    let mut existing = vec![0u8; contents.len().min(COMPARE_BUFFER)];
+    let mut offset = 0usize;
+    loop {
+        let window_len = contents.len().saturating_sub(offset).min(existing.len());
+        let window = &mut existing[..window_len];
+        if window.is_empty() {
+            return Ok(true);
+        }
+        file.read_exact(window)?;
+        if window != &contents[offset..offset + window.len()] {
+            return Ok(false);
+        }
+        offset += window.len();
+    }
+}
+
 fn write_if_changed(path: &Path, contents: &[u8]) -> Result<(), String> {
-    match fs::read(path) {
-        Ok(existing) if existing == contents => return Ok(()),
-        Ok(_) => {}
+    match existing_matches(path, contents) {
+        Ok(true) => return Ok(()),
+        Ok(false) => {}
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(format!("无法读取现有文件 {}：{error}", path.display())),
     }

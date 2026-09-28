@@ -6,6 +6,7 @@ use std::fs;
 use crate::analysis::analyze;
 
 use crate::discover_sources;
+use crate::lines::LineIndex;
 use crate::lsp::convert::path_to_uri;
 
 impl Session {
@@ -40,15 +41,62 @@ impl Session {
             }
         }
         self.discovery_dirty = true;
+        self.disk_text.clear();
+        self.namespaces.clear();
     }
 
     /// 重新收集项目、逐个分析并发布诊断。
     pub(super) fn refresh(&mut self) -> Vec<Value> {
+        let mut previous: BTreeMap<_, _> = std::mem::take(&mut self.projects)
+            .into_iter()
+            .map(|project| (project.key.clone(), project))
+            .collect();
         self.projects = self.collect_projects();
+        let active_paths: HashSet<&Path> = self
+            .projects
+            .iter()
+            .flat_map(|project| project.sources.iter().map(|source| source.path.as_path()))
+            .collect();
+        self.disk_text
+            .retain(|path, _| active_paths.contains(path.as_path()));
         for project in &mut self.projects {
-            project.analysis = analyze(&project.sources);
+            if let Some(cached) = previous.remove(&project.key)
+                && cached.sources == project.sources
+            {
+                project.analysis = cached.analysis;
+            } else {
+                project.analysis = analyze(&project.sources);
+            }
         }
         self.publish_diagnostics()
+    }
+
+    /// Reuse disk reads between edits. Text is still copied into the analysis
+    /// snapshot; explicit file events invalidate stamps that may be unchanged.
+    fn cached_disk_text(&mut self, path: &Path) -> Option<String> {
+        let stamp = fs::metadata(path).ok().map(|metadata| DiskStamp {
+            len: metadata.len(),
+            modified: metadata
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|delta| (delta.as_secs(), delta.subsec_nanos())),
+        })?;
+        if let Some((cached_stamp, text)) = self.disk_text.get(path)
+            && stamp.modified.is_some()
+            && *cached_stamp == stamp
+        {
+            return Some(text.clone());
+        }
+        let text = fs::read_to_string(path).ok()?;
+        self.disk_text
+            .insert(path.to_path_buf(), (stamp, text.clone()));
+        Some(text)
+    }
+
+    pub(super) fn invalidate_disk_text(&mut self, path: &Path) {
+        self.disk_text.remove(path);
+        self.namespaces.remove(path);
     }
 
     /// 收集所有打开文档所属项目的源文件。
@@ -77,32 +125,32 @@ impl Session {
             }
         }
 
-        let open: Vec<(PathBuf, String)> = self
-            .open
-            .iter()
-            .map(|(path, text)| (path.clone(), text.clone()))
-            .collect();
         keys.into_iter()
             .map(|(root, namespace)| {
                 let mut texts: BTreeMap<PathBuf, String> = BTreeMap::new();
                 if let Some(indices) = index.subtree_files.get(&root) {
                     for file_index in indices.iter().take(MAX_PROJECT_FILES) {
                         let path = &index.files[*file_index];
+                        // Open buffers are authoritative and will be added below.
+                        if self.open.contains_key(path) {
+                            continue;
+                        }
                         if !self.namespace_matches(path, &namespace) {
                             continue;
                         }
-                        if let Ok(text) = fs::read_to_string(path) {
+                        if let Some(text) = self.cached_disk_text(path) {
                             texts.insert(path.clone(), text);
                         }
                     }
                 }
                 // 打开的文档覆盖磁盘内容，未保存的编辑也能得到诊断。
-                for (path, text) in &open {
+                for path in &open_paths {
                     if path.starts_with(&root) && self.namespace_matches(path, &namespace) {
-                        texts.insert(path.clone(), text.clone());
+                        texts.insert(path.clone(), self.open[path].clone());
                     }
                 }
                 Project {
+                    key: (root, namespace),
                     sources: texts
                         .into_iter()
                         .map(|(path, text)| SourceFile { path, text })
@@ -284,14 +332,19 @@ impl Session {
                 .iter()
                 .map(|source| (source.path.as_path(), source))
                 .collect();
+            // 同一文件的所有诊断共用一个行首索引，避免按诊断数重扫源码前缀。
+            let mut indexes: HashMap<&Path, LineIndex> = HashMap::new();
             for diagnostic in &project.analysis.diagnostics {
                 let Some(source) = sources.get(diagnostic.path.as_path()) else {
                     continue;
                 };
+                let index = indexes
+                    .entry(diagnostic.path.as_path())
+                    .or_insert_with(|| LineIndex::new(&source.text));
                 grouped
                     .entry(diagnostic.path.clone())
                     .or_default()
-                    .push(diagnostic_json(&source.text, diagnostic));
+                    .push(diagnostic_json(&source.text, index, diagnostic));
             }
         }
 

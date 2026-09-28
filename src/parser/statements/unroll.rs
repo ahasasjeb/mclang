@@ -59,21 +59,33 @@ impl Parser {
             ));
         }
 
-        let body_start = self.cursor;
         if iterations <= 0 {
             // 空区间不产出语句，但仍检查循环体语法。
             self.block()?;
             return Ok(Vec::new());
         }
 
+        self.with_retained_tokens(|parser| {
+            parser.expand_unroll(&variable, variable_span, start_value, iterations)
+        })
+    }
+
+    fn expand_unroll(
+        &mut self,
+        variable: &str,
+        variable_span: Span,
+        start_value: i32,
+        iterations: i64,
+    ) -> Result<Vec<Statement>, Diagnostic> {
+        let body_start = self.cursor;
         let block_uses = self.active_macro_uses.len();
         let block_coordinates = self.active_macro_coordinates.len();
         let mut expanded = Vec::new();
         for index in 0..iterations {
             let diagnostic_count = self.diagnostics.len();
             let value = start_value + index as i32;
-            self.constant_bindings.push((variable.clone(), value));
-            self.constant_variables.push(variable.clone());
+            self.constant_bindings.push((variable.to_owned(), value));
+            self.constant_variables.push(variable.to_owned());
             self.cursor = body_start;
             let (body, end_span) = self.block()?;
             self.constant_variables.pop();

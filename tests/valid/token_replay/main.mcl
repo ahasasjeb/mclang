@@ -1,0 +1,28 @@
+namespace token_replay;
+
+score calls = 0;
+
+macro fn replay(text label) {
+    unroll for row in 0..2 {
+        unroll for col_index in 0..2 {
+            message.all("$(label)");
+            set_block(pos(row, 64, col_index), block_state("minecraft:stone"));
+        }
+    }
+    message.all("$(label) done");
+}
+
+fn invoke() {
+    call replay(nbt { label = "Player"; });
+    say("after macro call");
+}
+
+fn ordinary() {
+    unroll for outer in 0..2 {
+        unroll for inner in 0..2 {
+            say("replayed text");
+            calls += 1;
+        }
+    }
+    say("after nested replay");
+}

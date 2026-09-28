@@ -67,7 +67,7 @@ impl Parser {
     /// 标签条目：本命名空间函数、`#` 本命名空间标签或字符串形式的外部资源位置。
     fn function_tag_entry(&mut self) -> Result<FunctionTagEntry, Diagnostic> {
         if let Some(hash) = self.take(&TokenKind::Hash) {
-            let token = self.advance().clone();
+            let token = self.advance_owned();
             match token.kind {
                 TokenKind::Ident(value) => {
                     Ok(FunctionTagEntry::Tag(value, hash.span.merge(token.span)))
@@ -82,7 +82,7 @@ impl Parser {
                 )),
             }
         } else {
-            let token = self.advance().clone();
+            let token = self.advance_owned();
             match token.kind {
                 TokenKind::Ident(value) => Ok(FunctionTagEntry::Function(value, token.span)),
                 TokenKind::String(value) => Ok(FunctionTagEntry::External(value, token.span)),
@@ -118,7 +118,7 @@ impl Parser {
         &mut self,
         expected: &str,
     ) -> Result<(String, Span), Diagnostic> {
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         match token.kind {
             TokenKind::Ident(value) | TokenKind::String(value) => Ok((value, token.span)),
             _ => Err(Diagnostic::new(

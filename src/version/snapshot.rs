@@ -387,39 +387,68 @@ fn namespace_of(id: &str) -> &str {
         .unwrap_or("minecraft")
 }
 
+/// Maximum accepted edit distance for spelling suggestions.
+const MAX_SUGGESTION_DISTANCE: usize = 2;
+
 /// 在候选集合中找编辑距离 ≤ 2 的最近者。
 pub(crate) fn closest<'a>(
     value: &str,
     candidates: impl Iterator<Item = &'a str>,
 ) -> Option<String> {
-    let mut best: Option<(usize, String)> = None;
+    let value: Vec<char> = value.chars().collect();
+    let mut best: Option<(usize, &str)> = None;
+    let mut characters = Vec::new();
+    let mut previous = Vec::new();
+    let mut current = Vec::new();
     for candidate in candidates {
-        let distance = edit_distance(value, candidate);
-        if distance <= 2 && best.as_ref().is_none_or(|(best, _)| distance < *best) {
-            best = Some((distance, candidate.to_string()));
+        if value.len().abs_diff(candidate.chars().count()) > MAX_SUGGESTION_DISTANCE {
+            continue;
+        }
+        characters.clear();
+        characters.extend(candidate.chars());
+        let distance = edit_distance(&value, &characters, &mut previous, &mut current);
+        if distance <= MAX_SUGGESTION_DISTANCE
+            && best.as_ref().is_none_or(|(best, _)| distance < *best)
+        {
+            best = Some((distance, candidate));
+            if distance == 0 {
+                break;
+            }
         }
     }
-    best.map(|(_, candidate)| candidate)
+    best.map(|(_, candidate)| candidate.to_string())
 }
 
-/// 两段文本的 Levenshtein 距离（长度差异过大时直接返回上限）。
-fn edit_distance(left: &str, right: &str) -> usize {
-    let left: Vec<char> = left.chars().collect();
-    let right: Vec<char> = right.chars().collect();
-    if left.len().abs_diff(right.len()) > 4 {
-        return usize::MAX;
-    }
-    let mut previous: Vec<usize> = (0..=right.len()).collect();
-    let mut current = vec![0; right.len() + 1];
-    for (i, left_character) in left.iter().enumerate() {
-        current[0] = i + 1;
-        for (j, right_character) in right.iter().enumerate() {
-            let cost = usize::from(left_character != right_character);
-            current[j + 1] = (previous[j] + cost)
-                .min(previous[j + 1] + 1)
-                .min(current[j] + 1);
+/// Only visit cells within the accepted distance of the diagonal. Row and column
+/// numbers both count consumed characters, including the empty prefix at zero.
+fn edit_distance(
+    left: &[char],
+    right: &[char],
+    previous: &mut Vec<usize>,
+    current: &mut Vec<usize>,
+) -> usize {
+    let limit = MAX_SUGGESTION_DISTANCE + 1;
+    previous.clear();
+    previous.extend((0..=right.len()).map(|column| column.min(limit)));
+    current.resize(right.len() + 1, limit);
+    for row in 1..=left.len() {
+        let first = row.saturating_sub(MAX_SUGGESTION_DISTANCE).max(1);
+        let last = (row + MAX_SUGGESTION_DISTANCE).min(right.len());
+        current[0] = row.min(limit);
+        if first > 1 {
+            current[first - 1] = limit;
         }
-        std::mem::swap(&mut previous, &mut current);
+        for column in first..=last {
+            let cost = usize::from(left[row - 1] != right[column - 1]);
+            current[column] = (previous[column - 1] + cost)
+                .min(previous[column] + 1)
+                .min(current[column - 1] + 1)
+                .min(limit);
+        }
+        if last < right.len() {
+            current[last + 1] = limit;
+        }
+        std::mem::swap(previous, current);
     }
     previous[right.len()]
 }

@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use serde_json::Value;
+
 use crate::ast::*;
 use crate::diagnostic::Diagnostic;
 
@@ -276,12 +278,15 @@ pub(super) fn collect_data_slots<'a>(
 }
 
 /// 校验 JSON 资源声明，并返回按类型归类的资源名集合。
+///
+/// 解析成功的结果按声明下标保存，代码生成阶段直接复用，不再重复解析同一份文本。
 pub(super) fn validate_resources<'a>(
     program: &'a Program,
     diagnostics: &mut Vec<Diagnostic>,
-) -> ResourceSymbols<'a> {
+) -> (ResourceSymbols<'a>, Vec<Option<Value>>) {
     let mut resources = HashSet::new();
     let mut symbols = ResourceSymbols::default();
+    let mut parsed: Vec<Option<Value>> = Vec::with_capacity(program.resources.len());
     for resource in &program.resources {
         if !crate::version::snapshot::snapshot().resource_kind_supported(&resource.kind) {
             diagnostics.push(Diagnostic::new(
@@ -317,14 +322,17 @@ pub(super) fn validate_resources<'a>(
                 resource.span,
             ));
         }
-        match serde_json::from_str::<serde_json::Value>(&resource.json) {
-            Ok(value) => super::resource_schema::validate_resource(
-                &resource.kind,
-                &resource.name,
-                &value,
-                resource.span,
-                diagnostics,
-            ),
+        match serde_json::from_str::<Value>(&resource.json) {
+            Ok(value) => {
+                super::resource_schema::validate_resource(
+                    &resource.kind,
+                    &resource.name,
+                    &value,
+                    resource.span,
+                    diagnostics,
+                );
+                parsed.push(Some(value));
+            }
             Err(error) => {
                 diagnostics.push(Diagnostic::new(
                     format!(
@@ -337,6 +345,7 @@ pub(super) fn validate_resources<'a>(
                     ),
                     resource.span,
                 ));
+                parsed.push(None);
             }
         }
         let bucket = match resource.kind.as_str() {
@@ -348,7 +357,7 @@ pub(super) fn validate_resources<'a>(
         };
         bucket.insert(resource.name.as_str());
     }
-    symbols
+    (symbols, parsed)
 }
 
 /// 校验函数声明本身（名称、签名、属性和返回约定），并建立签名表。

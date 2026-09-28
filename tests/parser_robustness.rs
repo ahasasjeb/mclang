@@ -310,6 +310,9 @@ fn lsp_survives_deep_input_and_reports_later_edits() {
         json!({"jsonrpc":"2.0", "method":"textDocument/didChange", "params":{
             "textDocument":{"uri":uri, "version":2},
             "contentChanges":[{"text":program("let a = ; let b = ;")} ]}}),
+        // A request is an analysis barrier; adjacent edits may otherwise coalesce.
+        json!({"jsonrpc":"2.0", "id":3, "method":"textDocument/hover", "params":{
+            "textDocument":{"uri":uri}, "position":{"line":0, "character":0}}}),
         json!({"jsonrpc":"2.0", "method":"textDocument/didChange", "params":{
             "textDocument":{"uri":uri, "version":3}, "contentChanges":[{"text":valid}]}}),
         json!({"jsonrpc":"2.0", "id":2, "method":"shutdown"}),

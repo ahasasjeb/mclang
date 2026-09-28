@@ -56,6 +56,8 @@ pub(super) struct LoopContext {
 /// 单次代码生成的完整状态。
 pub(super) struct Compiler<'a> {
     program: &'a Program,
+    /// 语义校验阶段解析好的 `resource` JSON，与 `program.resources` 同序。
+    resource_json: &'a [Option<serde_json::Value>],
     objective: String,
     /// `<函数名, 变量名> -> 假玩家`，构造时一次算好。
     holders: HashMap<(&'a str, &'a str), String>,
@@ -90,9 +92,13 @@ pub(super) struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub(super) fn new(program: &'a Program) -> Self {
+    pub(super) fn new(
+        program: &'a Program,
+        resource_json: &'a [Option<serde_json::Value>],
+    ) -> Self {
         Self {
             program,
+            resource_json,
             objective: objective_name(&program.namespace),
             holders: build_holders(program),
             queries_by_name: program
@@ -280,10 +286,12 @@ impl<'a> Compiler<'a> {
             }
             files.insert(path, contents);
         }
-        for resource in &self.program.resources {
-            let value = serde_json::from_str::<serde_json::Value>(&resource.json)
-                .expect("semantic validation guarantees valid JSON");
-            let contents = serde_json::to_string_pretty(&value)
+        for (index, resource) in self.program.resources.iter().enumerate() {
+            // 校验阶段已解析过一次，这里直接复用；失败声明在通过校验时不会存在。
+            let value = self.resource_json[index]
+                .as_ref()
+                .expect("a resource reaching codegen has valid JSON");
+            let contents = serde_json::to_string_pretty(value)
                 .expect("a parsed JSON value can always be serialized")
                 + "\n";
             files.insert(

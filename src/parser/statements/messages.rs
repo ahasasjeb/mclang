@@ -184,7 +184,7 @@ impl Parser {
         label: &str,
     ) -> Result<String, Diagnostic> {
         let negative = self.negative_sign();
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         let (number, text) = match token.kind {
             TokenKind::Number(value) => {
                 let signed = if negative { -value } else { value };

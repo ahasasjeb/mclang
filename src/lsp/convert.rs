@@ -5,6 +5,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::lines::LineIndex;
+
 /// 文件路径转 `file://` URI，非保留字节按 UTF-8 百分号编码。
 pub fn path_to_uri(path: &Path) -> String {
     let text = path.to_string_lossy().replace('\\', "/");
@@ -61,39 +63,29 @@ fn percent_decode(text: &str) -> String {
 }
 
 /// 字节偏移转 LSP 位置（行号与 UTF-16 列号都从 0 开始）。
-pub fn offset_to_position(text: &str, offset: usize) -> (u32, u32) {
-    let offset = clamp_boundary(text, offset);
-    let mut line = 0u32;
-    let mut line_start = 0usize;
-    for (index, character) in text.char_indices() {
-        if index >= offset {
-            break;
-        }
-        if character == '\n' {
-            line += 1;
-            line_start = index + 1;
-        }
+///
+/// 已知行首索引时走二分查找；否则按需现建一次索引。
+pub fn offset_to_position_in(text: &str, offset: usize, index: Option<&LineIndex>) -> (u32, u32) {
+    match index {
+        Some(index) => index.utf16_position(text, offset),
+        None => LineIndex::new(text).utf16_position(text, offset),
     }
-    let character = text[line_start..offset].encode_utf16().count() as u32;
-    (line, character)
 }
 
 /// LSP 位置转字节偏移；超出文件末尾时落在末尾。
 pub fn position_to_offset(text: &str, line: u32, character: u32) -> usize {
-    let mut line_start = 0usize;
-    for _ in 0..line {
-        match text[line_start..].find('\n') {
-            Some(index) => line_start += index + 1,
-            None => return text.len(),
-        }
+    let index = LineIndex::new(text);
+    if line as usize >= index.starts_len() {
+        return text.len();
     }
+    let line_start = index.line_start(line as usize);
     let line_end = text[line_start..]
         .find('\n')
-        .map_or(text.len(), |index| line_start + index);
+        .map_or(text.len(), |position| line_start + position);
     let mut units = 0u32;
-    for (index, current) in text[line_start..line_end].char_indices() {
+    for (position, current) in text[line_start..line_end].char_indices() {
         if units >= character {
-            return line_start + index;
+            return line_start + position;
         }
         units += current.len_utf16() as u32;
     }

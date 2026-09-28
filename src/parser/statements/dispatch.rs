@@ -326,10 +326,7 @@ impl Parser {
             }
         };
         let end = self.previous().span;
-        Ok(Statement {
-            kind,
-            span: start.merge(end),
-        })
+        Ok(Statement::new(kind, start.merge(end)))
     }
     /// 读取一条底层命令字符串，执行与 `run` 相同的空值、斜杠和换行检查。
     pub(super) fn command_string(&mut self, label: &str) -> Result<(String, Span), Diagnostic> {
@@ -359,7 +356,7 @@ impl Parser {
     }
 
     pub(super) fn assignment_operator(&mut self) -> Result<AssignOp, Diagnostic> {
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         match token.kind {
             TokenKind::Equal => Ok(AssignOp::Set),
             TokenKind::PlusEqual => Ok(AssignOp::Add),

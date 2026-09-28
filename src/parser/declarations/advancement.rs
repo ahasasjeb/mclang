@@ -105,7 +105,7 @@ impl Parser {
         &mut self,
         label: &str,
     ) -> Result<AdvancementReference, Diagnostic> {
-        let token = self.advance().clone();
+        let token = self.advance_owned();
         match token.kind {
             TokenKind::Ident(value) => Ok(AdvancementReference {
                 name: value,
@@ -147,7 +147,7 @@ impl Parser {
                         return Err(Diagnostic::new("准则只能声明一次 trigger", property_span));
                     }
                     self.expect(TokenKind::Equal, "trigger 后需要 `=`")?;
-                    let token = self.advance().clone();
+                    let token = self.advance_owned();
                     let value = match token.kind {
                         TokenKind::Ident(value) | TokenKind::String(value) => value,
                         _ => {

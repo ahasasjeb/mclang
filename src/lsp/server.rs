@@ -1,48 +1,26 @@
 //! 语言服务器的会话状态：文档同步、项目分析与请求分派。
 //!
-//! 分析范围是工作区里的全部 `.mcl` 文件加上已打开但不在工作区内的文档；每次改动都
-//! 重新分析整个项目，因为命名空间、跨文件引用和函数标签本来就是项目级概念。项目
-//! 规模很小，全量分析换来的是与命令行完全一致的诊断。
+//! Unchanged projects reuse their analysis. Changed projects still resolve and
+//! compile together so cross-file diagnostics stay consistent with the CLI.
 
 use std::collections::{BTreeMap, HashMap};
-use std::io::{self, BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
 
 use crate::analysis::{FileDiagnostic, ProjectAnalysis, SourceFile};
+use crate::lines::LineIndex;
 
-use super::convert::{offset_to_position, position_to_offset, uri_to_path};
-use super::rpc;
+use super::convert::{offset_to_position_in, position_to_offset, uri_to_path};
+pub use transport::serve;
 
 /// 单个工作区最多分析的文件数，避免误把大目录当成项目。
 const MAX_PROJECT_FILES: usize = 512;
 
-/// 启动标准输入输出上的语言服务器，直到客户端发送 `exit`。
-pub fn serve() -> io::Result<()> {
-    let stdin = io::stdin();
-    let stdout = io::stdout();
-    let mut reader = BufReader::new(stdin.lock());
-    let mut writer = BufWriter::new(stdout.lock());
-    let mut session = Session::default();
-    while let Some(message) = rpc::read_message(&mut reader)? {
-        let (response, notifications) = session.handle(&message);
-        for notification in notifications {
-            rpc::write_message(&mut writer, &notification)?;
-        }
-        if let Some(response) = response {
-            rpc::write_message(&mut writer, &response)?;
-        }
-        if session.exiting {
-            break;
-        }
-    }
-    Ok(())
-}
-
 /// 一个 Mclang 项目：同一命名空间、可跨文件引用的一组源文件。
 struct Project {
+    key: (PathBuf, Option<String>),
     sources: Vec<SourceFile>,
     analysis: ProjectAnalysis,
 }
@@ -52,6 +30,15 @@ struct DiscoveryIndex {
     files: Vec<PathBuf>,
     direct_files: HashMap<PathBuf, Vec<usize>>,
     subtree_files: HashMap<PathBuf, Vec<usize>>,
+}
+
+/// 磁盘文件的缓存内容，附带用于判断是否变化的时间戳。
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct DiskStamp {
+    /// 文件长度。
+    pub(super) len: u64,
+    /// 最后修改时间；文件系统不提供时为 `None`。
+    pub(super) modified: Option<(u64, u32)>,
 }
 
 #[derive(Default)]
@@ -65,6 +52,8 @@ pub struct Session {
     discovery_index: Option<Arc<DiscoveryIndex>>,
     /// 每个文件的命名空间，用于推断打开文档属于哪个项目。
     namespaces: BTreeMap<PathBuf, Option<String>>,
+    /// 磁盘文件的内容与其修改时间戳；未变化的文件不重复读盘。
+    disk_text: BTreeMap<PathBuf, (DiskStamp, String)>,
     /// 上次发布的诊断，用于跳过没有变化的通知。
     published: BTreeMap<PathBuf, Value>,
     shutdown: bool,
@@ -152,9 +141,10 @@ fn folder_path(folder: &Value) -> Option<PathBuf> {
     uri_to_path(folder.get("uri")?.as_str()?).map(|path| absolute(&path))
 }
 
-fn diagnostic_json(text: &str, diagnostic: &FileDiagnostic) -> Value {
-    let (start_line, start_character) = offset_to_position(text, diagnostic.span.start);
-    let (end_line, end_character) = offset_to_position(text, diagnostic.span.end);
+fn diagnostic_json(text: &str, index: &LineIndex, diagnostic: &FileDiagnostic) -> Value {
+    let (start_line, start_character) =
+        offset_to_position_in(text, diagnostic.span.start, Some(index));
+    let (end_line, end_character) = offset_to_position_in(text, diagnostic.span.end, Some(index));
     json!({
         "range": {
             "start": {"line": start_line, "character": start_character},
@@ -184,3 +174,4 @@ fn absolute(path: &Path) -> PathBuf {
 
 mod dispatch;
 mod lifecycle;
+mod transport;

@@ -40,29 +40,29 @@ pub(super) fn translate(
     let mut output = String::with_capacity(source.len());
     for (index, token) in tokens.iter().enumerate() {
         if token.kind != TokenKind::Ident {
-            output.push_str(&token.text);
+            output.push_str(token.text);
             continue;
         }
         if imports.contains(&index) {
-            output.push_str(&token.text);
+            output.push_str(token.text);
             continue;
         }
         // NBT 字面量内部只翻译布尔字面量，键名与字符串是用户数据。
         if nbt.contains(&index) {
-            match rewriter.alias(&token.text, "boolean_word") {
+            match rewriter.alias(token.text, "boolean_word") {
                 Some(boolean) => output.push_str(boolean),
-                None => output.push_str(&token.text),
+                None => output.push_str(token.text),
             }
             continue;
         }
         // 方块状态的属性名与取值是原版数据（`level`、`facing`……），整块保持原样。
         if block_states.contains(&index) {
-            output.push_str(&token.text);
+            output.push_str(token.text);
             continue;
         }
         match translate_word(&tokens, &neighbors, &frames, index, &rewriter) {
             Some(word) => output.push_str(&word),
-            None => output.push_str(&token.text),
+            None => output.push_str(token.text),
         }
     }
     output
@@ -100,7 +100,7 @@ fn translate_word(
     index: usize,
     rewriter: &Rewriter,
 ) -> Option<String> {
-    let word = tokens[index].text.as_str();
+    let word = tokens[index].text;
     let previous = neighbors.previous(index);
     let next = neighbors.next(index);
 
@@ -165,7 +165,7 @@ fn chain_member(
             _ => break,
         }
     }
-    let root_word = root.and_then(|root| rewriter.tables.canonical(&tokens[root].text));
+    let root_word = root.and_then(|root| rewriter.tables.canonical(tokens[root].text));
     if root_word.is_some_and(|root| context::COMMAND_RECEIVERS.contains(&root)) {
         return rewriter
             .alias(word, "command_value")
@@ -174,7 +174,7 @@ fn chain_member(
             .map(str::to_owned);
     }
     if let Some(receiver) = receiver
-        && let Some(family) = rewriter.tables.receiver_family(&tokens[receiver].text)
+        && let Some(family) = rewriter.tables.receiver_family(tokens[receiver].text)
         && let Some(rewritten) = rewriter.alias(word, family)
     {
         return Some(rewritten.to_owned());
@@ -225,7 +225,7 @@ fn property_value(
 ) -> Option<String> {
     let property = neighbors
         .previous(equals)
-        .and_then(|property| rewriter.tables.canonical(&tokens[property].text))?;
+        .and_then(|property| rewriter.tables.canonical(tokens[property].text))?;
     context::property_value_families(property)
         .iter()
         .find_map(|family| rewriter.alias(word, family))
@@ -264,7 +264,7 @@ fn compute_frames(tokens: &[Token], neighbors: &Neighbors, tables: &Tables) -> V
     let mut frames = vec![None; tokens.len()];
     let mut stack: Vec<Option<String>> = Vec::new();
     for (index, token) in tokens.iter().enumerate() {
-        match token.text.as_str() {
+        match token.text {
             "(" => stack.push(canonical_callee(tokens, neighbors, index, tables)),
             ")" | "}" => {
                 stack.pop();
@@ -288,7 +288,7 @@ fn canonical_callee(
     if tokens[method].kind != TokenKind::Ident {
         return None;
     }
-    let mut parts = vec![tokens[method].text.clone()];
+    let mut parts = vec![tokens[method].text];
     let mut current = method;
     while let Some(dot) = neighbors.previous(current) {
         if tokens[dot].text != "." {
@@ -300,27 +300,22 @@ fn canonical_callee(
         if tokens[receiver].kind != TokenKind::Ident {
             break;
         }
-        parts.insert(0, tokens[receiver].text.clone());
+        parts.insert(0, tokens[receiver].text);
         current = receiver;
     }
 
-    let head = parts.first()?.as_str();
+    let head: &str = parts.first()?;
     let canonical_head = tables.canonical(head);
     if canonical_head.is_some_and(|canonical| context::COMMAND_RECEIVERS.contains(&canonical)) {
         let parts: Vec<String> = parts
             .iter()
-            .map(|part| {
-                tables
-                    .canonical(part)
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| part.clone())
-            })
+            .map(|part| tables.canonical(part).unwrap_or(part).to_owned())
             .collect();
         return Some(parts.join("."));
     }
 
     let receiver = canonical_head.unwrap_or(head);
-    let Some(tail) = parts.get(1).map(String::as_str) else {
+    let Some(tail) = parts.get(1).copied() else {
         return Some(receiver.to_owned());
     };
     let family = tables
@@ -360,7 +355,7 @@ fn nbt_body_tokens(tokens: &[Token], tables: &Tables) -> HashSet<usize> {
     for (index, token) in tokens.iter().enumerate() {
         if depth > 0 {
             opaque.insert(index);
-            match token.text.as_str() {
+            match token.text {
                 "{" => depth += 1,
                 "}" => depth -= 1,
                 _ => {}
@@ -376,7 +371,7 @@ fn nbt_body_tokens(tokens: &[Token], tables: &Tables) -> HashSet<usize> {
             pending = false;
             continue;
         }
-        pending = token.kind == TokenKind::Ident && tables.is_keyword(&token.text, "nbt");
+        pending = token.kind == TokenKind::Ident && tables.is_keyword(token.text, "nbt");
     }
     opaque
 }
@@ -391,7 +386,7 @@ fn block_state_body_tokens(
     let mut opaque = HashSet::new();
     for index in 0..tokens.len() {
         if tokens[index].kind != TokenKind::Ident
-            || !tables.is_keyword(&tokens[index].text, "block_state")
+            || !tables.is_keyword(tokens[index].text, "block_state")
         {
             continue;
         }
@@ -404,7 +399,7 @@ fn block_state_body_tokens(
         let mut depth = 0;
         let mut close = None;
         for (cursor, token) in tokens.iter().enumerate().skip(open + 1) {
-            match token.text.as_str() {
+            match token.text {
                 "(" => depth += 1,
                 ")" if depth == 0 => {
                     close = Some(cursor);
@@ -424,7 +419,7 @@ fn block_state_body_tokens(
         let mut cursor = brace;
         while cursor < tokens.len() {
             opaque.insert(cursor);
-            match tokens[cursor].text.as_str() {
+            match tokens[cursor].text {
                 "{" => depth += 1,
                 "}" => {
                     depth -= 1;
@@ -447,14 +442,14 @@ fn import_name_tokens(tokens: &[Token], tables: &Tables) -> HashSet<usize> {
     let mut in_import = false;
     for (index, token) in tokens.iter().enumerate() {
         if !in_import {
-            if token.kind == TokenKind::Ident && tables.canonical(&token.text) == Some("import") {
+            if token.kind == TokenKind::Ident && tables.canonical(token.text) == Some("import") {
                 in_import = true;
             }
             continue;
         }
         if token.text == ";" {
             in_import = false;
-        } else if token.kind == TokenKind::Ident && tables.canonical(&token.text) != Some("as") {
+        } else if token.kind == TokenKind::Ident && tables.canonical(token.text) != Some("as") {
             opaque.insert(index);
         }
     }

@@ -76,7 +76,8 @@ fn compile_inner(
     program: &mut Program,
     options: &CompileOptions,
 ) -> Result<Compilation, Vec<Diagnostic>> {
-    let diagnostics = validate::validate(program);
+    let validated = validate::validate(program);
+    let diagnostics = validated.diagnostics;
     if diagnostics
         .iter()
         .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
@@ -86,7 +87,7 @@ fn compile_inner(
 
     rename::rename_program(program);
 
-    let mut compiler = codegen::Compiler::new(program);
+    let mut compiler = codegen::Compiler::new(program, &validated.resource_json);
     compiler.compile_functions();
     let pack = match compiler.finish(&options.description) {
         Ok(pack) => pack,
