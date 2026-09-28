@@ -94,11 +94,46 @@
 | 表达式 | 中等 | 常量比较直接下降为 `matches` 范围，常量除零与 i32 溢出会诊断；继续增加一等 bool，并明确运行期计分板除法、取模与溢出语义。坐标的绝对整数分量已可写编译期常量表达式（配合编译期循环生成静态坐标表）。 |
 | 控制流 | 较高 | 保留短路与表达式求值顺序；简单条件和安全单命令块直接内联，无跳转循环省略状态。多实体执行、store 赋值结果和失败条件取反均保留语义边界；后续可增加 `match/switch`。已有编译期循环 `unroll for`：边界取常量，循环体按迭代展开，展开后不生成循环假玩家与辅助函数。 |
 | 函数调用 | 较高 | 整理参数、返回值、macro 调用规则和诊断。 |
+| 类型化点击函数引用 | 待实现 | 为文本组件增加 `click = run_function(bank.logout)` / `点击 = 运行函数(bank.logout)`；编译器解析真实函数符号并下降为 Minecraft 的 `run_command`，避免手写 `"/function namespace:path"`。 |
 | raw 入口 | 已有 | 保留兼容入口；增加严格模式统计哪些代码仍依赖 raw。 |
 | 诊断 | 较高 | 已支持非阻断 warning 等级，并能在 CLI 与 LSP 显示；继续增加诊断码、JSON 输出、related span、fix-it。 |
 | 项目配置 | 待实现 | 增加项目配置文件，保存 namespace、description、output、strict policy、libraries、pack metadata 等。 |
 | source map | 待实现 | 记录生成 `.mcfunction` 行与源文件 span/symbol 的对应关系。 |
 | 本地库 | 待实现 | 支持只读 library roots、稳定解析顺序和冲突诊断。 |
+
+### 4.1 类型化点击函数引用
+
+目标语法：
+
+```mcl
+text("【退出】") {
+    color = "red";
+    click = run_function(bank.logout);
+}
+```
+
+对应中文语法：
+
+```mcl
+文本("【退出】") {
+    颜色 = "red";
+    点击 = 运行函数(bank.logout);
+}
+```
+
+编译产物仍使用 Minecraft 原生点击事件：
+
+```json
+{"action":"run_command","command":"/function sign_bank:bank/logout"}
+```
+
+实现要求：
+
+- AST 新增 `ClickEvent::RunFunction`，保存可解析的函数引用与 span，不能退化成普通字符串。
+- parser 与中英文关键词表增加 `run_function` / `运行函数`；名称解析、模块导入、definition、references 和 rename 必须把它当作真实函数符号。
+- 校验目标函数存在并适合玩家点击上下文；codegen 根据项目 namespace 和模块路径生成 `/function <namespace>:<path>`。
+- 告示牌 `front_text.messages` 应允许使用高层 `TextComponent` 表达式，或提供等价的 typed component helper，避免用户回到原始 NBT 的 `action`/`command` 字段。
+- `run_command("...")` 继续保留给任意命令；严格模式可提示其中形如 `/function ...` 的字符串优先改用 `run_function(...)`。
 
 `examples/monster_market` 的复杂市场语料用于检查真实产物。当前产物为 528 条函数命令、66 个 mcfunction，其中 24 个位于 `__mcl`；安全单命令块与简单条件已直接内联，算术赋值直接写入目标，复用的常量在加载时统一初始化。多实体执行仍保留逐来源求值边界，store 不会丢失自赋值结果，查询失败后的取反与是否带 else 无关。
 
@@ -197,7 +232,7 @@
 
 ## 8. 测试与覆盖清单
 
-- [x] `examples/sign_bank` 端到端压力测试：纯结构化 MCL 实现 32 槽双牌账号/密码、独立余额、3×3→10×10 基岩仓库、light 照明、text_display 清理。2026-09-27 在 Minecraft 26.3 GameTest 服务端实际点击命令牌，368 项断言通过；入口 `examples/sign_bank/verification/run.ps1`。
+- [x] `examples/sign_bank` 端到端压力测试：纯结构化 MCL 实现 32 槽双牌账号/密码、独立余额、3×3→10×10 基岩仓库、light 照明、text_display 清理。2026-09-28 在 Minecraft 26.3 GameTest 服务端实际点击命令牌，411 项断言通过；入口 `examples/sign_bank/verification/run.ps1`。
 - [ ] 补足告示牌方块实体 NBT 的字段级 codec 校验：区分 `front_text.color` 染料色与文本组件 `color` 聊天色。当前严格模式不能阻止二者混用，必须检查原版加载日志。
 - [ ] 编译期相对坐标表达式（例如 `~(width - 6)`）；目前可用 `unroll for` 绝对坐标展开完成相同布局。
 

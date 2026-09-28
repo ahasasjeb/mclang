@@ -10,6 +10,12 @@ import rooms;
     return ready;
 }
 
+@player fn registration_page_ready(expected) -> score {
+    let ready = 0;
+    if page_ready(expected) == 1 && count(registering_terminal_players) == 1 { ready = 1; }
+    return ready;
+}
+
 @player fn deny() {
     title.actionbar(self, "页面已失效，或安全范围内出现其他玩家");
     sound.self("minecraft:block.note_block.bass", master);
@@ -27,6 +33,8 @@ export @player fn button_login() {
 export @player fn button_register() {
     if terminal_ready() == 1 {
         cancel_auth();
+        clear_registration_scratch();
+        self.add_tag("sb_registering");
         scoreboard.set(self, auth_mode, 3);
         set_input_sign();
         maintain_public_signs();
@@ -36,7 +44,6 @@ export @player fn button_register() {
 export @player fn button_home() {
     if terminal_ready() == 1 {
         cancel_auth();
-        reset_scratch();
         show_home_menu();
     } else { deny(); }
 }
@@ -45,39 +52,17 @@ export @player fn login_account() {
     if page_ready(1) == 1 {
         if capture_input() == 1 {
             let slot = lookup_account(1);
-            if slot == 0 { title.actionbar(self, "账号不存在或注册尚未完成"); }
-            if slot < 0 { title.actionbar(self, "账号记录重复，已拒绝登录"); }
+            if slot == 0 { title.actionbar(self, "账号不存在"); }
+            if slot < 0 { title.actionbar(self, "账号记录重复，拒绝登录"); }
             if slot > 0 {
-                if record_ready(slot) == 1 && account_online(slot) == 0 {
+                if record_ready(slot) != 1 { title.actionbar(self, "账号记录损坏，拒绝登录"); }
+                else { if account_online(slot) != 0 { title.actionbar(self, "账号已经在线"); }
+                else {
                     scoreboard.set(self, pending_slot, slot);
                     scoreboard.set(self, auth_mode, 2);
                     set_input_sign();
                     title.actionbar(self, "账号已确认：请输入密码");
-                } else { title.actionbar(self, "账号在线或记录异常，拒绝登录"); }
-            }
-        } else { title.actionbar(self, "请输入非空账号"); }
-        maintain_public_signs();
-    } else { deny(); }
-}
-
-export @player fn register_account() {
-    if page_ready(3) == 1 {
-        if capture_input() == 1 {
-            if lookup_account(0) != 0 { title.actionbar(self, "账号已存在或已被预留"); }
-            else {
-                let slot = first_free_slot();
-                scoreboard.set(self, transfer, 0);
-                execute store.result(self, transfer) { clear(self, "minecraft:emerald", 0); }
-                if slot == 0 { title.actionbar(self, "32 个账号槽位已满"); }
-                if scoreboard.get(self, transfer) == 0 { title.actionbar(self, "注册需要 1 枚绿宝石"); }
-                if slot > 0 && scoreboard.get(self, transfer) > 0 {
-                    if reserve_slot(slot) == 1 {
-                        scoreboard.set(self, pending_slot, slot);
-                        scoreboard.set(self, auth_mode, 4);
-                        set_input_sign();
-                        title.actionbar(self, "账号已存储并回读验证：请设置密码");
-                    } else { title.actionbar(self, "账号写入验证失败，未扣费"); }
-                }
+                } }
             }
         } else { title.actionbar(self, "请输入非空账号"); }
         maintain_public_signs();
@@ -87,45 +72,92 @@ export @player fn register_account() {
 export @player fn login_password() {
     if page_ready(2) == 1 {
         let slot = scoreboard.get(self, pending_slot);
-        let valid = capture_input();
-        if valid == 1 && record_ready(slot) == 1 && password_matches(slot) == 1 && account_online(slot) == 0 && room_available(slot) == 1 {
-            enter_account(slot);
-        } else {
+        if capture_input() != 1 { title.actionbar(self, "密码不能为空"); }
+        else { if record_ready(slot) != 1 {
             scoreboard.set(self, pending_slot, 0);
             scoreboard.set(self, auth_mode, 1);
-            title.actionbar(self, "密码错误、仓库有人或账号记录异常，请重新登录");
-        }
+            set_input_sign();
+            title.actionbar(self, "账号记录损坏，请重新输入账号");
+        } else { if password_matches(slot) != 1 {
+            scoreboard.set(self, pending_slot, 0);
+            scoreboard.set(self, auth_mode, 1);
+            set_input_sign();
+            title.actionbar(self, "密码错误，请重新输入账号");
+        } else { if account_online(slot) != 0 {
+            scoreboard.set(self, pending_slot, 0);
+            scoreboard.set(self, auth_mode, 1);
+            set_input_sign();
+            title.actionbar(self, "账号已经在线");
+        } else { if room_available(slot) != 1 {
+            scoreboard.set(self, pending_slot, 0);
+            scoreboard.set(self, auth_mode, 1);
+            set_input_sign();
+            title.actionbar(self, "仓库内或附近有人，拒绝登录");
+        } else {
+            enter_account(slot);
+        } } } } }
         reset_scratch();
-        set_input_sign();
+        maintain_public_signs();
+    } else { deny(); }
+}
+
+export @player fn register_account() {
+    if registration_page_ready(3) == 1 {
+        if capture_input() == 1 {
+            let existing = lookup_account(0);
+            if existing != 0 { title.actionbar(self, "账号已存在，请更换账号"); }
+            else { if store_pending_account() == 1 {
+                scoreboard.set(self, auth_mode, 4);
+                set_input_sign();
+                title.actionbar(self, "账号已暂存：请输入密码");
+            } else {
+                cancel_auth();
+                title.actionbar(self, "账号暂存失败，注册已取消");
+            } }
+        } else { title.actionbar(self, "请输入非空账号"); }
         maintain_public_signs();
     } else { deny(); }
 }
 
 export @player fn register_password() {
-    if page_ready(4) == 1 {
-        let slot = scoreboard.get(self, pending_slot);
+    if registration_page_ready(4) == 1 {
         if capture_input() == 1 {
-            scoreboard.set(self, transfer, 0);
-            execute store.result(self, transfer) { clear(self, "minecraft:emerald", 0); }
-            if scoreboard.get(self, transfer) > 0 && room_available(slot) == 1 && record_ready(slot) == 0 && write_password(slot) == 1 {
-                scoreboard.set(self, transfer, 0);
-                execute store.result(self, transfer) { clear(self, "minecraft:emerald", 1); }
-                if scoreboard.get(self, transfer) == 1 {
-                    complete_record(slot);
-                    open_new_room(slot);
-                    enter_account(slot);
-                    title.actionbar(self, "注册成功，已扣除 1 枚绿宝石");
-                } else {
-                    release_slot(slot);
-                    cancel_auth();
-                    title.actionbar(self, "扣费失败，注册已取消");
-                }
-            } else {
+            if store_pending_password() != 1 {
                 cancel_auth();
-                title.actionbar(self, "注册失败：缺少绿宝石、仓库有人或记录未通过回读");
+                title.actionbar(self, "密码暂存失败，注册已取消");
+            } else {
+                let slot = create_pending_record();
+                if slot <= 0 {
+                    cancel_auth();
+                    if slot == -1 { title.actionbar(self, "暂存账号丢失，注册已取消"); }
+                    if slot == -2 { title.actionbar(self, "账号已存在，注册已取消"); }
+                    if slot == -3 { title.actionbar(self, "32 个账号槽位已满"); }
+                    if slot <= -4 { title.actionbar(self, "凭据写入失败，未扣费"); }
+                } else {
+                    scoreboard.set(self, transfer, 0);
+                    execute store.result(self, transfer) { clear(self, "minecraft:emerald", 1); }
+                    if scoreboard.get(self, transfer) != 1 {
+                        discard_record(slot);
+                        cancel_auth();
+                        title.actionbar(self, "注册需要 1 枚绿宝石，未创建账户");
+                    } else {
+                        self.add_tag("sb_registration_paid");
+                        complete_record(slot);
+                        if record_ready(slot) != 1 {
+                            discard_record(slot);
+                            cancel_auth();
+                            title.actionbar(self, "账户提交失败，已退回 1 枚绿宝石");
+                        } else {
+                            self.remove_tag("sb_registration_paid");
+                            self.remove_tag("sb_registering");
+                            clear_registration_scratch();
+                            open_new_room(slot);
+                            enter_account(slot);
+                            title.actionbar(self, "注册成功，已扣除 1 枚绿宝石");
+                        }
+                    }
+                }
             }
-            reset_scratch();
-            set_input_sign();
         } else { title.actionbar(self, "密码不能为空"); }
         maintain_public_signs();
     } else { deny(); }

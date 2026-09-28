@@ -28,7 +28,7 @@ export fn refresh_display(slot) {
             if scoreboard.get(self, account_slot) == slot {
                 let balance = scoreboard.get(self, account_balance);
                 let size = scoreboard.get(self, account_size);
-                spawn("minecraft:text_display", vec3(~-3.5, ~0.5, ~-5.8)) {
+                spawn("minecraft:text_display", vec3(~-3.5, ~-0.5, ~-5.4)) {
                     self.add_tag("sb_display");
                     scoreboard.set(self, account_slot, slot);
                     scoreboard.set(self, account_balance, balance);

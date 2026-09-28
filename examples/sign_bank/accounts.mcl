@@ -1,8 +1,9 @@
 namespace sign_bank;
 import main;
 
-// x=5 input, x=6 comparison, x=7 blank, x=8 pending account.
-// Account rows: y=66/69/72/75. Password rows: y=67/70/73/76.
+// Scratch signs: x=5 current value, x=6 comparison, x=7 blank template,
+// x=8 pending account and x=9 pending password. Only message[0] is carried
+// between pages; complete block-entity NBT is never compared across ticks.
 export fn reset_scratch() {
     set_block(pos(7, 66, -7), block_state("minecraft:oak_wall_sign") { facing = "south"; waterlogged = "false"; }, nbt {
         front_text = { messages = ["", "", "", ""]; color = "black"; has_glowing_text = false; };
@@ -13,12 +14,56 @@ export fn reset_scratch() {
     clone(pos(7, 66, -7), pos(7, 66, -7), pos(6, 66, -7), force);
 }
 
+export fn clear_registration_scratch() {
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7), force);
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(9, 66, -7), force);
+}
+
 export fn capture_input() -> score {
     reset_scratch();
     let valid = 0;
-    // Copy the component itself: no numeric conversion, JSON parsing or macros.
-    if data(block, pos(0, 66, 1), "front_text.messages[0]") {
-        data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 66, 1), "front_text.messages[0]"));
+    if data(block, pos(0, 65, 1), "front_text.messages[0]") {
+        data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(0, 65, 1), "front_text.messages[0]"));
+        if !blocks(pos(5, 66, -7), pos(5, 66, -7), pos(7, 66, -7)) { valid = 1; }
+    }
+    return valid;
+}
+
+export fn store_pending_account() -> score {
+    let saved = 0;
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7), force);
+    data.modify(block, pos(8, 66, -7), "front_text.messages[0]", set, from(block, pos(5, 66, -7), "front_text.messages[0]"));
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(6, 66, -7), force);
+    data.modify(block, pos(6, 66, -7), "front_text.messages[0]", set, from(block, pos(8, 66, -7), "front_text.messages[0]"));
+    if blocks(pos(5, 66, -7), pos(5, 66, -7), pos(6, 66, -7)) { saved = 1; }
+    return saved;
+}
+
+export fn store_pending_password() -> score {
+    let saved = 0;
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(9, 66, -7), force);
+    data.modify(block, pos(9, 66, -7), "front_text.messages[0]", set, from(block, pos(5, 66, -7), "front_text.messages[0]"));
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(6, 66, -7), force);
+    data.modify(block, pos(6, 66, -7), "front_text.messages[0]", set, from(block, pos(9, 66, -7), "front_text.messages[0]"));
+    if blocks(pos(5, 66, -7), pos(5, 66, -7), pos(6, 66, -7)) { saved = 1; }
+    return saved;
+}
+
+export fn load_pending_account() -> score {
+    let valid = 0;
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(5, 66, -7), force);
+    if data(block, pos(8, 66, -7), "front_text.messages[0]") {
+        data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(8, 66, -7), "front_text.messages[0]"));
+        if !blocks(pos(5, 66, -7), pos(5, 66, -7), pos(7, 66, -7)) { valid = 1; }
+    }
+    return valid;
+}
+
+export fn load_pending_password() -> score {
+    let valid = 0;
+    clone(pos(7, 66, -7), pos(7, 66, -7), pos(5, 66, -7), force);
+    if data(block, pos(9, 66, -7), "front_text.messages[0]") {
+        data.modify(block, pos(5, 66, -7), "front_text.messages[0]", set, from(block, pos(9, 66, -7), "front_text.messages[0]"));
         if !blocks(pos(5, 66, -7), pos(5, 66, -7), pos(7, 66, -7)) { valid = 1; }
     }
     return valid;
@@ -32,7 +77,6 @@ export fn lookup_account(completed) -> score {
             data.modify(block, pos(6, 66, -7), "front_text.messages[0]", set, from(block, pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7), "front_text.messages[0]"));
             if blocks(pos(5, 66, -7), pos(5, 66, -7), pos(6, 66, -7)) {
                 if completed == 0 || block(pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
-                    // Duplicate names are corruption, never choose an arbitrary account.
                     if found == 0 { found = index; } else { found = -1; }
                 }
             }
@@ -51,33 +95,88 @@ export fn first_free_slot() -> score {
     return slot;
 }
 
-export fn reserve_slot(slot) -> score {
+export fn unique_record(slot) -> score {
+    let records = 0;
+    each(account_markers) {
+        if scoreboard.get(self, account_slot) == slot { records += 1; }
+    }
+    let valid = 0;
+    if slot >= 1 && slot <= 32 && records == 1 { valid = 1; }
+    return valid;
+}
+
+fn marker_state(slot) -> score {
+    let state = -1;
+    if unique_record(slot) == 1 {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot { state = scoreboard.get(self, account_ready); }
+        }
+    }
+    return state;
+}
+
+fn credentials_present(slot) -> score {
+    let present = 0;
+    unroll for index in 1..33 {
+        if index == slot && block(pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) && block(pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
+            present = 1;
+        }
+    }
+    return present;
+}
+
+export fn record_ready(slot) -> score {
+    let ready = 0;
+    if marker_state(slot) == 1 && credentials_present(slot) == 1 { ready = 1; }
+    return ready;
+}
+
+fn write_account(slot) -> score {
     let saved = 0;
-    if unique_record(slot) == 1 && record_ready(slot) == 0 {
+    if marker_state(slot) == 0 {
         unroll for index in 1..33 {
             if index == slot && !block(pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
                 clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7), force);
-                if blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7)) {
-                    clone(pos(5, 66, -7), pos(5, 66, -7), pos(8, 66, -7), force);
-                    saved = 1;
-                }
+                if blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7)) { saved = 1; }
             }
         }
     }
     return saved;
 }
 
-export fn write_password(slot) -> score {
+fn write_password(slot) -> score {
     let saved = 0;
-    if unique_record(slot) == 1 {
+    if marker_state(slot) == 0 {
         unroll for index in 1..33 {
-            if index == slot && blocks(pos(8, 66, -7), pos(8, 66, -7), pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7)) && !block(pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
+            if index == slot && block(pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) && !block(pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), block_state("minecraft:oak_wall_sign")) {
                 clone(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), force);
                 if blocks(pos(5, 66, -7), pos(5, 66, -7), pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7)) { saved = 1; }
             }
         }
     }
     return saved;
+}
+
+export fn create_pending_record() -> score {
+    let result = -1;
+    if load_pending_account() == 1 {
+        if lookup_account(0) != 0 { result = -2; }
+        else {
+            let slot = first_free_slot();
+            if slot == 0 { result = -3; }
+            else {
+                if write_account(slot) != 1 { discard_record(slot); result = -4; }
+                else {
+                    if load_pending_password() != 1 { discard_record(slot); result = -5; }
+                    else {
+                        if write_password(slot) != 1 { discard_record(slot); result = -6; }
+                        else { result = slot; }
+                    }
+                }
+            }
+        }
+    }
+    return result;
 }
 
 export fn password_matches(slot) -> score {
@@ -92,45 +191,26 @@ export fn password_matches(slot) -> score {
     return matched;
 }
 
-export fn unique_record(slot) -> score {
-    let records = 0;
-    each(account_markers) {
-        if scoreboard.get(self, account_slot) == slot { records += 1; }
-    }
-    let valid = 0;
-    if slot >= 1 && slot <= 32 && records == 1 { valid = 1; }
-    return valid;
-}
-
-export fn record_ready(slot) -> score {
-    let ready = 0;
-    if unique_record(slot) == 1 {
-        each(account_markers) {
-            if scoreboard.get(self, account_slot) == slot { ready = scoreboard.get(self, account_ready); }
-        }
-    }
-    return ready;
-}
-
 export fn complete_record(slot) {
-    each(account_markers) {
-        if scoreboard.get(self, account_slot) == slot { scoreboard.set(self, account_ready, 1); }
-    }
-}
-
-export fn release_slot(slot) {
-    if unique_record(slot) == 1 && record_ready(slot) == 0 {
-        unroll for index in 1..33 {
-            if index == slot {
-                set_block(pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7), block_state("minecraft:air"));
-                set_block(pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), block_state("minecraft:air"));
-            }
+    if unique_record(slot) == 1 && credentials_present(slot) == 1 {
+        each(account_markers) {
+            if scoreboard.get(self, account_slot) == slot { scoreboard.set(self, account_ready, 1); }
         }
     }
 }
 
-export fn clear_uncommitted() {
+export fn discard_record(slot) {
     each(account_markers) {
-        if scoreboard.get(self, account_ready) == 0 { release_slot(scoreboard.get(self, account_slot)); }
+        if scoreboard.get(self, account_slot) == slot {
+            scoreboard.set(self, account_ready, 0);
+            scoreboard.set(self, account_balance, 0);
+            scoreboard.set(self, account_size, 3);
+        }
+    }
+    unroll for index in 1..33 {
+        if index == slot {
+            set_block(pos(-4 + (index - 1) % 8, 66 + 3 * ((index - 1) / 8), -7), block_state("minecraft:air"));
+            set_block(pos(-4 + (index - 1) % 8, 67 + 3 * ((index - 1) / 8), -7), block_state("minecraft:air"));
+        }
     }
 }

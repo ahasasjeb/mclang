@@ -7,9 +7,9 @@ import rooms;
 import displays;
 
 score installed = 0;
-score revision = 0;
 score maintenance_ticks = 0;
 score reset_pending = 0;
+item registration_fee = item_stack("minecraft:emerald") {}
 export objective session;
 export objective pending_slot;
 export objective auth_mode;
@@ -28,7 +28,8 @@ export query all_players = entity("minecraft:player") {}
 export query terminal_players = entity("minecraft:player") { box(-7, 64, 1, 14, 6, 9); }
 export query terminal_player = entity("minecraft:player") { box(-7, 64, 1, 14, 6, 9); limit(1); }
 export query account_markers = entity("minecraft:marker") { tag("sb_account"); }
-query pending_registrations = entity("minecraft:player") { scores("auth_mode", "4"); }
+export query registering_terminal_players = entity("minecraft:player") { tag("sb_registering"); box(-7, 64, 1, 14, 6, 9); }
+query registration_fee_holders = entity("minecraft:player") { tag("sb_registration_paid"); }
 
 @load fn load() {
     in_dimension("minecraft:overworld") {
@@ -40,17 +41,14 @@ query pending_registrations = entity("minecraft:player") { scores("auth_mode", "
             cancel_auth();
             if scoreboard.get(self, session) != 0 { force_logout(); }
         }
-        if revision == 3 {
-            cleanup_reservations();
+        if installed == 1 {
             maintain_public_signs();
-        } else { if installed != 0 {
-            message.all("银行格式已更新：备份后执行 /function sign_bank:reset 重建测试区域。", yellow);
-        } }
+        }
     }
 }
 
 @tick fn tick() {
-    if revision == 3 {
+    if installed == 1 {
         in_dimension("minecraft:overworld") {
             each(all_players) {
                 let leaves = scoreboard.get(self, leave_count);
@@ -73,21 +71,20 @@ query pending_registrations = entity("minecraft:player") { scores("auth_mode", "
             if maintenance_ticks >= 20 {
                 maintenance_ticks = 0;
                 maintain_public_signs();
-                cleanup_reservations();
                 cleanup_displays();
             }
         }
     }
 }
 
-// This explicit command resets test data; /reload never rebuilds rooms.
+// This explicit command resets all bank data; /reload never rebuilds rooms.
 export fn reset() {
     in_dimension("minecraft:overworld") {
         each(all_players) {
             cancel_auth();
             if scoreboard.get(self, session) != 0 { force_logout(); }
         }
-        revision = 0;
+        installed = 0;
         reset_pending = 1;
         forceload.add(column(-16, -16), column(15, 15));
         forceload.add(column(96, 0), column(607, 15));
@@ -106,7 +103,6 @@ fn finish_reset() {
             if ready == 1 {
                 install();
                 reset_pending = 0;
-                message.all("银行 v3 已重建，测试账号和仓库已清空。", yellow);
             } else { schedule finish_reset() after 10 t replace; }
         }
     }
@@ -125,14 +121,14 @@ fn install() {
     build_rooms();
     make_button_templates();
     reset_scratch();
+    clear_registration_scratch();
     installed = 1;
-    revision = 3;
     show_home_menu();
 }
 
 export @player fn terminal_ready() -> score {
     let ready = 0;
-    if revision == 3 && dimension("minecraft:overworld") && count(terminal_players) == 1 {
+    if installed == 1 && dimension("minecraft:overworld") && count(terminal_players) == 1 {
         let x = data.get(entity, self, "Pos[0]");
         let y = data.get(entity, self, "Pos[1]");
         let z = data.get(entity, self, "Pos[2]");
@@ -151,20 +147,24 @@ export fn account_online(slot) -> score {
     return online;
 }
 
-fn cleanup_reservations() {
-    if count(pending_registrations) == 0 { clear_uncommitted(); }
+export fn refund_registration_fee() {
+    each(registration_fee_holders) {
+        give(self, registration_fee);
+        self.remove_tag("sb_registration_paid");
+    }
 }
 
 export @player fn cancel_auth() {
-    let slot = scoreboard.get(self, pending_slot);
-    if scoreboard.get(self, auth_mode) == 4 { release_slot(slot); }
+    refund_registration_fee();
     if scoreboard.get(self, auth_mode) != 0 {
         in_dimension("minecraft:overworld") {
             reset_scratch();
-            clone(pos(7, 66, -7), pos(7, 66, -7), pos(8, 66, -7), force);
+            clear_registration_scratch();
             set_input_sign();
         }
     }
+    self.remove_tag("sb_registering");
+    self.remove_tag("sb_registration_paid");
     scoreboard.set(self, pending_slot, 0);
     scoreboard.set(self, auth_mode, 0);
 }
