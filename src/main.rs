@@ -3,8 +3,8 @@ use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 
 use mclang::{
-    BuildOptions, KeywordLanguage, build_file, build_zip_file, check_file, serve, translate_file,
-    translate_project,
+    BuildOptions, KeywordLanguage, OutputStats, build_file, build_zip_file, check_file, serve,
+    translate_file, translate_project,
 };
 
 fn main() {
@@ -102,6 +102,7 @@ fn run() -> Result<(), String> {
                 result.file_count,
                 result.output.display()
             );
+            println!("{}", output_stats_line(&result.output_stats));
             Ok(())
         }
         "check" => {
@@ -109,9 +110,11 @@ fn run() -> Result<(), String> {
                 .next()
                 .ok_or_else(|| "缺少源文件或项目目录".to_owned())?;
             let mut deny_raw = false;
+            let mut stats = false;
             for argument in args {
                 match argument.as_str() {
                     "--deny-raw" => deny_raw = true,
+                    "--stats" => stats = true,
                     _ => return Err(format!("未知参数 `{argument}`")),
                 }
             }
@@ -139,6 +142,9 @@ fn run() -> Result<(), String> {
                 summary.advancements,
                 summary.raw_statements
             );
+            if stats {
+                println!("{}", output_stats_line(&summary.output_stats));
+            }
             Ok(())
         }
         "translate" => {
@@ -193,12 +199,19 @@ fn run() -> Result<(), String> {
     }
 }
 
+fn output_stats_line(stats: &OutputStats) -> String {
+    format!(
+        "产物：{} 个函数（其中 __mcl 辅助函数 {} 个），{} 条命令，{} 字节",
+        stats.functions, stats.helpers, stats.commands, stats.bytes
+    )
+}
+
 fn print_help() {
     println!(
         "mclang — Minecraft 26.3 数据包编译器\n\n\
          用法:\n  \
             mclang build <源文件.mcl|项目目录> [-o <输出路径>] [--zip] [--description <文本>] [--deny-raw]\n  \
-            mclang check <源文件.mcl|项目目录> [--deny-raw]\n  \
+            mclang check <源文件.mcl|项目目录> [--deny-raw] [--stats]\n  \
             mclang translate <源文件.mcl|项目目录> --to <en|zh>\n  \
             mclang lsp\n  \
             mclang help\n\n\

@@ -14,21 +14,11 @@
 
 `advancement`, `attribute`, `bossbar`, `clear`, `clone`, `compute`, `damage`, `data`, `datapack`, `defaultgamemode`, `dialog`, `difficulty`, `effect`, `enchant`, `execute`, `experience`, `fetchprofile`, `fill`, `fillbiome`, `forceload`, `function`, `gamemode`, `gamerule`, `give`, `help`, `item`, `kill`, `list`, `locate`, `loot`, `me`, `msg`, `particle`, `place`, `playsound`, `posteffect`, `random`, `recipe`, `reload`, `return`, `ride`, `rotate`, `say`, `schedule`, `scoreboard`, `seed`, `setblock`, `setworldspawn`, `spawnpoint`, `spectate`, `spreadplayers`, `stopsound`, `stopwatch`, `summon`, `swing`, `tag`, `team`, `teammsg`, `teleport`, `tellraw`, `test`, `time`, `title`, `trigger`, `version`, `waypoint`, `weather`, `worldborder`。
 
-### 1.2 本轮补全
-
-- `return run` 可接结构化命令语句；字符串形式仍作为兼容入口，并计入严格模式的 raw 统计。
-- `scoreboard` 补齐运行期 objectives list/remove/modify 与 players list/add/remove/reset/display name/numberformat；目标声明仍负责 load 时创建。
-- `fetchprofile`、`help`、`test`、`version`、`seed`、`me`、`say` 已有结构化入口；`test` 覆盖数据包可调用分支，IDE-only export 分支不计。
-
-### 1.3 未实现
-
-本统计口径内无未实现的命令族。
-
-### 1.4 别名
+### 1.2 别名
 
 别名不单独计入 68 个命令族：`tell`、`w` 跟随 `msg`；`tm` 跟随 `teammsg`；`tp` 跟随 `teleport`；`xp` 跟随 `experience`。
 
-### 1.5 不计入完成度
+### 1.3 不计入完成度
 
 `debug`, `kick`, `tick`, `jfr`, `ban`, `ban-ip`, `banlist`, `deop`, `op`, `pardon`, `pardon-ip`, `perf`, `save-all`, `save-off`, `save-on`, `setidletimeout`, `stop`, `transfer`, `whitelist`, `publish`, `unpublish`, `chase`, `raid`, `debugpath`, `debugmobspawning`, `warden_spawn_tracker`, `spawn_armor_trims`, `serverpack`, `debugconfig`。
 
@@ -50,7 +40,7 @@
 | MessageArgument | 部分 | `msg`/`teammsg`/`say`/`me` 已检查长度与续行风险；带选项选择器暂时拒绝，后续接入完整 Brigadier 解析。 |
 | 坐标 / 旋转 / 时间 / 范围 | 较高 | 统一 value type 与范围检查接口。 |
 
-共享参数示例在 `examples/shared_arguments.mcl`，有效/无效语料在 `tests/valid/shared_arguments` 与 `tests/invalid/shared_*`。方块状态快照位于 `block_states.json`，由 `cargo xtask generate-version-data` 重建。本轮扩充了物品组件、物品子谓词与 NBT path 匹配复合的检查。
+共享参数示例在 `examples/shared_arguments.mcl`，有效/无效语料在 `tests/valid/shared_arguments` 与 `tests/invalid/shared_*`。方块状态快照位于 `block_states.json`，由 `cargo xtask generate-version-data` 重建。
 
 ## 3. 数据包资源能力
 
@@ -135,35 +125,13 @@ text("【退出】") {
 - 告示牌 `front_text.messages` 应允许使用高层 `TextComponent` 表达式，或提供等价的 typed component helper，避免用户回到原始 NBT 的 `action`/`command` 字段。
 - `run_command("...")` 继续保留给任意命令；严格模式可提示其中形如 `/function ...` 的字符串优先改用 `run_function(...)`。
 
-`examples/monster_market` 的复杂市场语料用于检查真实产物。当前产物为 528 条函数命令、66 个 mcfunction，其中 24 个位于 `__mcl`；安全单命令块与简单条件已直接内联，算术赋值直接写入目标，复用的常量在加载时统一初始化。多实体执行仍保留逐来源求值边界，store 不会丢失自赋值结果，查询失败后的取反与是否带 else 无关。
+### 4.2 优化与产物预算
 
-编译期优化的分层与适用条件：
+控制流优化必须保留短路、求值顺序、命令成功值和失败回调语义。链式守卫只有在写集能证明读取稳定时才能重复求值；函数调用、运行期表达式或后续条件可能改写输入时，必须先冻结条件值。
 
-- **原生条件链**：连续嵌套 `if` 合并成一条 `execute if a if b if c run …`，不再产生 `run execute …` 的嵌套派发；`a && a`、`if a { if a { … } }` 这类同一纯条件只保留一次，含函数调用或随机 predicate 的条件不去重。
-- **整数范围传播**：沿同一条条件链维护 `x ∈ [min, max]` 与单个排除值，`x > 10` 之后 `x > 5` 直接判定为真、`x < 5` 判定为假，矛盾条件整段删除，`== v` 会收紧成单点。
-- **副作用保护**：`f() || 已知为真` 仍必须调用 `f()`，所以“编译期可判定为真”的条件只有在无副作用时才允许删除；带副作用的条件退回原标志路径（`ScoreFacts` 对含调用/谓词/随机的条件一律返回 Unknown）。
-- **`&&` 右侧比较折叠**：右侧是比较且左侧已算出 0/1 标志时，把右侧的否定子句直接并进合并命令，省掉第二个标志计分项的 `set 0` / `run set 1` 两条命令（例如 `choice == 1 && charge(price()) == 1`）。
-- **常量与不可达**：常量条件在编译期选定分支，`return` 之后同一生成块里的语句不再输出，被紧跟其后的常量赋值覆盖的赋值也会裁掉。
-- **编译期展开**：`unroll for` 在解析期按迭代展开循环体，坐标里的编译期常量表达式随之折叠成字面量；展开后不产生循环假玩家、循环上限与辅助函数，常量守卫（`if 槽位 == N`）直接选定分支。单循环上限 4096 次、单文件展开语句上限 65536 条。
+`mclang check <目标> --stats` 和 `build` 会报告 `.mcfunction` 数量、`__mcl` 辅助函数数量、命令条数与字节数。`tests/output_size.rs` 按 `tests/output_budget.json` 检查全部语料；确认产物增长合理后，用 `MCLANG_UPDATE_OUTPUT_BUDGET=1 cargo test --test output_size` 更新预算。
 
-对应回归语料位于 `tests/valid/control_semantics/` 和 `tests/valid/optimizations/`；`tests/control_optimization.rs` 里的 mini 解释器会在边界值上对比源码语义与生成命令语义。在 `examples/**` + `tests/valid/**` 共 54 个语料上，优化后命令总数 3029 → 2970、`execute` 1080 → 1026、`scoreboard` 1434 → 1376、临时计分项 409 → 383、产物字节数 −2.4%（monster_market 540 → 528）。
-
-**有意不做的优化**（都会改变运行时行为，或收益不抵风险）：
-
-- `if c { A } else { B }` 不能改写成 `execute if c run A` + `execute unless c run B`：两条命令之间 B 的求值发生在 A 之后，A 若写入 `c` 读取的计分项，`unless` 会看到新值而多执行一次 B。除非能证明 A/B 不写 `c` 的输入，否则保留一次性标志。
-- 不用 `execute store success … run execute if …` 合并标志：26.3 的 `ExecuteCommand.addConditional(...).executes(...)` 在条件为假时抛 `ERROR_CONDITIONAL_FAILED`（见 `createNumericConditionalHandler`），裸条件没有 `run` 就没有 fork 兜底。
-- `&&` 之外的标志合并、跨语句的区间传播（例如 `if x > 10 { …; if x > 5 { … } }`）需要先有“语句是否写入某计分项”的写集分析；本次没有引入，相关形状保持原样。
-
-后续可继续让 `scoreboard.get(self, objective)` 保留原目标作为表达式操作数，避免复制到内部临时项，并把区间传播扩展到能证明无写入的跨语句分支。
-
-编译器自身重复工作的消除（1024 个 advancement 的压力语料，release 构建，均为最小值）：`check` 63.02 ms → 26.02 ms，目录构建 402 ms → 384 ms，无变化的重复构建 485 ms → 137 ms。收益来自模块只解析一次、conditions 只做一次 JSON parse、版本快照按注册表/枚举/命令/触发器分别惰性解析，以及“内容未变不重写文件、只删除清单里消失的文件”的增量输出。
-
-已完成的编译器与输出优化：
-
-- [x] 项目解析共用大栈工作线程；关键词别名使用一次初始化的索引；诊断共用行首索引。
-- [x] 模块作用域按角色借用查询；资源 JSON 和函数标签图复用校验阶段的结果；循环跳转检查缓存子树结果；拼写建议使用阈值为 2 的带状编辑距离并复用缓冲区。
-- [x] 翻译 token 借用源码；解析器普通消费路径移动标识符和字符串，宏模板及 `unroll` 重放保留 token 内容。嵌套重放语料位于 `tests/valid/token_replay/`。
-- [x] 乘零折叠保留函数调用、随机数和命令求值；ZIP 借用文件内容顺序写出、使用 CRC 查表，并在覆盖输出前检查格式限制；目录输出复用父目录检查、分块比较已有内容。
+控制流语义回归位于 `tests/control_optimization.rs` 和 `tests/control_semantics.rs`。后续优化方向包括跨语句区间传播、辅助函数体去重、`each` 单命令体内联，以及 `while`/`for` 的冻结值分派。
 
 版本数据生成器建议补一份机器可读命令可用性文件，记录根命令、别名、注册条件、权限节点和可执行叶；命令覆盖统计由该文件校验。
 
@@ -211,11 +179,7 @@ text("【退出】") {
 
 当前已有 completion、hover、definition、diagnostics。
 
-- [x] 磁盘内容缓存支持保存、关闭、文件变更及工作区变化时失效；未变化项目复用整个分析结果，打开文档不再读取被缓冲区覆盖的磁盘内容。
-- [x] 输入线程使用有界队列，合并已排队的连续 `didChange`；请求、保存、关闭等消息保持先后顺序，最多合并 64 条编辑，不增加固定等待时间。
 - [ ] 逐文件 AST 与依赖增量检查。当前模块解析和编译会改写、合并 AST；需先明确不可变解析结果和依赖失效规则，变化项目目前仍执行完整检查。
-
-2026-09-28 的 release 对照测量：同时打开一个 49 模块、6144 条简单语句的项目和一个单文件项目，修改后者 80 次，优化前后交替运行各 5 次。每次编辑后发送 hover 请求时，进程总耗时中位数约 901 ms → 215 ms；连续排队编辑时约 855 ms → 33 ms。两种场景的响应一致；这些数字包含初始化，仅代表该合成负载。
 
 | 功能 | 计划 |
 | --- | --- |
@@ -232,7 +196,6 @@ text("【退出】") {
 
 ## 8. 测试与覆盖清单
 
-- [x] `examples/sign_bank` 端到端压力测试：纯结构化 MCL 实现 32 槽双牌账号/密码、独立余额、3×3→10×10 基岩仓库、light 照明、text_display 清理。2026-09-28 在 Minecraft 26.3 GameTest 服务端实际点击命令牌，411 项断言通过；入口 `examples/sign_bank/verification/run.ps1`。
 - [ ] 补足告示牌方块实体 NBT 的字段级 codec 校验：区分 `front_text.color` 染料色与文本组件 `color` 聊天色。当前严格模式不能阻止二者混用，必须检查原版加载日志。
 - [ ] 编译期相对坐标表达式（例如 `~(width - 6)`）；目前可用 `unroll for` 绝对坐标展开完成相同布局。
 

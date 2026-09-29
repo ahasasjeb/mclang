@@ -50,6 +50,43 @@ pub struct BuildResult {
     pub output: PathBuf,
     pub file_count: usize,
     pub warnings: Vec<String>,
+    pub output_stats: OutputStats,
+}
+
+/// 生成的函数产物规模：文件数、辅助函数数、命令条数与字节数。
+///
+/// 只统计 `.mcfunction`；命令条数按「非空且不以 `#` 开头的行」计，与
+/// `tests/output_size.rs` 的预算口径一致。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OutputStats {
+    pub functions: usize,
+    pub helpers: usize,
+    pub commands: usize,
+    pub bytes: usize,
+}
+
+impl OutputStats {
+    fn of(pack: &CompiledPack) -> Self {
+        let mut stats = Self::default();
+        for (path, contents) in &pack.files {
+            if path.extension().and_then(|extension| extension.to_str()) != Some("mcfunction") {
+                continue;
+            }
+            stats.functions += 1;
+            if path.iter().any(|part| part == "__mcl") {
+                stats.helpers += 1;
+            }
+            stats.bytes += contents.len();
+            stats.commands += contents
+                .lines()
+                .filter(|line| {
+                    let line = line.trim();
+                    !line.is_empty() && !line.starts_with('#')
+                })
+                .count();
+        }
+        stats
+    }
 }
 
 #[derive(Debug)]
@@ -66,6 +103,7 @@ pub struct CheckSummary {
     pub function_tags: usize,
     pub raw_statements: usize,
     pub warnings: Vec<String>,
+    pub output_stats: OutputStats,
 }
 
 pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
@@ -94,6 +132,7 @@ pub fn check_file(source_path: &Path) -> Result<CheckSummary, String> {
         function_tags: program.function_tags.len(),
         raw_statements: raw_statement_count(&program.functions),
         warnings,
+        output_stats: OutputStats::of(&compilation.pack),
     })
 }
 
@@ -178,11 +217,13 @@ pub fn build_file(
     options: &BuildOptions,
 ) -> Result<BuildResult, String> {
     let (pack, warnings) = prepare_pack(source_path, options)?;
+    let output_stats = OutputStats::of(&pack);
     write_pack(output, &pack)?;
     Ok(BuildResult {
         output: output.to_path_buf(),
         file_count: pack.files.len() + pack.binary_files.len(),
         warnings,
+        output_stats,
     })
 }
 
@@ -194,11 +235,13 @@ pub fn build_zip_file(
     options: &BuildOptions,
 ) -> Result<BuildResult, String> {
     let (pack, warnings) = prepare_pack(source_path, options)?;
+    let output_stats = OutputStats::of(&pack);
     archive::write_pack_zip(output, &pack)?;
     Ok(BuildResult {
         output: output.to_path_buf(),
         file_count: pack.files.len() + pack.binary_files.len(),
         warnings,
+        output_stats,
     })
 }
 

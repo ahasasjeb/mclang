@@ -6,8 +6,8 @@
 
 use crate::ast::{
     AdvancementOperation, AdvancementReference, AdvancementScope, DataSlotDecl, DataSlotKind,
-    EffectDuration, Expr, GiveItem, GiveTarget, Holder, ItemActionKind, ItemConditionSource,
-    ScoreTarget, SelfAction, TeleportDestination, XpKind, XpOperation,
+    EffectDuration, Expr, ExprKind, GiveItem, GiveTarget, Holder, ItemActionKind,
+    ItemConditionSource, ScoreTarget, SelfAction, TeleportDestination, XpKind, XpOperation,
 };
 
 use super::Compiler;
@@ -273,6 +273,16 @@ impl Compiler<'_> {
     ) {
         let objective = user_objective_name(&self.program.namespace, &target.objective);
         let prefix = self.score_holder_prefix(&target.holder);
+        // `scoreboard.set(self, X, scoreboard.get(self, Y))`：两个计分项都在
+        // `@s` 上，直接置 0 再复制，省掉中间临时项；需要保留命令结果或其它
+        // 持有者组合时沿用原路径，保证缺失来源最终仍由一次成功复制收尾。
+        if !self.preserve_command_result
+            && matches!(target.holder, Holder::SelfEntity)
+            && let ExprKind::ScoreQuery { target: query } = &value.kind
+            && self.score_query_into(query, ("@s", objective.as_str()), commands)
+        {
+            return;
+        }
         match self.compile_expr(value, owner, commands) {
             Value::Integer(value) => commands.push(format!(
                 "{prefix}scoreboard players set @s {objective} {value}"

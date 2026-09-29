@@ -2,7 +2,7 @@
 
 use crate::ast::{
     BinaryOp, ComputeKind, ComputeSource, Expr, ExprKind, Holder, ItemConditionSource,
-    NbtComponentSource,
+    NbtComponentSource, ScoreTarget,
 };
 
 use super::Compiler;
@@ -50,11 +50,60 @@ impl Compiler<'_> {
                 self.compile_expr_into(left, target, owner, commands);
                 self.apply_literal_operation(target, *operation, literal, commands);
             }
+            ExprKind::ScoreQuery { target: query } => {
+                let objective = self.objective.clone();
+                if self.score_query_into(query, (target, objective.as_str()), commands) {
+                    return;
+                }
+                let value = self.compile_expr(expression, owner, commands);
+                self.store_value(target, value, commands);
+            }
             _ => {
                 let value = self.compile_expr(expression, owner, commands);
                 self.store_value(target, value, commands);
             }
         }
+    }
+
+    /// `scoreboard.get(...)` 直接写进目标计分项：先把目标置成「读不到」时应当
+    /// 得到的 0，再用 `scoreboard players operation` 复制一次，省掉中间临时项。
+    ///
+    /// 源计分项没有值时 `operation` 会失败、目标保持刚写入的 0，与旧的
+    /// 「临时项置 0 后 `execute store result` 捕获失败」逐值一致。源持有者
+    /// 是查询或投掷者时需要 `execute ...` 前缀，此时目标不能是 `@s` 相对
+    /// （前缀会改写 `@s`），调用方遇到这种情况返回 `false` 走原路径。
+    pub(super) fn score_query_into(
+        &mut self,
+        query: &ScoreTarget,
+        destination: (&str, &str),
+        commands: &mut Vec<String>,
+    ) -> bool {
+        let source_objective = user_objective_name(&self.program.namespace, &query.objective);
+        let (holder, destination_objective) = destination;
+        // 目标和来源是同一个计分项时，下面的预置 0 会在复制前破坏源值。
+        // 返回 false 让调用方沿“先读入临时项，再写回目标”的通用路径处理。
+        if matches!(query.holder, Holder::SelfEntity)
+            && holder == "@s"
+            && destination_objective == source_objective
+        {
+            return false;
+        }
+        let prefix = match &query.holder {
+            Holder::SelfEntity => String::new(),
+            Holder::Origin if !holder.starts_with('@') => "execute on origin run ".to_owned(),
+            Holder::Query(name, _) if !holder.starts_with('@') => {
+                let query = self.query(name.as_str());
+                format!("execute {} run ", entity_query_clause(query))
+            }
+            Holder::Origin | Holder::Query(_, _) => return false,
+        };
+        commands.push(format!(
+            "scoreboard players set {holder} {destination_objective} 0"
+        ));
+        commands.push(format!(
+            "{prefix}scoreboard players operation {holder} {destination_objective} = @s {source_objective}"
+        ));
+        true
     }
 
     fn apply_literal_operation(

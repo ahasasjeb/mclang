@@ -6,8 +6,10 @@
 //!
 //! - [`statements`]：控制流（each/if/while/call 等）与辅助函数分配；
 //! - [`actions`]：`give` 与 `self` 实体操作；
+//! - [`dispatch`]：`if`/`else` 链的条件分派与链式守卫；
 //! - [`expressions`]: arithmetic evaluation and temporary score slots;
 //! - [`conditions`]: boolean evaluation and native execute predicates;
+//! - [`writes`]：语句块的保守写集，判断重复求值计分单元是否稳定；
 //! - [`names`]：假玩家、objective 和稳定哈希命名；
 //! - [`emit`]：Minecraft 命令片段与 JSON 文本的格式化。
 
@@ -18,6 +20,7 @@ mod components;
 mod condition_facts;
 mod conditions;
 mod core_commands;
+mod dispatch;
 mod emit;
 mod entity_commands;
 mod expressions;
@@ -27,6 +30,7 @@ mod scoreboard;
 mod statements;
 mod ui;
 mod world;
+mod writes;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;

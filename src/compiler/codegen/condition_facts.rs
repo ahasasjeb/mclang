@@ -179,7 +179,7 @@ pub(super) fn has_condition_effects(condition: &Condition) -> bool {
     }
 }
 
-fn has_expression_effects(expression: &crate::ast::Expr) -> bool {
+pub(super) fn has_expression_effects(expression: &crate::ast::Expr) -> bool {
     match &expression.kind {
         ExprKind::Call { .. }
         | ExprKind::CoreCommand(_)
@@ -227,7 +227,7 @@ fn invert(truth: Truth) -> Truth {
     }
 }
 
-fn invert_comparison(comparison: Comparison) -> Comparison {
+pub(super) fn invert_comparison(comparison: Comparison) -> Comparison {
     match comparison {
         Comparison::Equal => Comparison::NotEqual,
         Comparison::NotEqual => Comparison::Equal,

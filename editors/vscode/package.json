@@ -12,9 +12,7 @@
     "Linters"
   ],
   "main": "./extension.js",
-  "activationEvents": [
-    "onLanguage:mclang"
-  ],
+  "activationEvents": [],
   "contributes": {
     "languages": [
       {

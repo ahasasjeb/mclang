@@ -1,13 +1,49 @@
 use crate::ast::*;
 
 use crate::compiler::codegen::condition_facts::ScoreFacts;
+use crate::compiler::codegen::dispatch::guard_commands;
 use crate::compiler::codegen::emit::entity_query_clause;
 use crate::compiler::codegen::world;
+use crate::compiler::codegen::writes::WriteSet;
 use crate::compiler::codegen::{Compiler, Value};
 
 use super::helpers::{
     LoopLimit, constant_condition, constant_integer, contains_current_loop_jump, writes_variable,
 };
+
+/// 链式守卫的子句上限。超过后剩余 `else` 链整体放进一个带守卫的辅助函数：
+/// 单条命令的长度有界，同时仍避免为每层都生成文件。
+const MAX_CHAIN_GUARD_CLAUSES: usize = 8;
+
+/// 嵌套 `then` 链的叶子是否是「带 else 的 if」。
+///
+/// 这种形状交给链式扁平化：它把外层条件并进守卫，直接分派叶子的两个分支，
+/// 而不是为叶子单独生成一个辅助函数。叶子没有 else 时仍优先用
+/// [`Compiler::compile_direct_if_chain`] 的合并结果（一条命令）。
+fn then_chain_ends_with_else(then_body: &[Statement]) -> bool {
+    let mut body = then_body;
+    loop {
+        match body {
+            [
+                Statement {
+                    kind:
+                        StatementKind::If {
+                            then_body,
+                            else_body,
+                            ..
+                        },
+                    ..
+                },
+            ] => {
+                if !else_body.is_empty() {
+                    return true;
+                }
+                body = then_body;
+            }
+            _ => return false,
+        }
+    }
+}
 
 impl Compiler<'_> {
     pub(super) fn compile_each(
@@ -139,43 +175,167 @@ impl Compiler<'_> {
             }
             None => {}
         }
-        if else_body.is_empty() && !then_body.is_empty() {
+        if else_body.is_empty() && !then_body.is_empty() && !then_chain_ends_with_else(then_body) {
             if self.compile_direct_if_chain(condition, then_body, owner, commands) {
                 return;
             }
-            // The fact pass can decline a condition to preserve effects or
-            // expression evaluation order; retain the existing native lowering.
+            // 只测试一次：谓词、`&&` 合并等能写进原生条件链的形状仍直接成一条
+            // 命令，不必经过标志。
             if let Some(clause) = self.direct_condition_clause(condition, false, owner) {
                 let block = self.compile_small_block(then_body, owner);
                 commands.push(format!("execute {clause} run {block}"));
                 return;
             }
         }
-        let flag = self.compile_condition(condition, owner, commands);
-        self.compile_conditional_branch(&flag, true, then_body, owner, commands);
-        self.compile_conditional_branch(&flag, false, else_body, owner, commands);
+        let writes = self.chain_writes(condition, then_body, else_body, owner);
+        let mut guard = Vec::new();
+        self.compile_if_chain(
+            condition, then_body, else_body, owner, commands, &mut guard, &writes,
+        );
     }
 
-    /// Inline a one-command branch after `execute ... run`. A `return` must
-    /// retain the helper boundary; inlining it would exit the caller instead.
-    fn compile_conditional_branch(
+    /// 链上全部条件求值与分支体的写集：链式守卫子句会在后续条件或分支体
+    /// 可能运行之后再次求值。
+    ///
+    /// 与 [`Self::compile_if_chain`] 的展开条件保持一致：`then`/`else` 恰好是
+    /// 一条 `if` 语句时继续沿链收集，否则整块计入。
+    fn chain_writes(
+        &self,
+        condition: &Condition,
+        then_body: &[Statement],
+        else_body: &[Statement],
+        owner: &str,
+    ) -> WriteSet {
+        let mut writes = WriteSet::default();
+        writes.include_condition(condition);
+        if let [statement] = then_body
+            && let StatementKind::If {
+                condition,
+                then_body,
+                else_body,
+            } = &statement.kind
+        {
+            writes.merge(&self.chain_writes(condition, then_body, else_body, owner));
+        } else {
+            writes.merge(&self.block_writes(then_body, owner));
+        }
+        if let [statement] = else_body
+            && let StatementKind::If {
+                condition,
+                then_body,
+                else_body,
+            } = &statement.kind
+        {
+            writes.merge(&self.chain_writes(condition, then_body, else_body, owner));
+        } else {
+            writes.merge(&self.block_writes(else_body, owner));
+        }
+        writes
+    }
+
+    /// `if` / `else if` / `else` 链：逐层在**当前函数**里分派，不再为每层
+    /// `else`（以及嵌套在 `then` 里的 `if`）生成辅助函数。
+    ///
+    /// 每层：条件按需求值（求值命令带前面所有层否定子句的守卫），用互补的
+    /// 原生子句分派当层分支，否定子句累积进后续守卫。守卫子句数到
+    /// [`MAX_CHAIN_GUARD_CLAUSES`] 后，剩余部分整体交给 `compile_small_block`
+    /// （仍带守卫），避免单条命令随链深无限变长。
+    ///
+    /// 语义：守卫只在“前面所有分支都不成立”时可能通过；子句重复求值的稳定性
+    /// 由 [`Self::chain_writes`] 的写集证明，证明不了时条件值会先冻结到编译器
+    /// 临时项，因此分支体改写条件输入不会影响后续层。
+    #[allow(clippy::too_many_arguments)]
+    fn compile_if_chain(
         &mut self,
-        flag: &str,
-        expected: bool,
-        body: &[Statement],
+        condition: &Condition,
+        then_body: &[Statement],
+        else_body: &[Statement],
         owner: &str,
         commands: &mut Vec<String>,
+        guard: &mut Vec<String>,
+        writes: &WriteSet,
     ) {
-        if body.is_empty() {
+        let nested_then = matches!(
+            then_body,
+            [Statement {
+                kind: StatementKind::If { .. },
+                ..
+            }]
+        );
+        let needs_stability = nested_then || !else_body.is_empty();
+        let mut setup = Vec::new();
+        let branch = self.condition_branch(
+            condition,
+            owner,
+            needs_stability.then_some(writes),
+            &mut setup,
+        );
+        commands.extend(guard_commands(guard, setup));
+        if nested_then {
+            // 嵌套 `then`：把当层正向子句并进子 chain 的守卫，省掉一层辅助函数。
+            let mut nested_guard = guard.clone();
+            nested_guard.push(branch.positive.clone());
+            if nested_guard.len() < MAX_CHAIN_GUARD_CLAUSES {
+                if let [
+                    Statement {
+                        kind:
+                            StatementKind::If {
+                                condition,
+                                then_body,
+                                else_body,
+                            },
+                        ..
+                    },
+                ] = then_body
+                {
+                    self.compile_if_chain(
+                        condition,
+                        then_body,
+                        else_body,
+                        owner,
+                        commands,
+                        &mut nested_guard,
+                        writes,
+                    );
+                }
+            } else {
+                let block = self.compile_small_block(then_body, owner);
+                commands.push(format!("execute {} run {block}", nested_guard.join(" ")));
+            }
+        } else if !then_body.is_empty() {
+            let block = self.compile_small_block(then_body, owner);
+            let mut clauses = guard.clone();
+            clauses.push(branch.positive);
+            commands.push(format!("execute {} run {block}", clauses.join(" ")));
+        }
+        guard.push(branch.negative);
+        if else_body.is_empty() {
             return;
         }
-
-        let command = self.compile_small_block(body, owner);
-        commands.push(format!(
-            "execute if score {flag} {} matches {} run {command}",
-            self.objective,
-            u8::from(expected)
-        ));
+        if guard.len() >= MAX_CHAIN_GUARD_CLAUSES {
+            let block = self.compile_small_block(else_body, owner);
+            commands.push(format!("execute {} run {block}", guard.join(" ")));
+            return;
+        }
+        if let [
+            Statement {
+                kind:
+                    StatementKind::If {
+                        condition,
+                        then_body,
+                        else_body,
+                    },
+                ..
+            },
+        ] = else_body
+        {
+            self.compile_if_chain(
+                condition, then_body, else_body, owner, commands, guard, writes,
+            );
+        } else {
+            let block = self.compile_small_block(else_body, owner);
+            commands.push(format!("execute {} run {block}", guard.join(" ")));
+        }
     }
 
     /// `while` 循环：无跳转的原生条件循环只用一个自递归辅助函数；首次条件

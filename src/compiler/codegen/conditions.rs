@@ -110,36 +110,33 @@ impl Compiler<'_> {
                 comparison,
                 right,
             } => {
-                let (score, comparison, literal) = match (&left.kind, &right.kind) {
-                    (ExprKind::Score(name), _) => (
-                        self.variable_holder(owner, name),
-                        *comparison,
-                        constant_value(right),
-                    ),
-                    (_, ExprKind::Score(name)) => (
-                        self.variable_holder(owner, name),
-                        reverse_comparison(*comparison),
-                        constant_value(left),
-                    ),
-                    _ => return None,
-                };
-                if let Some(literal) = literal {
-                    let (test, range) = score_constant_clause(comparison, literal)?;
+                let left_cell = self.condition_score_cell(left, owner);
+                let right_cell = self.condition_score_cell(right, owner);
+                let literal_left = constant_value(left);
+                if let (Some((holder, objective)), None, Some(literal)) =
+                    (&left_cell, literal_left, constant_value(right))
+                {
+                    let (test, range) = score_constant_clause(*comparison, literal)?;
                     let test = if negated { invert_test(test) } else { test };
-                    return Some(format!(
-                        "{test} score {score} {} matches {range}",
-                        self.objective
-                    ));
+                    return Some(format!("{test} score {holder} {objective} matches {range}"));
                 }
-                if let (ExprKind::Score(left), ExprKind::Score(right)) = (&left.kind, &right.kind) {
-                    let (test, symbol) = comparison_operator(comparison);
+                if let (None, Some(literal), Some((holder, objective))) =
+                    (&left_cell, literal_left, &right_cell)
+                {
+                    let (test, range) =
+                        score_constant_clause(reverse_comparison(*comparison), literal)?;
+                    let test = if negated { invert_test(test) } else { test };
+                    return Some(format!("{test} score {holder} {objective} matches {range}"));
+                }
+                if let (
+                    Some((left_holder, left_objective)),
+                    Some((right_holder, right_objective)),
+                ) = (left_cell, right_cell)
+                {
+                    let (test, symbol) = comparison_operator(*comparison);
                     let test = if negated { invert_test(test) } else { test };
                     return Some(format!(
-                        "{test} score {} {} {symbol} {} {}",
-                        self.variable_holder(owner, left),
-                        self.objective,
-                        self.variable_holder(owner, right),
-                        self.objective
+                        "{test} score {left_holder} {left_objective} {symbol} {right_holder} {right_objective}"
                     ));
                 }
                 return None;
@@ -147,6 +144,25 @@ impl Compiler<'_> {
             Condition::And(_, _) | Condition::Or(_, _) => return None,
         };
         Some(format!("{polarity} {atom}"))
+    }
+
+    /// 条件里可以直接比较的计分单元。源码变量在读取前一定已经写入，因此可以
+    /// 安全地放进原生 `execute if score` 子句。
+    ///
+    /// `scoreboard.get(...)` 不能走这条路径：表达式语义把缺失的计分记录当作
+    /// `0`，原生计分条件却把它当作“不匹配”。这类读取必须先沿表达式路径固化
+    /// 到已初始化的编译器临时项。
+    pub(super) fn condition_score_cell(
+        &self,
+        expression: &Expr,
+        owner: &str,
+    ) -> Option<(String, String)> {
+        match &expression.kind {
+            ExprKind::Score(name) => {
+                Some((self.variable_holder(owner, name), self.objective.clone()))
+            }
+            _ => None,
+        }
     }
 
     fn condition_source_needs_capture(&self, source: &NbtComponentSource) -> bool {
@@ -345,7 +361,7 @@ impl Compiler<'_> {
     }
 
     /// 比较两侧按源码顺序求值；右侧可能改变左侧读取的状态时先冻结左值。
-    fn compile_comparison_operands(
+    pub(super) fn compile_comparison_operands(
         &mut self,
         left: &Expr,
         right: &Expr,
@@ -359,7 +375,7 @@ impl Compiler<'_> {
     }
 
     /// 把已经求值的比较固化成 0/1 标志计分项。
-    fn comparison_flag(
+    pub(super) fn comparison_flag(
         &self,
         flag: &str,
         comparison: Comparison,
@@ -553,11 +569,14 @@ impl Compiler<'_> {
     }
 }
 
-fn invert_test(test: &str) -> &str {
+pub(super) fn invert_test(test: &str) -> &str {
     if test == "if" { "unless" } else { "if" }
 }
 
-fn score_constant_clause(comparison: Comparison, value: i32) -> Option<(&'static str, String)> {
+pub(super) fn score_constant_clause(
+    comparison: Comparison,
+    value: i32,
+) -> Option<(&'static str, String)> {
     match comparison {
         Comparison::Equal => Some(("if", value.to_string())),
         Comparison::NotEqual => Some(("unless", value.to_string())),
@@ -581,7 +600,7 @@ fn compare_integers(left: i32, comparison: Comparison, right: i32) -> bool {
     }
 }
 
-fn reverse_comparison(comparison: Comparison) -> Comparison {
+pub(super) fn reverse_comparison(comparison: Comparison) -> Comparison {
     match comparison {
         Comparison::Equal => Comparison::Equal,
         Comparison::NotEqual => Comparison::NotEqual,
@@ -592,7 +611,7 @@ fn reverse_comparison(comparison: Comparison) -> Comparison {
     }
 }
 
-fn comparison_operator(comparison: Comparison) -> (&'static str, &'static str) {
+pub(super) fn comparison_operator(comparison: Comparison) -> (&'static str, &'static str) {
     match comparison {
         Comparison::Equal => ("if", "="),
         Comparison::NotEqual => ("unless", "="),

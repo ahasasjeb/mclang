@@ -1,0 +1,266 @@
+{
+  "examples/bounty_hunter": {
+    "bytes": 13261,
+    "commands": 148,
+    "functions": 26,
+    "helpers": 10
+  },
+  "examples/macro_demo": {
+    "bytes": 1165,
+    "commands": 17,
+    "functions": 5,
+    "helpers": 2
+  },
+  "examples/module_demo": {
+    "bytes": 1604,
+    "commands": 21,
+    "functions": 6,
+    "helpers": 2
+  },
+  "examples/monster_market": {
+    "bytes": 46664,
+    "commands": 513,
+    "functions": 66,
+    "helpers": 24
+  },
+  "examples/multi_counter": {
+    "bytes": 2715,
+    "commands": 31,
+    "functions": 10,
+    "helpers": 3
+  },
+  "examples/portable_chest": {
+    "bytes": 6340,
+    "commands": 74,
+    "functions": 20,
+    "helpers": 17
+  },
+  "examples/sign_bank": {
+    "bytes": 437504,
+    "commands": 4443,
+    "functions": 599,
+    "helpers": 532
+  },
+  "examples/stdlib_demo": {
+    "bytes": 11734,
+    "commands": 116,
+    "functions": 26,
+    "helpers": 8
+  },
+  "tests/valid/advancement": {
+    "bytes": 1521,
+    "commands": 15,
+    "functions": 5,
+    "helpers": 1
+  },
+  "tests/valid/chinese_identifiers": {
+    "bytes": 5891,
+    "commands": 67,
+    "functions": 16,
+    "helpers": 2
+  },
+  "tests/valid/components": {
+    "bytes": 1868,
+    "commands": 22,
+    "functions": 4,
+    "helpers": 1
+  },
+  "tests/valid/conditions": {
+    "bytes": 5922,
+    "commands": 58,
+    "functions": 6,
+    "helpers": 2
+  },
+  "tests/valid/control_semantics": {
+    "bytes": 20332,
+    "commands": 229,
+    "functions": 66,
+    "helpers": 30
+  },
+  "tests/valid/core_commands": {
+    "bytes": 1585,
+    "commands": 31,
+    "functions": 3,
+    "helpers": 1
+  },
+  "tests/valid/data_ops": {
+    "bytes": 4102,
+    "commands": 52,
+    "functions": 5,
+    "helpers": 2
+  },
+  "tests/valid/effects": {
+    "bytes": 2772,
+    "commands": 33,
+    "functions": 5,
+    "helpers": 1
+  },
+  "tests/valid/entities": {
+    "bytes": 3687,
+    "commands": 39,
+    "functions": 11,
+    "helpers": 6
+  },
+  "tests/valid/entity_commands": {
+    "bytes": 4147,
+    "commands": 77,
+    "functions": 3,
+    "helpers": 1
+  },
+  "tests/valid/execute": {
+    "bytes": 5171,
+    "commands": 51,
+    "functions": 12,
+    "helpers": 9
+  },
+  "tests/valid/expressions": {
+    "bytes": 3186,
+    "commands": 39,
+    "functions": 4,
+    "helpers": 1
+  },
+  "tests/valid/filtered_targets": {
+    "bytes": 5704,
+    "commands": 72,
+    "functions": 9,
+    "helpers": 8
+  },
+  "tests/valid/item_components": {
+    "bytes": 1004,
+    "commands": 10,
+    "functions": 3,
+    "helpers": 1
+  },
+  "tests/valid/language": {
+    "bytes": 5750,
+    "commands": 72,
+    "functions": 19,
+    "helpers": 5
+  },
+  "tests/valid/loops": {
+    "bytes": 15962,
+    "commands": 207,
+    "functions": 57,
+    "helpers": 40
+  },
+  "tests/valid/macro_sources": {
+    "bytes": 588,
+    "commands": 8,
+    "functions": 5,
+    "helpers": 1
+  },
+  "tests/valid/macros": {
+    "bytes": 1165,
+    "commands": 17,
+    "functions": 5,
+    "helpers": 2
+  },
+  "tests/valid/modules": {
+    "bytes": 3277,
+    "commands": 41,
+    "functions": 14,
+    "helpers": 2
+  },
+  "tests/valid/multifile": {
+    "bytes": 2253,
+    "commands": 28,
+    "functions": 9,
+    "helpers": 2
+  },
+  "tests/valid/nbt": {
+    "bytes": 1981,
+    "commands": 19,
+    "functions": 7,
+    "helpers": 1
+  },
+  "tests/valid/optimizations": {
+    "bytes": 19189,
+    "commands": 156,
+    "functions": 60,
+    "helpers": 14
+  },
+  "tests/valid/raw": {
+    "bytes": 521,
+    "commands": 10,
+    "functions": 8,
+    "helpers": 3
+  },
+  "tests/valid/registry_tags": {
+    "bytes": 72,
+    "commands": 1,
+    "functions": 1,
+    "helpers": 1
+  },
+  "tests/valid/remaining_commands": {
+    "bytes": 3226,
+    "commands": 62,
+    "functions": 8,
+    "helpers": 3
+  },
+  "tests/valid/resource_codecs": {
+    "bytes": 72,
+    "commands": 1,
+    "functions": 1,
+    "helpers": 1
+  },
+  "tests/valid/scoreboard": {
+    "bytes": 5692,
+    "commands": 60,
+    "functions": 13,
+    "helpers": 7
+  },
+  "tests/valid/selector_scores": {
+    "bytes": 185,
+    "commands": 2,
+    "functions": 2,
+    "helpers": 1
+  },
+  "tests/valid/shared_arguments": {
+    "bytes": 2269,
+    "commands": 16,
+    "functions": 2,
+    "helpers": 1
+  },
+  "tests/valid/sign_command_warnings.mcl": {
+    "bytes": 830,
+    "commands": 6,
+    "functions": 2,
+    "helpers": 1
+  },
+  "tests/valid/stdlib": {
+    "bytes": 13065,
+    "commands": 143,
+    "functions": 24,
+    "helpers": 6
+  },
+  "tests/valid/structure_assets": {
+    "bytes": 145,
+    "commands": 2,
+    "functions": 2,
+    "helpers": 1
+  },
+  "tests/valid/token_replay": {
+    "bytes": 931,
+    "commands": 22,
+    "functions": 4,
+    "helpers": 1
+  },
+  "tests/valid/ui_commands": {
+    "bytes": 4103,
+    "commands": 64,
+    "functions": 6,
+    "helpers": 3
+  },
+  "tests/valid/world": {
+    "bytes": 3342,
+    "commands": 71,
+    "functions": 4,
+    "helpers": 1
+  },
+  "tests/valid/zero_multiplication": {
+    "bytes": 1555,
+    "commands": 23,
+    "functions": 10,
+    "helpers": 1
+  }
+}

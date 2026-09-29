@@ -234,10 +234,26 @@ fn control_flow_effects_and_small_command_shapes() {
         if_else
             .matches("run function control_semantics:side_effect")
             .count(),
-        1
+        1,
+        "条件里的调用只能求值一次：{if_else}"
     );
     assert!(if_else.contains("matches 1 run scoreboard players add"));
-    assert!(if_else.contains("matches 0 run scoreboard players add"));
+    assert!(
+        if_else.contains("unless score #t") && if_else.contains("run scoreboard players add"),
+        "else 分支直接测试同一个冻结值：{if_else}"
+    );
+    assert!(
+        !if_else.contains("matches 0 run"),
+        "分支不再为取反额外固化标志：{if_else}"
+    );
+    assert_eq!(
+        if_else
+            .lines()
+            .filter(|line| !line.trim().is_empty() && !line.starts_with('#'))
+            .count(),
+        3,
+        "调用条件 + 两个分支共 3 条命令：{if_else}"
+    );
     let returned = function(&output, "return_execute");
     assert!(returned.contains("return run function control_semantics:__mcl/return_execute/"));
     assert!(owner_commands(&output, "return_execute").contains("say result boundary"));

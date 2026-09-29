@@ -88,7 +88,7 @@ fn tick() {
 
 ```text
 mclang build <源文件.mcl|项目目录> [-o <输出路径>] [--zip] [--description <文本>] [--deny-raw]
-mclang check <源文件.mcl|项目目录> [--deny-raw]
+mclang check <源文件.mcl|项目目录> [--deny-raw] [--stats]
 mclang translate <源文件.mcl|项目目录> --to <en|zh>
 mclang lsp
 mclang help
@@ -96,7 +96,7 @@ mclang version
 ```
 
 - 输入可以是单个 `.mcl` 文件，也可以是递归包含 `.mcl` 的项目目录；项目内所有文件必须声明相同命名空间，声明与引用在整个项目内可见。
-- `check` 只做检查并打印统计；`build` 通过全部检查后才写出文件。
+- `check` 只做检查并打印统计；`build` 通过全部检查后才写出文件。`--stats` 额外打印产物规模（`.mcfunction` 数量、其中 `__mcl` 辅助函数数量、命令条数与字节数），`build` 结束也会打印同一行；`tests/output_size.rs` 用这份口径对全部语料做预算回归（`tests/output_budget.json`）。
 - `translate` 把关键词就地改写成另一种写法，便于在中文与英文风格之间切换：只翻译语言词汇（关键词、函数属性、方法与枚举值），字符串、注释、NBT 键与用户声明的标识符保持原样，内容没有变化的文件不会被重写。
 - 默认输出目录是 `build/<源文件名>`。
 - `--zip` 直接生成 ZIP，默认路径是 `build/<源文件名>.zip`；指定 `-o` 时该路径就是 ZIP 文件名。
@@ -206,5 +206,8 @@ cargo run -- check tests/invalid/items.mcl
 
 编译器不含单元测试：验证方式是实际编写 `.mcl`、用真实编译器编译，并检查 `build/` 里生成的
 mcfunction 与 JSON 产物；`tests/valid` 与 `tests/invalid` 是随仓库维护的编译测试语料。
+`cargo test` 还会按 `tests/output_budget.json` 校验全部语料的产物规模（函数数、`__mcl`
+辅助函数数、命令条数与字节数），确认增长合理后用 `MCLANG_UPDATE_OUTPUT_BUDGET=1 cargo test
+--test output_size` 重新生成预算。
 
 依赖只有 `serde_json`，Rust edition 2024。
