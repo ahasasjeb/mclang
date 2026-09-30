@@ -1,0 +1,137 @@
+[
+  {
+    "name": "user on function keeps parameters and calls in execute conditions",
+    "source": "fn on(owner) -> score { return owner; } score vehicle = 1; score result = 0; fn helper() { result = on(vehicle); execute if on(vehicle) == 1 { result = 2; } }",
+    "chinese": "函数 on(owner) -> 计分 { 返回 owner; } 计分 vehicle = 1; 计分 result = 0; 函数 helper() { result = on(vehicle); 执行 如果 on(vehicle) == 1 { result = 2; } }"
+  },
+  {
+    "name": "execute on clause remains syntax beside a same-named user function",
+    "source": "fn on(owner) -> score { return owner; } score vehicle = 1; score result = 0; query q = entity(\"minecraft:pig\") {} fn helper() { execute as(q) on(owner) if on(vehicle) > 0 { result = on(vehicle); } }",
+    "chinese": "函数 on(owner) -> 计分 { 返回 owner; } 计分 vehicle = 1; 计分 result = 0; 查询 q = 实体(\"minecraft:pig\") {} 函数 helper() { 执行 作为(q) 关系(主人) 如果 on(vehicle) > 0 { result = on(vehicle); } }"
+  },
+  {
+    "name": "Chinese on function name is preserved in declarations and calls",
+    "source": "fn 关系(主人) -> score { return 主人; } score result = 0; fn helper() { result = 关系(1); }",
+    "chinese": "函数 关系(主人) -> 计分 { 返回 主人; } 计分 result = 0; 函数 helper() { result = 关系(1); }"
+  },
+  {
+    "name": "incomplete on function keeps its parameter names",
+    "source": "fn on(owner) { return owner;",
+    "chinese": "函数 on(owner) { 返回 owner;"
+  },
+  {
+    "name": "entity condition bodies are not query property blocks",
+    "source": "score sort = 0; fn limit(value) -> score { return value; } query q = entity(\"minecraft:pig\") { limit(1); } fn helper() { if entity(q) { sort = limit(1); } execute if entity(q) { sort = 2; } }",
+    "chinese": "计分 sort = 0; 函数 limit(value) -> 计分 { 返回 value; } 查询 q = 实体(\"minecraft:pig\") { 上限(1); } 函数 helper() { 如果 实体(q) { sort = limit(1); } 执行 如果 实体(q) { sort = 2; } }"
+  },
+  {
+    "name": "ordinary variable assignment keeps enum-like reference",
+    "source": "score rarity = 0; score rare = 1; fn helper() { rarity = rare; }",
+    "chinese": "计分 rarity = 0; 计分 rare = 1; 函数 helper() { rarity = rare; }"
+  },
+  {
+    "name": "Boss bar get option bypasses parameter protection",
+    "source": "fn helper(value) { let v = bossbar.get(\"test:bar\", value); return value; }",
+    "chinese": "函数 helper(value) { 令 v = Boss栏.取(\"test:bar\", 数值); 返回 value; }"
+  },
+  {
+    "name": "BOM does not hide advancement block context",
+    "source": "\ufeffadvancement a { display { description = \"D\"; } }",
+    "chinese": "\ufeff进度 a { 展示 { 描述 = \"D\"; } }"
+  },
+  {
+    "name": "Boss bar field bypasses parameter name protection",
+    "source": "fn helper(value) { execute store.result(bossbar, \"test:bar\", value) { return value; } }",
+    "chinese": "函数 helper(value) { 执行 存值.结果(Boss栏, \"test:bar\", 值) { 返回 value; } }"
+  },
+  {
+    "name": "function condition and reward property",
+    "source": "if function(helper) || function(#group) {} advancement a { reward { function = helper; } }",
+    "chinese": "如果 函数条件(helper) || 函数条件(#group) {} 进度 a { 奖励 { 函数 = helper; } }"
+  },
+  {
+    "name": "entity relation overrides origin keyword",
+    "source": "execute as(z) on(origin) { self.add_tag(\"x\"); }",
+    "chinese": "执行 作为(z) 关系(起源) { 自身.添加标签(\"x\"); }"
+  },
+  {
+    "name": "NBT keys and nested boolean values",
+    "source": "nbt { true = true; false = false; 真 = [true, false]; 假 = { true = false; }; }",
+    "chinese": "数据 { true = 真; false = 假; 真 = [真, 假]; 假 = { true = 假; }; }"
+  },
+  {
+    "name": "display description and item lore",
+    "source": "item icon = item_stack(\"minecraft:stone\") { lore = [\"L\"]; }; advancement a { criterion done { trigger = placed_block; } reward { function = helper; } display { icon = icon; description = \"D\"; frame = goal; } }",
+    "chinese": "物品 icon = 物品堆(\"minecraft:stone\") { 描述 = [\"L\"]; }; 进度 a { 准则 done { 触发器 = placed_block; } 奖励 { 函数 = helper; } 展示 { 图标 = icon; 描述 = \"D\"; 框架 = 目标; } }"
+  },
+  {
+    "name": "objective criteria and advancement criterion",
+    "source": "objective obj { criteria = \"dummy\"; render_type = hearts; number_format = blank; } advancement a { criterion done { trigger = placed_block; } }",
+    "chinese": "目标 obj { 准则 = \"dummy\"; 渲染类型 = 爱心; 数字格式 = 空白; } 进度 a { 准则 done { 触发器 = placed_block; } }"
+  },
+  {
+    "name": "declared name does not block store method",
+    "source": "score result = 0; execute store.result(origin, obj) { result = 1; }",
+    "chinese": "计分 result = 0; 执行 存值.结果(投掷者, obj) { result = 1; }"
+  },
+  {
+    "name": "declared parameter does not block tag property",
+    "source": "fn helper(value) { return value; } fn_tag group { value(helper); }",
+    "chinese": "函数 helper(value) { 返回 value; } 函数标签 group { 值(helper); }"
+  },
+  {
+    "name": "incomplete item declaration protects name",
+    "source": "item rarity = item_stack(\"minecraft:stone\") {",
+    "chinese": "物品 rarity = 物品堆(\"minecraft:stone\") {"
+  },
+  {
+    "name": "incomplete function protects parameters",
+    "source": "fn helper(t, s, d) { g(2, t);",
+    "chinese": "函数 helper(t, s, d) { g(2, t);"
+  },
+  {
+    "name": "user function named like property",
+    "source": "fn limit(value) { return value; } fn helper() { limit(1); }",
+    "chinese": "函数 limit(value) { 返回 value; } 函数 helper() { limit(1); }"
+  },
+  {
+    "name": "query property bypasses user function protection",
+    "source": "fn limit(value) { return value; } query q = entity(\"minecraft:pig\") { limit(1); }",
+    "chinese": "函数 limit(value) { 返回 value; } 查询 q = 实体(\"minecraft:pig\") { 上限(1); }"
+  },
+  {
+    "name": "text styles and click action",
+    "source": "message.self(text(\"x\") { color = \"red\"; bold = true; click = run_command(\"/say hi\"); hover = text(\"y\") { italic = false; }; });",
+    "chinese": "消息.自身(文本(\"x\") { 颜色 = \"red\"; 粗体 = 真; 点击 = 运行命令(\"/say hi\"); 悬停 = 文本(\"y\") { 斜体 = 假; }; });"
+  },
+  {
+    "name": "data and item methods",
+    "source": "data.get(entity, self, \"x\"); data.merge(entity, self, nbt { true = false; }); data.remove(entity, self, \"x\"); item.override(entity, self, \"weapon\", with(reward)); item.modify(entity, self, \"weapon\", \"minecraft:test\");",
+    "chinese": "数据操作.取(实体, 自身, \"x\"); 数据操作.合并(实体, 自身, 数据 { true = 假; }); 数据操作.移除(实体, 自身, \"x\"); 物品.覆盖(实体, 自身, \"weapon\", 用(reward)); 物品.修改(实体, 自身, \"weapon\", \"minecraft:test\");"
+  },
+  {
+    "name": "compute argument positions",
+    "source": "score integer = 1; let v = compute(default, integer, \"minecraft:test\"); let w = compute(entity, integer, float, \"minecraft:test\"); let b = compute(block, pos(1, 2, 3), integer, \"minecraft:test\");",
+    "chinese": "计分 integer = 1; 令 v = 计算(默认, 整数, \"minecraft:test\"); 令 w = 计算(实体, integer, 浮点, \"minecraft:test\"); 令 b = 计算(方块, 坐标(1, 2, 3), 整数, \"minecraft:test\");"
+  },
+  {
+    "name": "score operation only translates operation argument",
+    "source": "objective add = \"dummy\"; scoreboard.operation(self, add, add, self, add);",
+    "chinese": "目标 add = \"dummy\"; 计分板.运算(自身, add, 加上, 自身, add);"
+  },
+  {
+    "name": "scoreboard command chain spellings",
+    "source": "scoreboard.objectives.modify.rendertype(obj, hearts); scoreboard.objectives.modify.numberformat(obj, fixed(text(\"x\") { bold = true; })); scoreboard.players.display.numberformat(self, obj, styled(\"{}\"));",
+    "chinese": "计分板.目标集.修改.渲染类型(obj, 爱心); 计分板.目标集.修改.数字格式(obj, 固定(文本(\"x\") { 粗体 = 真; })); 计分板.玩家分数.显示.数字格式(自身, obj, 样式(\"{}\"));"
+  },
+  {
+    "name": "comments do not interrupt context and format is preserved",
+    "source": "\ufeffif function // function stays\r\n(helper) {}\r\nexecute on // origin stays\r\n(origin) {}",
+    "chinese": "\ufeff如果 函数条件 // function stays\r\n(helper) {}\r\n执行 关系 // origin stays\r\n(起源) {}"
+  },
+  {
+    "name": "opaque import and block state",
+    "source": "import time as t; call #time(); block_state(\"minecraft:light\") { level = \"15\"; facing = \"north\"; }",
+    "chinese": "导入 time 作为 t; 调用 #time(); 方块状态(\"minecraft:light\") { level = \"15\"; facing = \"north\"; }"
+  }
+]

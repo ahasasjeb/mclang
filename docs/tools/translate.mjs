@@ -64,30 +64,15 @@ const RECEIVER_FAMILIES = {
   进度: "advancement_method",
   store: "store_method",
   存值: "store_method",
-};
-
-/** 方法表反查出的规范接收者，用于把中文接收者还原成英文。 */
-const CANONICAL_RECEIVERS = {
-  self_method: "self",
-  message_target: "message",
-  effect_method: "effect",
-  xp_method: "xp",
-  stopwatch_method: "stopwatch",
-  scoreboard_method: "scoreboard",
-  place_method: "place",
-  forceload_method: "forceload",
-  time_method: "time",
-  gamerule_method: "gamerule",
-  worldborder_method: "worldborder",
-  locate_kind: "locate",
-  weather_kind: "weather",
-  schedule_method: "schedule",
-  advancement_method: "advancement",
-  store_method: "store",
+  data: "data_method",
+  数据操作: "data_method",
+  item: "item_method",
+  物品: "item_method",
 };
 
 /** 后面跟 `=` 或 `(` 时按属性表翻译的函数。 */
 const PROPERTY_FAMILIES = [
+  "objective_property",
   "query_property",
   "item_property",
   "item_stack_property",
@@ -99,6 +84,7 @@ const PROPERTY_FAMILIES = [
   "criterion_property",
   "reward_property",
   "display_property",
+  "text_style_property",
 ];
 
 /** 只在后面跟 `(` 时按函数名翻译的表：`facing(...)` 是 execute 子句，
@@ -140,6 +126,9 @@ const PROPERTY_VALUE_CONTEXTS = {
   rarity: ["rarity_value"],
   frame: ["advancement_frame"],
   requirements: ["advancement_requirements"],
+  number_format: ["number_format_kind"],
+  render_type: ["render_type"],
+  click: ["click_action"],
 };
 
 /** 其余可以独立出现、但只在行内代码里放心的值表。 */
@@ -162,7 +151,11 @@ const LOOSE_VALUE_FAMILIES = [
 export function buildTranslator(data) {
   // `schedule.clear` 的方法名在解析器里用 word_matches("clear") 单独判断，
   // keywords.rs 里没有对应的表，这里补上。
-  const tables = { ...data.tables, schedule_method: [{ en: "clear", zh: "清除" }] };
+  const tables = {
+    ...data.tables,
+    schedule_method: [{ en: "clear", zh: "清除" }],
+    scoreboard_group: [{ en: "objectives", zh: "目标集" }, { en: "players", zh: "玩家分数" }],
+  };
   const keywords = data.keywords;
   const attributes = data.attributes;
 
@@ -174,7 +167,7 @@ export function buildTranslator(data) {
       const backward = new Map();
       for (const pair of tables[family] ?? []) {
         forward.set(pair.en, pair.zh);
-        backward.set(pair.zh, pair.en);
+        if (!backward.has(pair.zh)) backward.set(pair.zh, pair.en);
       }
       indexes.set(family, { forward, backward });
     }
@@ -183,7 +176,9 @@ export function buildTranslator(data) {
 
   const rewrite = (word, family, target) => {
     const { forward, backward } = indexOf(family);
-    return target === "zh" ? forward.get(word) : backward.get(word);
+    return target === "zh"
+      ? forward.get(word) ?? (backward.has(word) ? word : undefined)
+      : backward.get(word) ?? backward.get(forward.get(word));
   };
 
   const hasPair = (word, family) => {
@@ -250,36 +245,147 @@ export function buildTranslator(data) {
     const raw = calleeName(tokens, openIndex);
     if (!raw) return null;
     const parts = raw.split(".");
-    if (COMMAND_RECEIVERS.has(canonicalWord(parts[0]) ?? parts[0])) {
-      return parts.map(part => canonicalWord(part) ?? part).join(".");
+    const root = canonicalWord(parts[0]) ?? parts[0];
+    const family = RECEIVER_FAMILIES[parts[0]];
+    return parts.map((part, index) => {
+      if (index === 0) return root;
+      let method;
+      if (root === "scoreboard" && (parts.length > 2 || ["objectives", "目标集", "players", "玩家分数"].includes(part))) {
+        method = rewrite(part, index === 1 ? "scoreboard_group" : "command_value", "en");
+      } else if (index === 1 && family) {
+        method = rewrite(part, family, "en");
+      }
+      return method ?? rewrite(part, "command_value", "en") ?? canonicalWord(part) ?? part;
+    }).join(".");
+  };
+
+  const blockFamily = (tokens, opens, brace, parent) => {
+    const previous = previousSignificant(tokens, brace);
+    if (!previous) return null;
+    if (previous.text === ")") {
+      const open = opens[previous.index];
+      const callee = open === undefined ? null : canonicalCallee(tokens, open);
+      if (callee === "item_stack") return "item_stack_property";
+      if (callee === "entity") {
+        const name = previousSignificant(tokens, open);
+        const equals = previousSignificant(tokens, name.index);
+        const queryName = equals && previousSignificant(tokens, equals.index);
+        const declaration = queryName && previousSignificant(tokens, queryName.index);
+        return equals?.text === "=" && queryName?.type === "ident" &&
+          canonicalWord(declaration?.text) === "query" ? "query_property" : null;
+      }
+      if (["text", "translate", "keybind", "object", "score", "selector", "nbt"].includes(callee)) return "text_style_property";
+      return null;
     }
-    const [head, tail] = raw.includes(".") ? raw.split(".") : [raw, null];
-    const receiver = canonicalWord(head) ?? head;
-    if (tail === null) return receiver;
-    const family = RECEIVER_FAMILIES[receiver] ?? RECEIVER_FAMILIES[head];
-    const canonicalReceiver = family ? CANONICAL_RECEIVERS[family] : receiver;
-    const method =
-      (family && rewrite(tail, family, "en")) ?? canonicalWord(tail) ?? tail;
-    return `${canonicalReceiver}.${method}`;
+    let start = previous;
+    let before;
+    while ((before = previousSignificant(tokens, start.index)) && ![";", "{", "}"].includes(before.text)) start = before;
+    if (parent === "advancement_property") {
+      return { criterion: "criterion_property", reward: "reward_property", display: "display_property" }[
+        rewrite(start.text, "advancement_property", "en")
+      ] ?? null;
+    }
+    if (canonicalWord(start.text) === "export") start = nextSignificant(tokens, start.index);
+    return { advancement: "advancement_property", objective: "objective_property", fn_tag: "function_tag_property" }[
+      canonicalWord(start?.text)
+    ] ?? null;
+  };
+
+  // 只跳过 execute 的完整修饰符；遇到 if 等条件头就停止，避免误认条件中的函数。
+  const isExecuteModifier = (tokens, opens, index) => {
+    let previous;
+    while ((previous = previousSignificant(tokens, index))) {
+      if (canonicalWord(previous.text) === "execute") return true;
+      if (previous.text !== ")" || opens[previous.index] === undefined) return false;
+      const name = previousSignificant(tokens, opens[previous.index]);
+      if (!name || !hasPair(name.text, "execute_clause")) return false;
+      index = name.index;
+    }
+    return false;
   };
 
   /** 每个标识符所在的最近调用 / 代码块框架。 */
-  const computeFrames = (tokens) => {
-    const frames = new Array(tokens.length).fill(null);
+  const computeFrames = (tokens, declared) => {
+    const frames = new Array(tokens.length);
     const stack = [];
+    const opens = [];
     tokens.forEach((token, index) => {
-      if (token.text === "(") {
-        stack.push(canonicalCallee(tokens, index));
-      } else if (token.text === ")") {
-        stack.pop();
-      } else if (token.text === "{") {
-        stack.push("{");
-      } else if (token.text === "}") {
-        stack.pop();
+      frames[index] = { ...(stack.at(-1) ?? {}) };
+      if (token.type === "ident") {
+        frames[index].executeModifier = hasPair(token.text, "execute_clause") &&
+          isExecuteModifier(tokens, opens, index);
       }
-      frames[index] = stack[stack.length - 1] ?? null;
+      if (token.type !== "punct") return;
+      if (token.text === "(") {
+        let callee = canonicalCallee(tokens, index);
+        const name = previousSignificant(tokens, index);
+        if (name) {
+          const before = previousSignificant(tokens, name.index);
+          const declaration = canonicalWord(before?.text) === "fn";
+          const family = frames[name.index].propertyFamily;
+          const property = family && hasPair(name.text, family) && ["{", ";", "}"].includes(before?.text);
+          if (declaration || (declared.has(name.text) && before?.text !== "." &&
+            !property && !frames[name.index].executeModifier)) callee = null;
+        }
+        stack.push({ delimiter: "(", open: index, callee, argument: 0,
+          computeSource: rewrite(nextSignificant(tokens, index)?.text, "compute_source", "en") });
+      } else if (token.text === "{") {
+        stack.push({ delimiter: "{", open: index, propertyFamily: blockFamily(tokens, opens, index, stack.at(-1)?.propertyFamily) });
+      } else if (token.text === "[") {
+        stack.push({ delimiter: "[", open: index });
+      } else if ([")", "}", "]"].includes(token.text)) {
+        const expected = { ")": "(", "}": "{", "]": "[" }[token.text];
+        if (stack.at(-1)?.delimiter === expected) opens[index] = stack.pop().open;
+      } else if (token.text === "," && stack.at(-1)?.delimiter === "(") {
+        stack.at(-1).argument += 1;
+      }
     });
     return frames;
+  };
+
+  const declaredNames = (tokens) => {
+    const names = new Set();
+    const declarations = new Set(["score", "objective", "query", "item", "storage", "data_slot", "advancement", "fn_tag", "fn", "let", "for"]);
+    for (const token of tokens) {
+      if (token.type !== "ident") continue;
+      const word = canonicalWord(token.text);
+      const resource = word === "resource";
+      if (!declarations.has(word) && !resource && !["criterion", "准则"].includes(token.text)) continue;
+      let name = nextSignificant(tokens, token.index);
+      if (resource && name) name = nextSignificant(tokens, name.index);
+      if (name?.type !== "ident") continue;
+      names.add(name.text);
+      if (word !== "fn") continue;
+      const open = nextSignificant(tokens, name.index);
+      if (open?.text !== "(") continue;
+      let cursor = nextSignificant(tokens, open.index);
+      let parameterStart = true;
+      while (cursor && ![")", "{", ";"].includes(cursor.text)) {
+        if (parameterStart && cursor.type === "ident") names.add(cursor.text);
+        parameterStart = cursor.text === ",";
+        cursor = nextSignificant(tokens, cursor.index);
+      }
+    }
+    return names;
+  };
+
+  const argumentValue = (frame, word, target) => {
+    const { callee, argument, computeSource } = frame;
+    if (callee === "bossbar.get" && argument === 1) {
+      return rewrite(word, "command_value", target) ?? rewrite(word, "ui_value", target);
+    }
+    let family;
+    if (callee === "on" && argument === 0) family = "entity_relation";
+    if (["store.result", "store.success"].includes(callee) && argument === 2) family = "bossbar_field";
+    if (callee === "compute") {
+      if (argument === 0) family = "compute_source";
+      else if (argument === (computeSource === "default" ? 1 : 2)) family = "compute_kind";
+    }
+    if (callee === "scoreboard.operation" && argument === 2) family = "score_operation";
+    if (callee === "scoreboard.objectives.modify.rendertype" && argument === 1) family = "render_type";
+    if (callee === "scoreboard.objectives.modify.numberformat" && argument === 1) family = "number_format_kind";
+    if (["scoreboard.players.numberformat", "scoreboard.players.display.numberformat"].includes(callee) && argument === 2) family = "number_format_kind";
+    return family ? rewrite(word, family, target) : null;
   };
 
   /** `t`/`s`/`d` 前面是数字，或前面是逗号且逗号前面是数字（`time.set(6000, t)`）。 */
@@ -295,10 +401,11 @@ export function buildTranslator(data) {
   };
 
   /** 单个标识符的改写；返回 `null` 表示保持原样。 */
-  const translateWord = (tokens, frames, index, target, relaxed) => {
+  const translateWord = (tokens, frames, index, target, relaxed, declared) => {
     const word = tokens[index].text;
     const previous = previousSignificant(tokens, index);
     const next = nextSignificant(tokens, index);
+    const alias = (word, family) => declared.has(word) ? null : rewrite(word, family, target);
 
     if (previous?.text === "@") return lookupAttributes(word, target);
     if (previous?.text === "#") return null;
@@ -313,6 +420,9 @@ export function buildTranslator(data) {
       if (COMMAND_RECEIVERS.has(canonicalWord(root?.text))) {
         return rewrite(word, "command_value", target) ?? rewrite(word, "ui_value", target) ?? lookupKeywords(word, target);
       }
+      if (canonicalWord(root?.text) === "scoreboard" && (root !== receiver || ["objectives", "目标集", "players", "玩家分数"].includes(word))) {
+        return rewrite(word, root === receiver ? "scoreboard_group" : "command_value", target);
+      }
       const family = receiver ? RECEIVER_FAMILIES[receiver.text] : undefined;
       if (family) {
         const rewritten = rewrite(word, family, target);
@@ -321,9 +431,17 @@ export function buildTranslator(data) {
       return lookupKeywords(word, target);
     }
 
+    if (frames[index].propertyFamily && ["{", ";", "}"].includes(previous?.text)) {
+      const property = rewrite(word, frames[index].propertyFamily, target);
+      if (property) return property;
+    }
+    if (frames[index].executeModifier) return rewrite(word, "execute_clause", target);
+    const argument = argumentValue(frames[index], word, target);
+    if (argument) return argument;
+
     if (next?.text === "=") {
       for (const family of PROPERTY_FAMILIES) {
-        const rewritten = rewrite(word, family, target);
+        const rewritten = alias(word, family);
         if (rewritten) return rewritten;
       }
     }
@@ -331,12 +449,13 @@ export function buildTranslator(data) {
     // 函数调用位置：声明属性与 execute 子句都写在这。
     if (next?.text === "(") {
       const canonical = canonicalWord(word);
+      if (canonical === "function") return lookupKeywords(word, target) ?? word;
       if (COMMAND_CALLS.has(canonical) || COMMAND_RECEIVERS.has(canonical) || EXPRESSION_CALLS.has(canonical)) {
-        const rewritten = lookupKeywords(word, target) ?? rewrite(word, "command_value", target) ?? rewrite(word, "ui_value", target);
+        const rewritten = lookupKeywords(word, target) ?? alias(word, "command_value") ?? alias(word, "ui_value");
         if (rewritten) return rewritten;
       }
       for (const family of [...PROPERTY_FAMILIES, ...CALL_FAMILIES]) {
-        const rewritten = rewrite(word, family, target);
+        const rewritten = alias(word, family);
         if (rewritten) return rewritten;
       }
     }
@@ -344,37 +463,38 @@ export function buildTranslator(data) {
     // `属性 = 值` 里的枚举值优先于关键词表：`frame = 目标` 的“目标”是
     // 进度框样式，不是 objective 关键词。
     if (previous?.text === "=") {
-      const property = canonicalWord(previousSignificant(tokens, previous.index)?.text);
+      const propertyToken = previousSignificant(tokens, previous.index);
+      const property = canonicalWord(propertyToken?.text);
+      const syntaxProperty = frames[index].propertyFamily &&
+        hasPair(propertyToken?.text, frames[index].propertyFamily) &&
+        ["{", ";", "}"].includes(previousSignificant(tokens, propertyToken.index)?.text);
       for (const family of PROPERTY_VALUE_CONTEXTS[property] ?? []) {
-        const rewritten = rewrite(word, family, target);
+        const rewritten = syntaxProperty ? rewrite(word, family, target) : alias(word, family);
         if (rewritten) return rewritten;
       }
     }
 
-    // 属性只在 `@` 之后成立：`load`、`tick` 作为函数名时必须保持原样。
-    const keyword = lookupKeywords(word, target);
-    if (keyword) return keyword;
-
-    const boolean = rewrite(word, "boolean_word", target);
-    if (boolean) return boolean;
-
-    const timeUnit = rewrite(word, "time_unit", target);
-    if (timeUnit && nextToNumber(tokens, index)) return timeUnit;
-
     // 枚举值只在取值位置翻译，避免命中同名标识符。
-    const frame = frames[index];
-    if (frame && frame !== "{") {
+    const frame = frames[index].callee;
+    if (frame) {
       if (COMMAND_RECEIVERS.has(frame.split(".")[0]) || COMMAND_CALLS.has(frame)) {
-        const rewritten = rewrite(word, "command_value", target) ??
-          (frame.startsWith("bossbar.") || frame.startsWith("title.") || frame === "particle" ? rewrite(word, "ui_value", target) : null) ??
-          rewrite(word, "text_color", target);
+        const rewritten = alias(word, "command_value") ??
+          (frame.startsWith("bossbar.") || frame.startsWith("title.") || frame === "particle" ? alias(word, "ui_value") : null) ??
+          alias(word, "text_color");
         if (rewritten) return rewritten;
       }
       for (const family of CALL_VALUE_CONTEXTS[frame] ?? []) {
-        const rewritten = rewrite(word, family, target);
+        const rewritten = alias(word, family);
         if (rewritten) return rewritten;
       }
     }
+    // 属性只在 `@` 之后成立：`load`、`tick` 作为函数名时必须保持原样。
+    const keyword = lookupKeywords(word, target);
+    if (keyword) return keyword;
+    const boolean = alias(word, "boolean_word");
+    if (boolean) return boolean;
+    const timeUnit = alias(word, "time_unit");
+    if (timeUnit && nextToNumber(tokens, index)) return timeUnit;
     if (relaxed) {
       for (const family of LOOSE_VALUE_FAMILIES) {
         const rewritten = rewrite(word, family, target);
@@ -486,7 +606,8 @@ export function buildTranslator(data) {
   /** 翻译一段代码；`relaxed` 供正文行内代码使用（时间单位等不要求上下文）。 */
   const translate = (code, target, options = {}) => {
     const tokens = tokenize(code);
-    const frames = computeFrames(tokens);
+    const declared = new Set([...declaredNames(tokens), ...(options.declared ?? [])]);
+    const frames = computeFrames(tokens, declared);
     const nbtOpaque = nbtBodyTokens(tokens);
     const blockStateOpaque = blockStateBodyTokens(tokens);
     const importOpaque = importNameTokens(tokens);
@@ -497,11 +618,12 @@ export function buildTranslator(data) {
         if (importOpaque.has(index)) return token.text;
         // NBT 块内部只翻译布尔字面量（`真`/`假`），键名与字符串是用户数据。
         if (nbtOpaque.has(index)) {
+          if (["=", ":"].includes(nextSignificant(tokens, index)?.text)) return token.text;
           return rewrite(token.text, "boolean_word", target) ?? token.text;
         }
         // 方块状态的属性名与取值是原版数据，整块保持原样。
         if (blockStateOpaque.has(index)) return token.text;
-        return translateWord(tokens, frames, index, target, relaxed) ?? token.text;
+        return translateWord(tokens, frames, index, target, relaxed, declared) ?? token.text;
       })
       .join("");
   };
@@ -541,6 +663,7 @@ export function buildTranslator(data) {
     isTranslatableInline,
     canonicalCallee,
     nbtBodyTokens,
+    declaredNames: (code) => declaredNames(tokenize(code)),
     isKnownWord: (word) => isKeyword(word) || isAttribute(word) || isValueWord(word) || isPropertyWord(word),
   };
 }
@@ -608,14 +731,14 @@ function matchAt(pattern, text, index) {
 
 function previousSignificant(tokens, index) {
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-    if (tokens[cursor].type !== "ws") return tokens[cursor];
+    if (!["ws", "comment"].includes(tokens[cursor].type)) return tokens[cursor];
   }
   return null;
 }
 
 function nextSignificant(tokens, index) {
   for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-    if (tokens[cursor].type !== "ws") return tokens[cursor];
+    if (!["ws", "comment"].includes(tokens[cursor].type)) return tokens[cursor];
   }
   return null;
 }

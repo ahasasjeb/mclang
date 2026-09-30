@@ -151,7 +151,8 @@ pub fn translate_file(source: &Path, language: KeywordLanguage) -> Result<bool, 
 /// 就地翻译项目目录下的全部 `.mcl` 文件，返回发生改写的文件数。
 ///
 /// 先读完所有模块并收集声明的标识符（跨模块引用同样受保护），全部翻译成功后才
-/// 写回；中途失败不会留下半翻译的项目。内容未变的文件不重写。
+/// 写回；写入前检查全部目标是否可写，写入失败时尝试恢复原文并报告恢复失败的文件。
+/// 内容未变的文件不重写。
 pub fn translate_project(source: &Path, language: KeywordLanguage) -> Result<usize, String> {
     if !source.is_dir() {
         return Err(format!("{} 不是项目目录", source.display()));
@@ -172,12 +173,32 @@ pub fn translate_project(source: &Path, language: KeywordLanguage) -> Result<usi
     for (path, text) in texts {
         let translated = translate::translate_declared(&text, language, &declared)?;
         if translated != text {
-            pending.push((path, translated));
+            pending.push((path, translated, text));
         }
     }
     let changed = pending.len();
-    for (path, text) in pending {
-        write_if_changed(&path, text.as_bytes())?;
+    // 先检查整批目标，避免后面的只读文件或权限错误让前面的文件提前改变。
+    for (path, _, _) in &pending {
+        let metadata =
+            fs::metadata(path).map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
+        if metadata.permissions().readonly() {
+            return Err(format!("无法写入 {}：文件为只读", path.display()));
+        }
+        fs::OpenOptions::new()
+            .write(true)
+            .open(path)
+            .map_err(|error| format!("无法写入 {}：{error}", path.display()))?;
+    }
+    for (index, (path, text, _)) in pending.iter().enumerate() {
+        if let Err(mut error) = write_if_changed(path, text.as_bytes()) {
+            // 失败的文件也可能被部分写入，因此一起恢复；不覆盖尚未开始写的文件。
+            for (path, _, original) in pending[..=index].iter().rev() {
+                if let Err(restore_error) = write_if_changed(path, original.as_bytes()) {
+                    error.push_str(&format!("\n恢复原文失败：{restore_error}"));
+                }
+            }
+            return Err(error);
+        }
     }
     Ok(changed)
 }

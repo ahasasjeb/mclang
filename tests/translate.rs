@@ -82,6 +82,38 @@ fn translated_projects_build_identically() {
         ("dual-zh", "tests/dual/zh", KeywordLanguage::English),
         ("language", "tests/valid/language", KeywordLanguage::Chinese),
         ("modules", "tests/valid/modules", KeywordLanguage::Chinese),
+        (
+            "conditions",
+            "tests/valid/conditions",
+            KeywordLanguage::Chinese,
+        ),
+        (
+            "control-semantics",
+            "tests/valid/control_semantics",
+            KeywordLanguage::Chinese,
+        ),
+        ("execute", "tests/valid/execute", KeywordLanguage::Chinese),
+        (
+            "optimizations",
+            "tests/valid/optimizations",
+            KeywordLanguage::Chinese,
+        ),
+        (
+            "advancement",
+            "tests/valid/advancement",
+            KeywordLanguage::Chinese,
+        ),
+        (
+            "scoreboard",
+            "tests/valid/scoreboard",
+            KeywordLanguage::Chinese,
+        ),
+        (
+            "expressions",
+            "tests/valid/expressions",
+            KeywordLanguage::Chinese,
+        ),
+        ("data-ops", "tests/valid/data_ops", KeywordLanguage::Chinese),
         ("macros", "tests/valid/macros", KeywordLanguage::Chinese),
         (
             "chinese-identifiers",
@@ -113,6 +145,20 @@ fn translated_projects_build_identically() {
             collect_files(&translated),
             "{name} 翻译前后的数据包产物不一致"
         );
+        let forward = collect_files(&working);
+        let reverse = match language {
+            KeywordLanguage::Chinese => KeywordLanguage::English,
+            KeywordLanguage::English => KeywordLanguage::Chinese,
+        };
+        translate_project(&working, reverse).expect("回译应当成功");
+        build(&working, &translated);
+        assert_eq!(
+            collect_files(&original),
+            collect_files(&translated),
+            "{name} 回译改变了产物"
+        );
+        translate_project(&working, *language).expect("再次翻译应当成功");
+        assert_eq!(forward, collect_files(&working), "{name} 双向往返不稳定");
     }
 }
 
@@ -220,4 +266,137 @@ fn translation_is_idempotent() {
             assert_eq!(once, twice, "{file} 重复翻译到 {language:?} 不稳定");
         }
     }
+}
+
+#[test]
+fn contextual_translation_regressions() {
+    let alias = "scoreboard.objectives.modify.displayname(obj, \"Points\");";
+    let canonical = "scoreboard.objectives.modify.display_name(obj, \"Points\");";
+    assert_eq!(
+        translate(alias, KeywordLanguage::English).unwrap(),
+        canonical
+    );
+    let cases: serde_json::Value =
+        serde_json::from_str(include_str!("translate_cases.json")).unwrap();
+    for case in cases.as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let source = case["source"].as_str().unwrap();
+        let chinese = case["chinese"].as_str().unwrap();
+        assert_eq!(
+            translate(source, KeywordLanguage::Chinese).unwrap(),
+            chinese,
+            "{name}"
+        );
+        assert_eq!(
+            translate(chinese, KeywordLanguage::English).unwrap(),
+            source,
+            "{name} 回译"
+        );
+        for (text, language) in [
+            (source, KeywordLanguage::English),
+            (chinese, KeywordLanguage::Chinese),
+        ] {
+            assert_eq!(translate(text, language).unwrap(), text, "{name} 身份性");
+        }
+    }
+}
+
+#[test]
+fn project_failures_leave_earlier_files_unchanged() {
+    let directory = output_directory("write-failure");
+    fs::create_dir_all(&directory).unwrap();
+    let first = directory.join("a.mcl");
+    let second = directory.join("z.mcl");
+    let original = "score result = 0;";
+    fs::write(&first, original).unwrap();
+    let modified = fs::metadata(&first).unwrap().modified().unwrap();
+
+    fs::write(&second, [0xff, 0xfe, 0x00]).unwrap();
+    assert!(translate_project(&directory, KeywordLanguage::Chinese).is_err());
+    assert_eq!(fs::read_to_string(&first).unwrap(), original);
+    assert_eq!(fs::metadata(&first).unwrap().modified().unwrap(), modified);
+
+    fs::write(&second, "score another = 0;").unwrap();
+    let permissions = fs::metadata(&second).unwrap().permissions();
+    let mut readonly = permissions.clone();
+    readonly.set_readonly(true);
+    fs::set_permissions(&second, readonly).unwrap();
+    let result = translate_project(&directory, KeywordLanguage::Chinese);
+    fs::set_permissions(&second, permissions).unwrap();
+    assert!(result.is_err());
+    assert_eq!(fs::read_to_string(&first).unwrap(), original);
+    assert_eq!(fs::metadata(&first).unwrap().modified().unwrap(), modified);
+    assert_eq!(fs::read_to_string(&second).unwrap(), "score another = 0;");
+}
+
+#[test]
+fn edge_cases_preserve_compiled_data_and_commands() {
+    let source = r#"namespace translation_edges;
+query z = entity("minecraft:zombie") { limit(1); }
+objective add;
+score integer = 1;
+fn check_ready() -> score { return 1; }
+fn helper(value) -> score { return value; }
+@entity
+fn init() {
+    set_block(pos(0, 0, 0), block_state("minecraft:chest"), nbt {
+        true = 1; false = 2; 真 = 3; 假 = 4;
+        flags = [true, false]; nested = { 真 = true; };
+    });
+    execute as(z) on(origin) { self.add_tag("x"); }
+    execute store.result(bossbar, "translation_edges:bar", value) {
+        if function(#group) { integer = 2; }
+        integer += 1;
+    }
+    scoreboard.operation(self, add, add, self, add);
+    integer = compute(entity, z, float, "minecraft:cooking/speed_default");
+}
+fn_tag group { value(check_ready); }
+"#;
+    let directory = output_directory("semantic-edges");
+    fs::create_dir_all(&directory).unwrap();
+    let file = directory.join("main.mcl");
+    let original = directory.join("original-pack");
+    let translated = directory.join("translated-pack");
+    fs::write(&file, source).unwrap();
+    build(&file, &original);
+    translate_project(&directory, KeywordLanguage::Chinese).unwrap();
+    build(&file, &translated);
+    assert_eq!(collect_files(&original), collect_files(&translated));
+    translate_project(&directory, KeywordLanguage::English).unwrap();
+    assert_eq!(fs::read_to_string(&file).unwrap(), source);
+}
+
+#[test]
+fn user_calls_and_condition_bodies_preserve_compiled_output() {
+    let source = r#"namespace translation_contexts;
+score vehicle = 1;
+score limit = 0;
+fn on(owner) -> score { return owner; }
+fn 关系(主人) -> score { return 主人; }
+fn sort(value) -> score { return value; }
+query q = entity("minecraft:pig") { limit(1); sort(nearest); }
+@load
+fn init() {
+    limit = on(vehicle);
+    limit += 关系(1);
+    if entity(q) { limit = sort(1); }
+    execute if entity(q) { limit = 2; }
+    execute if on(vehicle) == 1 { limit = 3; }
+    execute as(q) on(owner) if on(vehicle) > 0 { limit = on(vehicle); }
+}
+"#;
+    let directory = output_directory("user-call-contexts");
+    fs::create_dir_all(&directory).unwrap();
+    let file = directory.join("main.mcl");
+    let original = directory.join("original-pack");
+    let translated = directory.join("translated-pack");
+    fs::write(&file, source).unwrap();
+    build(&file, &original);
+    for language in [KeywordLanguage::Chinese, KeywordLanguage::English] {
+        translate_project(&directory, language).unwrap();
+        build(&file, &translated);
+        assert_eq!(collect_files(&original), collect_files(&translated));
+    }
+    assert_eq!(fs::read_to_string(&file).unwrap(), source);
 }

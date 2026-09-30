@@ -112,15 +112,12 @@ function parseAliasTables(source) {
     const bodyEnd = index + 1 < headers.length ? headers[index + 1].bodyStart : masked.length;
     const body = masked.slice(header.bodyStart, bodyEnd);
     const pairs = [];
-    for (const match of body.matchAll(/"([^"]+)"\s*\|\s*"([^"]+)"/g)) {
-      const [, left, right] = match;
-      const leftAscii = /^[a-z0-9_]+$/.test(left);
-      const rightAscii = /^[a-z0-9_]+$/.test(right);
-      if (leftAscii && !rightAscii && CJK.test(right)) {
-        pairs.push({ en: left, zh: right });
-      } else if (rightAscii && !leftAscii && CJK.test(left)) {
-        pairs.push({ en: right, zh: left });
-      }
+    for (const match of body.matchAll(/"[^"]+"(?:\s*\|\s*"[^"]+")+/g)) {
+      const words = [...match[0].matchAll(/"([^"]+)"/g)].map((word) => word[1]);
+      const english = words.filter((word) => /^[a-z0-9_]+$/.test(word));
+      const chinese = words.filter((word) => CJK.test(word));
+      if (chinese.length !== 1) continue;
+      for (const en of english) pairs.push({ en, zh: chinese[0] });
     }
     if (pairs.length > 0) tables[header.name] = pairs;
   });

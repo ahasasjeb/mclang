@@ -46,6 +46,11 @@ fn build() -> Result<Tables, String> {
     // `schedule.clear` 的方法名在解析器里由 `word_matches("clear")` 判断，没有对应的
     // 规范化函数；补一张只含该方法的表（与文档工具的做法一致）。
     families.insert("schedule_method", Pairs::from_pairs(&[("clear", "清除")]));
+    // 计分板命令分组在解析器里直接匹配，没有独立规范化函数。
+    families.insert(
+        "scoreboard_group",
+        Pairs::from_pairs(&[("objectives", "目标集"), ("players", "玩家分数")]),
+    );
     for (name, _) in FAMILIES {
         let empty = families
             .get(name)
@@ -120,19 +125,35 @@ impl Tables {
         })
     }
 
-    /// 按方法/属性表翻译；返回 `None` 表示该表不认识这个词。
-    pub(super) fn rewrite(
-        &self,
-        word: &str,
+    /// 按方法/属性表选写法，已是目标语言也返回命中，避免继续落入另一张歧义表。
+    /// 英文兼容别名归一为本表的首选写法；`None` 表示该表不认识这个词。
+    pub(super) fn rewrite<'a>(
+        &'a self,
+        word: &'a str,
         family: &str,
         language: KeywordLanguage,
-    ) -> Option<&str> {
+    ) -> Option<&'a str> {
         let pairs = self.families.get(family)?;
         match language {
-            KeywordLanguage::Chinese => pairs.forward.get(word),
-            KeywordLanguage::English => pairs.backward.get(word),
+            KeywordLanguage::Chinese => pairs
+                .forward
+                .get(word)
+                .map(String::as_str)
+                .or_else(|| pairs.backward.contains_key(word).then_some(word)),
+            KeywordLanguage::English => {
+                pairs.backward.get(word).map(String::as_str).or_else(|| {
+                    pairs
+                        .forward
+                        .get(word)
+                        .and_then(|chinese| pairs.backward.get(chinese))
+                        .map(String::as_str)
+                })
+            }
         }
-        .map(String::as_str)
+    }
+
+    pub(super) fn canonical_in<'a>(&'a self, word: &'a str, family: &str) -> Option<&'a str> {
+        self.rewrite(word, family, KeywordLanguage::English)
     }
 
     /// 任意写法 → 英文规范名（关键词优先，其后是属性、方法与枚举值表），
@@ -245,6 +266,33 @@ type Probe = fn(&str) -> Option<String>;
 /// 每张表对应解析器里的一个规范化函数；探测结果相同的英文与中文写法即互为对照。
 /// 新增别名函数时在这里登记，漏登记只会少翻译，不会错译。
 const FAMILIES: &[(&str, Probe)] = &[
+    ("text_style_property", |word| {
+        keywords::text_style_property(word).map(str::to_owned)
+    }),
+    ("click_action", |word| {
+        keywords::click_action(word).map(str::to_owned)
+    }),
+    ("score_operation", |word| {
+        keywords::score_operation(word).map(str::to_owned)
+    }),
+    ("data_method", |word| {
+        keywords::data_method(word).map(str::to_owned)
+    }),
+    ("item_method", |word| {
+        keywords::item_method(word).map(str::to_owned)
+    }),
+    ("number_format_kind", |word| {
+        keywords::number_format_kind(word).map(str::to_owned)
+    }),
+    ("render_type", |word| {
+        keywords::render_type(word).map(str::to_owned)
+    }),
+    ("compute_kind", |word| {
+        keywords::compute_kind(word).map(str::to_owned)
+    }),
+    ("compute_source", |word| {
+        keywords::compute_source(word).map(str::to_owned)
+    }),
     ("self_method", |word| {
         keywords::self_method(word).map(str::to_owned)
     }),
@@ -463,4 +511,60 @@ fn is_ascii_word(word: &str) -> bool {
         && word
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn added_families_translate_every_alias_in_grammar_positions() {
+        let tables = tables().unwrap();
+        let contexts = [
+            ("text_style_property", "text(\"x\") { PROBE = 1; }"),
+            ("click_action", "text(\"x\") { click = PROBE(\"y\"); }"),
+            (
+                "score_operation",
+                "scoreboard.operation(self, obj, PROBE, self, other);",
+            ),
+            ("data_method", "data.PROBE(entity, self, \"x\");"),
+            (
+                "item_method",
+                "item.PROBE(entity, self, \"weapon\", with(reward));",
+            ),
+            (
+                "compute_kind",
+                "compute(default, PROBE, \"minecraft:test\");",
+            ),
+            ("compute_source", "compute(PROBE);"),
+            (
+                "number_format_kind",
+                "objective obj { number_format = PROBE; }",
+            ),
+            (
+                "number_format_kind",
+                "scoreboard.objectives.modify.numberformat(obj, PROBE);",
+            ),
+            ("render_type", "objective obj { render_type = PROBE; }"),
+            (
+                "render_type",
+                "scoreboard.objectives.modify.rendertype(obj, PROBE);",
+            ),
+        ];
+        for (family, template) in contexts {
+            for (english, chinese) in &tables.families[family].forward {
+                for (source, expected, language) in [
+                    (english, chinese, KeywordLanguage::Chinese),
+                    (chinese, english, KeywordLanguage::English),
+                ] {
+                    let input = template.replace("PROBE", source);
+                    let output = crate::translate(&input, language).unwrap();
+                    let expected = crate::translate(template, language)
+                        .unwrap()
+                        .replace("PROBE", expected);
+                    assert_eq!(output, expected, "{family}: {input}");
+                }
+            }
+        }
+    }
 }

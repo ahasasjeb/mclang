@@ -34,7 +34,7 @@ pub(super) fn tokenize(source: &str) -> Vec<Token<'_>> {
             string_length(rest)
         } else if rest.starts_with("//") {
             rest.find('\n').unwrap_or(rest.len())
-        } else if current.is_whitespace() {
+        } else if current.is_whitespace() || current == '\u{feff}' {
             whitespace_length(rest)
         } else if current.is_ascii_digit() {
             number_length(rest)
@@ -47,7 +47,7 @@ pub(super) fn tokenize(source: &str) -> Vec<Token<'_>> {
             TokenKind::Comment
         } else if rest.starts_with("\"") {
             TokenKind::Text
-        } else if current.is_whitespace() {
+        } else if current.is_whitespace() || current == '\u{feff}' {
             TokenKind::Whitespace
         } else if current.is_ascii_digit() {
             TokenKind::Number
@@ -90,7 +90,7 @@ fn string_length(rest: &str) -> usize {
 
 fn whitespace_length(rest: &str) -> usize {
     rest.char_indices()
-        .find(|(_, character)| !character.is_whitespace())
+        .find(|(_, character)| !character.is_whitespace() && *character != '\u{feff}')
         .map_or(rest.len(), |(index, _)| index)
 }
 
@@ -140,8 +140,7 @@ fn number_length(rest: &str) -> usize {
     offset
 }
 
-/// 每个 token 前后最近的非空白 token 索引。注释也算有效邻居，与文档工具的
-/// `previousSignificant` / `nextSignificant` 一致。
+/// 每个 token 前后最近的语法 token 索引，空白与注释都不影响语境判断。
 pub(super) struct Neighbors {
     previous: Vec<Option<usize>>,
     next: Vec<Option<usize>>,
@@ -153,7 +152,7 @@ impl Neighbors {
         let mut last = None;
         for (index, token) in tokens.iter().enumerate() {
             previous[index] = last;
-            if token.kind != TokenKind::Whitespace {
+            if !matches!(token.kind, TokenKind::Whitespace | TokenKind::Comment) {
                 last = Some(index);
             }
         }
@@ -161,7 +160,7 @@ impl Neighbors {
         let mut upcoming = None;
         for (index, token) in tokens.iter().enumerate().rev() {
             next[index] = upcoming;
-            if token.kind != TokenKind::Whitespace {
+            if !matches!(token.kind, TokenKind::Whitespace | TokenKind::Comment) {
                 upcoming = Some(index);
             }
         }

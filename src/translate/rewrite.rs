@@ -7,8 +7,8 @@
 //! 其余位置的词保持原样，宁可少翻，不可错翻用户标识符。
 //!
 //! 位置规则仍可能撞上用户标识符（物品名 `reward`、查询名 `players` 恰好也是
-//! 属性或枚举词），因此方法/属性/枚举值的改写统一经过 [`Rewriter::alias`]：
-//! 已声明的名字只允许关键词与函数属性两种改写。
+//! 属性或枚举词），因此可能是用户引用的位置通过 [`Rewriter::alias`] 保护名字。
+//! 已明确属于语法的方法、块成员与固定枚举参数通过 [`Rewriter::syntax_alias`] 翻译。
 //!
 //! `nbt { ... }` 与 `block_state("…") { ... }` 内部是数据而不是语言：前者是用户
 //! NBT（只翻译布尔字面量），后者是原版方块状态属性名与取值，整块保持原样。
@@ -17,6 +17,7 @@ use std::collections::HashSet;
 
 use super::KeywordLanguage;
 use super::context;
+use super::syntax::{self, Frame};
 use super::tables::Tables;
 use super::token::{Neighbors, Token, TokenKind, tokenize};
 
@@ -28,7 +29,7 @@ pub(super) fn translate(
 ) -> String {
     let tokens = tokenize(source);
     let neighbors = Neighbors::new(&tokens);
-    let frames = compute_frames(&tokens, &neighbors, tables);
+    let frames = syntax::frames(&tokens, &neighbors, tables, declared);
     let nbt = nbt_body_tokens(&tokens, tables);
     let block_states = block_state_body_tokens(&tokens, &neighbors, tables);
     let imports = import_name_tokens(&tokens, tables);
@@ -49,7 +50,13 @@ pub(super) fn translate(
         }
         // NBT 字面量内部只翻译布尔字面量，键名与字符串是用户数据。
         if nbt.contains(&index) {
-            match rewriter.alias(token.text, "boolean_word") {
+            let key = neighbors
+                .next(index)
+                .is_some_and(|next| matches!(tokens[next].text, "=" | ":"));
+            match (!key)
+                .then(|| rewriter.syntax_alias(token.text, "boolean_word"))
+                .flatten()
+            {
                 Some(boolean) => output.push_str(boolean),
                 None => output.push_str(token.text),
             }
@@ -77,10 +84,15 @@ struct Rewriter<'a> {
 }
 
 impl Rewriter<'_> {
-    fn alias(&self, word: &str, family: &str) -> Option<&str> {
+    fn alias<'a>(&'a self, word: &'a str, family: &str) -> Option<&'a str> {
         if self.declared.contains(word) {
             return None;
         }
+        self.tables.rewrite(word, family, self.language)
+    }
+
+    /// 明确的方法、块成员和固定枚举参数是语法，不受同拼写的用户声明影响。
+    fn syntax_alias<'a>(&'a self, word: &'a str, family: &str) -> Option<&'a str> {
         self.tables.rewrite(word, family, self.language)
     }
 
@@ -96,7 +108,7 @@ impl Rewriter<'_> {
 fn translate_word(
     tokens: &[Token],
     neighbors: &Neighbors,
-    frames: &[Option<String>],
+    frames: &[Frame],
     index: usize,
     rewriter: &Rewriter,
 ) -> Option<String> {
@@ -113,6 +125,21 @@ fn translate_word(
     if let Some(dot) = previous.filter(|dot| tokens[*dot].text == ".") {
         return chain_member(tokens, neighbors, dot, word, rewriter);
     }
+    if let Some(family) = frames[index].property_family
+        && previous.is_some_and(|previous| matches!(tokens[previous].text, "{" | ";" | "}"))
+        && let Some(property) = rewriter.syntax_alias(word, family)
+    {
+        return Some(property.to_owned());
+    }
+    if frames[index].execute_modifier {
+        return rewriter
+            .syntax_alias(word, "execute_clause")
+            .map(str::to_owned);
+    }
+    // 枚举位置优先于关键词：on(origin) 中的 origin 是“起源”，不是“投掷者”。
+    if let Some(value) = argument_value(&frames[index], word, rewriter) {
+        return Some(value);
+    }
     if next.is_some_and(|next| tokens[next].text == "=")
         && let Some(rewritten) = declaration_property(word, rewriter)
     {
@@ -124,9 +151,15 @@ fn translate_word(
         return Some(rewritten);
     }
     if let Some(equals) = previous.filter(|equals| tokens[*equals].text == "=")
-        && let Some(rewritten) = property_value(tokens, neighbors, equals, word, rewriter)
+        && let Some(rewritten) =
+            property_value(tokens, neighbors, equals, &frames[index], word, rewriter)
     {
         return Some(rewritten);
+    }
+    if let Some(frame) = frames[index].callee.as_deref()
+        && let Some(value) = frame_value(frame, word, rewriter)
+    {
+        return Some(value);
     }
 
     if let Some(keyword) = rewriter.keyword(word) {
@@ -139,11 +172,6 @@ fn translate_word(
         && next_to_number(tokens, neighbors, index)
     {
         return Some(unit.to_owned());
-    }
-    if let Some(frame) = frames[index].as_deref()
-        && frame != "{"
-    {
-        return frame_value(frame, word, rewriter);
     }
     None
 }
@@ -168,14 +196,27 @@ fn chain_member(
     let root_word = root.and_then(|root| rewriter.tables.canonical(tokens[root].text));
     if root_word.is_some_and(|root| context::COMMAND_RECEIVERS.contains(&root)) {
         return rewriter
-            .alias(word, "command_value")
-            .or_else(|| rewriter.alias(word, "ui_value"))
+            .syntax_alias(word, "command_value")
+            .or_else(|| rewriter.syntax_alias(word, "ui_value"))
             .or_else(|| rewriter.keyword(word))
             .map(str::to_owned);
     }
+    if root_word == Some("scoreboard") {
+        // scoreboard.objectives.modify.rendertype 的多节命令链使用 command_value。
+        let nested =
+            root != receiver || matches!(word, "objectives" | "目标集" | "players" | "玩家分数");
+        if nested {
+            let rewritten = if root == receiver {
+                rewriter.syntax_alias(word, "scoreboard_group")
+            } else {
+                rewriter.syntax_alias(word, "command_value")
+            };
+            return rewritten.map(str::to_owned);
+        }
+    }
     if let Some(receiver) = receiver
         && let Some(family) = rewriter.tables.receiver_family(tokens[receiver].text)
-        && let Some(rewritten) = rewriter.alias(word, family)
+        && let Some(rewritten) = rewriter.syntax_alias(word, family)
     {
         return Some(rewritten.to_owned());
     }
@@ -194,6 +235,9 @@ fn declaration_property(word: &str, rewriter: &Rewriter) -> Option<String> {
 /// （`count` 在物品属性里是“数量”，在表达式里是“计数”）。
 fn call_position(word: &str, rewriter: &Rewriter) -> Option<String> {
     let canonical = rewriter.tables.canonical(word);
+    if rewriter.tables.is_keyword(word, "function") {
+        return Some(rewriter.keyword(word).unwrap_or(word).to_owned());
+    }
     if canonical.is_some_and(|canonical| {
         context::COMMAND_CALLS.contains(&canonical)
             || context::COMMAND_RECEIVERS.contains(&canonical)
@@ -220,16 +264,61 @@ fn property_value(
     tokens: &[Token],
     neighbors: &Neighbors,
     equals: usize,
+    frame: &Frame,
     word: &str,
     rewriter: &Rewriter,
 ) -> Option<String> {
-    let property = neighbors
-        .previous(equals)
-        .and_then(|property| rewriter.tables.canonical(tokens[property].text))?;
+    let property_index = neighbors.previous(equals)?;
+    let property_word = tokens[property_index].text;
+    let property = rewriter.tables.canonical(property_word)?;
+    let syntax_property = frame.property_family.is_some_and(|family| {
+        rewriter
+            .tables
+            .canonical_in(property_word, family)
+            .is_some()
+    }) && neighbors
+        .previous(property_index)
+        .is_some_and(|previous| matches!(tokens[previous].text, "{" | ";" | "}"));
     context::property_value_families(property)
         .iter()
-        .find_map(|family| rewriter.alias(word, family))
+        .find_map(|family| {
+            if syntax_property {
+                rewriter.syntax_alias(word, family)
+            } else {
+                rewriter.alias(word, family)
+            }
+        })
         .map(str::to_owned)
+}
+
+/// 只在解析器要求枚举的实参位置绕过名字保护，其他实参继续当作用户引用。
+fn argument_value(frame: &Frame, word: &str, rewriter: &Rewriter) -> Option<String> {
+    let callee = frame.callee.as_deref()?;
+    if callee == "bossbar.get" && frame.argument == 1 {
+        return rewriter
+            .syntax_alias(word, "command_value")
+            .or_else(|| rewriter.syntax_alias(word, "ui_value"))
+            .map(str::to_owned);
+    }
+    let compute_kind_argument = if frame.compute_source.as_deref() == Some("default") {
+        1
+    } else {
+        2
+    };
+    let family = match (callee, frame.argument) {
+        ("on", 0) => "entity_relation",
+        ("store.result" | "store.success", 2) => "bossbar_field",
+        ("compute", 0) => "compute_source",
+        ("compute", argument) if argument == compute_kind_argument => "compute_kind",
+        ("scoreboard.operation", 2) => "score_operation",
+        ("scoreboard.objectives.modify.rendertype", 1) => "render_type",
+        ("scoreboard.objectives.modify.numberformat", 1) => "number_format_kind",
+        ("scoreboard.players.numberformat" | "scoreboard.players.display.numberformat", 2) => {
+            "number_format_kind"
+        }
+        _ => return None,
+    };
+    rewriter.syntax_alias(word, family).map(str::to_owned)
 }
 
 /// 调用实参里的枚举值：只在明确的取值位置翻译，避免命中同名标识符。
@@ -256,78 +345,6 @@ fn frame_value(frame: &str, word: &str, rewriter: &Rewriter) -> Option<String> {
         .iter()
         .find_map(|family| rewriter.alias(word, family))
         .map(str::to_owned)
-}
-
-/// 每个标识符所在的最近调用 / 代码块框架：`(` 记录规范化被调用名，`{` 记录
-/// `{`，用于把实参与关键词表里的同名标识符区分开。
-fn compute_frames(tokens: &[Token], neighbors: &Neighbors, tables: &Tables) -> Vec<Option<String>> {
-    let mut frames = vec![None; tokens.len()];
-    let mut stack: Vec<Option<String>> = Vec::new();
-    for (index, token) in tokens.iter().enumerate() {
-        match token.text {
-            "(" => stack.push(canonical_callee(tokens, neighbors, index, tables)),
-            ")" | "}" => {
-                stack.pop();
-            }
-            "{" => stack.push(Some("{".to_owned())),
-            _ => {}
-        }
-        frames[index] = stack.last().cloned().flatten();
-    }
-    frames
-}
-
-/// `sound.self`、`message.nearest`、`sort` 这类被调用的名字，统一成英文规范写法。
-fn canonical_callee(
-    tokens: &[Token],
-    neighbors: &Neighbors,
-    open: usize,
-    tables: &Tables,
-) -> Option<String> {
-    let method = neighbors.previous(open)?;
-    if tokens[method].kind != TokenKind::Ident {
-        return None;
-    }
-    let mut parts = vec![tokens[method].text];
-    let mut current = method;
-    while let Some(dot) = neighbors.previous(current) {
-        if tokens[dot].text != "." {
-            break;
-        }
-        let Some(receiver) = neighbors.previous(dot) else {
-            break;
-        };
-        if tokens[receiver].kind != TokenKind::Ident {
-            break;
-        }
-        parts.insert(0, tokens[receiver].text);
-        current = receiver;
-    }
-
-    let head: &str = parts.first()?;
-    let canonical_head = tables.canonical(head);
-    if canonical_head.is_some_and(|canonical| context::COMMAND_RECEIVERS.contains(&canonical)) {
-        let parts: Vec<String> = parts
-            .iter()
-            .map(|part| tables.canonical(part).unwrap_or(part).to_owned())
-            .collect();
-        return Some(parts.join("."));
-    }
-
-    let receiver = canonical_head.unwrap_or(head);
-    let Some(tail) = parts.get(1).copied() else {
-        return Some(receiver.to_owned());
-    };
-    let family = tables
-        .receiver_family(receiver)
-        .or_else(|| tables.receiver_family(head));
-    let canonical = family
-        .and_then(context::canonical_receiver)
-        .unwrap_or(receiver);
-    let method = family
-        .and_then(|family| tables.rewrite(tail, family, KeywordLanguage::English))
-        .unwrap_or_else(|| tables.canonical(tail).unwrap_or(tail));
-    Some(format!("{canonical}.{method}"))
 }
 
 /// `t`/`s`/`d` 前面是数字，或前面是逗号且逗号前面是数字（`time.set(6000, t)`）。

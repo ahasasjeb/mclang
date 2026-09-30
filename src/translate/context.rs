@@ -26,6 +26,8 @@ pub(super) const RECEIVER_FAMILIES: &[(&str, &str)] = &[
     ("schedule", "schedule_method"),
     ("advancement", "advancement_method"),
     ("store", "store_method"),
+    ("data", "data_method"),
+    ("item", "item_method"),
 ];
 
 /// 这些命令的参数按 `command_value`、`ui_value` 与文本颜色翻译。
@@ -94,6 +96,7 @@ pub(super) const PROPERTY_FAMILIES: &[&str] = &[
     "criterion_property",
     "reward_property",
     "display_property",
+    "text_style_property",
 ];
 
 /// 只在后面跟 `(` 时按函数名翻译的表：`facing(...)` 是 execute 子句，
@@ -132,10 +135,24 @@ pub(super) const PROPERTY_VALUE_CONTEXTS: &[(&str, &[&str])] = &[
     ("rarity", &["rarity_value"]),
     ("frame", &["advancement_frame"]),
     ("requirements", &["advancement_requirements"]),
+    ("number_format", &["number_format_kind"]),
+    ("render_type", &["render_type"]),
+    ("click", &["click_action"]),
 ];
 
 /// 不经过上下文表、由改写逻辑直接使用的表。
-const DIRECT_FAMILIES: &[&str] = &["command_value", "ui_value", "boolean_word", "time_unit"];
+const DIRECT_FAMILIES: &[&str] = &[
+    "command_value",
+    "ui_value",
+    "boolean_word",
+    "time_unit",
+    "score_operation",
+    "compute_source",
+    "compute_kind",
+    "number_format_kind",
+    "render_type",
+    "scoreboard_group",
+];
 
 pub(super) fn call_value_families(callee: &str) -> &'static [&'static str] {
     CALL_VALUE_CONTEXTS
@@ -166,12 +183,4 @@ pub(super) fn referenced_families() -> Vec<&'static str> {
     names.sort_unstable();
     names.dedup();
     names
-}
-
-/// 接收者方法表反查出的规范接收者，用于把中文接收者还原成英文。
-pub(super) fn canonical_receiver(family: &str) -> Option<&'static str> {
-    RECEIVER_FAMILIES
-        .iter()
-        .find(|(_, receiver_family)| *receiver_family == family)
-        .map(|(receiver, _)| *receiver)
 }
