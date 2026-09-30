@@ -5,7 +5,7 @@ use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
 
 use super::Parser;
-use super::keywords::{boolean_word, item_stack_property, rarity_value};
+use super::keywords::{item_stack_property, rarity_value};
 
 impl Parser {
     pub(super) fn item_stack(&mut self) -> Result<ItemStackDecl, Diagnostic> {
@@ -180,12 +180,7 @@ impl Parser {
                         return Err(Diagnostic::new("附魔光效覆盖只能声明一次", span));
                     }
                     self.expect(TokenKind::Equal, "enchantment_glint_override 后需要 `=`")?;
-                    let (value, value_span) = self.ident("true 或 false")?;
-                    enchantment_glint_override = Some(match boolean_word(&value) {
-                        Some("true") => true,
-                        Some("false") => false,
-                        _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
-                    });
+                    enchantment_glint_override = Some(self.boolean("true 或 false")?);
                     self.expect(TokenKind::Semicolon, "附魔光效覆盖后需要 `;`")?;
                 }
                 "unbreakable" => {
@@ -194,12 +189,7 @@ impl Parser {
                     }
                     has_unbreakable = true;
                     self.expect(TokenKind::Equal, "unbreakable 后需要 `=`")?;
-                    let (value, value_span) = self.ident("true 或 false")?;
-                    unbreakable = match boolean_word(&value) {
-                        Some("true") => true,
-                        Some("false") => false,
-                        _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
-                    };
+                    unbreakable = self.boolean("true 或 false")?;
                     self.expect(TokenKind::Semicolon, "unbreakable 后需要 `;`")?;
                 }
                 "custom_data" => {

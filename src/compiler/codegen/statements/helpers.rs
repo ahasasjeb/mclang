@@ -1,6 +1,7 @@
 use crate::ast::*;
 
 use crate::compiler::codegen::Compiler;
+use crate::compiler::codegen::Value;
 use crate::constant::constant_value;
 
 impl Compiler<'_> {
@@ -44,6 +45,26 @@ impl Compiler<'_> {
         path
     }
 }
+
+/// 把表达式求值结果写入目标计分项。
+pub(in crate::compiler::codegen) fn store_value(
+    compiler: &Compiler<'_>,
+    target: &str,
+    value: Value,
+    commands: &mut Vec<String>,
+) {
+    match value {
+        Value::Integer(value) => commands.push(format!(
+            "scoreboard players set {target} {} {value}",
+            compiler.objective
+        )),
+        Value::Score(source) => commands.push(format!(
+            "scoreboard players operation {target} {} = {source} {}",
+            compiler.objective, compiler.objective
+        )),
+    }
+}
+
 /// `for` 循环的上限：常量直接用 `matches ..N` 比较，否则用计分项。
 pub(super) enum LoopLimit {
     Constant(i32),

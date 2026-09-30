@@ -60,6 +60,15 @@ pub(super) fn valid_resource_location(value: &str) -> bool {
         && valid_resource_path(path)
 }
 
+/// 补全省略的 `minecraft:` 命名空间；已带命名空间的值原样返回。
+pub(super) fn canonical_resource_location(value: &str) -> String {
+    if value.contains(':') {
+        value.to_owned()
+    } else {
+        format!("minecraft:{value}")
+    }
+}
+
 pub(super) fn valid_nbt_path(path: &str) -> bool {
     crate::ast::NbtPath::parse(path).is_ok()
 }

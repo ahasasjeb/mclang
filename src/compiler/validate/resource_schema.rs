@@ -5,7 +5,7 @@ use serde_json::{Map, Value};
 use crate::ast::Span;
 use crate::diagnostic::Diagnostic;
 
-use super::rules::valid_resource_location;
+use super::rules::{canonical_resource_location as canonical_json_id, valid_resource_location};
 
 pub(super) fn validate_resource(
     kind: &str,
@@ -217,14 +217,6 @@ fn valid_item_id(id: &str) -> bool {
     valid_resource_location(&id)
         && id != "minecraft:air"
         && crate::version::snapshot::snapshot().registry_contains("item", &id) == Some(true)
-}
-
-fn canonical_json_id(id: &str) -> String {
-    if id.contains(':') {
-        id.to_owned()
-    } else {
-        format!("minecraft:{id}")
-    }
 }
 
 fn valid_json_id(id: &str) -> bool {

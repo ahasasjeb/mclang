@@ -238,14 +238,9 @@ pub fn build_file(
     options: &BuildOptions,
 ) -> Result<BuildResult, String> {
     let (pack, warnings) = prepare_pack(source_path, options)?;
-    let output_stats = OutputStats::of(&pack);
+    let result = build_result(output, &pack, warnings);
     write_pack(output, &pack)?;
-    Ok(BuildResult {
-        output: output.to_path_buf(),
-        file_count: pack.files.len() + pack.binary_files.len(),
-        warnings,
-        output_stats,
-    })
+    Ok(result)
 }
 
 /// Build a single-file ZIP rooted at `pack.mcmeta` and `data/`.
@@ -256,14 +251,18 @@ pub fn build_zip_file(
     options: &BuildOptions,
 ) -> Result<BuildResult, String> {
     let (pack, warnings) = prepare_pack(source_path, options)?;
-    let output_stats = OutputStats::of(&pack);
+    let result = build_result(output, &pack, warnings);
     archive::write_pack_zip(output, &pack)?;
-    Ok(BuildResult {
+    Ok(result)
+}
+
+fn build_result(output: &Path, pack: &CompiledPack, warnings: Vec<String>) -> BuildResult {
+    BuildResult {
         output: output.to_path_buf(),
         file_count: pack.files.len() + pack.binary_files.len(),
         warnings,
-        output_stats,
-    })
+        output_stats: OutputStats::of(pack),
+    }
 }
 
 fn prepare_pack(

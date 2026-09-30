@@ -589,7 +589,11 @@ pub(super) fn score_constant_clause(
     }
 }
 
-fn compare_integers(left: i32, comparison: Comparison, right: i32) -> bool {
+pub(in crate::compiler::codegen) fn compare_integers(
+    left: i32,
+    comparison: Comparison,
+    right: i32,
+) -> bool {
     match comparison {
         Comparison::Equal => left == right,
         Comparison::NotEqual => left != right,
@@ -600,7 +604,7 @@ fn compare_integers(left: i32, comparison: Comparison, right: i32) -> bool {
     }
 }
 
-pub(super) fn reverse_comparison(comparison: Comparison) -> Comparison {
+pub(in crate::compiler::codegen) fn reverse_comparison(comparison: Comparison) -> Comparison {
     match comparison {
         Comparison::Equal => Comparison::Equal,
         Comparison::NotEqual => Comparison::NotEqual,

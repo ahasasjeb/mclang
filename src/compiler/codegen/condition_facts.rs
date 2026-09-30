@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use crate::ast::{Comparison, Condition, ExprKind};
 use crate::constant::constant_value;
 
+use super::conditions::reverse_comparison;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum Truth {
     True,
@@ -235,17 +237,6 @@ pub(super) fn invert_comparison(comparison: Comparison) -> Comparison {
         Comparison::LessEqual => Comparison::Greater,
         Comparison::Greater => Comparison::LessEqual,
         Comparison::GreaterEqual => Comparison::Less,
-    }
-}
-
-fn reverse_comparison(comparison: Comparison) -> Comparison {
-    match comparison {
-        Comparison::Equal => Comparison::Equal,
-        Comparison::NotEqual => Comparison::NotEqual,
-        Comparison::Less => Comparison::Greater,
-        Comparison::LessEqual => Comparison::GreaterEqual,
-        Comparison::Greater => Comparison::Less,
-        Comparison::GreaterEqual => Comparison::LessEqual,
     }
 }
 

@@ -331,6 +331,16 @@ impl Parser {
         }
     }
 
+    /// `true`/`false` 字面量，中英文等价。
+    fn boolean(&mut self, label: &str) -> Result<bool, Diagnostic> {
+        let (value, span) = self.ident(label)?;
+        match keywords::boolean_word(&value) {
+            Some("true") => Ok(true),
+            Some("false") => Ok(false),
+            _ => Err(Diagnostic::new("这里需要 true 或 false", span)),
+        }
+    }
+
     fn message_argument(&mut self, label: &str) -> Result<MessageArgument, Diagnostic> {
         let (text, span) = self.string(&format!("{label}需要单行消息字符串"))?;
         Ok(MessageArgument { text, span })

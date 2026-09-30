@@ -3,7 +3,7 @@ use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
 
 use crate::parser::Parser;
-use crate::parser::keywords::{boolean_word, function_tag_property, resource_kind};
+use crate::parser::keywords::{function_tag_property, resource_kind};
 
 impl Parser {
     /// `fn_tag 名称 { value(函数或#标签); replace = 真; }`
@@ -40,12 +40,7 @@ impl Parser {
                         ));
                     }
                     self.expect(TokenKind::Equal, "replace 后需要 `=`")?;
-                    let (value, value_span) = self.ident("true 或 false")?;
-                    replace = match boolean_word(&value) {
-                        Some("true") => true,
-                        Some("false") => false,
-                        _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
-                    };
+                    replace = self.boolean("true 或 false")?;
                     self.expect(TokenKind::Semicolon, "replace 后需要 `;`")?;
                     replace_span = Some(property_span);
                 }

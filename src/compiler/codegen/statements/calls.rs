@@ -1,10 +1,12 @@
 use crate::ast::*;
 
+use super::helpers::store_value;
+use crate::compiler::codegen::Compiler;
+use crate::compiler::codegen::Value;
 use crate::compiler::codegen::emit::entity_query_selector;
 use crate::compiler::codegen::expressions::expression_may_modify_state;
 use crate::compiler::codegen::names::parameter_holder;
 use crate::compiler::codegen::world;
-use crate::compiler::codegen::{Compiler, Value};
 
 impl Compiler<'_> {
     #[allow(clippy::too_many_arguments)]
@@ -90,16 +92,7 @@ impl Compiler<'_> {
         let parameters = &self.function(function).parameters;
         for (parameter, value) in parameters.iter().zip(values) {
             let target = parameter_holder(function, &parameter.name);
-            match value {
-                Value::Integer(value) => commands.push(format!(
-                    "scoreboard players set {target} {} {value}",
-                    self.objective
-                )),
-                Value::Score(source) => commands.push(format!(
-                    "scoreboard players operation {target} {} = {source} {}",
-                    self.objective, self.objective
-                )),
-            }
+            store_value(self, &target, value, commands);
         }
     }
 
@@ -117,7 +110,7 @@ impl Compiler<'_> {
                 // Store observes the assignment, including a self-assignment
                 // and the successful copy after a failed RHS command.
                 let value = self.compile_expr(expression, owner, commands);
-                self.store_value(&target, value, commands);
+                store_value(self, &target, value, commands);
             } else {
                 self.compile_expr_into(expression, &target, owner, commands);
             }

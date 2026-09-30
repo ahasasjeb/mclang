@@ -1,10 +1,10 @@
 use crate::ast::*;
 
 use super::helpers::constant_condition;
+use crate::compiler::codegen::Compiler;
 use crate::compiler::codegen::emit::{entity_query_as_clause, entity_query_selector};
 use crate::compiler::codegen::names::user_objective_name;
 use crate::compiler::codegen::world;
-use crate::compiler::codegen::{Compiler, Value};
 
 impl Compiler<'_> {
     pub(super) fn compile_execute(
@@ -281,24 +281,6 @@ impl Compiler<'_> {
             data.kind.as_str(),
             data.scale.as_deref().unwrap_or("1")
         )
-    }
-    /// 把表达式求值结果写入目标计分项。
-    pub(in crate::compiler::codegen) fn store_value(
-        &self,
-        target: &str,
-        value: Value,
-        commands: &mut Vec<String>,
-    ) {
-        match value {
-            Value::Integer(value) => commands.push(format!(
-                "scoreboard players set {target} {} {value}",
-                self.objective
-            )),
-            Value::Score(source) => commands.push(format!(
-                "scoreboard players operation {target} {} = {source} {}",
-                self.objective, self.objective
-            )),
-        }
     }
 }
 #[derive(Default)]

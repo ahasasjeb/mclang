@@ -3,9 +3,7 @@ use crate::diagnostic::Diagnostic;
 use crate::lexer::TokenKind;
 
 use crate::parser::Parser;
-use crate::parser::keywords::{
-    boolean_word, effect_method, self_method, word_matches, xp_kind, xp_method,
-};
+use crate::parser::keywords::{effect_method, self_method, word_matches, xp_kind, xp_method};
 
 impl Parser {
     pub(super) fn give_statement(&mut self) -> Result<StatementKind, Diagnostic> {
@@ -80,12 +78,7 @@ impl Parser {
                 }
             }
             "set_invulnerable" | "set_no_gravity" => {
-                let (value, value_span) = self.ident("true 或 false")?;
-                let value = match boolean_word(&value) {
-                    Some("true") => true,
-                    Some("false") => false,
-                    _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
-                };
+                let value = self.boolean("true 或 false")?;
                 if method_kind == "set_invulnerable" {
                     SelfAction::SetInvulnerable(value)
                 } else {
@@ -181,12 +174,7 @@ impl Parser {
                 if self.take(&TokenKind::Comma).is_some() {
                     amplifier = Some(self.unsigned("effect 等级")?);
                     if self.take(&TokenKind::Comma).is_some() {
-                        let (value, value_span) = self.ident("true 或 false")?;
-                        hide_particles = match boolean_word(&value) {
-                            Some("true") => true,
-                            Some("false") => false,
-                            _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
-                        };
+                        hide_particles = self.boolean("true 或 false")?;
                     }
                 }
                 StatementKind::EffectGive {

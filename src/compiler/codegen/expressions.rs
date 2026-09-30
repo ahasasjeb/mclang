@@ -9,6 +9,7 @@ use super::Compiler;
 use super::Value;
 use super::emit::{entity_query_clause, entity_query_selector};
 use super::names::user_objective_name;
+use super::statements::helpers::store_value;
 use crate::constant::constant_value;
 
 impl Compiler<'_> {
@@ -22,14 +23,14 @@ impl Compiler<'_> {
         commands: &mut Vec<String>,
     ) {
         if let Some(value) = constant_value(expression) {
-            self.store_value(target, Value::Integer(value), commands);
+            store_value(self, target, Value::Integer(value), commands);
             return;
         }
         match &expression.kind {
             ExprKind::Score(name) => {
                 let source = self.variable_holder(owner, name);
                 if source != target {
-                    self.store_value(target, Value::Score(source), commands);
+                    store_value(self, target, Value::Score(source), commands);
                 }
             }
             ExprKind::Call {
@@ -56,11 +57,11 @@ impl Compiler<'_> {
                     return;
                 }
                 let value = self.compile_expr(expression, owner, commands);
-                self.store_value(target, value, commands);
+                store_value(self, target, value, commands);
             }
             _ => {
                 let value = self.compile_expr(expression, owner, commands);
-                self.store_value(target, value, commands);
+                store_value(self, target, value, commands);
             }
         }
     }

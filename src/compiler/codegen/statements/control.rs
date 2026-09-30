@@ -1,6 +1,7 @@
 use crate::ast::*;
 
 use crate::compiler::codegen::condition_facts::ScoreFacts;
+use crate::compiler::codegen::conditions::{compare_integers, reverse_comparison};
 use crate::compiler::codegen::dispatch::guard_commands;
 use crate::compiler::codegen::emit::entity_query_clause;
 use crate::compiler::codegen::world;
@@ -743,27 +744,5 @@ fn score_constant_condition(condition: &Condition) -> Option<(&str, Comparison, 
             constant_integer(left)?,
         )),
         _ => None,
-    }
-}
-
-fn reverse_comparison(comparison: Comparison) -> Comparison {
-    match comparison {
-        Comparison::Equal => Comparison::Equal,
-        Comparison::NotEqual => Comparison::NotEqual,
-        Comparison::Less => Comparison::Greater,
-        Comparison::LessEqual => Comparison::GreaterEqual,
-        Comparison::Greater => Comparison::Less,
-        Comparison::GreaterEqual => Comparison::LessEqual,
-    }
-}
-
-fn compare_integers(left: i32, comparison: Comparison, right: i32) -> bool {
-    match comparison {
-        Comparison::Equal => left == right,
-        Comparison::NotEqual => left != right,
-        Comparison::Less => left < right,
-        Comparison::LessEqual => left <= right,
-        Comparison::Greater => left > right,
-        Comparison::GreaterEqual => left >= right,
     }
 }

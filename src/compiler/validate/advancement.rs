@@ -13,7 +13,9 @@ use crate::diagnostic::Diagnostic;
 
 use super::ResourceSymbols;
 use super::Signature;
-use super::rules::{valid_resource_location, valid_resource_path, validate_identifier};
+use super::rules::{
+    canonical_resource_location, valid_resource_location, valid_resource_path, validate_identifier,
+};
 
 /// 26.3 `CriteriaTriggers` 注册的全部触发器名。
 ///
@@ -489,14 +491,6 @@ fn validate_loot_condition_reference(
             format!("`{label}` 需要资源引用字符串或带 `type` 的内联条件对象"),
             span,
         )),
-    }
-}
-
-fn canonical_resource_location(value: &str) -> String {
-    if value.contains(':') {
-        value.to_owned()
-    } else {
-        format!("minecraft:{value}")
     }
 }
 

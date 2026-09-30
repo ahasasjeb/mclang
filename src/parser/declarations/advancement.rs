@@ -4,8 +4,8 @@ use crate::lexer::TokenKind;
 
 use crate::parser::Parser;
 use crate::parser::keywords::{
-    advancement_frame, advancement_property, advancement_requirements, boolean_word,
-    criterion_property, display_property, reward_property,
+    advancement_frame, advancement_property, advancement_requirements, criterion_property,
+    display_property, reward_property,
 };
 
 impl Parser {
@@ -349,12 +349,7 @@ impl Parser {
                         ));
                     }
                     self.expect(TokenKind::Equal, &format!("{property} 后需要 `=`"))?;
-                    let (value, value_span) = self.ident("true 或 false")?;
-                    *slot = Some(match boolean_word(&value) {
-                        Some("true") => true,
-                        Some("false") => false,
-                        _ => return Err(Diagnostic::new("这里需要 true 或 false", value_span)),
-                    });
+                    *slot = Some(self.boolean("true 或 false")?);
                     self.expect(TokenKind::Semicolon, &format!("{property} 后需要 `;`"))?;
                 }
                 _ => unreachable!(),
