@@ -14,7 +14,7 @@ use super::text::{first_string, is_identifier_byte, paren_range};
 /// `.requires(...)`、`.redirect(...)` 调用。生成器只解析这一子集，
 /// 记录根命令、字面量子命令、参数类型与 `requires` 权限等级。
 pub fn generate_commands(root: &Path) -> Result<String, String> {
-    let mut extractor = Extractor::new(root);
+    let extractor = Extractor::new(root);
     let mut commands: BTreeMap<String, Value> = BTreeMap::new();
     let mut root_count = 0usize;
     for directory in [
@@ -47,7 +47,6 @@ pub fn generate_commands(root: &Path) -> Result<String, String> {
 
     let mut root_object = Map::new();
     root_object.insert("source".into(), json!(SOURCE_DIR));
-    root_object.insert("digest".into(), json!(extractor.finish()));
     root_object.insert("root_count".into(), json!(root_count));
     root_object.insert(
         "commands".into(),

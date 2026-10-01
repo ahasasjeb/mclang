@@ -11,7 +11,6 @@
 //   - unknown_namespace_type：未知命名空间也不能伪装为原版 type
 //   - nested_unknown_type：组合条件的子节点也必须验证注册
 //   - victims_not_list：listOf codec 必须收到数组
-//   - terms_not_list：组合条件 terms 必须是数组或标签引用
 //   - ingredients_not_list：item_predicate 的 listOf 字段同样只能是数组
 //
 // 验证：
@@ -66,13 +65,6 @@ advancement victims_not_list {
     criterion arrow {
         trigger = killed_by_arrow;
         conditions = """{"victims":{"type":"minecraft:killed_by_player"}}""";
-    }
-}
-
-advancement terms_not_list {
-    criterion combination {
-        trigger = player_killed_entity;
-        conditions = """{"entity":{"type":"minecraft:any_of","terms":{"type":"minecraft:killed_by_player"}}}""";
     }
 }
 

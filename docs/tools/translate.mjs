@@ -90,7 +90,7 @@ const PROPERTY_FAMILIES = [
 /** 只在后面跟 `(` 时按函数名翻译的表：`facing(...)` 是 execute 子句，
  * `facing = "south"` 却是方块状态属性，不能混用同一张表。 */
 const CALL_FAMILIES = ["execute_clause"];
-const COMMAND_RECEIVERS = new Set(["tag", "attribute", "ride", "rotate", "team", "waypoint", "datapack", "recipe", "loot", "random", "title", "bossbar", "dialog", "posteffect"]);
+const COMMAND_RECEIVERS = new Set(["test", "tag", "attribute", "ride", "rotate", "team", "waypoint", "datapack", "recipe", "loot", "random", "title", "bossbar", "dialog", "posteffect"]);
 const COMMAND_CALLS = new Set(["kill", "enchant", "damage", "spreadplayers", "spectate", "swing", "trigger", "gamemode", "defaultgamemode", "difficulty", "spawnpoint", "setworldspawn", "list", "reload", "teleport", "has", "equals", "matches", "particle", "stopsound", "msg", "teammsg"]);
 
 /** 表达式内建函数 `count(查询)`、`compute(...)`：关键词表优先于同名的声明属性
@@ -154,7 +154,6 @@ export function buildTranslator(data) {
   const tables = {
     ...data.tables,
     schedule_method: [{ en: "clear", zh: "清除" }],
-    scoreboard_group: [{ en: "objectives", zh: "目标集" }, { en: "players", zh: "玩家分数" }],
   };
   const keywords = data.keywords;
   const attributes = data.attributes;
@@ -250,8 +249,10 @@ export function buildTranslator(data) {
     return parts.map((part, index) => {
       if (index === 0) return root;
       let method;
-      if (root === "scoreboard" && (parts.length > 2 || ["objectives", "目标集", "players", "玩家分数"].includes(part))) {
-        method = rewrite(part, index === 1 ? "scoreboard_group" : "command_value", "en");
+      if (root === "scoreboard" && (parts.length > 2 || hasPair(part, "scoreboard_group") || rewrite(part, "ui_value", "en") === "players")) {
+        method = index === 1
+          ? rewrite(part, "scoreboard_group", "en") ?? rewrite(part, "ui_value", "en")
+          : rewrite(part, "command_value", "en");
       } else if (index === 1 && family) {
         method = rewrite(part, family, "en");
       }
@@ -420,8 +421,10 @@ export function buildTranslator(data) {
       if (COMMAND_RECEIVERS.has(canonicalWord(root?.text))) {
         return rewrite(word, "command_value", target) ?? rewrite(word, "ui_value", target) ?? lookupKeywords(word, target);
       }
-      if (canonicalWord(root?.text) === "scoreboard" && (root !== receiver || ["objectives", "目标集", "players", "玩家分数"].includes(word))) {
-        return rewrite(word, root === receiver ? "scoreboard_group" : "command_value", target);
+      if (canonicalWord(root?.text) === "scoreboard" && (root !== receiver || hasPair(word, "scoreboard_group") || rewrite(word, "ui_value", "en") === "players")) {
+        return root === receiver
+          ? rewrite(word, "scoreboard_group", target) ?? rewrite(word, "ui_value", target)
+          : rewrite(word, "command_value", target);
       }
       const family = receiver ? RECEIVER_FAMILIES[receiver.text] : undefined;
       if (family) {

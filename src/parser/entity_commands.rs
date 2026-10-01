@@ -185,7 +185,9 @@ impl Parser {
                     self.command_boolean()?
                 },
             },
-            _ => unreachable!("entity command dispatch"),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         self.expect(TokenKind::RightParen, "命令调用缺少 `)`")?;
         Ok(command)

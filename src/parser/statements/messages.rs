@@ -37,7 +37,9 @@ impl Parser {
                 let component = self.text_component_or_string("消息内容")?;
                 (MessageTarget::Query { name, name_span }, component)
             }
-            _ => unreachable!(),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         // 兼容旧写法：纯文本消息后面可以再跟一个颜色标识符。
         let component = if self.take(&TokenKind::Comma).is_some() {
@@ -224,7 +226,9 @@ impl Parser {
             "t" => 1.0,
             "s" => 20.0,
             "d" => 24000.0,
-            _ => unreachable!("time_unit 只返回 t、s、d"),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         // Java 的 Math.round 对负数同样向正无穷取半，`(x + 0.5).floor()` 与它一致。
         let ticks = (number * factor + 0.5).floor();

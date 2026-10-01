@@ -60,23 +60,28 @@ pub(crate) fn resolve(
             module_paths.insert(*index, Vec::new());
             continue;
         }
-        let (Some(directory), Some(path)) = (root_directory.as_deref(), sources.get(*index)) else {
+        let path = sources[*index];
+        let span = first_span(program);
+        let Some((directory, segments)) = root_directory.as_deref().and_then(|directory| {
+            module_segments(path, directory).map(|segments| (directory, segments))
+        }) else {
+            diagnostics.push(Diagnostic::new(
+                format!(
+                    "模块路径 `{}` 必须是项目根目录内的 .mcl 文件",
+                    path.display()
+                ),
+                span,
+            ));
             continue;
         };
-        let Some(segments) = module_segments(path, directory) else {
-            continue;
-        };
-        if segments.first().is_some_and(|segment| segment == "std")
-            && !crate::stdlib::is_virtual_path(path, directory)
-        {
+        let builtin = crate::stdlib::is_virtual_path(path, directory);
+        if segments.first().is_some_and(|segment| segment == "std") && !builtin {
             diagnostics.push(Diagnostic::new(
                 "项目不能定义 `std` 模块：这个路径保留给内置标准库",
-                first_span(program),
+                span,
             ));
         }
-        let builtin = crate::stdlib::is_virtual_path(path, directory);
         for segment in segments.iter().filter(|_| !builtin) {
-            let span = first_span(program);
             if segment.starts_with("__mcl") {
                 diagnostics.push(Diagnostic::new(
                     format!("模块路径分段 `{segment}` 不能以 `__mcl` 开头：这是编译器的内部前缀"),
@@ -98,6 +103,10 @@ pub(crate) fn resolve(
             }
         }
         module_paths.insert(*index, segments);
+    }
+
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
     }
 
     let mut by_module_path: HashMap<String, usize> = HashMap::new();
@@ -176,7 +185,7 @@ pub(crate) fn resolve(
     let mut exports_by_name: ExportsByName = BTreeMap::new();
     let mut scopes: BTreeMap<usize, Scope> = BTreeMap::new();
     for index in &reachable {
-        let segments = module_paths.get(index).cloned().unwrap_or_default();
+        let segments = module_paths[index].clone();
         let declarations: Vec<Declaration> = collect_declarations(&by_source[index])
             .into_iter()
             .map(|(role, name, exported, _)| Declaration {
@@ -468,5 +477,29 @@ fn bind_import(
         )),
         Some(_) => {}
         None => scope.insert(role, name.to_owned(), qualified.to_owned()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_module_paths_are_diagnostics_instead_of_root_module_fallbacks() {
+        let root =
+            crate::parser::parse(crate::lexer::lex("namespace audit; fn main() {}", 0).unwrap())
+                .unwrap();
+        let child = crate::parser::parse(
+            crate::lexer::lex("namespace audit; export fn helper() {}", 1).unwrap(),
+        )
+        .unwrap();
+        let paths = [
+            Path::new("project/main.mcl"),
+            Path::new("outside/helper.mcl"),
+        ];
+        let errors = resolve(vec![(0, root), (1, child)], &paths, 0).unwrap_err();
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("必须是项目根目录内的 .mcl 文件"));
+        assert_eq!(errors[0].span.source, 1);
     }
 }

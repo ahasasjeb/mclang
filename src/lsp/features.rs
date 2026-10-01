@@ -3,6 +3,7 @@
 //! 关键词与属性直接来自解析器的中英文关键词表，补全和悬停因此不会与语言定义脱节；
 //! 声明名称来自 [`crate::analysis`] 的符号表。
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde_json::{Value, json};
@@ -11,7 +12,7 @@ use crate::analysis::{SourceFile, Symbol, SymbolKind};
 use crate::lines::LineIndex;
 use crate::parser::keywords::{ATTRIBUTES, KEYWORDS};
 
-use super::convert::{path_to_uri, word_at};
+use super::convert::{clamp_boundary, path_to_uri, word_at};
 
 /// 每个关键词的一句话说明，悬停与补全文档使用；与 `KEYWORDS` 逐项对应。
 const KEYWORD_DOCS: &[(&str, &str)] = &[
@@ -281,9 +282,10 @@ pub fn hover(
     path: &Path,
     symbols: &[Symbol],
     sources: &[SourceFile],
+    indexes: &BTreeMap<std::path::PathBuf, LineIndex>,
 ) -> Option<Value> {
     let (word, start, end) = word_at(text, offset)?;
-    let range = range_json(text, start, end);
+    let range = range_json(text, start, end, &indexes[path]);
     if let Some(contents) = keyword_hover(&word) {
         return Some(json!({"contents": contents, "range": range}));
     }
@@ -295,8 +297,7 @@ pub fn hover(
         symbol.detail
     );
     if let Some(source) = sources.iter().find(|source| source.path == symbol.path) {
-        let (line, _) =
-            LineIndex::new(&source.text).utf16_position(&source.text, symbol.name_span.start);
+        let (line, _) = indexes[&source.path].utf16_position(&source.text, symbol.name_span.start);
         value.push_str(&format!(
             "\n\n定义：`{}:{}`",
             symbol.path.display(),
@@ -316,13 +317,14 @@ pub fn definition(
     path: &Path,
     symbols: &[Symbol],
     sources: &[SourceFile],
+    indexes: &BTreeMap<std::path::PathBuf, LineIndex>,
 ) -> Option<Value> {
     let (word, _, _) = word_at(text, offset)?;
     let symbol = find_symbol(symbols, &word, path, offset)?;
     let source = sources.iter().find(|source| source.path == symbol.path)?;
     Some(json!({
         "uri": path_to_uri(&symbol.path),
-        "range": range_json(&source.text, symbol.name_span.start, symbol.name_span.end),
+        "range": range_json(&source.text, symbol.name_span.start, symbol.name_span.end, &indexes[&source.path]),
     }))
 }
 
@@ -486,27 +488,43 @@ fn completion_kind(kind: SymbolKind) -> u8 {
 
 /// 光标前的标识符前缀及其起始偏移；`@`、`#`、`.` 等前缀字符不属于标识符。
 fn prefix_at(text: &str, offset: usize) -> (&str, usize) {
-    let mut start = offset.min(text.len());
-    while start > 0 {
-        let previous = match text[..start].chars().next_back() {
-            Some(character) => character,
-            None => break,
-        };
+    let offset = clamp_boundary(text, offset);
+    let mut start = offset;
+    while let Some(previous) = text[..start].chars().next_back() {
         if previous == '_' || previous.is_alphanumeric() {
             start -= previous.len_utf8();
         } else {
             break;
         }
     }
-    (&text[start..offset.min(text.len())], start)
+    (&text[start..offset], start)
 }
 
-fn range_json(text: &str, start: usize, end: usize) -> Value {
-    let index = LineIndex::new(text);
+fn range_json(text: &str, start: usize, end: usize, index: &LineIndex) -> Value {
     let (start_line, start_character) = index.utf16_position(text, start);
     let (end_line, end_character) = index.utf16_position(text, end);
     json!({
         "start": {"line": start_line, "character": start_character},
         "end": {"line": end_line, "character": end_character},
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn completion_and_word_scans_accept_every_byte_offset() {
+        for text in ["", "变量", "🚀.变量", "@实体\nabc"] {
+            for offset in 0..=text.len() + 3 {
+                let (prefix, start) = prefix_at(text, offset);
+                assert!(text.is_char_boundary(start));
+                assert!(text[..clamp_boundary(text, offset)].ends_with(prefix));
+                if let Some((word, start, end)) = word_at(text, offset) {
+                    assert_eq!(word, text[start..end]);
+                }
+                completion(text, offset, Path::new("main.mcl"), &[]);
+            }
+        }
+    }
 }

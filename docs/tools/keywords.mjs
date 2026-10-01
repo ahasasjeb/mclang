@@ -1,9 +1,9 @@
 // 文档数据源：直接从编译器源码提取关键词、别名与注册表，避免手抄出错。
 //
 // 提取三部分：
-// 1. `src/parser/keywords/` 的 `KEYWORDS` / `ATTRIBUTES` 常量；
+// 1. `src/parser/keywords/` 的 `KEYWORDS` 常量与 `attributes!` 属性表；
 // 2. 同一模块里全部 `"英文" | "中文" => ...` 形式的别名表（按函数分组）；
-// 3. `src/compiler/validate/world/` 的游戏规则表与 `rules.rs` 的资源类型表。
+// 3. 游戏规则表、实体 NBT 别名及注册表和进度触发器快照。
 //
 // 文档工具与编译器共用同一份数据后，关键词对照表不可能与实现脱节；
 // 示例翻译同样使用这些表，并由构建脚本调用真实编译器验证。
@@ -38,9 +38,9 @@ export async function loadKeywordTables(repoRoot) {
   const keywordsSource = await readRustModule(repoRoot, "src/parser/keywords");
   const worldSource = await readRustModule(repoRoot, "src/compiler/validate/world");
   const lspSource = await readRustModule(repoRoot, "src/lsp/features");
-  const advancementSource = await readRustModule(
-    repoRoot,
-    "src/compiler/validate/advancement",
+  const advancementSource = await readFile(
+    path.join(repoRoot, "data/version/26.3/advancement_triggers.json"),
+    "utf8",
   );
   const entityNbtSource = await readRustModule(repoRoot, "src/version/entity_nbt");
   const registriesSource = await readFile(
@@ -49,7 +49,7 @@ export async function loadKeywordTables(repoRoot) {
   );
 
   const keywords = parseConstantBlock(keywordsSource, "KEYWORDS");
-  const attributes = parseConstantBlock(keywordsSource, "ATTRIBUTES");
+  const attributes = parseAttributes(keywordsSource);
   const tables = parseAliasTables(keywordsSource);
   return {
     keywords,
@@ -94,12 +94,20 @@ function parseConstantBlock(source, name) {
   return pairs;
 }
 
+/** 属性的英文、中文与 AST 值共用 `attributes!` 调用表。 */
+function parseAttributes(source) {
+  const block = source.match(/attributes!\s*\{([^}]+)\}/);
+  if (!block) throw new Error("keywords.rs 中找不到 attributes! 属性表");
+  const pairs = [...block[1].matchAll(/\w+\s*=>\s*"([^"]+)",\s*"([^"]+)"\s*;/g)]
+    .map((match) => ({ en: match[1], zh: match[2] }));
+  if (pairs.length === 0) throw new Error("attributes! 没有解析出任何条目");
+  return pairs;
+}
+
 /** 解析别名函数：`"en" | "zh" => ...` 与 `matches!(value, "en" | "zh")`。 */
 function parseAliasTables(source) {
   // 常量块里没有别名对，先挖掉，避免把 Keyword 条目混进按函数分组的表。
-  const masked = source
-    .replace(/const KEYWORDS[\s\S]*?\n\];/, "")
-    .replace(/const ATTRIBUTES[\s\S]*?\n\];/, "");
+  const masked = source.replace(/const KEYWORDS[\s\S]*?\n\];/, "");
 
   const headers = [];
   const headerPattern = /^((?:pub(?:\([^)]*\))?\s+)?fn\s+([a-z_][a-z0-9_]*))/gm;
@@ -164,15 +172,14 @@ function parseRegistryKinds(source) {
   return [...kinds].sort();
 }
 
-/** 解析 26.3 进度触发器清单（`const TRIGGERS`，来自 CriteriaTriggers）。 */function parseAdvancementTriggers(source) {
-  const start = source.indexOf("const TRIGGERS");
-  const end = source.indexOf("\n];", start);
-  if (start < 0 || end < 0) throw new Error("advancement.rs 中找不到 TRIGGERS");
-  const triggers = [];
-  for (const match of source.slice(start, end).matchAll(/"([a-z0-9_]+)"/g)) {
-    triggers.push(match[1]);
+/** 读取编译器共用的 26.3 进度触发器快照。 */
+function parseAdvancementTriggers(source) {
+  const snapshot = JSON.parse(source);
+  if (!snapshot.triggers || Array.isArray(snapshot.triggers) || typeof snapshot.triggers !== "object") {
+    throw new Error("advancement_triggers.json 中找不到 triggers");
   }
-  if (triggers.length === 0) throw new Error("TRIGGERS 没有解析出任何触发器");
+  const triggers = Object.keys(snapshot.triggers).sort();
+  if (triggers.length === 0) throw new Error("triggers 没有任何触发器");
   return triggers;
 }
 

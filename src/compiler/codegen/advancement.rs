@@ -54,20 +54,17 @@ pub(super) fn advancement_json(
         AdvancementRequirements::All => advancement
             .criteria
             .iter()
-            .map(|criterion| vec![criterion.name.clone()])
+            .map(|criterion| Value::Array(vec![Value::String(criterion.name.clone())]))
             .collect(),
-        AdvancementRequirements::Any => vec![
+        AdvancementRequirements::Any => vec![Value::Array(
             advancement
                 .criteria
                 .iter()
-                .map(|criterion| criterion.name.clone())
+                .map(|criterion| Value::String(criterion.name.clone()))
                 .collect::<Vec<_>>(),
-        ],
+        )],
     };
-    root.insert(
-        "requirements".to_owned(),
-        serde_json::to_value(requirements).expect("criterion names serialize as strings"),
-    );
+    root.insert("requirements".to_owned(), Value::Array(requirements));
 
     if let Some(reward) = &advancement.reward {
         let mut object = Map::new();

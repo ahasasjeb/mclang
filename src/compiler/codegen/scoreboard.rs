@@ -93,10 +93,13 @@ impl Compiler<'_> {
             ScoreNumberFormat::Fixed(component) => {
                 format!(" fixed {}", self.component_json(component))
             }
-            ScoreNumberFormat::Styled(style) => format!(
-                " styled {}",
-                serde_json::from_str::<serde_json::Value>(style).expect("validated style JSON")
-            ),
+            ScoreNumberFormat::Styled(style) => format!(" styled {}", self.style_value(style)),
         }
+    }
+
+    pub(super) fn style_value(&self, style: &str) -> &serde_json::Value {
+        self.style_json[style]
+            .as_ref()
+            .expect("styled JSON 在语义检查时已解析为对象")
     }
 }

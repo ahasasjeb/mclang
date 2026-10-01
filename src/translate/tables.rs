@@ -46,11 +46,6 @@ fn build() -> Result<Tables, String> {
     // `schedule.clear` 的方法名在解析器里由 `word_matches("clear")` 判断，没有对应的
     // 规范化函数；补一张只含该方法的表（与文档工具的做法一致）。
     families.insert("schedule_method", Pairs::from_pairs(&[("clear", "清除")]));
-    // 计分板命令分组在解析器里直接匹配，没有独立规范化函数。
-    families.insert(
-        "scoreboard_group",
-        Pairs::from_pairs(&[("objectives", "目标集"), ("players", "玩家分数")]),
-    );
     for (name, _) in FAMILIES {
         let empty = families
             .get(name)
@@ -431,6 +426,9 @@ const FAMILIES: &[(&str, Probe)] = &[
     ("advancement_requirements", |word| {
         keywords::advancement_requirements(word).map(|value| format!("{value:?}"))
     }),
+    ("scoreboard_group", |word| {
+        keywords::scoreboard_group(word).map(str::to_owned)
+    }),
     ("command_value", |word| {
         keywords::command_value(word).map(str::to_owned)
     }),
@@ -467,45 +465,24 @@ fn candidate_words() -> Vec<String> {
     words
 }
 
-/// 提取源码中的字符串字面量内容（跳过行注释，处理 `\\` 转义）。
+/// 关键词源码只使用无转义的普通字符串；新增其它字面量形式时必须更新提取规则。
 fn string_literals(source: &str) -> Vec<String> {
-    let chars: Vec<char> = source.chars().collect();
-    let mut words = Vec::new();
-    let mut index = 0;
-    while index < chars.len() {
-        if chars[index] == '/' && chars.get(index + 1) == Some(&'/') {
-            while index < chars.len() && chars[index] != '\n' {
-                index += 1;
-            }
-            continue;
-        }
-        if chars[index] != '"' {
-            index += 1;
-            continue;
-        }
-        index += 1;
-        let mut literal = String::new();
-        while index < chars.len() && chars[index] != '"' {
-            if chars[index] == '\\' {
-                index += 1;
-                if let Some(escaped) = chars.get(index) {
-                    literal.push(*escaped);
-                }
-            } else {
-                literal.push(chars[index]);
-            }
-            index += 1;
-        }
-        if index < chars.len() {
-            index += 1;
-        }
-        if !literal.is_empty() {
-            words.push(literal);
-        }
-    }
-    words
+    assert!(!source.contains('\\'), "关键词源码不能包含转义字符串");
+    assert!(
+        source.lines().all(|line| {
+            line.split_once("//")
+                .is_none_or(|(_, comment)| !comment.contains('"'))
+        }),
+        "关键词源码的行注释不能包含引号"
+    );
+    source
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
-
 fn is_ascii_word(word: &str) -> bool {
     !word.is_empty()
         && word

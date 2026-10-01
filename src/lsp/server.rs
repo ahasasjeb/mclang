@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use crate::analysis::{FileDiagnostic, ProjectAnalysis, SourceFile};
 use crate::lines::LineIndex;
 
-use super::convert::{offset_to_position_in, position_to_offset, uri_to_path};
+use super::convert::{offset_to_position_in, position_to_offset_in, uri_to_path};
 pub use transport::serve;
 
 /// 单个工作区最多分析的文件数，避免误把大目录当成项目。
@@ -23,6 +23,7 @@ struct Project {
     key: (PathBuf, Option<String>),
     sources: Vec<SourceFile>,
     analysis: ProjectAnalysis,
+    indexes: BTreeMap<PathBuf, LineIndex>,
 }
 
 /// 由发现到的源文件构建的项目查找索引；文件发现失效前可跨刷新复用。
@@ -105,7 +106,7 @@ fn extract_namespace(text: &str) -> Option<String> {
     None
 }
 
-fn document_offset(text: &str, params: &Value) -> usize {
+fn document_offset(text: &str, params: &Value, index: &LineIndex) -> usize {
     let line = params
         .get("position")
         .and_then(|position| position.get("line"))
@@ -116,7 +117,7 @@ fn document_offset(text: &str, params: &Value) -> usize {
         .and_then(|position| position.get("character"))
         .and_then(Value::as_u64)
         .unwrap_or(0) as u32;
-    position_to_offset(text, line, character)
+    position_to_offset_in(text, line, character, index)
 }
 
 fn workspace_roots(params: &Value) -> Vec<PathBuf> {
@@ -142,9 +143,8 @@ fn folder_path(folder: &Value) -> Option<PathBuf> {
 }
 
 fn diagnostic_json(text: &str, index: &LineIndex, diagnostic: &FileDiagnostic) -> Value {
-    let (start_line, start_character) =
-        offset_to_position_in(text, diagnostic.span.start, Some(index));
-    let (end_line, end_character) = offset_to_position_in(text, diagnostic.span.end, Some(index));
+    let (start_line, start_character) = offset_to_position_in(text, diagnostic.span.start, index);
+    let (end_line, end_character) = offset_to_position_in(text, diagnostic.span.end, index);
     json!({
         "range": {
             "start": {"line": start_line, "character": start_character},
@@ -175,3 +175,46 @@ fn absolute(path: &Path) -> PathBuf {
 mod dispatch;
 mod lifecycle;
 mod transport;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lsp::convert::path_to_uri;
+
+    #[test]
+    fn document_changes_replace_cached_indexes_used_by_hover_and_definition() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("target/lsp-index-regression/main.mcl");
+        let uri = path_to_uri(&path);
+        let mut session = Session::default();
+        session.handle(&json!({"id": 1, "method": "initialize", "params": {}}));
+        let first = "namespace audit;\nscore 变量 = 1;\nfn main() { 变量 += 1; }";
+        session.handle(&json!({"method": "textDocument/didOpen", "params": {
+            "textDocument": {"uri": uri, "text": first}
+        }}));
+        let updated =
+            "// 🚀 中文注释\n\nnamespace audit;\nscore 变量 = 1;\nfn main() { 变量 += 1; }";
+        session.handle(&json!({"method": "textDocument/didChange", "params": {
+            "textDocument": {"uri": uri}, "contentChanges": [{"text": updated}]
+        }}));
+        for (id, method) in [(2, "textDocument/hover"), (3, "textDocument/definition")] {
+            let (response, _) = session.handle(&json!({"id": id, "method": method, "params": {
+                "textDocument": {"uri": uri}, "position": {"line": 4, "character": 14}
+            }}));
+            let result = response.unwrap()["result"].clone();
+            assert!(!result.is_null(), "{method}: {result}");
+            if method.ends_with("hover") {
+                assert_eq!(result["range"]["start"]["line"], 4);
+                assert!(
+                    result["contents"]["value"]
+                        .as_str()
+                        .unwrap()
+                        .contains("main.mcl:4")
+                );
+            } else {
+                assert_eq!(result["range"]["start"]["line"], 3);
+                assert_eq!(result["range"]["start"]["character"], 6);
+            }
+        }
+    }
+}

@@ -142,6 +142,7 @@ pub(super) fn validate_function_bodies(
         collect_local_declarations(&function.body, local_scores, &parameters, diagnostics);
         let mut visible_locals = HashSet::new();
         let symbols = StatementSymbols {
+            style_json: &declarations.style_json,
             function_declarations: &function_declarations,
             loot_tables: &loot_tables,
             recipes: &recipes,

@@ -405,14 +405,12 @@ impl Compiler<'_> {
                 let right_value = self.compile_expr(right, owner, commands);
                 // Compiler temporaries have unique names within a build. The
                 // right operand cannot refer to one from source code.
-                let reuse = matches!(&left_value, Value::Score(score) if score.starts_with("#t"));
-                let target = if reuse {
-                    match &left_value {
-                        Value::Score(score) => score.clone(),
-                        _ => unreachable!(),
-                    }
+                let (target, reuse) = if let Value::Score(score) = &left_value
+                    && score.starts_with("#t")
+                {
+                    (score.clone(), true)
                 } else {
-                    self.temporary()
+                    (self.temporary(), false)
                 };
                 if !reuse {
                     match left_value {

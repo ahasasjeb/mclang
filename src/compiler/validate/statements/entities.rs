@@ -235,13 +235,21 @@ pub(in crate::compiler::validate) fn validate_score_target(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    validate_score_objective(target, ctx, diagnostics);
+    validate_holder(&target.holder, span, ctx, diagnostics);
+}
+
+pub(super) fn validate_score_objective(
+    target: &ScoreTarget,
+    ctx: ValidationContext<'_, '_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     if !ctx.symbols.objectives.contains(target.objective.as_str()) {
         diagnostics.push(Diagnostic::new(
             format!("找不到计分板目标 `{}`", target.objective),
             target.objective_span,
         ));
     }
-    validate_holder(&target.holder, span, ctx, diagnostics);
 }
 
 /// 持有者引用：`self`/`origin` 需要实体上下文，查询必须已声明。

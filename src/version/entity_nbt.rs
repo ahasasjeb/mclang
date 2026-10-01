@@ -29,7 +29,8 @@ use registry::{
 use scan::{ClassInfo, SharedTags, collect_method_tags, collect_tags, scan_classes};
 
 /// 具名 NBT 标签的期望粗类型；`Any` 表示无法从源码判定。
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EntityTagType {
     /// `putBoolean` / `getBooleanOr`。
     Bool,
@@ -67,22 +68,6 @@ impl EntityTagType {
             Self::IntArray => "int_array",
             Self::Any => "any",
         }
-    }
-
-    fn parse(value: &str) -> Option<Self> {
-        Some(match value {
-            "bool" => Self::Bool,
-            "number" => Self::Number,
-            "string" => Self::String,
-            "component" => Self::Component,
-            "list" => Self::List,
-            "numeric_list" => Self::NumericList,
-            "string_list" => Self::StringList,
-            "compound" => Self::Compound,
-            "int_array" => Self::IntArray,
-            "any" => Self::Any,
-            _ => return None,
-        })
     }
 
     /// 人类可读的期望说明，用于诊断。
@@ -249,6 +234,7 @@ fn is_identifier(character: char) -> bool {
 }
 
 /// 运行时标签目录：解析随附快照。
+#[derive(serde::Deserialize)]
 pub struct EntityNbtCatalog {
     tags: BTreeMap<String, EntityTagType>,
     entities: HashMap<String, HashSet<String>>,
@@ -259,41 +245,26 @@ static CATALOG: OnceLock<EntityNbtCatalog> = OnceLock::new();
 /// 进程内共享的实体 NBT 标签目录。
 pub fn catalog() -> &'static EntityNbtCatalog {
     CATALOG.get_or_init(|| {
-        let text = include_str!("../../data/version/26.3/entity_nbt.json");
-        EntityNbtCatalog::from_json(text)
-            .expect("data/version/26.3/entity_nbt.json 必须是有效的实体 NBT 快照")
+        EntityNbtCatalog::from_json(include_str!("../../data/version/26.3/entity_nbt.json"))
     })
 }
 
 impl EntityNbtCatalog {
-    fn from_json(text: &str) -> Result<Self, String> {
-        let root: serde_json::Value =
-            serde_json::from_str(text).map_err(|error| format!("快照 JSON 无效：{error}"))?;
-        let mut tags = BTreeMap::new();
-        if let Some(object) = root.get("tags").and_then(serde_json::Value::as_object) {
-            for (key, value) in object {
-                let Some(category) = value.as_str().and_then(EntityTagType::parse) else {
-                    return Err(format!("标签 `{key}` 的类型无法识别"));
-                };
-                tags.insert(key.clone(), category);
-            }
-        }
-        let mut entities = HashMap::new();
-        if let Some(object) = root.get("entities").and_then(serde_json::Value::as_object) {
-            for (id, value) in object {
-                let keys = value
-                    .as_array()
-                    .ok_or_else(|| format!("实体 `{id}` 的标签表必须是数组"))?
-                    .iter()
-                    .filter_map(|key| key.as_str().map(str::to_owned))
-                    .collect::<HashSet<_>>();
-                let normalized = id.strip_prefix("minecraft:").unwrap_or(id);
-                entities.insert(normalized.to_owned(), keys);
-            }
-        }
-        Ok(Self { tags, entities })
+    fn from_json(text: &str) -> Self {
+        let mut catalog: Self =
+            serde_json::from_str(text).expect("entity_nbt.json 必须符合实体 NBT 快照结构");
+        catalog.entities = catalog
+            .entities
+            .into_iter()
+            .map(|(id, keys)| {
+                (
+                    id.strip_prefix("minecraft:").unwrap_or(&id).to_owned(),
+                    keys,
+                )
+            })
+            .collect();
+        catalog
     }
-
     /// 某个实体类型允许的标签；未知类型返回 `None`。
     pub fn entity_tags(&self, entity_type: &str) -> Option<&HashSet<String>> {
         let normalized = entity_type
@@ -317,12 +288,7 @@ impl EntityNbtCatalog {
     /// 候选同时考虑英文键与可用中文别名：`NoAi` → `` `NoAI` ``，
     /// `无ai` → `` `无AI`（英文 `NoAI`） ``。
     pub fn suggest(&self, key: &str, allowed: Option<&HashSet<String>>) -> Option<String> {
-        let allowed = allowed.cloned();
-        let accepts = |candidate: &str| {
-            allowed
-                .as_ref()
-                .is_none_or(|allowed| allowed.contains(candidate))
-        };
+        let accepts = |candidate: &str| allowed.is_none_or(|allowed| allowed.contains(candidate));
         let mut best: Option<(usize, String)> = None;
         for candidate in self.tags.keys().filter(|candidate| accepts(candidate)) {
             let distance = edit_distance(&fold(key), &fold(candidate));
@@ -377,4 +343,35 @@ fn edit_distance(left: &str, right: &str) -> usize {
         previous = current;
     }
     previous[right.len()]
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+
+    #[test]
+    fn missing_fields_and_unknown_tag_types_do_not_create_empty_catalogs() {
+        for text in [
+            "{}",
+            r#"{"tags":{"Health":"unknown"},"entities":{}}"#,
+            r#"{"tags":{},"entities":{"minecraft:pig":[12]}}"#,
+        ] {
+            assert!(serde_json::from_str::<EntityNbtCatalog>(text).is_err());
+        }
+        for kind in [
+            EntityTagType::Bool,
+            EntityTagType::Number,
+            EntityTagType::String,
+            EntityTagType::Component,
+            EntityTagType::List,
+            EntityTagType::NumericList,
+            EntityTagType::StringList,
+            EntityTagType::Compound,
+            EntityTagType::IntArray,
+            EntityTagType::Any,
+        ] {
+            let text = serde_json::to_string(kind.as_str()).unwrap();
+            assert_eq!(serde_json::from_str::<EntityTagType>(&text).unwrap(), kind);
+        }
+    }
 }

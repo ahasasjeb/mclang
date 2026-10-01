@@ -44,22 +44,12 @@ pub(super) fn item_predicate_text(predicate: &crate::ast::ItemPredicate) -> Stri
 
 pub(super) fn entity_query_selector(query: &EntityQueryDecl) -> String {
     let mut selector = Vec::new();
-    let base_is_tag = if let Some(tag) = query.entity_type.strip_prefix('#') {
-        selector.push(format!("type=#{tag}"));
-        true
-    } else {
-        selector.push(format!("type={}", query.entity_type));
-        false
-    };
-    // A concrete positive type makes Brigadier reject every following `type=`
-    // option. Validation diagnoses that source shape; keep formatting defensive
-    // so only tag-based queries can emit the legal repeated exclusions.
-    if base_is_tag {
-        for filter in &query.type_filters {
-            match filter {
-                EntityTypeFilter::Include(value, _) => selector.push(format!("type={value}")),
-                EntityTypeFilter::Exclude(value, _) => selector.push(format!("type=!{value}")),
-            }
+    selector.push(format!("type={}", query.entity_type));
+    // Validation allows repeated exclusions only after a tag base type:
+    // Brigadier rejects every type option after a concrete positive type.
+    for filter in &query.type_filters {
+        if let EntityTypeFilter::Exclude(value, _) = filter {
+            selector.push(format!("type=!{value}"));
         }
     }
     selector.extend(query.tags.iter().map(|tag| format!("tag={tag}")));

@@ -48,11 +48,6 @@ impl LineIndex {
         self.starts.get(line).copied().unwrap_or(self.len)
     }
 
-    /// 已知行数（源码末尾的换行不额外计一行）。
-    pub fn starts_len(&self) -> usize {
-        self.starts.len()
-    }
-
     /// 0 起始的行号与字符计列（CLI 用）。
     pub fn character_position(&self, text: &str, offset: usize) -> (usize, usize) {
         let offset = self.clamp(text, offset);

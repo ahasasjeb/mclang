@@ -44,6 +44,7 @@ pub(super) fn collect_scores<'a>(
 /// 收集用户计分板目标，并检查名称与内部目标不冲突。
 pub(super) fn collect_objectives<'a>(
     program: &'a Program,
+    style_json: &crate::compiler::types::StyleCache,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> HashSet<&'a str> {
     let mut objectives = HashSet::new();
@@ -92,7 +93,7 @@ pub(super) fn collect_objectives<'a>(
             validate_objective_component(component, diagnostics);
         }
         if let Some(NumberFormat::Styled(style)) = &objective.number_format
-            && !serde_json::from_str::<serde_json::Value>(style).is_ok_and(|v| v.is_object())
+            && !super::scoreboard::parse_style(style, style_json)
         {
             diagnostics.push(Diagnostic::new("styled 需要 JSON 样式对象", objective.span));
         }

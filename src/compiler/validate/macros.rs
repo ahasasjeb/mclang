@@ -54,9 +54,10 @@ pub(super) fn validate_macro_call(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     if let MacroArguments::With { source, path } = arguments {
-        super::components::validate_nbt_source(source, span, ctx, diagnostics);
         if let NbtComponentSource::Entity(holder) = source {
             super::entity_commands::entity_target(holder, true, false, span, ctx, diagnostics);
+        } else {
+            super::components::validate_nbt_source(source, span, ctx, diagnostics);
         }
         if let Some((path, span)) = path
             && !super::components::valid_nbt_component_path(path)

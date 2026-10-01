@@ -27,7 +27,7 @@ impl Session {
                 let Some((path, text, project)) = self.request_document(params) else {
                     return response(id, Value::Null);
                 };
-                let offset = document_offset(text, params);
+                let offset = document_offset(text, params, &project.indexes[&path]);
                 response(
                     id,
                     features::completion(text, offset, &path, &project.analysis.symbols),
@@ -37,13 +37,14 @@ impl Session {
                 let Some((path, text, project)) = self.request_document(params) else {
                     return response(id, Value::Null);
                 };
-                let offset = document_offset(text, params);
+                let offset = document_offset(text, params, &project.indexes[&path]);
                 let hover = features::hover(
                     text,
                     offset,
                     &path,
                     &project.analysis.symbols,
                     &project.sources,
+                    &project.indexes,
                 );
                 response(id, hover.unwrap_or(Value::Null))
             }
@@ -51,13 +52,14 @@ impl Session {
                 let Some((path, text, project)) = self.request_document(params) else {
                     return response(id, Value::Null);
                 };
-                let offset = document_offset(text, params);
+                let offset = document_offset(text, params, &project.indexes[&path]);
                 let definition = features::definition(
                     text,
                     offset,
                     &path,
                     &project.analysis.symbols,
                     &project.sources,
+                    &project.indexes,
                 );
                 response(id, definition.unwrap_or(Value::Null))
             }

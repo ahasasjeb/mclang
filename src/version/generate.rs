@@ -1,8 +1,8 @@
 //! 版本数据生成：从仓库内的 Minecraft 源码提取可复现快照。
 //!
 //! 生成逻辑只做保守的文本提取：识别稳定出现的注册调用与数据包目录，
-//! 输出排序后的 JSON，并把全部输入的 FNV-1a 摘要写入 `digest` 字段，
-//! 便于 `cargo xtask check-version-data` 校验随附快照与源码一致。
+//! 输出排序后的 JSON；`cargo xtask check-version-data` 重新生成并逐字节
+//! 比对全文，校验随附快照与源码一致。
 //!
 //! 产物位于 `data/version/<版本>/`：
 //!

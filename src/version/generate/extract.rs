@@ -57,7 +57,6 @@ pub(super) fn data_kinds(root: &Path) -> Result<Vec<(String, PathBuf, &'static s
 
 /// 递归列出目录下的资源 id（相对路径去掉扩展名）。
 pub(super) fn scan_resource_ids(
-    extractor: &mut Extractor<'_>,
     directory: &Path,
     extension: &str,
 ) -> Result<BTreeSet<String>, String> {
@@ -74,7 +73,6 @@ pub(super) fn scan_resource_ids(
                     .to_string_lossy()
                     .replace('\\', "/");
                 let id = relative[..relative.len() - extension.len() - 1].to_string();
-                extractor.digest_path(&entry);
                 ids.insert(id);
             }
         }
@@ -83,10 +81,7 @@ pub(super) fn scan_resource_ids(
 }
 
 /// 扫描 `data/minecraft/tags`，返回含文件的注册表目录清单。
-pub(super) fn scan_tag_registries(
-    extractor: &mut Extractor<'_>,
-    root: &Path,
-) -> Result<Vec<String>, String> {
+pub(super) fn scan_tag_registries(root: &Path) -> Result<Vec<String>, String> {
     let tags = root.join("data/minecraft/tags");
     let mut found = BTreeSet::new();
     let mut stack = vec![tags.clone()];
@@ -97,7 +92,6 @@ pub(super) fn scan_tag_registries(
                 stack.push(entry);
             } else if entry.extension().and_then(|value| value.to_str()) == Some("json") {
                 has_json = true;
-                extractor.digest_path(&entry);
             }
         }
         if has_json {
@@ -130,43 +124,27 @@ impl Slots {
     }
 }
 
-/// 读取源码并按文件内容累计摘要。
+/// 读取随附源码并提取注册项。
 pub(super) struct Extractor<'a> {
     root: &'a Path,
-    digest: u64,
 }
 
 impl<'a> Extractor<'a> {
     pub(super) fn new(root: &'a Path) -> Self {
-        Self {
-            root,
-            digest: FNV_OFFSET,
-        }
+        Self { root }
     }
 
-    pub(super) fn read(&mut self, relative: &str) -> Result<String, String> {
+    pub(super) fn read(&self, relative: &str) -> Result<String, String> {
         let path = self.root.join(relative);
         let text = fs::read_to_string(&path)
             .map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
-        self.digest = fnv_update(self.digest, relative.as_bytes());
-        self.digest = fnv_update(self.digest, text.as_bytes());
         Ok(text)
     }
 
-    pub(super) fn digest_path(&mut self, path: &Path) {
-        let relative = path.strip_prefix(self.root).unwrap_or(path);
-        let text = relative.to_string_lossy().replace('\\', "/");
-        self.digest = fnv_update(self.digest, text.as_bytes());
-    }
-
     /// 读取源码并提取 `call("id")` 形式的 id。
-    pub(super) fn read_ids(&mut self, relative: &str, call: &str) -> Result<Vec<String>, String> {
+    pub(super) fn read_ids(&self, relative: &str, call: &str) -> Result<Vec<String>, String> {
         let text = self.read(relative)?;
         Ok(string_args_in_calls(&text, call).into_iter().collect())
-    }
-
-    pub(super) fn finish(&self) -> String {
-        format!("fnv1a64:{:016x}", self.digest)
     }
 }
 
@@ -207,17 +185,6 @@ pub(super) const COPPER_PREFIXES: [&str; 8] = [
     "waxed_weathered_",
     "waxed_oxidized_",
 ];
-
-const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
-
-pub(super) fn fnv_update(mut hash: u64, bytes: &[u8]) -> u64 {
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-    hash
-}
 
 /// 构造稳定的两空格缩进 JSON。
 pub(super) fn render_json(value: &Value) -> Result<String, String> {

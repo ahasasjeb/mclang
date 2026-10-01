@@ -9,7 +9,7 @@ use super::text::{enum_literals, first_string, matching_paren};
 
 /// 提取 `enums.json`。
 pub fn generate_enums(root: &Path) -> Result<String, String> {
-    let mut extractor = Extractor::new(root);
+    let extractor = Extractor::new(root);
     let mut enums: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
     enums.insert(
@@ -88,7 +88,6 @@ pub fn generate_enums(root: &Path) -> Result<String, String> {
 
     let mut root_object = Map::new();
     root_object.insert("source".into(), json!(SOURCE_DIR));
-    root_object.insert("digest".into(), json!(extractor.finish()));
     root_object.insert(
         "enums".into(),
         serde_json::to_value(&enums).map_err(|error| error.to_string())?,

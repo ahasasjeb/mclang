@@ -64,7 +64,13 @@ impl Session {
                 && cached.sources == project.sources
             {
                 project.analysis = cached.analysis;
+                project.indexes = cached.indexes;
             } else {
+                project.indexes = project
+                    .sources
+                    .iter()
+                    .map(|source| (source.path.clone(), LineIndex::new(&source.text)))
+                    .collect();
                 project.analysis = analyze(&project.sources);
             }
         }
@@ -156,6 +162,7 @@ impl Session {
                         .map(|(path, text)| SourceFile { path, text })
                         .collect(),
                     analysis: ProjectAnalysis::default(),
+                    indexes: BTreeMap::new(),
                 }
             })
             .collect()
@@ -333,14 +340,11 @@ impl Session {
                 .map(|source| (source.path.as_path(), source))
                 .collect();
             // 同一文件的所有诊断共用一个行首索引，避免按诊断数重扫源码前缀。
-            let mut indexes: HashMap<&Path, LineIndex> = HashMap::new();
             for diagnostic in &project.analysis.diagnostics {
                 let Some(source) = sources.get(diagnostic.path.as_path()) else {
                     continue;
                 };
-                let index = indexes
-                    .entry(diagnostic.path.as_path())
-                    .or_insert_with(|| LineIndex::new(&source.text));
+                let index = &project.indexes[&source.path];
                 grouped
                     .entry(diagnostic.path.clone())
                     .or_default()

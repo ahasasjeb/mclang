@@ -73,6 +73,8 @@ pub(crate) fn command_value(value: &str) -> Option<&'static str> {
         "collision_rule" | "碰撞规则" => Some("collision_rule"),
         "always" | "总是" => Some("always"),
         "never" | "从不" => Some("never"),
+        "run" | "运行测试" => Some("run"),
+        "stop" | "停止测试" => Some("stop"),
         "runmultiple" | "运行多份" => Some("runmultiple"),
         "runthese" | "运行附近" => Some("runthese"),
         "runclosest" | "运行最近" => Some("runclosest"),
@@ -122,6 +124,15 @@ pub(crate) fn ui_value(value: &str) -> Option<&'static str> {
         "notched_20" | "二十格" => Some("notched_20"),
         "show" | "显示对话框" => Some("show"),
         "force" | "强制" => Some("force"),
+        _ => None,
+    }
+}
+
+/// 计分板分组使用独立的中文术语；界面命令的 players 仍使用玩家列表。
+pub(crate) fn scoreboard_group(value: &str) -> Option<&'static str> {
+    match value {
+        "objectives" | "目标集" => Some("objectives"),
+        "players" | "玩家分数" => Some("players"),
         _ => None,
     }
 }

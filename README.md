@@ -210,4 +210,4 @@ mcfunction 与 JSON 产物；`tests/valid` 与 `tests/invalid` 是随仓库维�
 辅助函数数、命令条数与字节数），确认增长合理后用 `MCLANG_UPDATE_OUTPUT_BUDGET=1 cargo test
 --test output_size` 重新生成预算。
 
-依赖只有 `serde_json`，Rust edition 2024。
+依赖为 `serde`（版本快照结构反序列化）与 `serde_json`，Rust edition 2024。

@@ -411,7 +411,9 @@ impl Parser {
                     }
                     block.separator = Some(Box::new(self.text_component("分隔符")?));
                 }
-                _ => unreachable!("text_style_property 只返回已知属性"),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         Ok(block)
@@ -463,7 +465,9 @@ impl Parser {
                 let page = self.unsigned("change_page 需要页号")?;
                 ClickEvent::ChangePage(page)
             }
-            _ => unreachable!("click_action 只返回已知动作"),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         self.expect(TokenKind::RightParen, "点击事件缺少 `)`")?;
         Ok(event)

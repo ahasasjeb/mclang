@@ -41,7 +41,9 @@ impl Parser {
                 UiCommand::PrivateMessage { targets, message }
             }
             "teammsg" => UiCommand::TeamMessage(self.message_argument("队伍消息")?),
-            _ => unreachable!(),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         self.expect(TokenKind::RightParen, "界面命令缺少 `)`")?;
         Ok(command)
@@ -84,6 +86,25 @@ impl Parser {
     }
 
     fn bossbar_command(&mut self, method: &str) -> Result<UiCommand, Diagnostic> {
+        enum Setter {
+            Name,
+            Color,
+            Style,
+            Value,
+            Max,
+            Visible,
+            Players,
+        }
+        let setter = match method {
+            "set_name" => Some(Setter::Name),
+            "set_color" => Some(Setter::Color),
+            "set_style" => Some(Setter::Style),
+            "set_value" => Some(Setter::Value),
+            "set_max" => Some(Setter::Max),
+            "set_visible" => Some(Setter::Visible),
+            "set_players" => Some(Setter::Players),
+            _ => None,
+        };
         let action = match method {
             "add" => {
                 let id = self.string("首领栏资源位置")?.0;
@@ -96,33 +117,35 @@ impl Parser {
             }
             "remove" => BossBarAction::Remove(self.string("首领栏资源位置")?.0),
             "list" => BossBarAction::List,
-            "set_name" | "set_color" | "set_style" | "set_value" | "set_max" | "set_visible"
-            | "set_players" => {
-                let id = self.string("首领栏资源位置")?.0;
-                let property = if method == "set_players" && self.check(&TokenKind::RightParen) {
-                    BossBarProperty::Players(None)
-                } else {
-                    self.command_comma()?;
-                    match method {
-                        "set_name" => BossBarProperty::Name(Box::new(
-                            self.text_component_or_string("首领栏名称")?,
-                        )),
-                        "set_color" => BossBarProperty::Color(self.command_word()?),
-                        "set_style" => BossBarProperty::Style(self.command_word()?),
-                        "set_value" => BossBarProperty::Value(self.unsigned("首领栏数值")?),
-                        "set_max" => BossBarProperty::Max(self.unsigned("首领栏最大值")?),
-                        "set_visible" => BossBarProperty::Visible(self.command_boolean()?),
-                        "set_players" => BossBarProperty::Players(Some(self.holder("首领栏玩家")?)),
-                        _ => unreachable!(),
-                    }
+            _ => {
+                let Some(setter) = setter else {
+                    return self.unknown_command_method("bossbar", method);
                 };
+                let id = self.string("首领栏资源位置")?.0;
+                let property =
+                    if matches!(setter, Setter::Players) && self.check(&TokenKind::RightParen) {
+                        BossBarProperty::Players(None)
+                    } else {
+                        self.command_comma()?;
+                        match setter {
+                            Setter::Name => BossBarProperty::Name(Box::new(
+                                self.text_component_or_string("首领栏名称")?,
+                            )),
+                            Setter::Color => BossBarProperty::Color(self.command_word()?),
+                            Setter::Style => BossBarProperty::Style(self.command_word()?),
+                            Setter::Value => BossBarProperty::Value(self.unsigned("首领栏数值")?),
+                            Setter::Max => BossBarProperty::Max(self.unsigned("首领栏最大值")?),
+                            Setter::Visible => BossBarProperty::Visible(self.command_boolean()?),
+                            Setter::Players => {
+                                BossBarProperty::Players(Some(self.holder("首领栏玩家")?))
+                            }
+                        }
+                    };
                 BossBarAction::Set { id, property }
             }
-            _ => return self.unknown_command_method("bossbar", method),
         };
         Ok(UiCommand::BossBar(action))
     }
-
     fn dialog_command(&mut self, method: &str) -> Result<UiCommand, Diagnostic> {
         let targets = self.holder("对话框目标")?;
         let dialog = match method {

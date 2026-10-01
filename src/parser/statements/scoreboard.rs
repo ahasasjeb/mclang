@@ -11,13 +11,16 @@ impl Parser {
     pub(super) fn scoreboard_statement(&mut self) -> Result<StatementKind, Diagnostic> {
         self.expect(TokenKind::Dot, "scoreboard 后需要 `.`")?;
         let (method, method_span) = self.ident("scoreboard 方法")?;
-        if matches!(method.as_str(), "objectives" | "目标集") {
+        let method = crate::parser::keywords::scoreboard_group(&method)
+            .or_else(|| crate::parser::keywords::ui_value(&method))
+            .unwrap_or(&method);
+        if method == "objectives" {
             return self.scoreboard_objectives_command();
         }
-        if matches!(method.as_str(), "players" | "玩家分数") {
+        if method == "players" {
             return self.scoreboard_players_command();
         }
-        let Some(method) = scoreboard_method(&method) else {
+        let Some(method) = scoreboard_method(method) else {
             return Err(Diagnostic::new(
                 format!("未知 scoreboard 方法 `{method}`"),
                 method_span,
@@ -69,7 +72,7 @@ impl Parser {
                     _ => ScoreboardOp::Swap,
                 };
                 self.expect(TokenKind::Comma, "运算名称后需要 `,`")?;
-                let source = self.score_target_body("来源计分目标")?;
+                let source = self.score_target_body()?;
                 self.expect(TokenKind::RightParen, "scoreboard.operation 调用缺少 `)`")?;
                 self.expect(TokenKind::Semicolon, "scoreboard.operation 调用后需要 `;`")?;
                 Ok(StatementKind::ScoreboardOperation {
@@ -82,7 +85,7 @@ impl Parser {
                 "scoreboard.get 只能出现在表达式里，例如 `let id = scoreboard.get(self, box_key);`",
                 method_span,
             )),
-            _ => unreachable!("scoreboard_method 只返回已知方法"),
+            unknown => Err(self.unsupported_keyword(unknown)),
         }
     }
 
@@ -209,14 +212,11 @@ impl Parser {
         label: &str,
     ) -> Result<ScoreTarget, Diagnostic> {
         self.expect(TokenKind::LeftParen, &format!("{label} 后需要 `(`"))?;
-        self.score_target_body(label)
+        self.score_target_body()
     }
 
     /// `(持有者, 目标)` 的内部形式：`scoreboard.operation` 的来源参数不带括号。
-    pub(in crate::parser) fn score_target_body(
-        &mut self,
-        _label: &str,
-    ) -> Result<ScoreTarget, Diagnostic> {
+    pub(in crate::parser) fn score_target_body(&mut self) -> Result<ScoreTarget, Diagnostic> {
         let holder = self.score_holder()?;
         self.expect(TokenKind::Comma, "计分持有者后需要 `,`")?;
         let (objective, objective_span) = self.ident("计分板目标名称")?;

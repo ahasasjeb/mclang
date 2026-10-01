@@ -203,11 +203,17 @@ fn chain_member(
     }
     if root_word == Some("scoreboard") {
         // scoreboard.objectives.modify.rendertype 的多节命令链使用 command_value。
-        let nested =
-            root != receiver || matches!(word, "objectives" | "目标集" | "players" | "玩家分数");
+        let nested = root != receiver
+            || rewriter
+                .tables
+                .canonical_in(word, "scoreboard_group")
+                .is_some()
+            || rewriter.tables.canonical_in(word, "ui_value") == Some("players");
         if nested {
             let rewritten = if root == receiver {
-                rewriter.syntax_alias(word, "scoreboard_group")
+                rewriter
+                    .syntax_alias(word, "scoreboard_group")
+                    .or_else(|| rewriter.syntax_alias(word, "ui_value"))
             } else {
                 rewriter.syntax_alias(word, "command_value")
             };
@@ -323,7 +329,7 @@ fn argument_value(frame: &Frame, word: &str, rewriter: &Rewriter) -> Option<Stri
 
 /// 调用实参里的枚举值：只在明确的取值位置翻译，避免命中同名标识符。
 fn frame_value(frame: &str, word: &str, rewriter: &Rewriter) -> Option<String> {
-    let root = frame.split('.').next().unwrap_or(frame);
+    let root = frame.split('.').next().expect("split 至少返回一个片段");
     if context::COMMAND_RECEIVERS.contains(&root) || context::COMMAND_CALLS.contains(&frame) {
         let ui = if frame.starts_with("bossbar.")
             || frame.starts_with("title.")

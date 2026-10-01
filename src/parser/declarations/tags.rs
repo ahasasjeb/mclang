@@ -44,7 +44,9 @@ impl Parser {
                     self.expect(TokenKind::Semicolon, "replace 后需要 `;`")?;
                     replace_span = Some(property_span);
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         let end = self.advance().span;

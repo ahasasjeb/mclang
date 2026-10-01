@@ -73,7 +73,7 @@ impl Parser {
             }),
             "reset" => ScoreboardCommand::PlayersResetAll(self.holder("计分持有者")?),
             "add" | "remove" => {
-                let target = self.score_target_body("计分目标")?;
+                let target = self.score_target_body()?;
                 self.command_comma()?;
                 let amount = self.signed("分数变化量")?;
                 ScoreboardCommand::PlayersChange {
@@ -83,7 +83,7 @@ impl Parser {
                 }
             }
             "display_name" => {
-                let target = self.score_target_body("计分目标")?;
+                let target = self.score_target_body()?;
                 let name = if self.command_optional_comma() {
                     Some(Box::new(self.text_component_or_string("分数显示名")?))
                 } else {
@@ -92,7 +92,7 @@ impl Parser {
                 ScoreboardCommand::PlayersDisplayName { target, name }
             }
             "numberformat" | "display_numberformat" => {
-                let target = self.score_target_body("计分目标")?;
+                let target = self.score_target_body()?;
                 let format = if self.command_optional_comma() {
                     self.score_number_format()?
                 } else {

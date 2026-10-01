@@ -254,14 +254,15 @@ pub(super) fn validate_statement<'a>(
             operation: _,
             source,
         } => {
-            validate_score_target(result, statement.span, ctx, diagnostics);
-            validate_score_target(source, statement.span, ctx, diagnostics);
             for target in [result, source] {
                 if matches!(target.holder, Holder::Origin) {
+                    validate_score_objective(target, ctx, diagnostics);
                     diagnostics.push(Diagnostic::new(
                         "scoreboard.operation 的持有者不能是投掷者；请用 self/自身 或实体查询",
                         statement.span,
                     ));
+                } else {
+                    validate_score_target(target, statement.span, ctx, diagnostics);
                 }
             }
         }

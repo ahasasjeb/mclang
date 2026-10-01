@@ -76,7 +76,9 @@ impl Parser {
                     }
                     display = Some(self.advancement_display()?);
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         let end = self.advance().span;
@@ -169,7 +171,9 @@ impl Parser {
                     self.expect(TokenKind::Semicolon, "conditions 后需要 `;`")?;
                     conditions = Some((AdvancementConditions::parse(&json), span));
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         let end = self.advance().span;
@@ -241,7 +245,9 @@ impl Parser {
                     recipes.push(self.advancement_reference("配方")?);
                     self.expect(TokenKind::Semicolon, "recipe 后需要 `;`")?;
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         self.advance();
@@ -352,7 +358,9 @@ impl Parser {
                     *slot = Some(self.boolean("true 或 false")?);
                     self.expect(TokenKind::Semicolon, &format!("{property} 后需要 `;`"))?;
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         let end = self.advance().span;

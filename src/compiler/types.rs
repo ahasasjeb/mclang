@@ -1,8 +1,12 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
     AdvancementDecl, DataSlotDecl, EntityQueryDecl, FunctionTagDecl, ItemStackDecl, ObjectiveDecl,
 };
+
+/// 语义检查只解析每份 styled JSON 一次，代码生成复用同一对象。
+pub(super) type StyleCache = RefCell<HashMap<String, Option<serde_json::Value>>>;
 
 /// 函数签名的语义摘要，供调用、调度和执行上下文检查使用。
 #[derive(Clone, Copy)]
@@ -77,6 +81,7 @@ impl ReturnRules {
 
 /// 语句校验可见的符号表。
 pub(super) struct StatementSymbols<'a> {
+    pub(super) style_json: &'a StyleCache,
     pub(super) scores: &'a HashSet<&'a str>,
     pub(super) objectives: &'a HashSet<&'a str>,
     /// 目标声明表，供 scoreboard.enable 等语句读取准则。

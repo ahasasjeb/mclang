@@ -65,7 +65,9 @@ impl Parser {
             "datapack" => CoreCommand::Datapack(self.datapack_command(&method)?),
             "random" => self.random_command(&method)?,
             "loot" => self.loot_command(&method)?,
-            _ => unreachable!("core command dispatch"),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         self.expect(TokenKind::RightParen, "命令缺少 `)`")?;
         Ok(command)

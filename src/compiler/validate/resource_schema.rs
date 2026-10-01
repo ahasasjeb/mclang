@@ -80,64 +80,13 @@ fn validate_predicate(name: &str, value: &Value, span: Span, diagnostics: &mut V
         );
         return;
     };
-    let Some(kind) = resource_type(object, "loot_condition_type", name, span, diagnostics) else {
-        return;
-    };
-    match kind.as_str() {
-        "minecraft:random_chance" => {
-            if !object.get("chance").is_some_and(|value| {
-                value.as_f64().is_some_and(|number| number.is_finite())
-                    || value.is_object()
-                    || value.as_str().is_some_and(valid_json_id)
-            }) {
-                report(
-                    name,
-                    "random_chance 需要数字、浮点提供器对象或引用 chance",
-                    span,
-                    diagnostics,
-                );
-            }
-        }
-        "minecraft:inverted" => {
-            if let Some(term) = object.get("term") {
-                validate_predicate_reference(name, term, span, diagnostics);
-            } else {
-                report(name, "inverted 谓词缺少 term", span, diagnostics);
-            }
-        }
-        "minecraft:any_of" | "minecraft:all_of" => match object.get("terms") {
-            Some(Value::Array(terms)) => {
-                for term in terms {
-                    validate_predicate_reference(name, term, span, diagnostics);
-                }
-            }
-            Some(Value::String(tag)) if tag.starts_with('#') => {
-                if !valid_json_id(&tag[1..]) {
-                    report(name, "组合谓词 terms 的标签引用无效", span, diagnostics);
-                }
-            }
-            Some(term) => validate_predicate_reference(name, term, span, diagnostics),
-            None => report(name, "组合谓词缺少 terms", span, diagnostics),
-        },
-        _ => {}
-    }
+    super::loot_conditions::validate_object(
+        &format!("资源 `{name}` 的 predicate"),
+        object,
+        span,
+        diagnostics,
+    );
 }
-
-fn validate_predicate_reference(
-    name: &str,
-    value: &Value,
-    span: Span,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    if let Some(reference) = value.as_str() {
-        if !valid_json_id(reference) {
-            report(name, "predicate 引用需要有效资源位置", span, diagnostics);
-        }
-    } else {
-        validate_predicate(name, value, span, diagnostics);
-    }
-}
-
 fn validate_recipe(name: &str, value: &Value, span: Span, diagnostics: &mut Vec<Diagnostic>) {
     let Some(object) = value.as_object() else {
         report(name, "recipe 需要 JSON 对象", span, diagnostics);
@@ -220,7 +169,7 @@ fn valid_item_id(id: &str) -> bool {
 }
 
 fn valid_json_id(id: &str) -> bool {
-    !id.is_empty() && valid_resource_location(&canonical_json_id(id))
+    valid_resource_location(&canonical_json_id(id))
 }
 
 fn validate_loot_table(name: &str, value: &Value, span: Span, diagnostics: &mut Vec<Diagnostic>) {
@@ -272,13 +221,13 @@ fn resource_type(
     } else {
         format!("minecraft:{kind}")
     };
-    if crate::version::snapshot::snapshot().registry_contains(registry, &canonical) != Some(true) {
-        report(
-            name,
-            &format!("type `{kind}` 未在 Minecraft 26.3 的 {registry} 注册表中"),
-            span,
-            diagnostics,
-        );
+    if !super::registry::validate_static_id(
+        registry,
+        &format!("资源 `{name}` 的 type"),
+        &canonical,
+        span,
+        diagnostics,
+    ) {
         return None;
     }
     Some(canonical)

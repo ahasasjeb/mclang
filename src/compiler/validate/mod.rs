@@ -14,6 +14,7 @@ mod functions;
 mod graph;
 mod item_components;
 mod items;
+mod loot_conditions;
 mod macros;
 mod recursion;
 mod registry;
@@ -55,6 +56,7 @@ pub(super) struct Validated {
     pub(super) diagnostics: Vec<Diagnostic>,
     /// 与 `program.resources` 同序的已解析 JSON；解析失败的声明为 `None`。
     pub(super) resource_json: Vec<Option<serde_json::Value>>,
+    pub(super) style_json: HashMap<String, Option<serde_json::Value>>,
 }
 
 pub(super) fn validate(program: &Program) -> Validated {
@@ -62,7 +64,8 @@ pub(super) fn validate(program: &Program) -> Validated {
 
     validate_namespace(program, &mut diagnostics);
     let scores = collect_scores(program, &mut diagnostics);
-    let objectives = collect_objectives(program, &mut diagnostics);
+    let style_json = super::types::StyleCache::default();
+    let objectives = collect_objectives(program, &style_json, &mut diagnostics);
     let function_tags = collect_function_tags(program, &mut diagnostics);
     let signatures = collect_signatures(program, &scores, &mut diagnostics);
     // 标签图与环只构建一次：报环与展开可达函数共用同一份结果。
@@ -79,6 +82,7 @@ pub(super) fn validate(program: &Program) -> Validated {
         &mut diagnostics,
     );
     let declarations = Declarations {
+        style_json,
         queries: collect_queries(program, &mut diagnostics),
         item_stacks,
         storages: collect_storages(program, &mut diagnostics),
@@ -107,6 +111,7 @@ pub(super) fn validate(program: &Program) -> Validated {
     Validated {
         diagnostics: deduplicate(diagnostics),
         resource_json,
+        style_json: declarations.style_json.into_inner(),
     }
 }
 
@@ -121,6 +126,7 @@ fn deduplicate(diagnostics: Vec<Diagnostic>) -> Vec<Diagnostic> {
 
 /// 顶层声明收集出的符号表，供函数体校验共享。
 struct Declarations<'a> {
+    style_json: super::types::StyleCache,
     scores: HashSet<&'a str>,
     objectives: HashSet<&'a str>,
     /// 目标声明表，供 scoreboard.enable 等语句读取准则。

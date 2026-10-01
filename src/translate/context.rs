@@ -32,6 +32,7 @@ pub(super) const RECEIVER_FAMILIES: &[(&str, &str)] = &[
 
 /// 这些命令的参数按 `command_value`、`ui_value` 与文本颜色翻译。
 pub(super) const COMMAND_RECEIVERS: &[&str] = &[
+    "test",
     "tag",
     "attribute",
     "ride",

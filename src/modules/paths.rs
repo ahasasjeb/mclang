@@ -54,12 +54,10 @@ pub(super) fn reachable_modules(
     order.push(root);
     queue.push_back(root);
     while let Some(index) = queue.pop_front() {
-        if let Some(targets) = edges.get(&index) {
-            for (target, _) in targets {
-                if reachable.insert(*target) {
-                    order.push(*target);
-                    queue.push_back(*target);
-                }
+        for (target, _) in &edges[&index] {
+            if reachable.insert(*target) {
+                order.push(*target);
+                queue.push_back(*target);
             }
         }
     }

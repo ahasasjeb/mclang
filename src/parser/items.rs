@@ -200,7 +200,9 @@ impl Parser {
                     custom_data = Some(self.nbt_compound("物品自定义数据")?);
                     self.expect(TokenKind::Semicolon, "物品自定义数据后需要 `;`")?;
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         let end = self.advance().span;

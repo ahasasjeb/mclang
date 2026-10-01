@@ -32,7 +32,7 @@ pub(super) fn validate_give_count(
             format!(
                 "给予数量必须是 1 到 {limit}（`{}` 的最大堆叠数为 {}）",
                 item.name,
-                item.max_stack_size.unwrap_or(1)
+                super::item_components::component_stack_size(item).unwrap_or(1)
             ),
             count_span.unwrap_or(statement_span),
         ));

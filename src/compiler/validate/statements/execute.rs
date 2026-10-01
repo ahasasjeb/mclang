@@ -19,7 +19,6 @@ pub(super) fn validate_execute<'a>(
     let mut seen: HashSet<&'static str> = HashSet::new();
     // 0 = 修饰符，1 = 条件，2 = store；子句只能按这个顺序推进。
     let mut stage = 0_u8;
-    let mut has_stores = false;
     for clause in clauses {
         let clause_ctx = ValidationContext {
             context,
@@ -131,7 +130,7 @@ pub(super) fn validate_execute<'a>(
                     *entity_type_span,
                     diagnostics,
                 );
-                if valid_resource_location(summoned) && non_summonable_entity(summoned) {
+                if non_summonable_entity(summoned) {
                     diagnostics.push(Diagnostic::new(
                         format!("Minecraft 的 /summon 不支持实体类型 `{summoned}`"),
                         clause.span,
@@ -152,26 +151,27 @@ pub(super) fn validate_execute<'a>(
             }
             ExecuteClauseKind::StoreResult(target) | ExecuteClauseKind::StoreSuccess(target) => {
                 stage = 2;
-                has_stores = true;
                 validate_store_target(target, clause.span, clause_ctx, diagnostics);
             }
             ExecuteClauseKind::StoreData(data) => {
                 stage = 2;
-                has_stores = true;
                 validate_store_data(data, clause.span, clause_ctx, diagnostics);
             }
         }
     }
 
-    if has_stores && let Some(last) = body.last() {
+    if stage == 2
+        && let Some(last) = body.last()
+    {
         match &last.kind {
             StatementKind::If { .. }
             | StatementKind::While { .. }
+            | StatementKind::For { .. }
             | StatementKind::Each { .. }
             | StatementKind::InDimension { .. }
             | StatementKind::Spawn { .. }
             | StatementKind::Execute { .. } => diagnostics.push(Diagnostic::new(
-                "execute store 捕获块内最后一条命令的结果；if/while/each/spawn/in_dimension/execute \
+                "execute store 捕获块内最后一条命令的结果；if/while/for/each/spawn/in_dimension/execute \
                  作为最后一条语句时结果不会传递，请把要捕获的命令放到块末尾",
                 last.span,
             )),
@@ -194,7 +194,7 @@ pub(super) fn validate_execute<'a>(
             _ => {}
         }
     }
-    if has_stores && body.is_empty() {
+    if stage == 2 && body.is_empty() {
         diagnostics.push(Diagnostic::new(
             "execute store 需要块内至少一条命令来产生结果",
             span,
@@ -361,22 +361,9 @@ pub(super) fn validate_store_data(
 /// 函数权限模型（1.6）：`run` 字符串里的根命令不得越过数据包函数固定的
 /// GAMEMASTER 等级（2）。未知根命令留给后续的命令树校验（8.4）。
 pub(super) fn validate_raw_command(command: &str, span: Span, diagnostics: &mut Vec<Diagnostic>) {
-    let Some(first) = command.split_whitespace().next() else {
+    let Some(name) = command.split_whitespace().next() else {
         return;
     };
-    if command.trim_end().ends_with('\\') {
-        diagnostics.push(Diagnostic::new(
-            "原始命令不能以反斜杠结尾；Minecraft 会拼接下一行",
-            span,
-        ));
-    }
-    if command.trim_start().starts_with('/') {
-        diagnostics.push(Diagnostic::new(
-            "Minecraft 函数中的命令不能以 `/` 开头",
-            span,
-        ));
-    }
-    let name = first.strip_prefix('/').unwrap_or(first);
     let snapshot = crate::version::snapshot::snapshot();
     if !snapshot.has_root_command(name) {
         diagnostics.push(Diagnostic::new(

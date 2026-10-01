@@ -137,19 +137,17 @@ impl Compiler<'_> {
         if operand_stable(&operand, writes) {
             return operand;
         }
-        match operand {
-            Operand::Cell { holder, objective } => {
-                let frozen = self.temporary();
-                setup.push(format!(
-                    "scoreboard players operation {frozen} {objective} = {holder} {objective}"
-                ));
-                Operand::Cell {
-                    holder: frozen,
-                    objective,
-                }
+        if let Operand::Cell { holder, objective } = operand {
+            let frozen = self.temporary();
+            setup.push(format!(
+                "scoreboard players operation {frozen} {objective} = {holder} {objective}"
+            ));
+            Operand::Cell {
+                holder: frozen,
+                objective,
             }
-            // 常量不依赖任何计分单元，不可能不稳定。
-            Operand::Literal(literal) => Operand::Literal(literal),
+        } else {
+            operand
         }
     }
 }

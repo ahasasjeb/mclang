@@ -3,10 +3,8 @@
 
 use crate::ast::{NbtEntry, NbtValueKind, PlaceFeatureSource, Span};
 use crate::diagnostic::Diagnostic;
-use crate::version::snapshot::snapshot;
 
-use super::super::registry::validate_id;
-use super::super::rules::valid_resource_location;
+use super::super::registry::{validate_id, validate_static_id};
 
 pub(super) fn validate_place_feature(
     feature: &PlaceFeatureSource,
@@ -51,18 +49,11 @@ fn validate_inline_feature(entries: &[NbtEntry], span: Span, diagnostics: &mut V
         ));
         return;
     };
-    if !valid_resource_location(id) {
-        diagnostics.push(Diagnostic::new(
-            format!("`{id}` 不是有效的地物类型资源位置"),
-            feature_type.value.span,
-        ));
-    } else if snapshot().registry_contains("feature_type", id) != Some(true) {
-        // FEATURE_TYPE is a code registry, not a data-pack registry. Data
-        // packs cannot add feature codecs under another namespace.
-        let mut message = format!("未知地物类型 `{id}`；该类型不在 26.3 的 FeatureTypes 注册表中");
-        if let Some(candidate) = snapshot().suggest_registry_id("feature_type", id) {
-            message.push_str(&format!("，是否想写 `{candidate}`？"));
-        }
-        diagnostics.push(Diagnostic::new(message, feature_type.value.span));
-    }
+    validate_static_id(
+        "feature_type",
+        "地物类型",
+        id,
+        feature_type.value.span,
+        diagnostics,
+    );
 }

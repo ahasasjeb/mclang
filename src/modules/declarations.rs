@@ -81,41 +81,18 @@ pub(super) fn first_span(program: &Program) -> Span {
     if let Some(span) = program.namespace_span {
         return span;
     }
-    let mut spans = Vec::new();
-    spans.extend(program.scores.iter().map(|declaration| declaration.span));
-    spans.extend(
-        program
-            .objectives
-            .iter()
-            .map(|declaration| declaration.span),
-    );
-    spans.extend(program.queries.iter().map(|declaration| declaration.span));
-    spans.extend(
-        program
-            .item_stacks
-            .iter()
-            .map(|declaration| declaration.span),
-    );
-    spans.extend(program.storages.iter().map(|declaration| declaration.span));
-    spans.extend(
-        program
-            .data_slots
-            .iter()
-            .map(|declaration| declaration.span),
-    );
-    spans.extend(program.resources.iter().map(|declaration| declaration.span));
-    spans.extend(
-        program
-            .advancements
-            .iter()
-            .map(|declaration| declaration.span),
-    );
-    spans.extend(
-        program
-            .function_tags
-            .iter()
-            .map(|declaration| declaration.span),
-    );
-    spans.extend(program.functions.iter().map(|declaration| declaration.span));
-    spans.into_iter().next().unwrap_or_default()
+    program
+        .scores
+        .first()
+        .map(|decl| decl.span)
+        .or_else(|| program.objectives.first().map(|decl| decl.span))
+        .or_else(|| program.queries.first().map(|decl| decl.span))
+        .or_else(|| program.item_stacks.first().map(|decl| decl.span))
+        .or_else(|| program.storages.first().map(|decl| decl.span))
+        .or_else(|| program.data_slots.first().map(|decl| decl.span))
+        .or_else(|| program.resources.first().map(|decl| decl.span))
+        .or_else(|| program.advancements.first().map(|decl| decl.span))
+        .or_else(|| program.function_tags.first().map(|decl| decl.span))
+        .or_else(|| program.functions.first().map(|decl| decl.span))
+        .unwrap_or_default()
 }

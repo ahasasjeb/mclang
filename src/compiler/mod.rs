@@ -76,18 +76,10 @@ fn compile_inner(
     program: &mut Program,
     options: &CompileOptions,
 ) -> Result<Compilation, Vec<Diagnostic>> {
-    let validated = validate::validate(program);
+    let validated = prepare_program(program)?;
     let diagnostics = validated.diagnostics;
-    if diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
-    {
-        return Err(diagnostics);
-    }
-
-    rename::rename_program(program);
-
-    let mut compiler = codegen::Compiler::new(program, &validated.resource_json);
+    let mut compiler =
+        codegen::Compiler::new(program, &validated.resource_json, &validated.style_json);
     compiler.compile_functions();
     let pack = match compiler.finish(&options.description) {
         Ok(pack) => pack,
@@ -100,4 +92,41 @@ fn compile_inner(
         pack,
         warnings: diagnostics,
     })
+}
+
+/// 编辑器复用生成命令的校验，但不构造函数文件、资源文件与包元数据。
+pub(crate) fn check(program: &mut Program) -> Vec<Diagnostic> {
+    crate::stack::run(|| {
+        let validated = match prepare_program(program) {
+            Ok(validated) => validated,
+            Err(diagnostics) => return diagnostics,
+        };
+        let mut compiler =
+            codegen::Compiler::new(program, &validated.resource_json, &validated.style_json);
+        compiler.compile_functions();
+        let mut diagnostics = compiler.check_commands();
+        diagnostics.extend(validated.diagnostics);
+        diagnostics
+    })
+    .unwrap_or_else(|error| {
+        vec![Diagnostic::new(
+            format!("无法创建编译工作线程：{error}"),
+            crate::ast::Span::default(),
+        )]
+    })
+}
+
+fn prepare_program(program: &mut Program) -> Result<validate::Validated, Vec<Diagnostic>> {
+    let validated = validate::validate(program);
+    let diagnostics = &validated.diagnostics;
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+    {
+        return Err(validated.diagnostics);
+    }
+
+    rename::rename_program(program);
+
+    Ok(validated)
 }

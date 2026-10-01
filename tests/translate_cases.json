@@ -130,6 +130,11 @@
     "chinese": "\ufeff如果 函数条件 // function stays\r\n(helper) {}\r\n执行 关系 // origin stays\r\n(起源) {}"
   },
   {
+    "name": "test run and stop methods",
+    "source": "test.run(\"audit:basic\"); test.stop();",
+    "chinese": "测试命令.运行测试(\"audit:basic\"); 测试命令.停止测试();"
+  },
+  {
     "name": "opaque import and block state",
     "source": "import time as t; call #time(); block_state(\"minecraft:light\") { level = \"15\"; facing = \"north\"; }",
     "chinese": "导入 time 作为 t; 调用 #time(); 方块状态(\"minecraft:light\") { level = \"15\"; facing = \"north\"; }"

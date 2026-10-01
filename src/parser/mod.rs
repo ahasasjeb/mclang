@@ -37,7 +37,7 @@ use crate::lexer::{Token, TokenKind};
 use keywords::{keyword_alias, word_matches};
 
 pub fn parse(tokens: Vec<Token>) -> Result<Program, Vec<Diagnostic>> {
-    let span = tokens.first().map(|token| token.span).unwrap_or_default();
+    let span = tokens.first().expect("词法单元流以 Eof 结束").span;
     crate::stack::run(|| parse_inner(tokens)).unwrap_or_else(|error| {
         Err(vec![Diagnostic::new(
             format!("无法创建解析工作线程：{error}"),
@@ -394,6 +394,14 @@ impl Parser {
 
     fn current(&self) -> &Token {
         &self.tokens[self.cursor]
+    }
+
+    /// 关键词表新增值而语法分派未更新时，返回诊断供编辑器继续工作。
+    fn unsupported_keyword(&self, keyword: &str) -> Diagnostic {
+        Diagnostic::new(
+            format!("解析器尚未实现关键词 `{keyword}` 的语法"),
+            self.previous().span,
+        )
     }
 
     /// 向前看 `offset` 个词法单元；越界时返回文件末尾的 `Eof`。

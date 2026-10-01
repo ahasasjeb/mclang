@@ -198,7 +198,9 @@ impl Parser {
                     }
                     item = Some(self.item_filter(property_span)?);
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
         }
         let end = self.advance().span;
@@ -317,7 +319,9 @@ impl Parser {
                     }
                     custom_name = Some(self.string("item.custom_name 需要文本字符串")?.0);
                 }
-                _ => unreachable!(),
+                unknown => {
+                    return Err(self.unsupported_keyword(unknown));
+                }
             }
             self.expect(TokenKind::Semicolon, "item 属性后需要 `;`")?;
         }

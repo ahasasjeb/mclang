@@ -27,7 +27,7 @@ pub(super) fn tokenize(source: &str) -> Vec<Token<'_>> {
     let mut index = 0usize;
     while index < source.len() {
         let rest = &source[index..];
-        let current = rest.chars().next().unwrap_or_default();
+        let current = rest.chars().next().expect("扫描位置尚未到达源码末尾");
         let length = if rest.starts_with("\"\"\"") {
             raw_string_length(rest)
         } else if current == '"' {

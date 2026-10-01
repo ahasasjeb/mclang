@@ -15,7 +15,7 @@ use super::text::{
 
 /// 提取 `registries.json`。
 pub fn generate_registries(root: &Path) -> Result<String, String> {
-    let mut extractor = Extractor::new(root);
+    let extractor = Extractor::new(root);
     let mut registries: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut slots = Slots::default();
 
@@ -248,7 +248,7 @@ pub fn generate_registries(root: &Path) -> Result<String, String> {
 
     // 数据包目录：JSON 资源与结构文件。
     for (kind, path, extension) in data_kinds(root)? {
-        let ids = scan_resource_ids(&mut extractor, &path, extension)?;
+        let ids = scan_resource_ids(&path, extension)?;
         let entry = registries.entry(kind).or_default();
         for id in ids {
             entry.insert(format!("minecraft:{id}"));
@@ -266,7 +266,7 @@ pub fn generate_registries(root: &Path) -> Result<String, String> {
     }
 
     // 标签注册表清单：data/minecraft/tags 下含文件的目录路径。
-    let tag_registries = scan_tag_registries(&mut extractor, root)?;
+    let tag_registries = scan_tag_registries(root)?;
 
     // 资源类型清单：可以出现在 resource 声明里的类型。
     let mut resource_kinds: BTreeSet<String> = BTreeSet::new();
@@ -299,7 +299,6 @@ pub fn generate_registries(root: &Path) -> Result<String, String> {
         json!(enchantment_max_levels),
     );
     root_object.insert("source".into(), json!(SOURCE_DIR));
-    root_object.insert("digest".into(), json!(extractor.finish()));
     root_object.insert(
         "registries".into(),
         serde_json::to_value(&registries).map_err(|error| error.to_string())?,

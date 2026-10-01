@@ -1,21 +1,6 @@
-use crate::ast::{AdvancementFrame, AdvancementRequirements, Attribute, ItemRarity};
+use crate::ast::{AdvancementFrame, AdvancementRequirements, ItemRarity};
 
-use super::table::{ATTRIBUTES, KEYWORDS};
-
-pub(crate) fn attribute_word(value: &str) -> Option<Attribute> {
-    let english = ATTRIBUTES
-        .iter()
-        .find(|keyword| keyword.english == value || keyword.chinese == value)?
-        .english;
-    match english {
-        "load" => Some(Attribute::Load),
-        "tick" => Some(Attribute::Tick),
-        "entity" => Some(Attribute::Entity),
-        "player" => Some(Attribute::Player),
-        "non_player" => Some(Attribute::NonPlayer),
-        _ => unreachable!("ATTRIBUTES 表与 attribute_word 不同步"),
-    }
-}
+use super::table::KEYWORDS;
 
 /// 英文词 → 中文别名的一次性哈希索引。
 ///

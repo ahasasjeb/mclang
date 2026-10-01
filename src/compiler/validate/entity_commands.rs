@@ -176,34 +176,38 @@ pub(in crate::compiler::validate) fn entity_target(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    validate_holder(target, span, ctx, diagnostics);
-    match target {
-        Holder::Query(name, query_span) => {
-            if let Some(query) = ctx.symbols.queries.get(name.as_str()) {
-                if single && query.limit != Some(1) {
-                    diagnostics.push(Diagnostic::new(
-                        format!("目标 `{name}` 必须使用 limit(1)，此参数只接受单实体"),
-                        *query_span,
-                    ));
-                }
-                if player && query.entity_type != "minecraft:player" {
-                    diagnostics.push(Diagnostic::new(
-                        format!("目标 `{name}` 必须匹配 minecraft:player"),
-                        *query_span,
-                    ));
-                }
-            }
-        }
-        Holder::SelfEntity if player && ctx.context != ExecutionContext::Player => diagnostics
-            .push(Diagnostic::new(
-                "self 需要玩家执行上下文（@player 或玩家查询的 each）",
-                span,
-            )),
-        Holder::Origin => diagnostics.push(Diagnostic::new(
+    if matches!(target, Holder::Origin) {
+        diagnostics.push(Diagnostic::new(
             "此命令的实体参数不接受 origin；请使用 execute on origin 后的 self",
             span,
-        )),
-        _ => {}
+        ));
+        return;
+    }
+    if matches!(target, Holder::SelfEntity) && player {
+        if ctx.context != ExecutionContext::Player {
+            diagnostics.push(Diagnostic::new(
+                "self 需要玩家执行上下文（@player 或玩家查询的 each）",
+                span,
+            ));
+        }
+        return;
+    }
+    validate_holder(target, span, ctx, diagnostics);
+    if let Holder::Query(name, query_span) = target
+        && let Some(query) = ctx.symbols.queries.get(name.as_str())
+    {
+        if single && query.limit != Some(1) {
+            diagnostics.push(Diagnostic::new(
+                format!("目标 `{name}` 必须使用 limit(1)，此参数只接受单实体"),
+                *query_span,
+            ));
+        }
+        if player && query.entity_type != "minecraft:player" {
+            diagnostics.push(Diagnostic::new(
+                format!("目标 `{name}` 必须匹配 minecraft:player"),
+                *query_span,
+            ));
+        }
     }
 }
 

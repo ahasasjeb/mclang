@@ -198,8 +198,7 @@ impl Parser {
         let (method, method_span) = self.ident("名称方法")?;
         let span = start_span.merge(method_span);
         if word_matches(&receiver, "bossbar")
-            && (word_matches(&method, "get")
-                || super::keywords::command_value(&method) == Some("get"))
+            && super::keywords::command_value(&method) == Some("get")
         {
             self.expect(TokenKind::LeftParen, "bossbar.get 后需要 `(`")?;
             let id = self.string("bossbar.get 需要首领栏资源位置")?.0;

@@ -64,20 +64,12 @@ fn percent_decode(text: &str) -> String {
 
 /// 字节偏移转 LSP 位置（行号与 UTF-16 列号都从 0 开始）。
 ///
-/// 已知行首索引时走二分查找；否则按需现建一次索引。
-pub fn offset_to_position_in(text: &str, offset: usize, index: Option<&LineIndex>) -> (u32, u32) {
-    match index {
-        Some(index) => index.utf16_position(text, offset),
-        None => LineIndex::new(text).utf16_position(text, offset),
-    }
+pub fn offset_to_position_in(text: &str, offset: usize, index: &LineIndex) -> (u32, u32) {
+    index.utf16_position(text, offset)
 }
 
-/// LSP 位置转字节偏移；超出文件末尾时落在末尾。
-pub fn position_to_offset(text: &str, line: u32, character: u32) -> usize {
-    let index = LineIndex::new(text);
-    if line as usize >= index.starts_len() {
-        return text.len();
-    }
+/// LSP 位置转字节偏移；索引由项目复用，超出文件末尾时落在末尾。
+pub fn position_to_offset_in(text: &str, line: u32, character: u32, index: &LineIndex) -> usize {
     let line_start = index.line_start(line as usize);
     let line_end = text[line_start..]
         .find('\n')
@@ -124,10 +116,38 @@ fn identifier_continue(character: char) -> bool {
     character == '_' || character.is_alphanumeric()
 }
 
-fn clamp_boundary(text: &str, mut offset: usize) -> usize {
+pub(super) fn clamp_boundary(text: &str, mut offset: usize) -> usize {
     offset = offset.min(text.len());
     while !text.is_char_boundary(offset) {
         offset -= 1;
     }
     offset
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unicode_positions_round_trip_and_out_of_range_lines_reach_eof() {
+        for text in ["", "变量🚀x\n第二行\n", "变量\r\n🚀末尾"] {
+            let index = LineIndex::new(text);
+            for offset in text
+                .char_indices()
+                .map(|(offset, _)| offset)
+                .chain([text.len()])
+            {
+                let (line, character) = offset_to_position_in(text, offset, &index);
+                assert_eq!(position_to_offset_in(text, line, character, &index), offset);
+            }
+            assert_eq!(
+                position_to_offset_in(text, u32::MAX, u32::MAX, &index),
+                text.len()
+            );
+        }
+        let text = "🚀x";
+        let index = LineIndex::new(text);
+        assert_eq!(position_to_offset_in(text, 0, 1, &index), "🚀".len());
+        assert_eq!(position_to_offset_in(text, 0, u32::MAX, &index), text.len());
+    }
 }

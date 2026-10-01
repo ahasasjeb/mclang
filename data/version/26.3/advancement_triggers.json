@@ -1,5 +1,4 @@
 {
-  "digest": "fnv1a64:b99d580460657323",
   "source": "minecraft_client_26.3",
   "triggers": {
     "allay_drop_item_on_block": {
@@ -109,6 +108,7 @@
     "hero_of_the_village": {
       "player": "loot_condition"
     },
+    "impossible": {},
     "inventory_changed": {
       "items": "item_predicate_list",
       "player": "loot_condition",

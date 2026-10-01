@@ -141,9 +141,7 @@ pub(super) fn validate_spawn<'a>(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     validate_id("entity_type", "实体类型", entity_type, span, diagnostics);
-    if crate::compiler::validate::rules::valid_resource_location(entity_type)
-        && non_summonable_entity(entity_type)
-    {
+    if non_summonable_entity(entity_type) {
         diagnostics.push(Diagnostic::new(
             format!("Minecraft 的 /summon 不支持实体类型 `{entity_type}`"),
             span,

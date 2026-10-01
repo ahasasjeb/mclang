@@ -12,12 +12,12 @@ use super::text::matching_paren;
 /// 触发器名与类名取自 `CriteriaTriggers.java` 的注册调用；每个触发器类的
 /// `TriggerInstance` 用 `RecordCodecBuilder` 声明条件字段，字段名取自
 /// `.optionalFieldOf("…")`，字段粗类型取自紧邻的编解码表达式。没有条件
-/// 字段的触发器（例如 `impossible`）不写入快照，校验时跳过。
+/// 字段的触发器（例如 `impossible`）保留空字段表，供注册名查询使用。
 ///
 /// 26.3 的战利品条件判定键由旧版本的 `condition` 改成了 `type`，这里把
 /// `LootItemCondition` 字段单独分类，供校验器给出针对性的诊断。
 pub fn generate_triggers(root: &Path) -> Result<String, String> {
-    let mut extractor = Extractor::new(root);
+    let extractor = Extractor::new(root);
     let registry = extractor.read("net/minecraft/advancements/triggers/CriteriaTriggers.java")?;
     let registered = registered_triggers(&registry);
     if registered.is_empty() {
@@ -36,9 +36,6 @@ pub fn generate_triggers(root: &Path) -> Result<String, String> {
                 fields
             }
         };
-        if fields.is_empty() {
-            continue;
-        }
         triggers.insert(
             id,
             serde_json::to_value(&fields).map_err(|error| error.to_string())?,
@@ -46,7 +43,6 @@ pub fn generate_triggers(root: &Path) -> Result<String, String> {
     }
     let mut root_object = Map::new();
     root_object.insert("source".into(), json!(SOURCE_DIR));
-    root_object.insert("digest".into(), json!(extractor.finish()));
     root_object.insert(
         "triggers".into(),
         Value::Object(triggers.into_iter().collect()),

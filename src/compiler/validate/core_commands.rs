@@ -26,15 +26,7 @@ pub(super) fn validate_core_command(
         }
         CoreCommand::Help(None) => {}
         CoreCommand::FetchProfile(FetchProfileTarget::Id(id)) => {
-            let valid = id.len() == 36
-                && id.chars().enumerate().all(|(index, c)| {
-                    if [8, 13, 18, 23].contains(&index) {
-                        c == '-'
-                    } else {
-                        c.is_ascii_hexdigit()
-                    }
-                });
-            if !valid {
+            if !super::rules::valid_uuid(id) {
                 diagnostics.push(Diagnostic::new(
                     format!("fetchprofile.id 的 `{id}` 不是有效的 UUID"),
                     span,

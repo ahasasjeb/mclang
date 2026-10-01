@@ -87,10 +87,10 @@ impl Parser {
             }
             "save_items" | "restore_items" => {
                 let (reference, _) = self.ident("物品存储名称")?;
-                match method_kind {
-                    "save_items" => SelfAction::SaveItems(reference),
-                    "restore_items" => SelfAction::RestoreItems(reference),
-                    _ => unreachable!(),
+                if method_kind == "save_items" {
+                    SelfAction::SaveItems(reference)
+                } else {
+                    SelfAction::RestoreItems(reference)
                 }
             }
             "remove_preserving_items" => {
@@ -142,7 +142,9 @@ impl Parser {
             }
             "clear_items" => SelfAction::ClearItems,
             "remove" => SelfAction::Remove,
-            _ => unreachable!(),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         self.expect(TokenKind::RightParen, "self 方法缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "self 方法调用后需要 `;`")?;
@@ -193,7 +195,9 @@ impl Parser {
                 };
                 StatementKind::EffectClear { target, effect }
             }
-            _ => unreachable!(),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         self.expect(TokenKind::RightParen, "effect 调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "effect 调用后需要 `;`")?;

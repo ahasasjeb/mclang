@@ -117,7 +117,9 @@ impl Parser {
                         display_slot = Some(value);
                         display_slot_span = Some(span);
                     }
-                    _ => unreachable!("objective_property 只返回已知属性"),
+                    unknown => {
+                        return Err(self.unsupported_keyword(unknown));
+                    }
                 }
                 self.expect(TokenKind::Semicolon, "目标属性后需要 `;`")?;
             }

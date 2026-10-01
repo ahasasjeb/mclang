@@ -544,26 +544,25 @@ pub(crate) const KEYWORDS: &[Keyword] = &[
     },
 ];
 
-/// 函数属性的规范英文写法与中文别名，`@` 之后使用。
-pub(crate) const ATTRIBUTES: &[Keyword] = &[
-    Keyword {
-        english: "load",
-        chinese: "加载",
-    },
-    Keyword {
-        english: "tick",
-        chinese: "每刻",
-    },
-    Keyword {
-        english: "entity",
-        chinese: "实体",
-    },
-    Keyword {
-        english: "player",
-        chinese: "玩家",
-    },
-    Keyword {
-        english: "non_player",
-        chinese: "非玩家",
-    },
-];
+// 属性的展示信息与 AST 值从同一张表派生，不再手工同步两份分派。
+macro_rules! attributes {
+    ($($variant:ident => $english:literal, $chinese:literal;)*) => {
+        pub(crate) const ATTRIBUTES: &[Keyword] = &[
+            $(Keyword { english: $english, chinese: $chinese },)*
+        ];
+        pub(crate) fn attribute_word(value: &str) -> Option<crate::ast::Attribute> {
+            match value {
+                $($english | $chinese => Some(crate::ast::Attribute::$variant),)*
+                _ => None,
+            }
+        }
+    };
+}
+
+attributes! {
+    Load => "load", "加载";
+    Tick => "tick", "每刻";
+    Entity => "entity", "实体";
+    Player => "player", "玩家";
+    NonPlayer => "non_player", "非玩家";
+}

@@ -179,11 +179,6 @@ pub fn translate_project(source: &Path, language: KeywordLanguage) -> Result<usi
     let changed = pending.len();
     // 先检查整批目标，避免后面的只读文件或权限错误让前面的文件提前改变。
     for (path, _, _) in &pending {
-        let metadata =
-            fs::metadata(path).map_err(|error| format!("无法读取 {}：{error}", path.display()))?;
-        if metadata.permissions().readonly() {
-            return Err(format!("无法写入 {}：文件为只读", path.display()));
-        }
         fs::OpenOptions::new()
             .write(true)
             .open(path)

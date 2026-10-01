@@ -9,6 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
+use serde::Deserialize;
 use serde_json::Value;
 
 /// 当前随附的版本标识。
@@ -22,7 +23,7 @@ static SNAPSHOT: Snapshot = Snapshot {
 };
 
 /// 槽位清单：单槽、范围槽（前缀 + 数量）与多槽集合。
-#[derive(Default)]
+#[derive(Default, Deserialize)]
 pub struct Slots {
     single: BTreeSet<String>,
     ranges: BTreeMap<String, usize>,
@@ -39,28 +40,6 @@ impl Slots {
                         .is_ok_and(|index| index < *count && index.to_string() == suffix)
                 })
             })
-    }
-    fn from_value(value: Option<&Value>) -> Self {
-        let Some(object) = value.and_then(Value::as_object) else {
-            return Self::default();
-        };
-        let ranges = object
-            .get("ranges")
-            .and_then(Value::as_object)
-            .map(|ranges| {
-                ranges
-                    .iter()
-                    .filter_map(|(prefix, count)| {
-                        count.as_u64().map(|count| (prefix.clone(), count as usize))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        Self {
-            single: string_set(object.get("single")),
-            ranges,
-            multi: string_set(object.get("multi")),
-        }
     }
 
     /// 某个槽位名是否在本版本的槽位表里。
@@ -103,6 +82,7 @@ pub struct Snapshot {
     triggers: OnceLock<TriggerSnapshot>,
 }
 
+#[derive(Deserialize)]
 struct RegistrySnapshot {
     enchantment_max_levels: BTreeMap<String, u64>,
     registries: BTreeMap<String, BTreeSet<String>>,
@@ -111,14 +91,17 @@ struct RegistrySnapshot {
     slots: Slots,
 }
 
+#[derive(Deserialize)]
 struct EnumSnapshot {
     enums: BTreeMap<String, Vec<String>>,
 }
 
+#[derive(Deserialize)]
 struct CommandSnapshot {
     commands: BTreeMap<String, Value>,
 }
 
+#[derive(Deserialize)]
 struct TriggerSnapshot {
     triggers: BTreeMap<String, BTreeMap<String, String>>,
 }
@@ -256,131 +239,33 @@ impl Snapshot {
 
 impl RegistrySnapshot {
     fn load() -> Self {
-        let registries = parse_json(include_str!("../../data/version/26.3/registries.json"));
-        Self {
-            enchantment_max_levels: serde_json::from_value(
-                registries
-                    .get("enchantment_max_levels")
-                    .cloned()
-                    .unwrap_or_else(|| serde_json::json!({})),
-            )
-            .expect("valid enchantment level snapshot"),
-            registries: object_sets(registries.get("registries")),
-            resource_kinds: string_set(registries.get("resource_kinds")),
-            tag_registries: string_set(registries.get("tag_registries")),
-            slots: Slots::from_value(registries.get("slots")),
-        }
+        serde_json::from_str(include_str!("../../data/version/26.3/registries.json"))
+            .expect("registries.json 必须符合注册表快照结构")
     }
 }
 
 impl EnumSnapshot {
     fn load() -> Self {
-        let enums = parse_json(include_str!("../../data/version/26.3/enums.json"));
-        Self {
-            enums: object_arrays(enums.get("enums")),
-        }
+        serde_json::from_str(include_str!("../../data/version/26.3/enums.json"))
+            .expect("enums.json 必须符合枚举快照结构")
     }
 }
 
 impl CommandSnapshot {
     fn load() -> Self {
-        let commands = parse_json(include_str!("../../data/version/26.3/commands.json"));
-        Self {
-            commands: commands
-                .get("commands")
-                .and_then(Value::as_object)
-                .map(|object| {
-                    object
-                        .iter()
-                        .map(|(name, node)| (name.clone(), node.clone()))
-                        .collect()
-                })
-                .unwrap_or_default(),
-        }
+        serde_json::from_str(include_str!("../../data/version/26.3/commands.json"))
+            .expect("commands.json 必须符合命令快照结构")
     }
 }
 
 impl TriggerSnapshot {
     fn load() -> Self {
-        let triggers = parse_json(include_str!(
+        serde_json::from_str(include_str!(
             "../../data/version/26.3/advancement_triggers.json"
-        ));
-        Self {
-            triggers: object_maps(triggers.get("triggers")),
-        }
+        ))
+        .expect("advancement_triggers.json 必须符合触发器快照结构")
     }
 }
-
-fn parse_json(text: &str) -> Value {
-    serde_json::from_str(text).expect("版本快照必须是合法 JSON")
-}
-
-fn object_sets(value: Option<&Value>) -> BTreeMap<String, BTreeSet<String>> {
-    value
-        .and_then(Value::as_object)
-        .map(|object| {
-            object
-                .iter()
-                .map(|(key, value)| (key.clone(), string_set(Some(value))))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn object_arrays(value: Option<&Value>) -> BTreeMap<String, Vec<String>> {
-    value
-        .and_then(Value::as_object)
-        .map(|object| {
-            object
-                .iter()
-                .map(|(key, value)| {
-                    let values = value
-                        .as_array()
-                        .map(|values| {
-                            values
-                                .iter()
-                                .filter_map(|value| value.as_str().map(str::to_string))
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    (key.clone(), values)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn object_maps(value: Option<&Value>) -> BTreeMap<String, BTreeMap<String, String>> {
-    value
-        .and_then(Value::as_object)
-        .map(|object| {
-            object
-                .iter()
-                .filter_map(|(key, value)| {
-                    let inner = value.as_object()?;
-                    let map = inner
-                        .iter()
-                        .filter_map(|(key, value)| Some((key.clone(), value.as_str()?.to_owned())))
-                        .collect();
-                    Some((key.clone(), map))
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn string_set(value: Option<&Value>) -> BTreeSet<String> {
-    value
-        .and_then(Value::as_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(|value| value.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 fn namespace_of(id: &str) -> &str {
     id.split_once(':')
         .map(|(namespace, _)| namespace)
@@ -451,4 +336,26 @@ fn edit_distance(
         std::mem::swap(previous, current);
     }
     previous[right.len()]
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+
+    #[test]
+    fn missing_and_malformed_snapshot_fields_are_rejected() {
+        assert!(serde_json::from_str::<RegistrySnapshot>("{}").is_err());
+        assert!(serde_json::from_str::<EnumSnapshot>(r#"{"enums":{"gamemode":[1]}}"#).is_err());
+        assert!(serde_json::from_str::<CommandSnapshot>(r#"{"commands":[]}"#).is_err());
+        assert!(
+            serde_json::from_str::<TriggerSnapshot>(r#"{"triggers":{"tick":{"player":0}}}"#)
+                .is_err()
+        );
+        assert!(
+            serde_json::from_str::<Slots>(r#"{"single":[],"multi":[],"ranges":{"hotbar.":-1}}"#)
+                .is_err()
+        );
+        // Metadata may evolve independently; all semantic fields remain mandatory.
+        assert!(serde_json::from_str::<EnumSnapshot>(r#"{"source":"test","enums":{}}"#).is_ok());
+    }
 }

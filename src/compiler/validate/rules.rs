@@ -162,3 +162,14 @@ pub(super) fn function_context(function: &Function) -> ExecutionContext {
         ExecutionContext::None
     }
 }
+
+pub(super) fn valid_uuid(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(index, byte)| {
+            if [8, 13, 18, 23].contains(&index) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
+}

@@ -175,7 +175,9 @@ impl Parser {
                         self.expect(TokenKind::Comma, "filtered 后需要 `,` 和方块谓词")?;
                         CloneFilter::Filtered(self.block_state_value("clone 的方块谓词")?)
                     }
-                    _ => unreachable!("clone_filter 只返回 replace、masked、filtered"),
+                    unknown => {
+                        return Err(self.unsupported_keyword(unknown));
+                    }
                 });
                 continue;
             }
@@ -284,7 +286,9 @@ impl Parser {
                     strict: options.strict,
                 }
             }
-            _ => unreachable!("place_method 只返回 feature、jigsaw、structure、template"),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         self.expect(TokenKind::RightParen, "place 调用缺少 `)`")?;
         self.expect(TokenKind::Semicolon, "place 调用后需要 `;`")?;

@@ -165,7 +165,9 @@ impl Parser {
                     entity_type_span,
                 }
             }
-            _ => unreachable!("execute_clause 与解析分支不同步"),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         Ok(ExecuteClause {
             kind,
@@ -322,7 +324,9 @@ impl Parser {
                     scale,
                 })
             }
-            _ => unreachable!("store_method 只返回 result、success、data"),
+            unknown => {
+                return Err(self.unsupported_keyword(unknown));
+            }
         };
         Ok(ExecuteClause {
             kind,

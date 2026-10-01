@@ -15,11 +15,6 @@ impl Parser {
     }
 
     pub(super) fn test_command(&mut self, method: &str) -> Result<TestCommand, Diagnostic> {
-        let method = match method {
-            "运行测试" => "run",
-            "停止测试" => "stop",
-            other => other,
-        };
         Ok(match method {
             "run" | "runthese" | "runclosest" | "runthat" | "runfailed" => {
                 self.test_run_command(method)?

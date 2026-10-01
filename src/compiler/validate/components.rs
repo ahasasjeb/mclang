@@ -84,7 +84,7 @@ pub(super) fn validate_component(
                     component.span,
                     diagnostics,
                 );
-                if !valid_uuid(uuid) {
+                if !super::rules::valid_uuid(uuid) {
                     diagnostics.push(Diagnostic::new(
                         format!("show_entity 的 `{uuid}` 不是有效的 UUID"),
                         component.span,
@@ -255,13 +255,16 @@ pub(super) fn validate_data_nbt_source(
     ctx: ValidationContext<'_, '_>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    validate_nbt_source(source, span, ctx, diagnostics);
     if let NbtComponentSource::Entity(holder) = source {
-        match holder {
-            Holder::Origin => diagnostics.push(Diagnostic::new(
+        if matches!(holder, Holder::Origin) {
+            diagnostics.push(Diagnostic::new(
                 "data 实体参数不接受 origin；请在 execute on origin 块中使用 self",
                 span,
-            )),
+            ));
+            return;
+        }
+        super::statements::validate_holder(holder, span, ctx, diagnostics);
+        match holder {
             Holder::Query(name, query_span)
                 if ctx
                     .symbols
@@ -274,8 +277,10 @@ pub(super) fn validate_data_nbt_source(
                     *query_span,
                 ));
             }
-            Holder::SelfEntity | Holder::Query(_, _) => {}
+            Holder::SelfEntity | Holder::Origin | Holder::Query(_, _) => {}
         }
+    } else {
+        validate_nbt_source(source, span, ctx, diagnostics);
     }
 }
 
@@ -291,7 +296,10 @@ pub(super) fn validate_writable_data_nbt_target(
         return;
     };
     match holder {
-        Holder::SelfEntity if ctx.context != crate::compiler::types::ExecutionContext::Mob => {
+        Holder::SelfEntity
+            if ctx.context.is_entity()
+                && ctx.context != crate::compiler::types::ExecutionContext::Mob =>
+        {
             diagnostics.push(Diagnostic::new(
                 "data 写入实体 NBT 时 self 必须处于确定的非玩家上下文",
                 span,
@@ -383,17 +391,6 @@ fn validate_click(click: &ClickEvent, span: crate::ast::Span, diagnostics: &mut 
     }
 }
 
-fn valid_uuid(value: &str) -> bool {
-    value.len() == 36
-        && value.bytes().enumerate().all(|(index, byte)| {
-            if [8, 13, 18, 23].contains(&index) {
-                byte == b'-'
-            } else {
-                byte.is_ascii_hexdigit()
-            }
-        })
-}
-
 /// 16 个颜色名或 `#rrggbb`。
 pub(super) fn valid_component_color(color: &str) -> bool {
     super::rules::valid_text_color(color)
@@ -416,6 +413,4 @@ fn valid_translation_key(key: &str) -> bool {
 }
 
 /// 数据与文本组件共用的 NBT path 语法。
-pub(super) fn valid_nbt_component_path(path: &str) -> bool {
-    crate::ast::NbtPath::parse(path).is_ok()
-}
+pub(super) use super::rules::valid_nbt_path as valid_nbt_component_path;

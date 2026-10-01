@@ -108,9 +108,10 @@ impl Compiler<'_> {
             paths.push(function.name.clone());
             paths.extend(helpers);
             for path in paths {
-                let Some(commands) = self.functions.get_mut(&path) else {
-                    continue;
-                };
+                let commands = self
+                    .functions
+                    .get_mut(&path)
+                    .expect("函数和辅助函数在宏处理前已经生成");
                 for command in commands {
                     for call in &helper_calls {
                         if command.ends_with(call) {

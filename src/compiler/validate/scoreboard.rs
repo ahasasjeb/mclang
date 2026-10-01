@@ -80,9 +80,7 @@ fn validate_number_format(
     match format {
         ScoreNumberFormat::Fixed(component) => validate_component(component, ctx, diagnostics),
         ScoreNumberFormat::Styled(style) => {
-            if !serde_json::from_str::<serde_json::Value>(style)
-                .is_ok_and(|value| value.is_object())
-            {
+            if !parse_style(style, ctx.symbols.style_json) {
                 diagnostics.push(Diagnostic::new(
                     "styled 需要 JSON 样式对象，例如 `\"{\\\"color\\\":\\\"red\\\"}\"`",
                     span,
@@ -91,4 +89,17 @@ fn validate_number_format(
         }
         ScoreNumberFormat::Reset | ScoreNumberFormat::Blank => {}
     }
+}
+
+pub(super) fn parse_style(style: &str, cache: &crate::compiler::types::StyleCache) -> bool {
+    let mut cache = cache.borrow_mut();
+    if let Some(value) = cache.get(style) {
+        return value.is_some();
+    }
+    let value = serde_json::from_str::<serde_json::Value>(style)
+        .ok()
+        .filter(|value| value.is_object());
+    let valid = value.is_some();
+    cache.insert(style.to_owned(), value);
+    valid
 }
