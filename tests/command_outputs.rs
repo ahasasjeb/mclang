@@ -204,7 +204,10 @@ fn native_command_shapes_and_macro_forwarding() {
     );
     let helper = files(&output)
         .into_iter()
-        .filter(|(path, _)| path.to_string_lossy().contains("__mcl\\welcome"))
+        .filter(|(path, _)| {
+            path.parent()
+                .is_some_and(|parent| parent.ends_with(Path::new("__mcl").join("welcome")))
+        })
         .map(|(_, bytes)| String::from_utf8(bytes).unwrap())
         .find(|source| source.contains("{\"label\":\"$(label)\",\"x\":$(x),\"z\":$(z)}"))
         .expect("宏循环辅助函数必须转发参数");
