@@ -321,6 +321,12 @@ fn project_failures_leave_earlier_files_unchanged() {
     let mut readonly = permissions.clone();
     readonly.set_readonly(true);
     fs::set_permissions(&second, readonly).unwrap();
+    if fs::OpenOptions::new().write(true).open(&second).is_ok() {
+        // Elevated users can bypass Unix mode bits, so this environment cannot
+        // exercise the write-failure branch with a read-only file.
+        fs::set_permissions(&second, permissions).unwrap();
+        return;
+    }
     let result = translate_project(&directory, KeywordLanguage::Chinese);
     fs::set_permissions(&second, permissions).unwrap();
     assert!(result.is_err());

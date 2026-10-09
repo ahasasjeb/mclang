@@ -47,9 +47,14 @@ impl Compiler<'_> {
                 left,
                 operation,
                 right,
-            } if let Some(literal) = constant_value(right) => {
-                self.compile_expr_into(left, target, owner, commands);
-                self.apply_literal_operation(target, *operation, literal, commands);
+            } => {
+                if let Some(literal) = constant_value(right) {
+                    self.compile_expr_into(left, target, owner, commands);
+                    self.apply_literal_operation(target, *operation, literal, commands);
+                } else {
+                    let value = self.compile_expr(expression, owner, commands);
+                    store_value(self, target, value, commands);
+                }
             }
             ExprKind::ScoreQuery { target: query } => {
                 let objective = self.objective.clone();
